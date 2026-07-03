@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { handleCors, corsHeaders, jsonResponse, errorResponse } from "../_shared/cors.ts";
 import { getSupabaseClient } from "../_shared/supabase.ts";
+import { aiChatCompletion } from "../_shared/aiGateway.ts";
 
 interface MemoryItem {
   id: string;
@@ -128,9 +129,38 @@ async function callClaudeOpus(
   tools?: typeof MEMORY_TOOLS
 ): Promise<{ content: string; tool_use?: Array<{ name: string; input: unknown }> }> {
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-  
+
   if (!apiKey) {
-    throw new Error("ANTHROPIC_API_KEY not configured");
+    // Fallback: run synthesis on the default AI gateway (Gemini) with the
+    // same tools translated to OpenAI function-calling format, and map the
+    // response back to the Anthropic-style shape callers expect.
+    console.log("[memory-synthesize] No ANTHROPIC_API_KEY, using AI gateway fallback");
+    const openAiTools = (tools ?? []).map((t) => ({
+      type: "function",
+      function: { name: t.name, description: t.description, parameters: t.input_schema },
+    }));
+    const response = await aiChatCompletion({
+      model: "google/gemini-2.5-pro",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      tools: openAiTools.length > 0 ? openAiTools : undefined,
+      stream: false,
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`AI gateway synthesis failed: ${response.status} ${errorText.slice(0, 200)}`);
+    }
+    const data = await response.json();
+    const message = data.choices?.[0]?.message;
+    return {
+      content: message?.content || "",
+      tool_use: (message?.tool_calls || []).map((tc: { function?: { name?: string; arguments?: string } }) => ({
+        name: tc.function?.name || "",
+        input: (() => { try { return JSON.parse(tc.function?.arguments || "{}"); } catch { return {}; } })(),
+      })),
+    };
   }
 
   const body: Record<string, unknown> = {
@@ -286,7 +316,14 @@ Use detect_contradictions first, then resolve_conflict for each issue found.`;
 Memories to analyze:
 ${JSON.stringify(memories.map(m => ({ id: m.id, key: m.key, value: m.value, category: m.category })), null, 2)}
 
-Use identify_themes first, then extract_insight for each significant pattern you discover.`;
+Use identify_themes first, then extract_insight for each significant pattern you discover.
+
+Additionally, look for COMMUNICATION-STYLE observations — how the user prefers
+to be spoken to (e.g. "prefers short direct answers", "likes being called by
+nickname", "enjoys humor", "dislikes emoji", "responds well to follow-up
+questions"). For each one, call extract_insight with an insight_key prefixed
+"style_" (e.g. "style_prefers_short_answers") — these are stored separately
+and shape Atlas's tone in future conversations.`;
         break;
 
       case "prune":
@@ -376,16 +413,21 @@ Be conservative - when in doubt, keep the memory.`;
                 confidence: number;
               };
               
+              // style_ insights feed the Communication Preferences block of
+              // the chat system prompt (category communication_style)
+              const isStyle = input.insight_key.startsWith("style_");
               await supabase.from("ai_memory").insert({
                 user_id: userId,
-                key: `insight_${input.insight_key}`,
-                value: { 
-                  insight: input.insight_value, 
-                  confidence: input.confidence,
-                  sources: input.supporting_memories,
-                  extracted_at: new Date().toISOString()
-                },
-                category: "insights",
+                key: isStyle ? input.insight_key : `insight_${input.insight_key}`,
+                value: isStyle
+                  ? input.insight_value
+                  : {
+                      insight: input.insight_value,
+                      confidence: input.confidence,
+                      sources: input.supporting_memories,
+                      extracted_at: new Date().toISOString()
+                    },
+                category: isStyle ? "communication_style" : "insights",
                 memory_type: "insight",
                 importance: Math.min(10, Math.round(8 * input.confidence)),
               });

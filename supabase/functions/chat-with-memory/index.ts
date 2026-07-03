@@ -200,7 +200,9 @@ function buildPersonalizedPrompt(
   upcomingEvents: LifeEvent[],
   recentEvents: LifeEvent[],
   knowledgeBank: KnowledgeEntry[],
-  hasTools: boolean
+  hasTools: boolean,
+  styleNotes: Array<{ key: string; value: unknown }> = [],
+  conversationSummaries: Array<{ key: string; value: unknown; created_at: string }> = []
 ): string {
   const userName = profile?.nickname || profile?.first_name || "there";
   const timeOfDay = profile?.timezone ? getTimeOfDay(profile.timezone) : "day";
@@ -215,6 +217,16 @@ function buildPersonalizedPrompt(
   let knowledgeContext = "";
   if (knowledgeBank.length > 0) {
     knowledgeContext = `\n## Knowledge Bank (Things You've Learned)\n${knowledgeBank.map(k => `- [${k.category}] ${k.topic}: ${JSON.stringify(k.content)}`).join("\n")}`;
+  }
+
+  let styleContext = "";
+  if (styleNotes.length > 0) {
+    styleContext = `\n## Communication Preferences You've Learned\nAdapt how you talk based on these observations:\n${styleNotes.map(s => `- ${s.key}: ${JSON.stringify(s.value)}`).join("\n")}`;
+  }
+
+  let summaryContext = "";
+  if (conversationSummaries.length > 0) {
+    summaryContext = `\n## Recent Conversations (for continuity — reference naturally, don't recite)\n${conversationSummaries.map(s => `- ${new Date(s.created_at).toLocaleDateString()}: ${JSON.stringify(s.value)}`).join("\n")}`;
   }
 
   let eventsContext = "";
@@ -275,6 +287,8 @@ ${isBirthdayToday ? "- 🎂 TODAY IS THEIR BIRTHDAY! Wish them happy birthday wa
 - Emoji occasionally but don't overdo it
 ${toolInstructions}
 ${memoryContext}
+${styleContext}
+${summaryContext}
 ${knowledgeContext}
 ${eventsContext}
 
@@ -501,6 +515,55 @@ async function triggerKnowledgeExtraction(
   }
 }
 
+// Summarize longer conversations into ai_memory (category conversation_summary)
+// so the next chat can pick up where this one left off. Cheap model, one call,
+// fire-and-forget — never blocks the response stream.
+async function summarizeConversation(
+  supabase: any,
+  userId: string,
+  conversationId: string | null,
+  messages: Array<{ role: string; content: string }>
+) {
+  try {
+    if (messages.length < 10) return;
+
+    const transcript = messages
+      .slice(-30)
+      .map(m => `${m.role}: ${String(m.content).slice(0, 400)}`)
+      .join("\n");
+
+    const response = await aiChatCompletion({
+      model: "google/gemini-2.5-flash-lite",
+      messages: [
+        {
+          role: "system",
+          content: "Summarize this conversation in 2-3 sentences: main topics, decisions made, and anything the user said they'd do next. Output only the summary.",
+        },
+        { role: "user", content: transcript },
+      ],
+      stream: false,
+    });
+    if (!response.ok) return;
+    const data = await response.json();
+    const summary = data.choices?.[0]?.message?.content?.trim();
+    if (!summary) return;
+
+    const key = `conversation_${conversationId || new Date().toISOString().slice(0, 10)}`;
+    await supabase.from("ai_memory").upsert({
+      user_id: userId,
+      key,
+      value: summary,
+      category: "conversation_summary",
+      memory_type: "fact",
+      importance: 5,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id,key" });
+    console.log("[chat-with-memory] Stored conversation summary");
+  } catch (e) {
+    console.log("[chat-with-memory] Conversation summary failed:", e);
+  }
+}
+
 // Track session context for working memory
 async function trackSessionContext(
   supabase: any,
@@ -657,7 +720,7 @@ serve(async (req) => {
     const sessionId = req.headers.get("x-session-id") || `session_${Date.now()}`;
 
     // Parallelize all database queries for faster response - including session context
-    const [profileResult, memoriesResult, knowledgeResult, upcomingResult, recentResult, sessionContextResult] = await Promise.all([
+    const [profileResult, memoriesResult, knowledgeResult, upcomingResult, recentResult, sessionContextResult, styleResult, summaryResult] = await Promise.all([
       // Fetch user profile
       userId 
         ? supabase.from("profiles").select("first_name, nickname, birthday, timezone, communication_style").eq("user_id", userId).single()
@@ -695,6 +758,16 @@ serve(async (req) => {
       userId
         ? getSessionContext(supabase, userId, sessionId)
         : Promise.resolve(""),
+
+      // Learned communication-style observations (how the user likes Atlas to talk)
+      userId
+        ? supabase.from("ai_memory").select("key, value").eq("user_id", userId).eq("category", "communication_style").order("updated_at", { ascending: false }).limit(5)
+        : Promise.resolve({ data: [] }),
+
+      // Recent conversation summaries (cross-session continuity)
+      userId
+        ? supabase.from("ai_memory").select("key, value, created_at").eq("user_id", userId).eq("category", "conversation_summary").order("created_at", { ascending: false }).limit(3)
+        : Promise.resolve({ data: [] }),
     ]);
 
     // Get session context string
@@ -717,7 +790,9 @@ serve(async (req) => {
     const hasTools = enableTools && !teachingMode && (!!PERPLEXITY_API_KEY || true); // Disable tools in teaching mode for speed
     
     // Build personalized prompt and append session context (working memory)
-    let systemPrompt = systemPromptOverride || buildPersonalizedPrompt(profile, memories, upcomingEvents, recentEvents, knowledgeBank, hasTools);
+    const styleNotes = ((styleResult as { data?: Array<{ key: string; value: unknown }> }).data || []);
+    const conversationSummaries = ((summaryResult as { data?: Array<{ key: string; value: unknown; created_at: string }> }).data || []);
+    let systemPrompt = systemPromptOverride || buildPersonalizedPrompt(profile, memories, upcomingEvents, recentEvents, knowledgeBank, hasTools, styleNotes, conversationSummaries);
     
     // Inject session context into the system prompt for conversation continuity
     if (sessionContextStr) {
@@ -941,8 +1016,12 @@ serve(async (req) => {
     
     // Track session context for working memory (non-blocking)
     if (userId) {
-      trackSessionContext(supabase, userId, sessionId, messages).catch(e => 
+      trackSessionContext(supabase, userId, sessionId, messages).catch(e =>
         console.log("[chat-with-memory] Session tracking error:", e)
+      );
+      // Cross-session continuity: summarize longer conversations (non-blocking)
+      summarizeConversation(supabase, userId, conversationId, messages).catch(e =>
+        console.log("[chat-with-memory] Summary error:", e)
       );
     }
 
