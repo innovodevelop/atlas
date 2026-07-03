@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { handleCors, corsHeaders, jsonResponse, errorResponse } from "../_shared/cors.ts";
 import { getSupabaseClient } from "../_shared/supabase.ts";
+import { aiChatCompletion } from "../_shared/aiGateway.ts";
 
 interface ToolCallRequest {
   tool_name: string;
@@ -41,20 +42,13 @@ const AVAILABLE_TOOLS: Record<string, (args: Record<string, unknown>, supabase: 
     const PERPLEXITY_API_KEY = Deno.env.get("PERPLEXITY_API_KEY");
     
     if (!PERPLEXITY_API_KEY) {
-      console.log("[web_search] Perplexity API key not configured, falling back to Lovable AI");
-      const response = await fetch(PROVIDERS.lovable.url, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${Deno.env.get("LOVABLE_API_KEY")}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      console.log("[web_search] Perplexity API key not configured, falling back to AI gateway");
+      const response = await aiChatCompletion({
           model: PROVIDERS.lovable.models.fast,
           messages: [
             { role: "system", content: "You are a web search assistant. Provide accurate information." },
             { role: "user", content: `Search and summarize information about: ${query}` },
           ],
-        }),
       });
       const data = await response.json();
       return { 
@@ -101,19 +95,12 @@ const AVAILABLE_TOOLS: Record<string, (args: Record<string, unknown>, supabase: 
     const PERPLEXITY_API_KEY = Deno.env.get("PERPLEXITY_API_KEY");
     
     if (!PERPLEXITY_API_KEY) {
-      const response = await fetch(PROVIDERS.lovable.url, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${Deno.env.get("LOVABLE_API_KEY")}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      const response = await aiChatCompletion({
           model: PROVIDERS.lovable.models.standard,
           messages: [
             { role: "system", content: "You are an expert researcher. Provide comprehensive research findings." },
             { role: "user", content: `Research thoroughly: ${topic}\n\nProvide a ${depth} analysis.` },
           ],
-        }),
       });
       const data = await response.json();
       return { 

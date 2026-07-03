@@ -6,89 +6,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-// Generate embedding using Lovable AI
-async function generateEmbedding(text: string): Promise<number[]> {
-  if (!LOVABLE_API_KEY) {
-    throw new Error("LOVABLE_API_KEY not configured");
-  }
-
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
-      messages: [
-        {
-          role: "system",
-          content: `You are an embedding generator. Given text, output ONLY a JSON array of exactly 768 floating point numbers between -1 and 1 that represent the semantic meaning of the text. The numbers should capture:
-- Main topics and concepts (positions 0-255)
-- Sentiment and tone (positions 256-383)
-- Entities and specifics (positions 384-511)
-- Context and relationships (positions 512-767)
-Output ONLY the JSON array, no other text.`
-        },
-        {
-          role: "user",
-          content: text.slice(0, 2000)
-        }
-      ],
-      temperature: 0,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Embedding generation failed: ${response.status}`);
-  }
-
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content || "";
-  
-  try {
-    const jsonMatch = content.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
-      throw new Error("No JSON array found");
-    }
-    const embedding = JSON.parse(jsonMatch[0]);
-    
-    if (!Array.isArray(embedding) || embedding.length !== 768) {
-      throw new Error(`Invalid embedding length: ${embedding.length}`);
-    }
-    
-    return embedding;
-  } catch (e) {
-    console.error("Parse error, using fallback:", e);
-    return generateFallbackEmbedding(text);
-  }
-}
-
-function generateFallbackEmbedding(text: string): number[] {
-  const embedding: number[] = new Array(768).fill(0);
-  const words = text.toLowerCase().split(/\s+/);
-  
-  for (let i = 0; i < words.length; i++) {
-    const word = words[i];
-    for (let j = 0; j < word.length; j++) {
-      const idx = (word.charCodeAt(j) * (i + 1) * (j + 1)) % 768;
-      embedding[idx] = Math.sin(word.charCodeAt(j) * (j + 1)) * 0.5 + 0.5;
-    }
-  }
-  
-  const magnitude = Math.sqrt(embedding.reduce((sum, v) => sum + v * v, 0));
-  if (magnitude > 0) {
-    for (let i = 0; i < embedding.length; i++) {
-      embedding[i] /= magnitude;
-    }
-  }
-  
-  return embedding;
-}
+import { generateEmbedding } from "../_shared/aiGateway.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {

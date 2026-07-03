@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
 import { getSupabaseClient, getSupabaseUrl } from "../_shared/supabase.ts";
 import { isLovableAIEnabled } from "../_shared/providerStatus.ts";
+import { aiChatCompletion } from "../_shared/aiGateway.ts";
 
 interface AgentRunRequest {
   agent_id: string;
@@ -146,7 +147,7 @@ function getApiKey(provider: string): string {
       return Deno.env.get("PERPLEXITY_API_KEY") || "";
     case "lovable":
     default:
-      return Deno.env.get("LOVABLE_API_KEY") || "";
+      return Deno.env.get("LOVABLE_API_KEY") || Deno.env.get("GEMINI_API_KEY") || "";
   }
 }
 
@@ -216,14 +217,16 @@ async function callAI(
     body.tool_choice = "auto";
   }
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+  const response = provider === "lovable"
+    ? await aiChatCompletion(body)
+    : await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
 
   if (!response.ok) {
     const errorText = await response.text();

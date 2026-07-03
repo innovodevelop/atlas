@@ -9,6 +9,7 @@ import {
   updateLearningSession
 } from "../_shared/providerStatus.ts";
 import { isLovableAIEnabled } from "../_shared/providerStatus.ts";
+import { aiChatCompletion, hasAIKey } from "../_shared/aiGateway.ts";
 
 // Declare EdgeRuntime for background tasks
 declare const EdgeRuntime: {
@@ -225,7 +226,6 @@ async function researchTopic(
   description: string | null,
   depth: number,
   perplexityKey: string | null,
-  lovableKey: string,
   context: RootTopicContext | null
 ): Promise<{ findings: ResearchFinding[]; subTopics: SubTopic[]; citations: string[] }> {
   
@@ -336,16 +336,10 @@ Current research depth: ${depth} (0 = root topic, higher = more specific)`
     }
   }
 
-  // Fallback to Lovable AI with tool calling
-  console.log(`[atlas-research] Using Lovable AI for: ${topic}`);
-  
-  const response = await fetch(PROVIDERS.lovable.url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${lovableKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+  // Fallback to the default AI gateway with tool calling
+  console.log(`[atlas-research] Using AI gateway for: ${topic}`);
+
+  const response = await aiChatCompletion({
       model: PROVIDERS.lovable.model,
       messages: [
         {
@@ -405,7 +399,6 @@ CRITICAL RULES:
         }
       ],
       tool_choice: { type: "function", function: { name: "submit_research" } }
-    }),
   });
 
   if (!response.ok) {
@@ -451,13 +444,12 @@ serve(async (req) => {
       learningSessionId = null
     } = await req.json();
     
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const PERPLEXITY_API_KEY = Deno.env.get("PERPLEXITY_API_KEY");
     const SUPABASE_URL = getSupabaseUrl();
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    if (!LOVABLE_API_KEY) {
-      throw new Error("Missing required environment variables");
+    if (!hasAIKey()) {
+      throw new Error("No AI key configured (GEMINI_API_KEY)");
     }
 
     const supabase = getSupabaseClient();
@@ -566,7 +558,6 @@ serve(async (req) => {
         topicData.description,
         topicData.depth_level,
         PERPLEXITY_API_KEY || null,
-        LOVABLE_API_KEY,
         context
       );
 

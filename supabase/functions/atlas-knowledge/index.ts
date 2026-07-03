@@ -8,6 +8,7 @@ import {
   recordError
 } from "../_shared/providerStatus.ts";
 import { isLovableAIEnabled } from "../_shared/providerStatus.ts";
+import { aiChatCompletion, hasAIKey } from "../_shared/aiGateway.ts";
 
 interface KnowledgeExtraction {
   topic: string;
@@ -19,7 +20,6 @@ interface KnowledgeExtraction {
 // Extract knowledge using AI
 async function extractKnowledge(
   conversation: Array<{ role: string; content: string }>,
-  apiKey: string,
   supabase: ReturnType<typeof getSupabaseClient>
 ): Promise<KnowledgeExtraction[]> {
   const conversationText = conversation
@@ -28,13 +28,7 @@ async function extractKnowledge(
 
   const startTime = Date.now();
 
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+  const response = await aiChatCompletion({
       model: "google/gemini-2.5-flash",
       messages: [
         {
@@ -94,7 +88,6 @@ Return a JSON array of extractions. If nothing worth extracting, return an empty
         }
       ],
       tool_choice: { type: "function", function: { name: "store_knowledge" } }
-    }),
   });
 
   const responseTime = Date.now() - startTime;
@@ -145,10 +138,8 @@ serve(async (req) => {
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-
-    if (!LOVABLE_API_KEY) {
-      return errorResponse("Missing required environment variables", 500);
+    if (!hasAIKey()) {
+      return errorResponse("No AI key configured (GEMINI_API_KEY)", 500);
     }
 
     if (!conversation || !Array.isArray(conversation)) {
@@ -173,7 +164,7 @@ serve(async (req) => {
     console.log("[atlas-knowledge] Learning topic:", learningTopic || "general");
 
     // Extract knowledge using AI
-    const extractions = await extractKnowledge(conversation, LOVABLE_API_KEY, supabase);
+    const extractions = await extractKnowledge(conversation, supabase);
     console.log("[atlas-knowledge] Extracted", extractions.length, "knowledge entries");
 
     if (extractions.length === 0) {

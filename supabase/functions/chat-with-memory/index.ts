@@ -11,6 +11,7 @@ import {
   isProviderHealthy
 } from "../_shared/providerStatus.ts";
 import { isLovableAIEnabled } from "../_shared/providerStatus.ts";
+import { aiChatCompletion, hasAIKey } from "../_shared/aiGateway.ts";
 
 interface Memory {
   key: string;
@@ -610,12 +611,12 @@ serve(async (req) => {
 
   try {
     const { messages, userId, source = "text_chat", enableTools = true, teachingMode = false, systemPromptOverride } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const hasKey = hasAIKey();
     const PERPLEXITY_API_KEY = Deno.env.get("PERPLEXITY_API_KEY");
     const SUPABASE_URL = getSupabaseUrl();
     
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    if (!hasKey) {
+      throw new Error("No AI key configured (GEMINI_API_KEY)");
     }
 
     // Initialize Supabase client
@@ -726,13 +727,7 @@ serve(async (req) => {
       console.log("[chat-with-memory] Teaching mode: using fast path (no tool loop)");
       
       // Make a simple non-streaming request for teaching mode to get faster response
-      const teachResponse = await fetch(PROVIDERS.lovable.url, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      const teachResponse = await aiChatCompletion({
           model: PROVIDERS.lovable.model,
           messages: currentMessages,
           tools: [{
@@ -753,7 +748,6 @@ serve(async (req) => {
           }],
           tool_choice: "auto",
           stream: false,
-        }),
       });
 
       if (!teachResponse.ok) {
@@ -816,19 +810,12 @@ serve(async (req) => {
     while (maxToolIterations > 0) {
       console.log("[chat-with-memory] Making AI request, iteration:", 4 - maxToolIterations);
       
-      const checkResponse = await fetch(PROVIDERS.lovable.url, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      const checkResponse = await aiChatCompletion({
           model: PROVIDERS.lovable.model,
           messages: currentMessages,
           tools: hasTools ? ATLAS_TOOLS : undefined,
           tool_choice: hasTools ? "auto" : undefined,
           stream: false, // Non-streaming to check for tool calls
-        }),
       });
 
       if (!checkResponse.ok) {
@@ -909,17 +896,10 @@ serve(async (req) => {
     console.log("[chat-with-memory] Total citations collected:", allCitations.length);
 
     // Now stream the final response
-    const streamResponse = await fetch(PROVIDERS.lovable.url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
+    const streamResponse = await aiChatCompletion({
         model: PROVIDERS.lovable.model,
         messages: currentMessages,
         stream: true,
-      }),
     });
 
     if (!streamResponse.ok) {

@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
 import { getSupabaseClient } from "../_shared/supabase.ts";
+import { aiChatCompletion, hasAIKey } from "../_shared/aiGateway.ts";
 
 interface ValidationRequest {
   entryId: string;
@@ -128,8 +129,7 @@ async function validateWithClaude(
 
 // Validate with Gemini
 async function validateWithGemini(
-  entry: ValidationRequest,
-  lovableKey: string
+  entry: ValidationRequest
 ): Promise<ValidationResult> {
   const startTime = Date.now();
 
@@ -139,19 +139,12 @@ async function validateWithGemini(
       .replace("{content}", entry.content)
       .replace("{source}", entry.source || "unknown");
 
-    const response = await fetch(PROVIDERS.lovable.url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
+    const response = await aiChatCompletion({
         model: PROVIDERS.lovable.model,
         messages: [
           { role: "system", content: "You are a fact-checker. Always respond with valid JSON only." },
           { role: "user", content: prompt }
         ],
-      }),
     });
 
     if (!response.ok) {
@@ -347,11 +340,10 @@ serve(async (req) => {
     const { entries, immediate = false } = await req.json();
     
     const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const PERPLEXITY_API_KEY = Deno.env.get("PERPLEXITY_API_KEY");
 
-    if (!LOVABLE_API_KEY) {
-      return errorResponse("LOVABLE_API_KEY is required", 500);
+    if (!hasAIKey()) {
+      return errorResponse("No AI key configured (GEMINI_API_KEY)", 500);
     }
 
     const supabase = getSupabaseClient();
@@ -364,7 +356,7 @@ serve(async (req) => {
     const processEntry = async (entry: ValidationRequest) => {
       const validationPromises: Promise<ValidationResult>[] = [];
 
-      validationPromises.push(validateWithGemini(entry, LOVABLE_API_KEY!));
+      validationPromises.push(validateWithGemini(entry));
 
       if (ANTHROPIC_API_KEY) {
         validationPromises.push(validateWithClaude(entry, ANTHROPIC_API_KEY));
@@ -376,8 +368,7 @@ serve(async (req) => {
 
       if (validationPromises.length < 2) {
         validationPromises.push(validateWithGemini(
-          { ...entry, content: `STRICT VERIFICATION: ${entry.content}` },
-          LOVABLE_API_KEY!
+          { ...entry, content: `STRICT VERIFICATION: ${entry.content}` }
         ));
       }
 

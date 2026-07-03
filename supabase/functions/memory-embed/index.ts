@@ -6,36 +6,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-const AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
-
-// Generate embeddings using AI to create semantic representation
-async function generateEmbedding(text: string): Promise<number[]> {
-  // Use a simple approach: hash the text into a pseudo-embedding
-  // In production, you'd use a proper embedding model
-  const encoder = new TextEncoder();
-  const data = encoder.encode(text);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  
-  // Expand to 1536 dimensions (OpenAI embedding size)
-  const embedding: number[] = [];
-  for (let i = 0; i < 1536; i++) {
-    embedding.push((hashArray[i % 32] / 255) * 2 - 1);
-  }
-  
-  return embedding;
-}
+import { aiChatCompletion, generateEmbedding } from "../_shared/aiGateway.ts";
 
 // Use AI to extract semantic chunks from text
 async function extractChunks(text: string): Promise<string[]> {
-  const response = await fetch(AI_GATEWAY, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+  const response = await aiChatCompletion({
       model: "google/gemini-2.5-flash",
       messages: [
         {
@@ -44,7 +19,6 @@ async function extractChunks(text: string): Promise<string[]> {
         },
         { role: "user", content: text },
       ],
-    }),
   });
 
   if (!response.ok) {
