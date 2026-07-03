@@ -12,6 +12,7 @@ import {
 } from "../_shared/providerStatus.ts";
 import { isLovableAIEnabled } from "../_shared/providerStatus.ts";
 import { aiChatCompletion, hasAIKey } from "../_shared/aiGateway.ts";
+import { findOrCreateSession } from "../_shared/learningGuards.ts";
 
 interface Memory {
   key: string;
@@ -433,12 +434,13 @@ async function triggerKnowledgeExtraction(
   userId: string | null,
   source: string,
   supabase: any,
-  learningIntent: ReturnType<typeof detectLearningIntent>
+  learningIntent: ReturnType<typeof detectLearningIntent>,
+  conversationId: string | null
 ) {
   try {
     // Check if learning is enabled in system settings
     const learningSettings = await isLearningEnabled(supabase);
-    
+
     if (!learningSettings.enabled) {
       console.log("[chat-with-memory] Learning is disabled, skipping knowledge extraction");
       return;
@@ -457,9 +459,19 @@ async function triggerKnowledgeExtraction(
       return;
     }
 
-    // Log the learning session
+    // Containment: everything learned from this chat belongs to one session,
+    // scoped to the conversation and its topic budget.
+    const session = await findOrCreateSession(supabase, {
+      userId,
+      conversationId,
+      rootTopic: learningIntent.topic || "general",
+      triggerType: source === 'voice' ? 'voice' : 'text',
+    });
+
+    // Audit log (atlas_learning_logs)
     await logLearningSession(supabase, {
       userId: userId || undefined,
+      sessionId: session?.id,
       triggerType: source === 'voice' ? 'voice' : 'text',
       intentDetected: learningIntent.intentType,
       topicRequested: learningIntent.topic,
@@ -467,19 +479,21 @@ async function triggerKnowledgeExtraction(
       maxTopicsAllowed: learningSettings.maxTopics,
     });
 
-    console.log(`[chat-with-memory] Triggering knowledge extraction for topic: ${learningIntent.topic || 'general'}`);
+    console.log(`[chat-with-memory] Triggering knowledge extraction for topic: ${learningIntent.topic || 'general'} (session: ${session?.id})`);
 
     fetch(`${supabaseUrl}/functions/v1/atlas-knowledge`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ 
-        conversation, 
-        userId, 
+      body: JSON.stringify({
+        conversation,
+        userId,
         source,
         learningTopic: learningIntent.topic,
         maxTopics: learningSettings.maxTopics,
+        learningSessionId: session?.id ?? null,
+        conversationId,
       }),
     }).catch(e => console.log("[chat-with-memory] Knowledge extraction trigger failed:", e));
   } catch (e) {
@@ -610,7 +624,7 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, userId, source = "text_chat", enableTools = true, teachingMode = false, systemPromptOverride } = await req.json();
+    const { messages, userId, source = "text_chat", enableTools = true, teachingMode = false, systemPromptOverride, conversationId = null } = await req.json();
     const hasKey = hasAIKey();
     const PERPLEXITY_API_KEY = Deno.env.get("PERPLEXITY_API_KEY");
     const SUPABASE_URL = getSupabaseUrl();
@@ -922,7 +936,7 @@ serve(async (req) => {
 
     // Trigger knowledge extraction ONLY if learning intent detected and learning is enabled
     if (messages.length >= 2 && SUPABASE_URL && learningIntent.hasIntent) {
-      triggerKnowledgeExtraction(SUPABASE_URL, messages, userId, source, supabase, learningIntent);
+      triggerKnowledgeExtraction(SUPABASE_URL, messages, userId, source, supabase, learningIntent, conversationId);
     }
     
     // Track session context for working memory (non-blocking)

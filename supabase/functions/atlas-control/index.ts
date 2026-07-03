@@ -177,39 +177,22 @@ serve(async (req) => {
           maxTopicsAllowed: learningConfig.maxTopics,
         });
 
-        // Trigger research if topic provided
+        // Trigger research if topic provided. Route through atlas-research's
+        // "create" action, which owns session creation, semantic dedup and
+        // the containment limits — never insert research topics directly.
         if (topic) {
           const supabaseUrl = getSupabaseUrl();
-          
-          // Create research topic
-          const { data: researchTopic, error: topicError } = await supabase
-            .from('atlas_research_topics')
-            .insert({
+          fetch(`${supabaseUrl}/functions/v1/atlas-research`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'create',
               topic,
               description: `User-requested learning: ${topic}`,
-              status: 'pending',
-              user_id: userId || null,
-              auto_generated: false,
-              priority: 10,
-              depth_level: 0,
-            })
-            .select('id')
-            .single();
-
-          if (topicError) {
-            console.error('[atlas-control] Failed to create research topic:', topicError);
-          } else if (researchTopic) {
-            // Trigger research (fire and forget)
-            fetch(`${supabaseUrl}/functions/v1/atlas-research`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                topicId: researchTopic.id,
-                action: 'start',
-                maxDepth: learningConfig.maxDepth,
-              }),
-            }).catch(e => console.error('[atlas-control] Failed to trigger research:', e));
-          }
+              userId,
+              autoDeepen: true,
+            }),
+          }).catch(e => console.error('[atlas-control] Failed to trigger research:', e));
         }
 
         return jsonResponse({

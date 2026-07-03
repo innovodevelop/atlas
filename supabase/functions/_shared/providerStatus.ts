@@ -229,34 +229,38 @@ export function detectLearningIntent(content: string): {
   topic?: string;
   intentType?: 'learn' | 'research' | 'remember' | 'teach';
 } {
-  const lowerContent = content.toLowerCase();
+  // Patterns are anchored to the start of the request (optionally prefixed by
+  // an address like "Atlas," or a politeness marker) so that a passing mention
+  // of "research" mid-sentence no longer triggers background learning. Only
+  // explicit asks count.
+  const PREFIX = String.raw`^(?:atlas[,!]?\s+)?(?:please\s+)?(?:can you\s+|could you\s+|will you\s+)?`;
 
   const learningPatterns = [
-    { regex: /learn(?:ing)?\s+(?:about|more about)\s+(.+)/i, type: 'learn' as const },
-    { regex: /research\s+(.+)/i, type: 'research' as const },
-    { regex: /find out (?:about|more about)\s+(.+)/i, type: 'research' as const },
-    { regex: /look into\s+(.+)/i, type: 'research' as const },
-    { regex: /teach you (?:about\s+)?(.+)/i, type: 'teach' as const },
-    { regex: /remember (?:that\s+)?(.+)/i, type: 'remember' as const },
-    { regex: /what do you know about\s+(.+)/i, type: 'learn' as const },
-    { regex: /tell me everything about\s+(.+)/i, type: 'research' as const },
+    { regex: new RegExp(PREFIX + String.raw`learn\s+(?:about|more about)\s+(.+)`, 'i'), type: 'learn' as const },
+    { regex: new RegExp(PREFIX + String.raw`research\s+(.+)`, 'i'), type: 'research' as const },
+    { regex: new RegExp(PREFIX + String.raw`find out (?:about|more about)\s+(.+)`, 'i'), type: 'research' as const },
+    { regex: new RegExp(PREFIX + String.raw`look into\s+(.+)`, 'i'), type: 'research' as const },
+    { regex: new RegExp(PREFIX + String.raw`(?:i(?:'d| would) like to |let me )?teach you (?:about\s+)?(.+)`, 'i'), type: 'teach' as const },
+    { regex: new RegExp(PREFIX + String.raw`remember (?:that\s+)?(.+)`, 'i'), type: 'remember' as const },
+    { regex: new RegExp(PREFIX + String.raw`tell me everything about\s+(.+)`, 'i'), type: 'research' as const },
   ];
 
   for (const pattern of learningPatterns) {
     const match = content.match(pattern.regex);
     if (match) {
-      return {
-        hasIntent: true,
-        topic: match[1]?.trim(),
-        intentType: pattern.type,
-      };
+      const topic = match[1]?.trim();
+      // A topic of one throwaway word ("research it", "research this") is a
+      // conversational reference, not a research request.
+      const substantive = topic && topic.length >= 4 &&
+        !/^(it|this|that|them|those|these|stuff|things?)[.!?]?$/i.test(topic);
+      if (substantive) {
+        return {
+          hasIntent: true,
+          topic,
+          intentType: pattern.type,
+        };
+      }
     }
-  }
-
-  // Check for simple learning keywords
-  const simplePatterns = ['learn about', 'research', 'look up', 'find out about'];
-  if (simplePatterns.some(p => lowerContent.includes(p))) {
-    return { hasIntent: true };
   }
 
   return { hasIntent: false };

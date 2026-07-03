@@ -78,13 +78,13 @@ export const useAtlasResearch = () => {
     // Use the edge function to create and start research
     try {
       const { data, error } = await supabase.functions.invoke('atlas-research', {
-        body: { 
+        body: {
           action: 'create',
-          topic, 
+          topic,
           description,
           userId: user?.id,
           autoDeepen: true,
-          maxDepth: 3
+          // depth is decided server-side from atlas_system_settings
         },
       });
 

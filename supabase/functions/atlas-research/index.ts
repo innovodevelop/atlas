@@ -10,6 +10,17 @@ import {
 } from "../_shared/providerStatus.ts";
 import { isLovableAIEnabled } from "../_shared/providerStatus.ts";
 import { aiChatCompletion, hasAIKey } from "../_shared/aiGateway.ts";
+import {
+  findOrCreateSession,
+  isDuplicateTopic,
+  checkSessionBudget,
+  recordSessionCost,
+  completeSessionIfDone,
+} from "../_shared/learningGuards.ts";
+
+// Rough per-research-call cost in cents, accumulated against the session
+// budget. Deliberately conservative — sessions should end early, not late.
+const RESEARCH_COST_CENTS = 2;
 
 // Declare EdgeRuntime for background tasks
 declare const EdgeRuntime: {
@@ -433,16 +444,18 @@ serve(async (req) => {
   }
 
   try {
-    const { 
-      topicId, 
-      action, 
-      topic, 
-      description, 
-      userId, 
-      autoDeepen = true, 
-      maxDepth = 3,
+    const {
+      topicId,
+      action,
+      topic,
+      description,
+      userId,
+      autoDeepen = true,
+      conversationId = null,
       learningSessionId = null
     } = await req.json();
+    // NOTE: client-supplied maxDepth is intentionally ignored — the depth
+    // limit comes from atlas_system_settings only (see effectiveMaxDepth).
     
     const PERPLEXITY_API_KEY = Deno.env.get("PERPLEXITY_API_KEY");
     const SUPABASE_URL = getSupabaseUrl();
@@ -498,9 +511,9 @@ serve(async (req) => {
       );
     }
 
-    // Use settings-based max depth instead of hardcoded
-    const effectiveMaxDepth = Math.min(maxDepth, learningSettings.maxDepth);
-    console.log(`[atlas-research] Using max depth: ${effectiveMaxDepth} (settings: ${learningSettings.maxDepth}, requested: ${maxDepth})`);
+    // Single source of truth for depth: atlas_system_settings
+    const effectiveMaxDepth = learningSettings.maxDepth;
+    console.log(`[atlas-research] Using max depth from settings: ${effectiveMaxDepth}`);
 
     // Log provider being used
     console.log(`[atlas-research] Provider: ${PERPLEXITY_API_KEY && isPerplexityHealthy ? 'Perplexity sonar-pro' : 'Lovable AI (fallback)'}`);
@@ -516,6 +529,31 @@ serve(async (req) => {
 
       if (fetchError || !topicData) {
         throw new Error("Topic not found");
+      }
+
+      // Containment: research only runs inside an active, funded session
+      const sessionId = topicData.learning_session_id || learningSessionId;
+      if (!sessionId) {
+        await supabase
+          .from("atlas_research_topics")
+          .update({ status: "cancelled", updated_at: new Date().toISOString() })
+          .eq("id", topicId);
+        return new Response(
+          JSON.stringify({ success: false, reason: "no_learning_session" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const budgetCheck = await checkSessionBudget(supabase, sessionId);
+      if (!budgetCheck.ok) {
+        console.log(`[atlas-research] Session gate failed (${budgetCheck.reason}), cancelling topic`);
+        await supabase
+          .from("atlas_research_topics")
+          .update({ status: "cancelled", updated_at: new Date().toISOString() })
+          .eq("id", topicId);
+        return new Response(
+          JSON.stringify({ success: false, reason: budgetCheck.reason }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
 
       // Get or create root topic context
@@ -560,6 +598,9 @@ serve(async (req) => {
         PERPLEXITY_API_KEY || null,
         context
       );
+
+      // Charge the session for this research call
+      await recordSessionCost(supabase, sessionId, RESEARCH_COST_CENTS);
 
       // Count validated vs flagged findings
       const validatedFindings = findings.filter(f => f.confidence >= 0.6);
@@ -665,38 +706,65 @@ serve(async (req) => {
         }
       }
 
-      // Create sub-topics if auto-deepen is enabled and within depth limit
-      if (autoDeepen && topicData.depth_level < maxDepth && subTopics.length > 0) {
-        const subTopicEntries = subTopics.map(st => ({
-          parent_id: topicId,
-          user_id: topicData.user_id || null,
-          topic: st.topic,
-          description: st.description,
-          status: "queued",
-          depth_level: topicData.depth_level + 1,
-          priority: st.priority,
-          auto_generated: true,
-          findings: [],
-          sources: [],
-          root_topic_context: context ? {
-            ...context,
-            parent_chain: [...context.parent_chain, st.topic]
-          } : null,
-          learning_session_id: topicData.learning_session_id || learningSessionId
-        }));
+      // Deepen into sub-topics only while the session allows it: depth from
+      // settings, semantic dedup against existing knowledge, budget re-check,
+      // and at most 2 sub-topics per topic. The DB trigger enforces the same
+      // limits as a backstop, so a failed insert here is expected behavior,
+      // not an error.
+      if (autoDeepen && topicData.depth_level < effectiveMaxDepth && subTopics.length > 0) {
+        const postResearchBudget = await checkSessionBudget(supabase, sessionId);
+        if (!postResearchBudget.ok) {
+          console.log(`[atlas-research] Skipping sub-topics: ${postResearchBudget.reason}`);
+        } else {
+          const candidates = [...subTopics]
+            .sort((a, b) => b.priority - a.priority)
+            .slice(0, 2);
+          const freshTopics = [];
+          for (const st of candidates) {
+            if (await isDuplicateTopic(supabase, st.topic, topicData.user_id)) continue;
+            freshTopics.push(st);
+          }
 
-        const { data: createdSubTopics, error: subError } = await supabase
-          .from("atlas_research_topics")
-          .insert(subTopicEntries)
-          .select();
+          const subTopicEntries = freshTopics.map(st => ({
+            parent_id: topicId,
+            user_id: topicData.user_id || null,
+            topic: st.topic,
+            description: st.description,
+            status: "queued",
+            depth_level: topicData.depth_level + 1,
+            priority: st.priority,
+            auto_generated: true,
+            findings: [],
+            sources: [],
+            root_topic_context: context ? {
+              ...context,
+              parent_chain: [...context.parent_chain, st.topic]
+            } : null,
+            learning_session_id: sessionId,
+            conversation_id: topicData.conversation_id || conversationId
+          }));
 
-        if (subError) {
-          console.error("[atlas-research] Failed to create sub-topics:", subError);
-        } else if (createdSubTopics) {
-          console.log(`[atlas-research] Created ${createdSubTopics.length} sub-topics`);
+          let createdSubTopics: Array<{ id: string }> = [];
+          if (subTopicEntries.length > 0) {
+            // Insert one at a time so the session-limit trigger can reject
+            // individual rows without voiding the whole batch.
+            for (const entry of subTopicEntries) {
+              const { data: created, error: subError } = await supabase
+                .from("atlas_research_topics")
+                .insert(entry)
+                .select()
+                .single();
+              if (subError) {
+                console.log(`[atlas-research] Sub-topic rejected by session limits: ${subError.message}`);
+              } else if (created) {
+                createdSubTopics.push(created);
+              }
+            }
+          }
 
-          // Queue up research for sub-topics (process top priority first)
-          for (const subTopic of createdSubTopics.slice(0, 2)) {
+          console.log(`[atlas-research] Created ${createdSubTopics.length} sub-topics (of ${subTopics.length} suggested)`);
+
+          for (const subTopic of createdSubTopics) {
             EdgeRuntime.waitUntil(
               fetch(`${SUPABASE_URL}/functions/v1/atlas-research`, {
                 method: "POST",
@@ -708,14 +776,16 @@ serve(async (req) => {
                   topicId: subTopic.id,
                   action: "start",
                   autoDeepen: true,
-                  maxDepth,
-                  learningSessionId: topicData.learning_session_id || learningSessionId
+                  learningSessionId: sessionId
                 })
               }).catch(e => console.error("[atlas-research] Sub-topic research failed:", e))
             );
           }
         }
       }
+
+      // If nothing is left queued or running, the session is done
+      await completeSessionIfDone(supabase, sessionId);
 
       return new Response(
         JSON.stringify({ 
@@ -734,6 +804,37 @@ serve(async (req) => {
 
     // Create new research topic
     if (action === "create" || (!action && topic)) {
+      // Semantic dedup: don't re-research what Atlas already knows
+      if (await isDuplicateTopic(supabase, topic, userId)) {
+        console.log(`[atlas-research] Duplicate topic, skipping: ${topic}`);
+        return new Response(
+          JSON.stringify({ success: true, skipped: true, reason: "duplicate_topic" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Every root topic lives inside a session (find-or-create per
+      // conversation) — this is what scopes research to the current chat.
+      let session = null;
+      if (learningSessionId) {
+        const gate = await checkSessionBudget(supabase, learningSessionId);
+        if (gate.ok) session = { id: learningSessionId };
+      }
+      if (!session) {
+        session = await findOrCreateSession(supabase, {
+          userId,
+          conversationId,
+          rootTopic: topic,
+          triggerType: "text",
+        });
+      }
+      if (!session) {
+        return new Response(
+          JSON.stringify({ success: false, reason: "session_unavailable" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       // Extract context for new root topic
       const context = extractTopicContext(topic, description || null);
 
@@ -750,13 +851,19 @@ serve(async (req) => {
           findings: [],
           sources: [],
           root_topic_context: context,
-          learning_session_id: learningSessionId
+          learning_session_id: session.id,
+          conversation_id: conversationId
         })
         .select()
         .single();
 
       if (createError) {
-        throw new Error(`Failed to create topic: ${createError.message}`);
+        // Session limits rejected the topic — a contained no, not a failure
+        console.log(`[atlas-research] Topic rejected: ${createError.message}`);
+        return new Response(
+          JSON.stringify({ success: false, reason: "session_limit", detail: createError.message }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
 
       console.log(`[atlas-research] Created research topic: ${newTopic.id} with context: ${context.root_topic}`);
@@ -773,8 +880,8 @@ serve(async (req) => {
             topicId: newTopic.id,
             action: "start",
             autoDeepen,
-            maxDepth,
-            learningSessionId
+            learningSessionId: session.id,
+            conversationId
           })
         }).catch(e => console.error("[atlas-research] Research start failed:", e))
       );

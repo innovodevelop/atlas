@@ -122,7 +122,7 @@ serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   try {
-    const { conversation, userId, source = "conversation", learningTopic, maxTopics } = await req.json();
+    const { conversation, userId, source = "conversation", learningTopic, maxTopics, learningSessionId = null, conversationId = null } = await req.json();
 
     const supabase = getSupabaseClient();
 
@@ -186,6 +186,8 @@ serve(async (req) => {
         source: source,
         confidence: e.confidence,
         relevance_score: e.confidence,
+        learning_session_id: learningSessionId,
+        conversation_id: conversationId,
       }));
 
     if (entries.length > 0) {

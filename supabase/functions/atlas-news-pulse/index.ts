@@ -249,6 +249,22 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // News-pulse fed the research queue with up to 20 global topics per run —
+    // one of the two engines of the endless-research loop. Disabled unless
+    // explicitly re-enabled in settings.
+    const { data: settings } = await supabase
+      .from("atlas_system_settings")
+      .select("global_discovery_enabled")
+      .limit(1)
+      .maybeSingle();
+    if (!settings?.global_discovery_enabled) {
+      console.log("[news-pulse] global_discovery_enabled is false, skipping");
+      return new Response(
+        JSON.stringify({ success: true, disabled: true, newsCollected: 0 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     console.log("[news-pulse] Starting news collection...");
     console.log(`[news-pulse] Providers: NewsAPI=${!!NEWS_API_KEY}, Perplexity=${!!PERPLEXITY_API_KEY}, Firecrawl=${!!FIRECRAWL_API_KEY}`);
 

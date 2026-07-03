@@ -39,6 +39,22 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // Global gap-driven discovery is the engine of the old endless-research
+    // loop: it invents topics from the whole knowledge base, unscoped to any
+    // conversation. Disabled unless explicitly re-enabled in settings.
+    const { data: settings } = await supabase
+      .from("atlas_system_settings")
+      .select("global_discovery_enabled")
+      .limit(1)
+      .maybeSingle();
+    if (!settings?.global_discovery_enabled) {
+      console.log("[topic-discovery] global_discovery_enabled is false, skipping");
+      return new Response(
+        JSON.stringify({ success: true, disabled: true, topicsGenerated: 0 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     console.log("[topic-discovery] Analyzing knowledge base for gaps...");
 
     // Gather existing knowledge context

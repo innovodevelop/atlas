@@ -57,6 +57,9 @@ export const useUnifiedChat = ({
   // Refs for values that don't need to trigger re-renders
   const abortControllerRef = useRef<AbortController | null>(null);
   const messageBufferRef = useRef<string>('');
+  // Stable id for this conversation — the backend scopes learning/research
+  // sessions to it. Reset when the chat is cleared.
+  const conversationIdRef = useRef<string>(crypto.randomUUID());
 
   // Detect multiple card focuses from message content
   const detectCardFocus = useCallback((content: string) => {
@@ -178,8 +181,8 @@ export const useUnifiedChat = ({
         content: m.content,
       }));
 
-      const body = enableMemory 
-        ? { messages: chatMessages, userId, source, enableTools: true }
+      const body = enableMemory
+        ? { messages: chatMessages, userId, source, enableTools: true, conversationId: conversationIdRef.current }
         : { messages: chatMessages };
 
       const response = await fetch(url, {
@@ -325,6 +328,7 @@ export const useUnifiedChat = ({
   const clearMessages = useCallback(() => {
     setMessages([]);
     messageBufferRef.current = '';
+    conversationIdRef.current = crypto.randomUUID();
   }, []);
 
   const cancel = useCallback(() => {
