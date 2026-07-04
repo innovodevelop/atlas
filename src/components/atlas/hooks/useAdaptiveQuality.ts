@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { detectPerformanceTier, PerformanceTier } from '@/lib/performance';
+import { isWindowActive } from '@/hooks/useWindowActivity';
 
 export interface QualitySettings {
   particleCount: number;
@@ -56,6 +57,13 @@ const QUALITY_PRESETS: Record<PerformanceTier, QualityPreset> = {
 const FPS_SAMPLES = 30;
 const REDUCE_QUALITY_THRESHOLD = 40;
 const RESTORE_QUALITY_THRESHOLD = 55;
+// Report FPS to consumers at most this often — updating state every rAF tick
+// re-renders the whole sphere 60x/s (the original reason this hook sat unused).
+const FPS_REPORT_INTERVAL_MS = 1000;
+// Minimum time between quality transitions. Each transition rebuilds particle
+// geometry (a visible hitch), so without a cooldown the level oscillates and
+// the sphere "blinks".
+const QUALITY_CHANGE_COOLDOWN_MS = 5000;
 
 /**
  * Adaptive quality system that monitors FPS and automatically
@@ -86,70 +94,25 @@ export function useAdaptiveQuality(
   const isManualRef = useRef(false);
   const degradationLevelRef = useRef(0); // 0 = full quality, 3 = max degradation
 
-  // FPS monitoring
-  useEffect(() => {
-    if (!enabled) return;
-
-    let animationId: number;
-    
-    const measureFPS = () => {
-      const now = performance.now();
-      const delta = now - lastFrameTimeRef.current;
-      lastFrameTimeRef.current = now;
-      
-      const fps = 1000 / delta;
-      
-      fpsSamplesRef.current.push(fps);
-      if (fpsSamplesRef.current.length > FPS_SAMPLES) {
-        fpsSamplesRef.current.shift();
-      }
-      
-      // Calculate average FPS
-      const avgFPS = fpsSamplesRef.current.reduce((a, b) => a + b, 0) / 
-        fpsSamplesRef.current.length;
-      
-      setCurrentFPS(Math.round(avgFPS));
-      
-      // Auto-adjust quality if not manual
-      if (!isManualRef.current && fpsSamplesRef.current.length >= FPS_SAMPLES) {
-        if (avgFPS < REDUCE_QUALITY_THRESHOLD && degradationLevelRef.current < 3) {
-          // Reduce quality
-          degradationLevelRef.current++;
-          applyDegradation(degradationLevelRef.current);
-        } else if (avgFPS > RESTORE_QUALITY_THRESHOLD && degradationLevelRef.current > 0) {
-          // Restore quality gradually
-          degradationLevelRef.current--;
-          applyDegradation(degradationLevelRef.current);
-        }
-      }
-      
-      animationId = requestAnimationFrame(measureFPS);
-    };
-    
-    animationId = requestAnimationFrame(measureFPS);
-    
-    return () => {
-      cancelAnimationFrame(animationId);
-    };
-  }, [enabled]);
-
+  // Declared before the FPS-monitoring effect that lists it as a dependency
+  // (a dep array evaluates at render time — referencing it later is a TDZ crash)
   const applyDegradation = useCallback((level: number) => {
     const basePreset = QUALITY_PRESETS[tier];
-    
+
     // Progressive degradation
     const degradations: Partial<QualityPreset>[] = [
       {}, // Level 0: Full quality
-      { 
+      {
         trailLength: Math.max(0, basePreset.trailLength - 2),
         bloomIntensity: basePreset.bloomIntensity * 0.5,
       }, // Level 1: Reduce trails and bloom
-      { 
+      {
         enableTrails: false,
         trailLength: 0,
         enableBloom: false,
         coreParticleCount: Math.floor(basePreset.coreParticleCount * 0.5),
       }, // Level 2: Disable trails and bloom
-      { 
+      {
         enableTrails: false,
         trailLength: 0,
         enableBloom: false,
@@ -157,15 +120,85 @@ export function useAdaptiveQuality(
         particleCount: Math.floor(basePreset.particleCount * 0.6),
       }, // Level 3: Maximum degradation
     ];
-    
+
     const degradation = degradations[Math.min(level, 3)];
-    
+
     setQuality(prev => ({
       ...prev,
       ...basePreset,
       ...degradation,
     }));
   }, [tier]);
+
+  // FPS monitoring. Sampling runs every frame (cheap refs only); React state
+  // updates are throttled to once a second, and quality transitions have a
+  // cooldown + sample reset so the level settles instead of oscillating.
+  useEffect(() => {
+    if (!enabled) return;
+
+    let animationId: number;
+    let lastReportAt = performance.now();
+    let lastQualityChangeAt = 0;
+
+    const measureFPS = () => {
+      const now = performance.now();
+      const delta = now - lastFrameTimeRef.current;
+      lastFrameTimeRef.current = now;
+
+      // Ignore pathological deltas (window was hidden/blurred and rAF was
+      // throttled) — they would read as "low FPS" and degrade quality for
+      // nothing. Also drop stale samples so recovery is judged on fresh data.
+      if (delta > 250 || !isWindowActive()) {
+        fpsSamplesRef.current = [];
+        animationId = requestAnimationFrame(measureFPS);
+        return;
+      }
+
+      const fps = 1000 / delta;
+
+      fpsSamplesRef.current.push(fps);
+      if (fpsSamplesRef.current.length > FPS_SAMPLES) {
+        fpsSamplesRef.current.shift();
+      }
+
+      const avgFPS = fpsSamplesRef.current.reduce((a, b) => a + b, 0) /
+        fpsSamplesRef.current.length;
+
+      // Throttled state update — and only when the rounded value changed
+      if (now - lastReportAt >= FPS_REPORT_INTERVAL_MS) {
+        lastReportAt = now;
+        const rounded = Math.round(avgFPS);
+        setCurrentFPS(prev => (prev === rounded ? prev : rounded));
+      }
+
+      // Auto-adjust quality: full sample window + cooldown between changes
+      if (
+        !isManualRef.current &&
+        fpsSamplesRef.current.length >= FPS_SAMPLES &&
+        now - lastQualityChangeAt >= QUALITY_CHANGE_COOLDOWN_MS
+      ) {
+        if (avgFPS < REDUCE_QUALITY_THRESHOLD && degradationLevelRef.current < 3) {
+          degradationLevelRef.current++;
+          lastQualityChangeAt = now;
+          fpsSamplesRef.current = [];
+          applyDegradation(degradationLevelRef.current);
+        } else if (avgFPS > RESTORE_QUALITY_THRESHOLD && degradationLevelRef.current > 0) {
+          degradationLevelRef.current--;
+          lastQualityChangeAt = now;
+          fpsSamplesRef.current = [];
+          applyDegradation(degradationLevelRef.current);
+        }
+      }
+
+      animationId = requestAnimationFrame(measureFPS);
+    };
+
+    animationId = requestAnimationFrame(measureFPS);
+
+    return () => {
+      cancelAnimationFrame(animationId);
+    };
+  }, [enabled, applyDegradation]);
 
   const forceQuality = useCallback((newTier: PerformanceTier) => {
     isManualRef.current = true;
