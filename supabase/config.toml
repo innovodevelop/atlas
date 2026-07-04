@@ -99,18 +99,6 @@ verify_jwt = false
 [functions.atlas-daily-digest]
 verify_jwt = false
 
-# Scheduled cron job to record daily usage snapshots at midnight UTC
-# NOTE: [[cron_jobs]] is Lovable Cloud syntax. On a standalone supabase.com
-# project, recreate these via Dashboard -> Integrations -> Cron (pg_cron), see
-# CONVERSION.md. Keep this block for reference.
-[[cron_jobs]]
-name = "daily-usage-snapshot"
-schedule = "0 0 * * *"
-function_name = "record-usage-snapshot"
-
-# Daily digest: one budgeted learning cycle following up on recent
-# conversation topics (06:00 UTC)
-[[cron_jobs]]
-name = "atlas-daily-digest"
-schedule = "0 6 * * *"
-function_name = "atlas-daily-digest"
+# Cron jobs: [[cron_jobs]] was Lovable Cloud syntax and is not valid for the
+# standalone Supabase CLI. The two schedules (record-usage-snapshot at 00:00,
+# atlas-daily-digest at 06:00) are created via pg_cron — see CONVERSION.md.
