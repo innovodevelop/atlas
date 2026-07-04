@@ -4,6 +4,19 @@ Everything code-side is done on the `mac-app-conversion` branch. This file
 covers the manual steps only you can do (accounts, keys, deploys) and how to
 verify each phase.
 
+## STATUS (2026-07-04)
+
+| Step | State |
+|------|-------|
+| Own Supabase project ("AtlasAI", `gdhdqetwlinlpimpxokp`, eu-west-2) | ✅ created, linked, 16 migrations pushed |
+| Edge functions | ✅ all 33 deployed |
+| Cron jobs (pg_cron migration) | ✅ usage snapshot 00:00 UTC, digest 06:00 UTC — these also double as free-tier keep-alive pings |
+| `.env` → new project | ✅ verified: app only contacts the new project |
+| Containment trigger | ✅ verified live (unsessioned insert rejected) |
+| **Edge function secrets** | ❌ TODO — `GEMINI_API_KEY` (required), `ELEVENLABS_API_KEY` (voice), optional others (step 1.5 below) |
+| **Account** | ❌ TODO — sign up in the app, or run migration script for old data (step 2) |
+| Mac app build | see `src-tauri/target/release/bundle/` |
+
 ## What changed (already committed)
 
 | Phase | Commit | Summary |
