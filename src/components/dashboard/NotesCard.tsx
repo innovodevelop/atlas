@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { StickyNote, Plus, MoreHorizontal, Trash2, Loader2 } from 'lucide-react';
 import { DashboardCard } from './DashboardCard';
 import { motion } from 'framer-motion';
@@ -18,7 +19,7 @@ const colorMap: Record<string, { gradient: string; border: string }> = {
   rose: { gradient: 'from-rose-500/20 to-pink-500/20', border: 'border-rose-500/30' },
 };
 
-export const NotesCard = ({ isFocused, onExpand }: NotesCardProps) => {
+const NotesCardComponent = ({ isFocused, onExpand }: NotesCardProps) => {
   const { notes, isLoading, addNote, deleteNote } = useNotes();
   const [isAdding, setIsAdding] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -146,3 +147,5 @@ export const NotesCard = ({ isFocused, onExpand }: NotesCardProps) => {
     </DashboardCard>
   );
 };
+
+export const NotesCard = memo(NotesCardComponent);

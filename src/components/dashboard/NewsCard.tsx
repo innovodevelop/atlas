@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Newspaper, ExternalLink, TrendingUp } from 'lucide-react';
 import { DashboardCard } from './DashboardCard';
 import { motion } from 'framer-motion';
@@ -13,7 +14,7 @@ const mockNews = [
   { id: 3, title: 'Space Agency Announces New Moon Mission Timeline', source: 'Reuters', time: '6h ago', trending: false, category: 'Science' },
 ];
 
-export const NewsCard = ({ isFocused, onExpand }: NewsCardProps) => {
+const NewsCardComponent = ({ isFocused, onExpand }: NewsCardProps) => {
   return (
     <DashboardCard 
       glowColor="rgba(168, 85, 247, 0.15)"
@@ -77,3 +78,5 @@ export const NewsCard = ({ isFocused, onExpand }: NewsCardProps) => {
     </DashboardCard>
   );
 };
+
+export const NewsCard = memo(NewsCardComponent);

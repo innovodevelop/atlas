@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { audio, userId, storeTranscript = true } = await req.json();
+    const { audio, userId, storeTranscript = true, mimeType = "audio/webm", extension = "webm" } = await req.json();
     const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -34,10 +34,11 @@ serve(async (req) => {
       bytes[i] = binaryString.charCodeAt(i);
     }
 
-    // Prepare form data
+    // Prepare form data. The client sends whatever container its engine can
+    // record (webm/opus in Chrome, mp4/aac in WKWebView) — pass it through.
     const formData = new FormData();
-    const blob = new Blob([bytes.buffer], { type: "audio/webm" });
-    formData.append("file", blob, "audio.webm");
+    const blob = new Blob([bytes.buffer], { type: mimeType });
+    formData.append("file", blob, `audio.${extension}`);
     formData.append("model_id", "scribe_v1");
     formData.append("tag_audio_events", "false");
     formData.append("diarize", "false");

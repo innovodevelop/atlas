@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { CheckCircle2, Circle, Clock, Flag, Plus, Trash2, Loader2 } from 'lucide-react';
 import { DashboardCard } from './DashboardCard';
 import { motion } from 'framer-motion';
@@ -16,7 +17,7 @@ const priorityColors = {
   low: 'text-slate-400',
 };
 
-export const TasksCard = ({ isFocused, onExpand }: TasksCardProps) => {
+const TasksCardComponent = ({ isFocused, onExpand }: TasksCardProps) => {
   const { tasks, isLoading, completedCount, progress, addTask, toggleTask, deleteTask } = useTasks();
   const [isAdding, setIsAdding] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -167,3 +168,5 @@ export const TasksCard = ({ isFocused, onExpand }: TasksCardProps) => {
     </DashboardCard>
   );
 };
+
+export const TasksCard = memo(TasksCardComponent);

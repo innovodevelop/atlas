@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { getSupportedAudioFormat, getRecorderOptions, type AudioFormat } from "@/lib/audioFormat";
 
 export const useVoice = () => {
   const [isRecording, setIsRecording] = useState(false);
@@ -9,6 +10,8 @@ export const useVoice = () => {
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  // Negotiated per-engine: webm/opus in Chrome, mp4/aac in WKWebView (Tauri)
+  const audioFormatRef = useRef<AudioFormat>(getSupportedAudioFormat());
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -74,9 +77,7 @@ export const useVoice = () => {
       };
       updateLevel();
 
-      mediaRecorderRef.current = new MediaRecorder(stream, {
-        mimeType: "audio/webm;codecs=opus",
-      });
+      mediaRecorderRef.current = new MediaRecorder(stream, getRecorderOptions(audioFormatRef.current));
 
       audioChunksRef.current = [];
 
@@ -116,7 +117,7 @@ export const useVoice = () => {
       setAudioLevel(0);
 
       mediaRecorderRef.current.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        const audioBlob = new Blob(audioChunksRef.current, { type: audioFormatRef.current.blobType });
         
         // Convert blob to base64
         const reader = new FileReader();
@@ -128,8 +129,10 @@ export const useVoice = () => {
             const { data: { user } } = await supabase.auth.getUser();
             
             const { data, error } = await supabase.functions.invoke("elevenlabs-stt", {
-              body: { 
+              body: {
                 audio: base64Audio,
+                mimeType: audioFormatRef.current.blobType,
+                extension: audioFormatRef.current.extension,
                 userId: user?.id || null,
                 storeTranscript: true, // Enable automatic transcript storage
               },

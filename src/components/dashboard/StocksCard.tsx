@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { TrendingUp, TrendingDown, BarChart3, ChevronRight, Wifi } from 'lucide-react';
 import { DashboardCard } from './DashboardCard';
 import { motion } from 'framer-motion';
@@ -37,7 +38,7 @@ const Sparkline = ({ data, positive, symbol }: { data: number[]; positive: boole
   );
 };
 
-export const StocksCard = ({ isFocused, onExpand }: StocksCardProps) => {
+const StocksCardComponent = ({ isFocused, onExpand }: StocksCardProps) => {
   const { stocks, isLive } = useStocksRealtime(defaultSymbols);
   
   // Store price history for each symbol
@@ -164,3 +165,4 @@ export const StocksCard = ({ isFocused, onExpand }: StocksCardProps) => {
   );
 };
 
+export const StocksCard = memo(StocksCardComponent);

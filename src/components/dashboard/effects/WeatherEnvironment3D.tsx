@@ -5,6 +5,7 @@ import { RainParticles } from './RainParticles';
 import { SnowParticles } from './SnowParticles';
 import { LightningFlash } from './LightningFlash';
 import { AtmosphericFog } from './AtmosphericFog';
+import { useWindowActivity } from '@/hooks/useWindowActivity';
 
 interface WeatherEnvironment3DProps {
   condition: string;
@@ -187,10 +188,11 @@ const WeatherScene = ({ condition, intensity = 1 }: { condition: string; intensi
 
 export const WeatherEnvironment3D = ({ condition, intensity = 1, className = '' }: WeatherEnvironment3DProps) => {
   const config = useMemo(() => getWeatherConfig(condition), [condition]);
-  
+  const windowActive = useWindowActivity();
+
   // Don't render canvas if no weather effects
   const hasEffects = config.showClouds || config.showRain || config.showSnow || config.showFog;
-  
+
   if (!hasEffects) {
     return null;
   }
@@ -201,6 +203,7 @@ export const WeatherEnvironment3D = ({ condition, intensity = 1, className = '' 
         camera={{ position: [0, 0, 10], fov: 60 }}
         style={{ background: 'transparent' }}
         gl={{ alpha: true, antialias: true }}
+        frameloop={windowActive ? 'always' : 'never'}
       >
         <Suspense fallback={null}>
           <WeatherScene condition={condition} intensity={intensity} />

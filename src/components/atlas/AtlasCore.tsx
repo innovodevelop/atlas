@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { WakeWordState } from '@/types';
 import { GPUParticleSystem, GPUCoreSystem, TrailSystem, RippleSystem, NebulaFlowSystem } from './systems';
 import { STATE_CONFIGS } from './utils/stateConfigs';
+import { useWindowActivity } from '@/hooks/useWindowActivity';
 
 export interface AtlasCoreProps {
   state: WakeWordState;
@@ -441,6 +442,10 @@ export const AtlasCore = memo(forwardRef<HTMLDivElement, AtlasCoreProps>(({
     internalAudioLevelRef.current = audioLevel;
   }
   
+  // Pause the whole render loop when the window is hidden/blurred — the
+  // sphere is the single biggest idle CPU/GPU consumer.
+  const windowActive = useWindowActivity();
+
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -464,6 +469,7 @@ export const AtlasCore = memo(forwardRef<HTMLDivElement, AtlasCoreProps>(({
         gl={{ antialias: false, alpha: true, powerPreference: 'default', failIfMajorPerformanceCaveat: false }}
         style={{ background: 'transparent' }}
         dpr={pixelRatio}
+        frameloop={windowActive ? 'always' : 'never'}
         onCreated={({ gl }) => { gl.setClearColor(0x000000, 0); }}
         fallback={<CSSFallbackOrb state={state} audioLevel={audioLevelRefToUse.current} />}
       >

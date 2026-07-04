@@ -58,11 +58,14 @@ export const TrailSystem = memo(({
     return geo;
   }, [particleCount, trailLength]);
 
-  // Store geometry ref for parent to update positions
+  // Store geometry ref for parent to update positions, and dispose GPU
+  // buffers when the geometry is swapped (particleCount/trailLength change)
+  // or the component unmounts — imperative geometries aren't auto-disposed.
   useEffect(() => {
     geometryRef.current = geometry;
     return () => {
       geometryRef.current = null;
+      geometry.dispose();
     };
   }, [geometry, geometryRef]);
 

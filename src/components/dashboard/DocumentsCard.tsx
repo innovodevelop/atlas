@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { FileText, FileSpreadsheet, Presentation, Folder, Upload, Download, MoreHorizontal, Share2, ChevronRight } from 'lucide-react';
 import { DashboardCard } from './DashboardCard';
 import { motion } from 'framer-motion';
@@ -61,7 +62,7 @@ const recentDocuments = [
 
 const storageUsed = 67;
 
-export const DocumentsCard = ({ isFocused, onExpand }: DocumentsCardProps) => {
+const DocumentsCardComponent = ({ isFocused, onExpand }: DocumentsCardProps) => {
   return (
     <DashboardCard
       glowColor="rgba(59, 130, 246, 0.15)"
@@ -165,3 +166,5 @@ export const DocumentsCard = ({ isFocused, onExpand }: DocumentsCardProps) => {
     </DashboardCard>
   );
 };
+
+export const DocumentsCard = memo(DocumentsCardComponent);

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { isWindowActive } from '@/hooks/useWindowActivity';
 
 interface BrainRun {
   id: string;
@@ -70,7 +71,7 @@ export function useAtlasLearning() {
       if (error) throw error;
       return data as BrainRun[];
     },
-    refetchInterval: 30000
+    refetchInterval: () => (isWindowActive() ? 30000 : false)
   });
 
   // Fetch research queue
@@ -86,7 +87,7 @@ export function useAtlasLearning() {
       if (error) throw error;
       return data as QueueItem[];
     },
-    refetchInterval: 15000
+    refetchInterval: () => (isWindowActive() ? 15000 : false)
   });
 
   // Fetch validation logs
@@ -102,7 +103,7 @@ export function useAtlasLearning() {
       if (error) throw error;
       return data as ValidationLog[];
     },
-    refetchInterval: 30000
+    refetchInterval: () => (isWindowActive() ? 30000 : false)
   });
 
   // Calculate learning metrics
@@ -157,7 +158,7 @@ export function useAtlasLearning() {
         successRate
       };
     },
-    refetchInterval: 60000
+    refetchInterval: () => (isWindowActive() ? 60000 : false)
   });
 
   // Set up realtime subscriptions

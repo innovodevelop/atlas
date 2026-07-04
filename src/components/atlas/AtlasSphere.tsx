@@ -1,5 +1,6 @@
 import { memo, useRef } from 'react';
 import { AtlasCore } from './AtlasCore';
+import { useAdaptiveQuality } from './hooks/useAdaptiveQuality';
 import { useAtlasSettingsReadOnly } from '@/hooks/useAtlasSettings';
 import { useSphereRenderer } from '@/hooks/useSphereRenderer';
 import { cn } from '@/lib/utils';
@@ -95,6 +96,16 @@ const AtlasSphereComponent = ({
   // Use computed camera Z or custom override
   const finalCameraZ = customCameraZ ?? renderState.cameraZ;
 
+  // Adaptive quality: FPS-monitored degradation ladder (trails -> bloom ->
+  // core -> particle count). The hook existed but was never wired in; the
+  // sphere now self-throttles instead of dropping frames on weaker GPUs.
+  const { quality } = useAdaptiveQuality(true);
+  const degraded = quality.tier !== 'high' || !quality.enableBloom;
+  const effectiveParticleCount = Math.min(renderState.particleCount, quality.particleCount * 3);
+  const effectiveEnableBloom = settings.enableBloom && quality.enableBloom;
+  const effectiveEnableTrails = settings.enableTrails && quality.enableTrails;
+  const effectiveEnableCore = settings.enableCore && quality.enableCore;
+
   return (
     <div
       ref={containerRef}
@@ -111,9 +122,9 @@ const AtlasSphereComponent = ({
           containerWidth={renderState.containerWidth}
           containerHeight={renderState.containerHeight}
           pixelRatio={renderState.pixelRatio}
-          dynamicParticleCount={renderState.particleCount}
+          dynamicParticleCount={effectiveParticleCount}
           // Pass all settings
-          enableTrails={settings.enableTrails}
+          enableTrails={effectiveEnableTrails}
           trailLength={settings.trailLength}
           trailOpacity={settings.trailOpacity}
           trailColorGradient={settings.trailColorGradient}
@@ -123,8 +134,8 @@ const AtlasSphereComponent = ({
           particleSize={settings.particleSize}
           density={settings.density}
           rotationSpeed={settings.rotationSpeed}
-          enableBloom={settings.enableBloom}
-          bloomIntensity={settings.bloomIntensity}
+          enableBloom={effectiveEnableBloom}
+          bloomIntensity={degraded ? Math.min(settings.bloomIntensity, quality.bloomIntensity) : settings.bloomIntensity}
           morphSpeed={settings.morphSpeed}
           enableRipples={settings.enableRipples}
           rippleSpeed={settings.rippleSpeed}
@@ -137,8 +148,8 @@ const AtlasSphereComponent = ({
           mouseMode={settings.mouseMode}
           mouseStrength={settings.mouseStrength}
           mouseInfluenceRadius={settings.mouseInfluenceRadius}
-          enableCore={settings.enableCore}
-          coreParticleCount={settings.coreParticleCount}
+          enableCore={effectiveEnableCore}
+          coreParticleCount={Math.min(settings.coreParticleCount, quality.coreParticleCount)}
           coreDensity={settings.coreDensity}
           coreParticleSize={settings.coreParticleSize}
           coreIntensity={settings.coreIntensity}

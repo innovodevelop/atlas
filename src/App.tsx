@@ -2,7 +2,9 @@ import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
@@ -15,7 +17,30 @@ const AtlasCore = lazy(() => import("./pages/AtlasCore"));
 const AtlasTeach = lazy(() => import("./pages/AtlasTeach"));
  const AtlasArchitecture = lazy(() => import("./pages/AtlasArchitecture"));
 
-const queryClient = new QueryClient();
+// Instant startup: dashboard data (weather, stocks, news, tasks…) is
+// persisted to disk-backed localStorage, so the app paints with last-known
+// data immediately and refetches in the background. Bump `buster` when the
+// cached shape changes.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      gcTime: 24 * 60 * 60 * 1000, // keep cached data a day for the persister
+    },
+  },
+});
+
+const persister = createSyncStoragePersister({
+  storage: typeof window !== "undefined" ? window.localStorage : undefined,
+  key: "atlas-query-cache",
+});
+
+export const clearPersistedCache = () => {
+  try {
+    window.localStorage.removeItem("atlas-query-cache");
+  } catch {
+    /* storage unavailable */
+  }
+};
 
 // Loading fallback for lazy routes
 const PageLoader = () => (
@@ -25,7 +50,10 @@ const PageLoader = () => (
 );
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
+  <PersistQueryClientProvider
+    client={queryClient}
+    persistOptions={{ persister, maxAge: 24 * 60 * 60 * 1000, buster: "v1" }}
+  >
     <TooltipProvider>
       <Toaster />
       <Sonner />
@@ -85,7 +113,7 @@ const App = () => (
         </Routes>
       </BrowserRouter>
     </TooltipProvider>
-  </QueryClientProvider>
+  </PersistQueryClientProvider>
 );
 
 export default App;

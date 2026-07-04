@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Mail, Star, ChevronRight } from 'lucide-react';
 import { DashboardCard } from './DashboardCard';
 import { motion } from 'framer-motion';
@@ -15,7 +16,7 @@ const mockEmails = [
   { id: 4, sender: 'Alex Rivera', subject: 'Meeting Notes', preview: 'Key takeaways from our meeting yesterday...', time: 'Yesterday', read: true, starred: true, avatar: 'AR', avatarColor: 'bg-gradient-to-br from-emerald-500 to-teal-500' },
 ];
 
-export const EmailCard = ({ isFocused, onExpand }: EmailCardProps) => {
+const EmailCardComponent = ({ isFocused, onExpand }: EmailCardProps) => {
   const unreadCount = mockEmails.filter(e => !e.read).length;
   return (
     <DashboardCard glowColor="rgba(236, 72, 153, 0.15)" onClick={onExpand} header={
@@ -49,3 +50,5 @@ export const EmailCard = ({ isFocused, onExpand }: EmailCardProps) => {
     </DashboardCard>
   );
 };
+
+export const EmailCard = memo(EmailCardComponent);

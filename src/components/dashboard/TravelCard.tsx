@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Plane, Calendar, MapPin, Luggage, ChevronRight } from 'lucide-react';
 import { DashboardCard } from './DashboardCard';
 import { motion } from 'framer-motion';
@@ -30,7 +31,7 @@ const upcomingTrip = {
   activities: ['Eiffel Tower', 'Louvre Museum', 'Seine Cruise'],
 };
 
-export const TravelCard = ({ isFocused, onExpand }: TravelCardProps) => {
+const TravelCardComponent = ({ isFocused, onExpand }: TravelCardProps) => {
   return (
     <DashboardCard
       glowColor="rgba(168, 85, 247, 0.15)"
@@ -155,3 +156,5 @@ export const TravelCard = ({ isFocused, onExpand }: TravelCardProps) => {
     </DashboardCard>
   );
 };
+
+export const TravelCard = memo(TravelCardComponent);

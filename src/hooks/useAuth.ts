@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { clearPersistedCache } from "@/App";
 
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -89,6 +90,8 @@ export const useAuth = () => {
         toast.error(error.message);
         return { error };
       }
+      // Persisted query cache holds auth-scoped data — drop it on sign-out
+      clearPersistedCache();
       toast.success("Signed out successfully");
       return {};
     } catch (err) {

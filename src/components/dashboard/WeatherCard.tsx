@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Cloud, Sun, Droplets, Wind, Sunrise, Sunset } from 'lucide-react';
 import { DashboardCard } from './DashboardCard';
 import { motion } from 'framer-motion';
@@ -77,7 +78,7 @@ const WeatherCardSkeleton = () => (
   </DashboardCard>
 );
 
-export const WeatherCard = ({ isFocused, onExpand }: WeatherCardProps) => {
+const WeatherCardComponent = ({ isFocused, onExpand }: WeatherCardProps) => {
   const { weather, isLoading } = useWeather();
 
   if (isLoading || !weather) {
@@ -165,3 +166,5 @@ export const WeatherCard = ({ isFocused, onExpand }: WeatherCardProps) => {
     </DashboardCard>
   );
 };
+
+export const WeatherCard = memo(WeatherCardComponent);

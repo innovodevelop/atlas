@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { isWindowActive } from '@/hooks/useWindowActivity';
 
 interface AtlasStats {
   knowledgeCount: number;
@@ -59,8 +60,11 @@ export const useAtlasHealth = () => {
   useEffect(() => {
     fetchStats();
 
-    // Refresh stats every 30 seconds
-    const interval = setInterval(fetchStats, 30000);
+    // Refresh stats every 30 seconds — but not while the window is
+    // hidden/blurred (background polling is wasted work in a desktop app)
+    const interval = setInterval(() => {
+      if (isWindowActive()) fetchStats();
+    }, 30000);
     return () => clearInterval(interval);
   }, [fetchStats]);
 

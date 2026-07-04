@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { getSupportedAudioFormat, getRecorderOptions, type AudioFormat } from '@/lib/audioFormat';
 
 // Smoothing factor for audio level (lower = smoother, higher = more responsive)
 const AUDIO_SMOOTHING = 0.25;
@@ -22,6 +23,8 @@ export const usePerformanceOptimizedAudio = () => {
   // Refs for managing resources without causing re-renders
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  // Negotiated per-engine: webm/opus in Chrome, mp4/aac in WKWebView (Tauri)
+  const audioFormatRef = useRef<AudioFormat>(getSupportedAudioFormat());
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -102,9 +105,7 @@ export const usePerformanceOptimizedAudio = () => {
       // Start level monitoring
       updateAudioLevel();
 
-      mediaRecorderRef.current = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus',
-      });
+      mediaRecorderRef.current = new MediaRecorder(stream, getRecorderOptions(audioFormatRef.current));
 
       audioChunksRef.current = [];
 
@@ -145,7 +146,7 @@ export const usePerformanceOptimizedAudio = () => {
       setState((prev) => ({ ...prev, audioLevel: 0 }));
 
       mediaRecorderRef.current.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioBlob = new Blob(audioChunksRef.current, { type: audioFormatRef.current.blobType });
 
         const reader = new FileReader();
         reader.onloadend = async () => {
@@ -153,7 +154,11 @@ export const usePerformanceOptimizedAudio = () => {
 
           try {
             const { data, error } = await supabase.functions.invoke('elevenlabs-stt', {
-              body: { audio: base64Audio },
+              body: {
+                audio: base64Audio,
+                mimeType: audioFormatRef.current.blobType,
+                extension: audioFormatRef.current.extension,
+              },
             });
 
             if (error) {

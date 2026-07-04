@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Calendar, Clock, Video, MapPin, ChevronRight, Plus, Trash2, Loader2 } from 'lucide-react';
 import { DashboardCard } from './DashboardCard';
 import { motion } from 'framer-motion';
@@ -19,7 +20,7 @@ const eventColors = [
   'from-amber-500 to-orange-500',
 ];
 
-export const CalendarCard = ({ isFocused, onExpand }: CalendarCardProps) => {
+const CalendarCardComponent = ({ isFocused, onExpand }: CalendarCardProps) => {
   const { events, isLoading, addEvent, deleteEvent } = useCalendarEvents();
   const [isAdding, setIsAdding] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -200,3 +201,5 @@ export const CalendarCard = ({ isFocused, onExpand }: CalendarCardProps) => {
     </DashboardCard>
   );
 };
+
+export const CalendarCard = memo(CalendarCardComponent);

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { isWindowActive } from '@/hooks/useWindowActivity';
 
 export interface UseDataFetchingOptions<T> {
   fetcher: () => Promise<T>;
@@ -103,14 +104,14 @@ export function useDataFetching<T>({
     }
   }, [enabled, fetchData]);
 
-  // Refresh interval
+  // Refresh interval — skipped while the window is hidden/blurred
   useEffect(() => {
     if (!refreshInterval || !enabled) return;
-    
+
     const interval = setInterval(() => {
-      fetchData(true);
+      if (isWindowActive()) fetchData(true);
     }, refreshInterval);
-    
+
     return () => clearInterval(interval);
   }, [refreshInterval, enabled, fetchData]);
 

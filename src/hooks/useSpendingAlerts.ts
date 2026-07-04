@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useRef } from "react";
 import { useHolographicToast } from "@/hooks/useHolographicToast";
+import { isWindowActive } from "@/hooks/useWindowActivity";
 
 interface BudgetSettings {
   id: string;
@@ -71,7 +72,7 @@ export function useSpendingAlerts() {
       if (error) throw error;
       return data;
     },
-    refetchInterval: 60000, // Refresh every minute
+    refetchInterval: () => (isWindowActive() ? 60000 : false), // Refresh every minute
   });
 
   // Calculate current spending

@@ -1,23 +1,31 @@
 import { motion } from 'framer-motion';
-import { useMemo } from 'react';
+import { memo } from 'react';
+import { useWindowActivity } from '@/hooks/useWindowActivity';
+
+// Ambient card backgrounds. Perf rules for this file:
+// - Every component is memo()'d — parent re-renders must not restart loops
+// - Particle configs live at module scope — computed once per app load
+// - Counts are tuned down: these are ambience, nobody counts the particles
+// - When the window is hidden/blurred every atmosphere renders null, killing
+//   all infinite framer-motion loops at once
 
 // Email Card - Data Stream Background
-export const EmailAtmosphere = () => {
-  const streams = useMemo(() => 
-    Array.from({ length: 20 }, (_, i) => ({
-      id: i,
-      left: `${Math.random() * 100}%`,
-      width: 1 + Math.random() * 2,
-      height: 50 + Math.random() * 100,
-      duration: 3 + Math.random() * 4,
-      delay: Math.random() * 5,
-    })),
-    []
-  );
+const EMAIL_STREAMS = Array.from({ length: 8 }, (_, i) => ({
+  id: i,
+  left: `${Math.random() * 100}%`,
+  width: 1 + Math.random() * 2,
+  height: 50 + Math.random() * 100,
+  duration: 3 + Math.random() * 4,
+  delay: Math.random() * 5,
+}));
+
+export const EmailAtmosphere = memo(() => {
+  const active = useWindowActivity();
+  if (!active) return null;
 
   return (
     <div className="absolute inset-0 overflow-hidden opacity-30">
-      {streams.map((stream) => (
+      {EMAIL_STREAMS.map((stream) => (
         <motion.div
           key={stream.id}
           className="absolute bg-gradient-to-b from-pink-500/40 via-rose-500/20 to-transparent rounded-full"
@@ -41,23 +49,24 @@ export const EmailAtmosphere = () => {
       ))}
     </div>
   );
-};
+});
+EmailAtmosphere.displayName = 'EmailAtmosphere';
 
 // Stocks Card - Market Pulse Background
-export const StocksAtmosphere = () => {
-  const pulses = useMemo(() => 
-    Array.from({ length: 8 }, (_, i) => ({
-      id: i,
-      delay: i * 0.5,
-      size: 200 + i * 100,
-    })),
-    []
-  );
+const STOCK_PULSES = Array.from({ length: 4 }, (_, i) => ({
+  id: i,
+  delay: i * 0.8,
+  size: 200 + i * 160,
+}));
+
+export const StocksAtmosphere = memo(() => {
+  const active = useWindowActivity();
+  if (!active) return null;
 
   return (
     <div className="absolute inset-0 overflow-hidden">
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-        {pulses.map((pulse) => (
+        {STOCK_PULSES.map((pulse) => (
           <motion.div
             key={pulse.id}
             className="absolute rounded-full border border-emerald-500/20"
@@ -80,7 +89,7 @@ export const StocksAtmosphere = () => {
           />
         ))}
       </div>
-      
+
       {/* Trend lines */}
       <svg className="absolute inset-0 w-full h-full opacity-10" viewBox="0 0 100 100" preserveAspectRatio="none">
         <motion.path
@@ -96,25 +105,26 @@ export const StocksAtmosphere = () => {
       </svg>
     </div>
   );
-};
+});
+StocksAtmosphere.displayName = 'StocksAtmosphere';
 
 // Calendar Card - Time Flow Background
-export const CalendarAtmosphere = () => {
-  const orbs = useMemo(() => 
-    Array.from({ length: 12 }, (_, i) => ({
-      id: i,
-      left: 10 + (i * 7),
-      size: 8 + Math.random() * 20,
-      duration: 8 + Math.random() * 4,
-      delay: i * 0.3,
-    })),
-    []
-  );
+const CALENDAR_ORBS = Array.from({ length: 6 }, (_, i) => ({
+  id: i,
+  left: 10 + i * 14,
+  size: 8 + Math.random() * 20,
+  duration: 8 + Math.random() * 4,
+  delay: i * 0.3,
+}));
+
+export const CalendarAtmosphere = memo(() => {
+  const active = useWindowActivity();
+  if (!active) return null;
 
   return (
     <div className="absolute inset-0 overflow-hidden">
       {/* Flowing time orbs */}
-      {orbs.map((orb) => (
+      {CALENDAR_ORBS.map((orb) => (
         <motion.div
           key={orb.id}
           className="absolute rounded-full bg-gradient-to-br from-blue-500/30 to-cyan-500/20"
@@ -137,7 +147,7 @@ export const CalendarAtmosphere = () => {
           }}
         />
       ))}
-      
+
       {/* Horizontal time flow lines */}
       <div className="absolute inset-0 opacity-10">
         {[1, 2, 3].map((i) => (
@@ -152,23 +162,35 @@ export const CalendarAtmosphere = () => {
       </div>
     </div>
   );
-};
+});
+CalendarAtmosphere.displayName = 'CalendarAtmosphere';
 
 // Tasks Card - Zen Ripple Background
-export const TasksAtmosphere = () => {
+const TASK_PARTICLES = Array.from({ length: 8 }, (_, i) => ({
+  id: i,
+  left: `${Math.random() * 100}%`,
+  top: `${Math.random() * 100}%`,
+  duration: 3 + Math.random() * 2,
+  delay: Math.random() * 2,
+}));
+
+export const TasksAtmosphere = memo(() => {
+  const active = useWindowActivity();
+  if (!active) return null;
+
   return (
     <div className="absolute inset-0 overflow-hidden">
       {/* Central zen ripples */}
       <div className="absolute bottom-1/4 left-1/2 -translate-x-1/2">
-        {[1, 2, 3, 4, 5].map((i) => (
+        {[1, 2, 3].map((i) => (
           <motion.div
             key={i}
             className="absolute rounded-full border border-blue-500/20"
             style={{
-              width: 100 * i,
-              height: 100 * i,
-              left: -50 * i,
-              top: -50 * i,
+              width: 130 * i,
+              height: 130 * i,
+              left: -65 * i,
+              top: -65 * i,
             }}
             animate={{
               scale: [1, 1.3],
@@ -183,23 +205,20 @@ export const TasksAtmosphere = () => {
           />
         ))}
       </div>
-      
+
       {/* Floating focus particles */}
-      {Array.from({ length: 15 }).map((_, i) => (
+      {TASK_PARTICLES.map((p) => (
         <motion.div
-          key={i}
+          key={p.id}
           className="absolute w-1 h-1 rounded-full bg-indigo-400/40"
-          style={{
-            left: `${Math.random() * 100}%`,
-            top: `${Math.random() * 100}%`,
-          }}
+          style={{ left: p.left, top: p.top }}
           animate={{
             y: [0, -20, 0],
             opacity: [0.2, 0.6, 0.2],
           }}
           transition={{
-            duration: 3 + Math.random() * 2,
-            delay: Math.random() * 2,
+            duration: p.duration,
+            delay: p.delay,
             repeat: Infinity,
             ease: 'easeInOut',
           }}
@@ -207,33 +226,36 @@ export const TasksAtmosphere = () => {
       ))}
     </div>
   );
-};
+});
+TasksAtmosphere.displayName = 'TasksAtmosphere';
 
 // Notes Card - Creative Paper Texture
-export const NotesAtmosphere = () => {
-  const inkSplashes = useMemo(() => 
-    Array.from({ length: 6 }, (_, i) => ({
-      id: i,
-      left: 10 + Math.random() * 80,
-      top: 10 + Math.random() * 80,
-      size: 30 + Math.random() * 60,
-      rotation: Math.random() * 360,
-    })),
-    []
-  );
+const INK_SPLASHES = Array.from({ length: 4 }, (_, i) => ({
+  id: i,
+  left: 10 + Math.random() * 80,
+  top: 10 + Math.random() * 80,
+  size: 30 + Math.random() * 60,
+  rotation: Math.random() * 360,
+  duration: 5 + Math.random() * 3,
+  delay: Math.random() * 2,
+}));
+
+export const NotesAtmosphere = memo(() => {
+  const active = useWindowActivity();
+  if (!active) return null;
 
   return (
     <div className="absolute inset-0 overflow-hidden">
       {/* Paper texture grain */}
-      <div 
+      <div
         className="absolute inset-0 opacity-[0.03]"
         style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
         }}
       />
-      
+
       {/* Ink splashes */}
-      {inkSplashes.map((splash) => (
+      {INK_SPLASHES.map((splash) => (
         <motion.div
           key={splash.id}
           className="absolute rounded-full bg-gradient-to-br from-amber-500/10 to-orange-500/5 blur-xl"
@@ -249,8 +271,8 @@ export const NotesAtmosphere = () => {
             opacity: [0.3, 0.5, 0.3],
           }}
           transition={{
-            duration: 5 + Math.random() * 3,
-            delay: Math.random() * 2,
+            duration: splash.duration,
+            delay: splash.delay,
             repeat: Infinity,
             ease: 'easeInOut',
           }}
@@ -258,34 +280,46 @@ export const NotesAtmosphere = () => {
       ))}
     </div>
   );
-};
+});
+NotesAtmosphere.displayName = 'NotesAtmosphere';
 
 // News Card - Information Flow
-export const NewsAtmosphere = () => {
+const NEWS_BARS = Array.from({ length: 6 }, (_, i) => ({
+  id: i,
+  top: `${10 + i * 15}%`,
+  width: 100 + Math.random() * 200,
+  duration: 8 + Math.random() * 4,
+  delay: i * 0.5,
+}));
+
+export const NewsAtmosphere = memo(() => {
+  const active = useWindowActivity();
+  if (!active) return null;
+
   return (
     <div className="absolute inset-0 overflow-hidden">
       {/* Headline bars flowing */}
-      {Array.from({ length: 10 }).map((_, i) => (
+      {NEWS_BARS.map((bar) => (
         <motion.div
-          key={i}
+          key={bar.id}
           className="absolute h-1 rounded-full bg-gradient-to-r from-violet-500/30 via-purple-500/20 to-transparent"
           style={{
-            top: `${10 + i * 9}%`,
+            top: bar.top,
             left: '-100%',
-            width: 100 + Math.random() * 200,
+            width: bar.width,
           }}
           animate={{
             x: ['0%', '200vw'],
           }}
           transition={{
-            duration: 8 + Math.random() * 4,
-            delay: i * 0.5,
+            duration: bar.duration,
+            delay: bar.delay,
             repeat: Infinity,
             ease: 'linear',
           }}
         />
       ))}
-      
+
       {/* Trending indicator pulses */}
       <motion.div
         className="absolute top-10 right-10 w-4 h-4 rounded-full bg-amber-500/40"
@@ -301,24 +335,27 @@ export const NewsAtmosphere = () => {
       />
     </div>
   );
-};
+});
+NewsAtmosphere.displayName = 'NewsAtmosphere';
 
 // Documents Card - File Constellation
-export const DocumentsAtmosphere = () => {
-  const nodes = useMemo(() => 
-    Array.from({ length: 20 }, (_, i) => ({
-      id: i,
-      x: Math.random() * 100,
-      y: Math.random() * 100,
-      size: 2 + Math.random() * 4,
-    })),
-    []
-  );
+const DOC_NODES = Array.from({ length: 10 }, (_, i) => ({
+  id: i,
+  x: Math.random() * 100,
+  y: Math.random() * 100,
+  size: 2 + Math.random() * 4,
+  duration: 3 + Math.random() * 2,
+  delay: Math.random() * 2,
+}));
+
+export const DocumentsAtmosphere = memo(() => {
+  const active = useWindowActivity();
+  if (!active) return null;
 
   return (
     <div className="absolute inset-0 overflow-hidden opacity-40">
       {/* File nodes */}
-      {nodes.map((node) => (
+      {DOC_NODES.map((node) => (
         <motion.div
           key={node.id}
           className="absolute rounded-full bg-blue-400"
@@ -333,18 +370,18 @@ export const DocumentsAtmosphere = () => {
             scale: [1, 1.2, 1],
           }}
           transition={{
-            duration: 3 + Math.random() * 2,
-            delay: Math.random() * 2,
+            duration: node.duration,
+            delay: node.delay,
             repeat: Infinity,
             ease: 'easeInOut',
           }}
         />
       ))}
-      
+
       {/* Connection lines */}
       <svg className="absolute inset-0 w-full h-full">
-        {nodes.slice(0, 10).map((node, i) => {
-          const next = nodes[(i + 1) % 10];
+        {DOC_NODES.map((node, i) => {
+          const next = DOC_NODES[(i + 1) % DOC_NODES.length];
           return (
             <motion.line
               key={i}
@@ -369,10 +406,14 @@ export const DocumentsAtmosphere = () => {
       </svg>
     </div>
   );
-};
+});
+DocumentsAtmosphere.displayName = 'DocumentsAtmosphere';
 
 // Travel Card - Journey Path
-export const TravelAtmosphere = () => {
+export const TravelAtmosphere = memo(() => {
+  const active = useWindowActivity();
+  if (!active) return null;
+
   return (
     <div className="absolute inset-0 overflow-hidden">
       {/* World map grid lines */}
@@ -392,7 +433,7 @@ export const TravelAtmosphere = () => {
           />
         ))}
       </div>
-      
+
       {/* Destination beacon */}
       <motion.div
         className="absolute top-1/3 right-1/4"
@@ -409,7 +450,7 @@ export const TravelAtmosphere = () => {
         <div className="w-4 h-4 rounded-full bg-violet-500/60" />
         <div className="absolute inset-0 w-4 h-4 rounded-full bg-violet-500/30 animate-ping" />
       </motion.div>
-      
+
       {/* Flight path */}
       <svg className="absolute inset-0 w-full h-full opacity-30" viewBox="0 0 100 100" preserveAspectRatio="none">
         <motion.path
@@ -426,4 +467,5 @@ export const TravelAtmosphere = () => {
       </svg>
     </div>
   );
-};
+});
+TravelAtmosphere.displayName = 'TravelAtmosphere';
