@@ -1,0 +1,121 @@
+import { Mic, Volume2, Sparkles } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useAtlasSettings, type AtlasSettings } from '@/hooks/useAtlasSettings';
+import { useStreamingTTS } from '@/hooks/useStreamingTTS';
+
+// Curated ElevenLabs voices — each one verified to work via API on the free
+// plan (several premade voices, e.g. Aria/Rachel/Charlotte, are API-blocked
+// for free accounts with "paid_plan_required").
+const VOICES: Array<{ id: string; name: string; description: string }> = [
+  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah', description: 'Soft, warm (default)' },
+  { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George', description: 'Calm, British' },
+  { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel', description: 'Deep, authoritative' },
+  { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily', description: 'Clear, velvety' },
+  { id: 'ErXwobaYiN019PkySvjV', name: 'Antoni', description: 'Well-rounded, friendly' },
+];
+
+const MODELS: Array<{ id: AtlasSettings['ttsModel']; name: string; description: string }> = [
+  { id: 'eleven_turbo_v2_5', name: 'Turbo v2.5', description: 'Fast, great quality (default)' },
+  { id: 'eleven_flash_v2_5', name: 'Flash v2.5', description: 'Lowest latency (~75ms)' },
+  { id: 'eleven_multilingual_v2', name: 'Multilingual v2', description: 'Highest quality, slower' },
+];
+
+export const VoiceSettingsPanel = () => {
+  const { settings, setSetting } = useAtlasSettings();
+  const { speak, isPlaying } = useStreamingTTS();
+
+  const previewVoice = () => {
+    const voice = VOICES.find(v => v.id === settings.voiceId);
+    void speak(
+      `Hi, I'm Atlas — this is the ${voice?.name ?? 'selected'} voice.`,
+      settings.voiceId,
+      settings.ttsModel,
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-2">
+        <Volume2 className="w-4 h-4 text-violet-400" />
+        <h4 className="font-medium">Voice Output</h4>
+      </div>
+
+      <div className="grid gap-4 pl-6">
+        <div className="grid gap-2">
+          <Label>Voice</Label>
+          <div className="flex items-center gap-2">
+            <Select
+              value={settings.voiceId}
+              onValueChange={(value) => setSetting('voiceId', value)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Choose a voice" />
+              </SelectTrigger>
+              <SelectContent>
+                {VOICES.map((voice) => (
+                  <SelectItem key={voice.id} value={voice.id}>
+                    {voice.name} — {voice.description}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" onClick={previewVoice} disabled={isPlaying}>
+              <Sparkles className="w-4 h-4 mr-1" />
+              Preview
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid gap-2">
+          <Label>Speech model</Label>
+          <Select
+            value={settings.ttsModel}
+            onValueChange={(value) => setSetting('ttsModel', value as AtlasSettings['ttsModel'])}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {MODELS.map((model) => (
+                <SelectItem key={model.id} value={model.id}>
+                  {model.name} — {model.description}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 pt-2">
+        <Mic className="w-4 h-4 text-cyan-400" />
+        <h4 className="font-medium">Voice Input</h4>
+      </div>
+
+      <div className="grid gap-4 pl-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="voice-isolation">Voice isolation</Label>
+            <p className="text-xs text-muted-foreground">
+              Removes background noise and other voices before transcribing.
+              Improves accuracy in noisy places; adds ~1s and uses extra credits.
+            </p>
+          </div>
+          <Switch
+            id="voice-isolation"
+            checked={settings.voiceIsolation}
+            onCheckedChange={(checked) => setSetting('voiceIsolation', checked)}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};

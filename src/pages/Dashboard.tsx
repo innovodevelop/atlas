@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
@@ -146,9 +146,18 @@ const Dashboard = () => {
     setFocusedCards(cardIds || []);
   }, []);
 
+  // Sentence-streamed speech: useUnifiedChat emits sentences during the LLM
+  // stream; useDashboardVoice consumes them. The ref breaks the circular
+  // dependency between the two hooks.
+  const speakSentenceRef = useRef<(sentence: string) => void>(() => {});
+  const handleSpeakSentence = useCallback((sentence: string) => {
+    speakSentenceRef.current(sentence);
+  }, []);
+
   const { messages, aiState, setAiState, isLoading, sendMessage, clearMessages } = useUnifiedChat({
     enableMemory: true,
     onCardFocus: handleCardFocus,
+    onSpeakSentence: handleSpeakSentence,
   });
 
   // Voice logic - extracted to hook
@@ -166,6 +175,7 @@ const Dashboard = () => {
     handleVoiceRelease,
     handleManualActivate,
     stopCurrentAudio,
+    speakSentence,
   } = useDashboardVoice({
     sendMessage,
     stopAudio: undefined,
@@ -173,6 +183,10 @@ const Dashboard = () => {
     isLoading,
     setAiState,
   });
+
+  useEffect(() => {
+    speakSentenceRef.current = speakSentence;
+  }, [speakSentence]);
 
   // Redirect if not authenticated
   useEffect(() => {

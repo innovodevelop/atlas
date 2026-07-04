@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { getSupportedAudioFormat, getRecorderOptions, type AudioFormat } from '@/lib/audioFormat';
+import { useAtlasSettingsReadOnly } from '@/hooks/useAtlasSettings';
 
 // Smoothing factor for audio level (lower = smoother, higher = more responsive)
 const AUDIO_SMOOTHING = 0.25;
@@ -14,6 +15,7 @@ interface AudioState {
 }
 
 export const usePerformanceOptimizedAudio = () => {
+  const { voiceId, ttsModel, voiceIsolation } = useAtlasSettingsReadOnly();
   const [state, setState] = useState<AudioState>({
     isRecording: false,
     isPlaying: false,
@@ -158,6 +160,7 @@ export const usePerformanceOptimizedAudio = () => {
                 audio: base64Audio,
                 mimeType: audioFormatRef.current.blobType,
                 extension: audioFormatRef.current.extension,
+                isolate: voiceIsolation,
               },
             });
 
@@ -195,7 +198,7 @@ export const usePerformanceOptimizedAudio = () => {
         setState((prev) => ({ ...prev, isPlaying: true }));
 
         const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
-          body: { text, voiceId: 'EXAVITQu4vr4xnSDxMaL' },
+          body: { text, voiceId, modelId: ttsModel },
         });
 
         if (error) {

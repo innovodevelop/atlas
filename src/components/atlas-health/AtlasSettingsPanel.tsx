@@ -25,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/hooks/use-toast';
 import { LovableAIControlPanel } from './LovableAIControlPanel';
 import { BudgetSettingsPanel } from './BudgetSettingsPanel';
+import { VoiceSettingsPanel } from './VoiceSettingsPanel';
 
 interface AtlasSettings {
   notifications: {
@@ -166,10 +167,14 @@ export const AtlasSettingsPanel = ({ onClose }: AtlasSettingsPanelProps) => {
 
       {/* Tabs for Settings Categories */}
       <Tabs defaultValue="ai" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 mb-4">
+        <TabsList className="grid w-full grid-cols-5 mb-4">
           <TabsTrigger value="ai" className="gap-2">
             <Zap className="w-4 h-4" />
             <span className="hidden sm:inline">AI Control</span>
+          </TabsTrigger>
+          <TabsTrigger value="voice" className="gap-2">
+            <Volume2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Voice</span>
           </TabsTrigger>
           <TabsTrigger value="budget" className="gap-2">
             <DollarSign className="w-4 h-4" />
@@ -187,6 +192,10 @@ export const AtlasSettingsPanel = ({ onClose }: AtlasSettingsPanelProps) => {
 
         <TabsContent value="ai" className="mt-0">
           <LovableAIControlPanel />
+        </TabsContent>
+
+        <TabsContent value="voice" className="mt-0">
+          <VoiceSettingsPanel />
         </TabsContent>
 
         <TabsContent value="budget" className="mt-0">

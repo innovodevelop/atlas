@@ -2,8 +2,10 @@ import { useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getSupportedAudioFormat, getRecorderOptions, type AudioFormat } from "@/lib/audioFormat";
+import { useAtlasSettingsReadOnly } from "@/hooks/useAtlasSettings";
 
 export const useVoice = () => {
+  const { voiceId, ttsModel, voiceIsolation } = useAtlasSettingsReadOnly();
   const [isRecording, setIsRecording] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
@@ -135,6 +137,7 @@ export const useVoice = () => {
                 extension: audioFormatRef.current.extension,
                 userId: user?.id || null,
                 storeTranscript: true, // Enable automatic transcript storage
+                isolate: voiceIsolation,
               },
             });
 
@@ -160,7 +163,7 @@ export const useVoice = () => {
       mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
       setIsRecording(false);
     });
-  }, []);
+  }, [voiceIsolation]);
 
   const speakText = useCallback(async (text: string): Promise<void> => {
     // Prevent duplicate audio - stop any existing playback
@@ -173,7 +176,7 @@ export const useVoice = () => {
       setIsPlaying(true);
 
       const { data, error } = await supabase.functions.invoke("elevenlabs-tts", {
-        body: { text, voiceId: "EXAVITQu4vr4xnSDxMaL" }, // Sarah voice
+        body: { text, voiceId, modelId: ttsModel },
       });
 
       if (error) {
@@ -238,7 +241,7 @@ export const useVoice = () => {
       toast.error("Failed to play audio");
       stopCurrentAudio();
     }
-  }, [stopCurrentAudio]);
+  }, [stopCurrentAudio, voiceId, ttsModel]);
 
   return {
     isRecording,

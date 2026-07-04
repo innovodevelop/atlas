@@ -44,6 +44,13 @@ export type StateCustomizations = Partial<Record<WakeWordState, Partial<NebulaSt
 
 // Complete settings interface for Atlas visualization
 export interface AtlasSettings {
+  // Voice output
+  voiceId: string;
+  ttsModel: 'eleven_turbo_v2_5' | 'eleven_flash_v2_5' | 'eleven_multilingual_v2';
+  // Pre-clean recorded audio via ElevenLabs Audio Isolation before STT.
+  // Helps in noisy environments; adds ~0.5-1s latency + credits. Default off.
+  voiceIsolation: boolean;
+
   // Visualization mode
   visualizationMode: 'classic' | 'nebulaFlow';
   
@@ -155,6 +162,9 @@ export interface AtlasSettings {
 
 // Default settings - optimized for performance
 export const defaultAtlasSettings: AtlasSettings = {
+  voiceId: 'EXAVITQu4vr4xnSDxMaL', // Sarah
+  ttsModel: 'eleven_turbo_v2_5',
+  voiceIsolation: false,
   visualizationMode: 'nebulaFlow',
   nebulaParticleMode: 'fixed', // Use manual particle count by default
   dashboardPreview: false,

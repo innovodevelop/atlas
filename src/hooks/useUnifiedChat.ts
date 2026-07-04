@@ -22,7 +22,48 @@ interface UseUnifiedChatOptions {
   source?: 'text_chat' | 'voice_chat';
   /** Callback to speak the response (for voice mode) */
   onSpeakResponse?: (text: string) => void;
+  /**
+   * Low-latency voice: called with each COMPLETED sentence while the LLM is
+   * still streaming, so TTS can start after the first sentence. When set,
+   * onSpeakResponse is NOT called at the end (the text was already spoken).
+   */
+  onSpeakSentence?: (sentence: string) => void;
 }
+
+// Sentence chunking for streaming TTS: split on sentence-ending punctuation
+// followed by whitespace, but don't emit tiny fragments (choppy audio).
+const MIN_SPOKEN_CHUNK = 40;
+
+const splitCompletedSentences = (buffer: string): { sentences: string[]; rest: string } => {
+  const sentences: string[] = [];
+  let rest = buffer;
+  for (;;) {
+    const match = rest.match(/[.!?…][)"'”’]*\s/);
+    if (!match || match.index === undefined) break;
+    const end = match.index + match[0].length;
+    const candidate = rest.slice(0, end);
+    if (candidate.trim().length < MIN_SPOKEN_CHUNK) {
+      // Too short on its own — try to extend to the next boundary
+      const next = rest.slice(end).match(/[.!?…][)"'”’]*\s/);
+      if (!next || next.index === undefined) break;
+      const extendedEnd = end + next.index + next[0].length;
+      sentences.push(rest.slice(0, extendedEnd));
+      rest = rest.slice(extendedEnd);
+    } else {
+      sentences.push(candidate);
+      rest = rest.slice(end);
+    }
+  }
+  return { sentences, rest };
+};
+
+// Markdown reads badly aloud — strip the common syntax before speaking
+const stripForSpeech = (text: string): string =>
+  text
+    .replace(/```[\s\S]*?```/g, " code block omitted. ")
+    .replace(/[*_#`>]+/g, "")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/\s{2,}/g, " ");
 
 /** Extract URLs from text and convert to citations */
 const extractUrlsAsCitations = (text: string): Citation[] => {
@@ -48,6 +89,7 @@ export const useUnifiedChat = ({
   onCardFocus,
   source = 'text_chat',
   onSpeakResponse,
+  onSpeakSentence,
 }: UseUnifiedChatOptions = {}) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [aiState, setAiState] = useState<AIState>('idle');
@@ -110,7 +152,11 @@ export const useUnifiedChat = ({
           },
         ]);
         
-        onSpeakResponse?.(cached.response);
+        if (onSpeakSentence) {
+          onSpeakSentence(stripForSpeech(cached.response).trim());
+        } else {
+          onSpeakResponse?.(cached.response);
+        }
         return cached.response;
       }
     }
@@ -216,6 +262,8 @@ export const useUnifiedChat = ({
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      // Buffer of not-yet-spoken text for sentence-streamed TTS
+      let speechBuffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
@@ -250,6 +298,17 @@ export const useUnifiedChat = ({
             const chunkContent = parsed.choices?.[0]?.delta?.content;
             if (chunkContent) {
               updateAssistantMessage(chunkContent, collectedCitations);
+
+              // Emit completed sentences to TTS while still streaming
+              if (onSpeakSentence) {
+                speechBuffer += chunkContent;
+                const { sentences, rest } = splitCompletedSentences(speechBuffer);
+                speechBuffer = rest;
+                for (const sentence of sentences) {
+                  const spoken = stripForSpeech(sentence).trim();
+                  if (spoken) onSpeakSentence(spoken);
+                }
+              }
             }
           } catch {
             // Put incomplete JSON back in buffer
@@ -292,8 +351,12 @@ export const useUnifiedChat = ({
       // Store the last response
       setLastResponse(assistantContent);
 
-      // Speak the response if callback provided
-      if (onSpeakResponse && assistantContent) {
+      // Speak: flush the tail of the sentence buffer (streamed mode), or the
+      // whole response at once (legacy mode)
+      if (onSpeakSentence) {
+        const tail = stripForSpeech(speechBuffer).trim();
+        if (tail) onSpeakSentence(tail);
+      } else if (onSpeakResponse && assistantContent) {
         onSpeakResponse(assistantContent);
       }
 
@@ -323,7 +386,7 @@ export const useUnifiedChat = ({
       setIsLoading(false);
       abortControllerRef.current = null;
     }
-  }, [messages, detectCardFocus, onCardFocus, source, enableMemory, enableCaching, onSpeakResponse]);
+  }, [messages, detectCardFocus, onCardFocus, source, enableMemory, enableCaching, onSpeakResponse, onSpeakSentence]);
 
   const clearMessages = useCallback(() => {
     setMessages([]);

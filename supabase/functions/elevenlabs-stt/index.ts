@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { audio, userId, storeTranscript = true, mimeType = "audio/webm", extension = "webm" } = await req.json();
+    const { audio, userId, storeTranscript = true, mimeType = "audio/webm", extension = "webm", isolate = false } = await req.json();
     const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -34,11 +34,39 @@ serve(async (req) => {
       bytes[i] = binaryString.charCodeAt(i);
     }
 
-    // Prepare form data. The client sends whatever container its engine can
-    // record (webm/opus in Chrome, mp4/aac in WKWebView) — pass it through.
+    // The client sends whatever container its engine can record
+    // (webm/opus in Chrome, mp4/aac in WKWebView) — pass it through.
+    let sttBlob = new Blob([bytes.buffer], { type: mimeType });
+    let sttFilename = `audio.${extension}`;
+
+    // Optional: isolate the speaker's voice (removes background noise/other
+    // voices) before transcription. Best-effort — on any failure we transcribe
+    // the original audio rather than block the request.
+    if (isolate) {
+      try {
+        const isolationForm = new FormData();
+        isolationForm.append("audio", sttBlob, sttFilename);
+        const isolationResponse = await fetch("https://api.elevenlabs.io/v1/audio-isolation", {
+          method: "POST",
+          headers: { "xi-api-key": ELEVENLABS_API_KEY },
+          body: isolationForm,
+        });
+        if (isolationResponse.ok) {
+          const isolatedBuffer = await isolationResponse.arrayBuffer();
+          sttBlob = new Blob([isolatedBuffer], { type: "audio/mpeg" });
+          sttFilename = "audio.mp3";
+          console.log(`[stt] Voice isolation applied (${isolatedBuffer.byteLength} bytes)`);
+        } else {
+          console.warn(`[stt] Voice isolation failed (${isolationResponse.status}), using original audio`);
+        }
+      } catch (isolationError) {
+        console.warn("[stt] Voice isolation error, using original audio:", isolationError);
+      }
+    }
+
+    // Prepare form data for transcription
     const formData = new FormData();
-    const blob = new Blob([bytes.buffer], { type: mimeType });
-    formData.append("file", blob, `audio.${extension}`);
+    formData.append("file", sttBlob, sttFilename);
     formData.append("model_id", "scribe_v1");
     formData.append("tag_audio_events", "false");
     formData.append("diarize", "false");

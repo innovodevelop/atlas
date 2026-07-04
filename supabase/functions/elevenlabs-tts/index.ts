@@ -6,7 +6,11 @@ serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   try {
-    const { text, voiceId = "EXAVITQu4vr4xnSDxMaL" } = await req.json();
+    const { text, voiceId = "EXAVITQu4vr4xnSDxMaL", modelId = "eleven_multilingual_v2" } = await req.json();
+
+    // Only allow known TTS models (client input reaches billing)
+    const ALLOWED_MODELS = ["eleven_turbo_v2_5", "eleven_flash_v2_5", "eleven_multilingual_v2"];
+    const model = ALLOWED_MODELS.includes(modelId) ? modelId : "eleven_multilingual_v2";
     const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
 
     if (!ELEVENLABS_API_KEY) {
@@ -29,7 +33,7 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           text,
-          model_id: "eleven_multilingual_v2",
+          model_id: model,
           output_format: "mp3_44100_128",
           voice_settings: {
             stability: 0.5,

@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useVoice } from '@/hooks/useVoice';
 import { useWakeWord } from '@/hooks/useWakeWord';
+import { useStreamingTTS } from '@/hooks/useStreamingTTS';
+import { useAtlasSettingsReadOnly } from '@/hooks/useAtlasSettings';
 import type { WakeWordState, AIState } from '@/types';
 
 interface UseDashboardVoiceOptions {
@@ -31,6 +33,8 @@ interface UseDashboardVoiceReturn {
   handleVoiceRelease: () => Promise<void>;
   handleManualActivate: () => Promise<void>;
   stopCurrentAudio: () => void;
+  /** Wire to useUnifiedChat's onSpeakSentence for low-latency streamed speech */
+  speakSentence: (sentence: string) => void;
 }
 
 export function useDashboardVoice({
@@ -55,13 +59,50 @@ export function useDashboardVoice({
   // Voice hook
   const {
     isRecording,
-    isPlaying,
-    audioLevel,
+    isPlaying: isVoicePlaying,
+    audioLevel: voiceAudioLevel,
     startRecording,
     stopRecording,
     speakText,
-    stopCurrentAudio,
+    stopCurrentAudio: stopVoiceAudio,
   } = useVoice();
+
+  // Streaming TTS: plays LLM sentences as they complete (low latency).
+  // Only active for voice-initiated queries — typed chat stays silent.
+  const streamingTTS = useStreamingTTS();
+  const { voiceId, ttsModel } = useAtlasSettingsReadOnly();
+  const voiceSessionRef = useRef(false);
+  const streamedSentencesRef = useRef(0);
+
+  const speakSentence = useCallback((sentence: string) => {
+    if (!voiceSessionRef.current) return;
+    streamedSentencesRef.current++;
+    streamingTTS.enqueue(sentence, { voiceId, modelId: ttsModel });
+  }, [streamingTTS, voiceId, ttsModel]);
+
+  const stopCurrentAudio = useCallback(() => {
+    stopVoiceAudio();
+    streamingTTS.stopPlayback();
+    voiceSessionRef.current = false;
+  }, [stopVoiceAudio, streamingTTS]);
+
+  const isPlaying = isVoicePlaying || streamingTTS.isPlaying;
+  const audioLevel = Math.max(voiceAudioLevel, streamingTTS.audioLevel);
+
+  // Mirror playing state into a ref so async handlers can await playback end
+  const isPlayingRef = useRef(false);
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
+
+  const waitForPlaybackEnd = useCallback(async (timeoutMs = 60_000) => {
+    const start = Date.now();
+    // Give the queue a beat to start before checking
+    await new Promise(r => setTimeout(r, 300));
+    while (isPlayingRef.current && Date.now() - start < timeoutMs) {
+      await new Promise(r => setTimeout(r, 200));
+    }
+  }, []);
 
   // Wake word hook
   const {
@@ -149,16 +190,27 @@ export function useDashboardVoice({
       
       if (transcribedText && transcribedText.trim()) {
         setLastUserMessage(transcribedText);
-        
+
+        // Sentence-streamed speech: sentences play while the LLM streams
+        voiceSessionRef.current = true;
+        streamedSentencesRef.current = 0;
+
         console.log('[useDashboardVoice] Sending message to chat...');
         const response = await sendMessage(transcribedText);
         console.log('[useDashboardVoice] Got response:', response?.substring(0, 100));
-        
+
         if (response && response.trim()) {
           setLastAiResponse(response);
           setWakeWordState('speaking');
-          console.log('[useDashboardVoice] Speaking response...');
-          await speakText(response);
+          if (streamedSentencesRef.current > 0) {
+            // Already speaking via the sentence queue — wait for it to drain
+            await waitForPlaybackEnd();
+          } else {
+            // Sentence path wasn't wired (or produced nothing): legacy whole-
+            // response playback
+            console.log('[useDashboardVoice] Speaking response (fallback)...');
+            await speakText(response);
+          }
           console.log('[useDashboardVoice] TTS complete');
         } else {
           console.warn('[useDashboardVoice] No response to speak');
@@ -169,11 +221,12 @@ export function useDashboardVoice({
     } catch (error) {
       console.error('[useDashboardVoice] Voice processing error:', error);
     } finally {
+      voiceSessionRef.current = false;
       setIsVoiceProcessing(false);
       console.log('[useDashboardVoice] Resuming wake word listening');
       resumeListening();
     }
-  }, [isRecording, stopRecording, sendMessage, setWakeWordState, speakText, resumeListening]);
+  }, [isRecording, stopRecording, sendMessage, setWakeWordState, speakText, resumeListening, waitForPlaybackEnd]);
 
   // Manual activate handler
   const handleManualActivate = useCallback(async () => {
@@ -244,5 +297,6 @@ export function useDashboardVoice({
     handleVoiceRelease,
     handleManualActivate,
     stopCurrentAudio,
+    speakSentence,
   };
 }
