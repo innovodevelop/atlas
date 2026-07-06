@@ -51,7 +51,8 @@ export const useWeather = (city: string = 'San Francisco') => {
   );
 
   return {
-    weather: data,
+    // Never null — fall back to representative data until the edge fn resolves
+    weather: data ?? fallbackData,
     isLoading,
     error,
     refetch,

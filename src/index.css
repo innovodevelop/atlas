@@ -6,39 +6,39 @@
 
 @layer base {
   :root {
-    /* Core backgrounds - deep space theme */
-    --background: 230 25% 5%;
-    --foreground: 210 40% 98%;
+    /* Core backgrounds - Aurora deep indigo theme */
+    --background: 240 28% 7%;
+    --foreground: 240 30% 96%;
 
     /* Cards with glassmorphic feel */
-    --card: 230 25% 8%;
-    --card-foreground: 210 40% 98%;
+    --card: 240 33% 12%;
+    --card-foreground: 240 30% 96%;
 
-    --popover: 230 25% 10%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 240 33% 11%;
+    --popover-foreground: 240 30% 96%;
 
-    /* Primary - electric cyan */
-    --primary: 195 100% 50%;
-    --primary-foreground: 230 25% 5%;
+    /* Primary - Aurora indigo */
+    --primary: 243 75% 58%;
+    --primary-foreground: 0 0% 100%;
 
-    /* Secondary - deep purple */
-    --secondary: 260 60% 45%;
-    --secondary-foreground: 210 40% 98%;
+    /* Secondary - deep violet */
+    --secondary: 258 60% 45%;
+    --secondary-foreground: 240 30% 96%;
 
     /* Muted tones */
-    --muted: 230 20% 15%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 240 30% 16%;
+    --muted-foreground: 240 20% 62%;
 
-    /* Accent - vibrant magenta */
-    --accent: 280 80% 60%;
-    --accent-foreground: 210 40% 98%;
+    /* Accent - Aurora violet */
+    --accent: 280 70% 60%;
+    --accent-foreground: 240 30% 96%;
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 350 75% 55%;
+    --destructive-foreground: 240 40% 98%;
 
-    --border: 230 30% 20%;
-    --input: 230 25% 12%;
-    --ring: 195 100% 50%;
+    --border: 243 30% 22%;
+    --input: 240 33% 14%;
+    --ring: 243 75% 62%;
 
     --radius: 1rem;
 
@@ -93,26 +93,26 @@
   }
 
   .dark {
-    /* Same as root - this is a dark-first design */
-    --background: 230 25% 5%;
-    --foreground: 210 40% 98%;
-    --card: 230 25% 8%;
-    --card-foreground: 210 40% 98%;
-    --popover: 230 25% 10%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 195 100% 50%;
-    --primary-foreground: 230 25% 5%;
-    --secondary: 260 60% 45%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 230 20% 15%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 280 80% 60%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 230 30% 20%;
-    --input: 230 25% 12%;
-    --ring: 195 100% 50%;
+    /* Same as root - Aurora is a dark-first design */
+    --background: 240 28% 7%;
+    --foreground: 240 30% 96%;
+    --card: 240 33% 12%;
+    --card-foreground: 240 30% 96%;
+    --popover: 240 33% 11%;
+    --popover-foreground: 240 30% 96%;
+    --primary: 243 75% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 258 60% 45%;
+    --secondary-foreground: 240 30% 96%;
+    --muted: 240 30% 16%;
+    --muted-foreground: 240 20% 62%;
+    --accent: 280 70% 60%;
+    --accent-foreground: 240 30% 96%;
+    --destructive: 350 75% 55%;
+    --destructive-foreground: 240 40% 98%;
+    --border: 243 30% 22%;
+    --input: 240 33% 14%;
+    --ring: 243 75% 62%;
     --sidebar-background: 230 25% 8%;
     --sidebar-foreground: 210 40% 98%;
     --sidebar-primary: 195 100% 50%;
