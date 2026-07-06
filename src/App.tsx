@@ -7,6 +7,8 @@ import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import AuroraDashboard from "./pages/aurora/AuroraDashboard";
+import AuroraHome from "./pages/aurora/AuroraHome";
+import AuroraCore from "./pages/aurora/AuroraCore";
 import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -62,20 +64,22 @@ const App = () => (
       <BrowserRouter>
         <RouteErrorBoundary>
         <Routes>
-          {/* Aurora dashboard is the main route */}
+          {/* Aurora screens */}
           <Route path="/" element={<AuroraDashboard />} />
           <Route path="/dashboard" element={<AuroraDashboard />} />
+          <Route path="/home" element={<AuroraHome />} />
+          <Route path="/atlas-core" element={<AuroraCore />} />
           <Route path="/legacy-dashboard" element={<Dashboard />} />
           <Route path="/auth" element={<Auth />} />
-          
-          {/* Atlas Core Dashboard */}
-          <Route 
-            path="/atlas-core" 
+
+          {/* Legacy Atlas Core health dashboard */}
+          <Route
+            path="/atlas-core-legacy"
             element={
               <Suspense fallback={<PageLoader />}>
                 <AtlasCore />
             </Suspense>
-            } 
+            }
           />
            <Route 
              path="/atlas-architecture" 

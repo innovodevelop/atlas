@@ -1,12 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { BackgroundEffects } from "@/components/aria/BackgroundEffects";
-import { cn } from "@/lib/utils";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, Chrome, Github } from "lucide-react";
 import { z } from "zod";
 
 const authSchema = z.object({
@@ -15,10 +10,12 @@ const authSchema = z.object({
   displayName: z.string().optional(),
 });
 
+// Aurora auth screen (design: .overlay/.authwrap/.authcard). Real Supabase
+// wiring via useAuth is preserved.
 const Auth = () => {
   const navigate = useNavigate();
   const { signIn, signUp, isAuthenticated, loading } = useAuth();
-  
+
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,9 +25,7 @@ const Auth = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (isAuthenticated && !loading) {
-      navigate("/");
-    }
+    if (isAuthenticated && !loading) navigate("/");
   }, [isAuthenticated, loading, navigate]);
 
   const validate = () => {
@@ -40,13 +35,9 @@ const Auth = () => {
       return true;
     } catch (err) {
       if (err instanceof z.ZodError) {
-        const newErrors: Record<string, string> = {};
-        err.errors.forEach((e) => {
-          if (e.path[0]) {
-            newErrors[e.path[0] as string] = e.message;
-          }
-        });
-        setErrors(newErrors);
+        const next: Record<string, string> = {};
+        err.errors.forEach((e) => { if (e.path[0]) next[e.path[0] as string] = e.message; });
+        setErrors(next);
       }
       return false;
     }
@@ -54,16 +45,11 @@ const Auth = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!validate()) return;
-
     setIsSubmitting(true);
     try {
-      if (mode === "signin") {
-        await signIn(email, password);
-      } else {
-        await signUp(email, password, displayName);
-      }
+      if (mode === "signin") await signIn(email, password);
+      else await signUp(email, password, displayName);
     } finally {
       setIsSubmitting(false);
     }
@@ -71,131 +57,68 @@ const Auth = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="page fx ac jc" style={{ minHeight: "100vh" }}>
+        <div className="auro" />
+        <Loader2 className="animate-spin" style={{ width: 28, height: 28, color: "hsl(243 82% 80%)" }} />
       </div>
     );
   }
 
+  const isSignup = mode === "signup";
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-background flex items-center justify-center">
-      <BackgroundEffects />
-
-      <div className="relative z-10 w-full max-w-md px-4">
-        {/* Logo */}
-        <div className="flex items-center justify-center gap-3 mb-8">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-            <span className="text-xl font-bold text-primary-foreground">A</span>
-          </div>
-          <div>
-            <h1 className="text-2xl font-semibold text-foreground tracking-tight">Atlas</h1>
-            <p className="text-xs text-muted-foreground">AI Research Assistant</p>
-          </div>
+    <div className="overlay" data-screen-label="Aurora — Auth">
+      <div className="ovwash" />
+      <div className="authwrap"><div className="authcol">
+        <div className="authlogo">
+          <div className="authmk">A</div>
+          <div><h1 className="authname">Atlas</h1><p className="authtag">AI Assistant</p></div>
         </div>
-
-        {/* Auth Card */}
-        <div className="glass-card p-8">
-          <div className="text-center mb-6">
-            <h2 className="text-xl font-semibold text-foreground">
-              {mode === "signin" ? "Welcome back" : "Create your account"}
-            </h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              {mode === "signin" 
-                ? "Sign in to access your AI assistant" 
-                : "Start your journey with Atlas"}
-            </p>
+        <div className="authcard">
+          <div className="authseg">
+            <button className={`segbtn ${!isSignup ? "on" : ""}`} onClick={() => setMode("signin")}>Sign In</button>
+            <button className={`segbtn ${isSignup ? "on" : ""}`} onClick={() => setMode("signup")}>Sign Up</button>
           </div>
+          <h2 className="authh">{isSignup ? "Create your account" : "Welcome back"}</h2>
+          <p className="auths">{isSignup ? "Start your journey with Atlas" : "Sign in to access your assistant"}</p>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {mode === "signup" && (
-              <div className="space-y-2">
-                <Label htmlFor="displayName">Display Name</Label>
-                <Input
-                  id="displayName"
-                  type="text"
-                  placeholder="How should Atlas call you?"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  className="bg-input/50 border-border/50"
-                />
+          <form onSubmit={handleSubmit}>
+            {isSignup && (
+              <div className="fld">
+                <label className="lbl">Display Name</label>
+                <input className="field" placeholder="How should Atlas call you?" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
               </div>
             )}
-
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={cn(
-                  "bg-input/50 border-border/50",
-                  errors.email && "border-destructive"
-                )}
-              />
-              {errors.email && (
-                <p className="text-xs text-destructive">{errors.email}</p>
-              )}
+            <div className="fld">
+              <label className="lbl">Email</label>
+              <input className="field" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+              {errors.email && <p style={{ fontSize: 12, color: "hsl(350 75% 72%)", margin: "6px 0 0" }}>{errors.email}</p>}
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={cn(
-                    "bg-input/50 border-border/50 pr-10",
-                    errors.password && "border-destructive"
-                  )}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+            <div className="fld">
+              <label className="lbl">Password</label>
+              <div className="pwwrap">
+                <input className="field" type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} style={{ paddingRight: 42 }} />
+                <button type="button" className="eye" onClick={() => setShowPassword((s) => !s)}>{showPassword ? <EyeOff className="i16" /> : <Eye className="i16" />}</button>
               </div>
-              {errors.password && (
-                <p className="text-xs text-destructive">{errors.password}</p>
-              )}
+              {errors.password && <p style={{ fontSize: 12, color: "hsl(350 75% 72%)", margin: "6px 0 0" }}>{errors.password}</p>}
             </div>
-
-            <Button
-              type="submit"
-              className="w-full bg-primary hover:bg-primary/90"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-              ) : null}
-              {mode === "signin" ? "Sign In" : "Create Account"}
-            </Button>
+            <button className="authbtn" type="submit" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="i16 animate-spin" style={{ marginRight: 8, display: "inline", verticalAlign: -3 }} />}
+              {isSignup ? "Create Account" : "Sign In"}
+            </button>
           </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-sm text-muted-foreground">
-              {mode === "signin" ? "Don't have an account?" : "Already have an account?"}
-              <button
-                type="button"
-                onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-                className="ml-1 text-primary hover:underline"
-              >
-                {mode === "signin" ? "Sign up" : "Sign in"}
-              </button>
-            </p>
+          <div className="ordiv">or</div>
+          <div className="oauth">
+            <button className="oauthbtn" type="button" disabled><Chrome className="i16" />Google</button>
+            <button className="oauthbtn" type="button" disabled><Github className="i16" />GitHub</button>
           </div>
+          <p className="authswap">
+            {isSignup ? "Already have an account?" : "Don't have an account?"}{" "}
+            <button className="linkA" onClick={() => setMode(isSignup ? "signin" : "signup")}>{isSignup ? "Sign in" : "Sign up"}</button>
+          </p>
         </div>
-
-        <p className="text-center text-xs text-muted-foreground mt-6">
-          By continuing, you agree to our Terms of Service and Privacy Policy.
-        </p>
-      </div>
+        <p className="authterms">By continuing, you agree to our Terms of Service and Privacy Policy.</p>
+      </div></div>
     </div>
   );
 };
