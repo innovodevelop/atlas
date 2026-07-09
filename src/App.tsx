@@ -13,6 +13,7 @@ import Dashboard from "./pages/Dashboard";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
+import { useRealtimePauseOnInactivity } from "./hooks/useRealtimePauseOnInactivity";
 
 // Lazy load heavy pages
 const LegacyIndex = lazy(() => import("./pages/Index"));
@@ -28,7 +29,9 @@ const AtlasTeach = lazy(() => import("./pages/AtlasTeach"));
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      gcTime: 24 * 60 * 60 * 1000, // keep cached data a day for the persister
+      // Evict inactive queries after 30 min. 24h let the in-memory cache grow
+      // unbounded across a long-open desktop session.
+      gcTime: 30 * 60 * 1000,
     },
   },
 });
@@ -37,6 +40,22 @@ const persister = createSyncStoragePersister({
   storage: typeof window !== "undefined" ? window.localStorage : undefined,
   key: "atlas-query-cache",
 });
+
+// Only persist the small, stable "instant startup" queries. Volatile/large
+// payloads (stock sparklines, news, realtime health) would bloat localStorage
+// and get replayed into memory on every launch.
+const PERSIST_ALLOWLIST = ["weather", "profile", "tasks", "notes", "calendar", "user"];
+const persistOptions = {
+  persister,
+  maxAge: 24 * 60 * 60 * 1000,
+  buster: "v2",
+  dehydrateOptions: {
+    shouldDehydrateQuery: (query: { queryKey: unknown[] }) => {
+      const head = String(query.queryKey?.[0] ?? "").toLowerCase();
+      return PERSIST_ALLOWLIST.some((k) => head.includes(k));
+    },
+  },
+};
 
 export const clearPersistedCache = () => {
   try {
@@ -53,12 +72,19 @@ const PageLoader = () => (
   </div>
 );
 
+// App-wide side effects that must run once, inside the providers.
+const GlobalEffects = () => {
+  useRealtimePauseOnInactivity();
+  return null;
+};
+
 const App = () => (
   <PersistQueryClientProvider
     client={queryClient}
-    persistOptions={{ persister, maxAge: 24 * 60 * 60 * 1000, buster: "v1" }}
+    persistOptions={persistOptions}
   >
     <TooltipProvider>
+      <GlobalEffects />
       <Toaster />
       <Sonner />
       <BrowserRouter>

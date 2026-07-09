@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 interface AIInsight {
   id: string;
@@ -16,11 +17,18 @@ export const useProactiveAI = () => {
   const [currentInsight, setCurrentInsight] = useState<AIInsight | null>(null);
 
   useEffect(() => {
-    const setupRealtimeSubscription = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+    // NOTE: the effect owns the cleanup — the async setup below CANNOT return
+    // it (its return value is lost). We stash the channel in a ref and remove
+    // it from the effect's own cleanup, otherwise the channel leaks on every
+    // mount (it accumulates on the single Supabase realtime socket → the
+    // WKWebView Networking process balloons over a long session).
+    let cancelled = false;
+    const channelRef: { current: RealtimeChannel | null } = { current: null };
 
-      // Subscribe to new insights
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || cancelled) return;
+
       const channel = supabase
         .channel("ai-insights")
         .on(
@@ -35,8 +43,6 @@ export const useProactiveAI = () => {
             const newInsight = payload.new as AIInsight;
             if (!newInsight.is_spoken) {
               setCurrentInsight(newInsight);
-              
-              // Mark as spoken
               await supabase
                 .from("ai_insights")
                 .update({ is_spoken: true })
@@ -45,13 +51,15 @@ export const useProactiveAI = () => {
           }
         )
         .subscribe();
+      channelRef.current = channel;
+      // If the effect was already cleaned up while awaiting getUser, tear down now.
+      if (cancelled) supabase.removeChannel(channel);
+    })();
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
+    return () => {
+      cancelled = true;
+      if (channelRef.current) supabase.removeChannel(channelRef.current);
     };
-
-    setupRealtimeSubscription();
   }, []);
 
   const clearInsight = useCallback(() => {

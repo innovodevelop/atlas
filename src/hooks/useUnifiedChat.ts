@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { Message, Citation, AIState } from '@/types';
@@ -102,6 +102,13 @@ export const useUnifiedChat = ({
   // Stable id for this conversation — the backend scopes learning/research
   // sessions to it. Reset when the chat is cleared.
   const conversationIdRef = useRef<string>(crypto.randomUUID());
+
+  // Abort any in-flight SSE stream on unmount — otherwise navigating away
+  // mid-response leaves the streamed body buffered in the Networking process.
+  useEffect(() => () => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+  }, []);
 
   // Detect multiple card focuses from message content
   const detectCardFocus = useCallback((content: string) => {

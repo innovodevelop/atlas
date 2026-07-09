@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { isWindowActive } from '@/hooks/useWindowActivity';
 
 interface RealtimeStock {
   symbol: string;
@@ -31,6 +32,7 @@ export const useStocksRealtime = (symbols: string[]) => {
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fallbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptRef = useRef(0);
+  const stableTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Initialize with baseline prices
   const initializeStocks = useCallback(async () => {
@@ -91,18 +93,33 @@ export const useStocksRealtime = (symbols: string[]) => {
   // Connect to WebSocket
   const connectWebSocket = useCallback(async () => {
     if (symbols.length === 0) return;
+    // Don't churn sockets while the window is hidden/blurred.
+    if (!isWindowActive()) return;
+
+    // Close any prior socket before opening a new one, or they leak.
+    if (wsRef.current && wsRef.current.readyState <= WebSocket.OPEN) {
+      try { wsRef.current.onclose = null; wsRef.current.close(); } catch { /* ignore */ }
+    }
 
     try {
       const wsUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stocks-realtime`.replace('https://', 'wss://');
-      
+
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
         setIsConnected(true);
         setIsLive(true);
-        reconnectAttemptRef.current = 0; // Reset on successful connection
-        
+        // Only reset the reconnect counter once the connection PROVES stable
+        // (5s). Resetting instantly on open let a socket that opens-then-errors
+        // reconnect forever, buffering in the Networking process.
+        if (stableTimerRef.current) clearTimeout(stableTimerRef.current);
+        stableTimerRef.current = setTimeout(() => {
+          if (wsRef.current === ws && ws.readyState === WebSocket.OPEN) {
+            reconnectAttemptRef.current = 0;
+          }
+        }, 5000);
+
         // Subscribe to symbols
         ws.send(JSON.stringify({
           type: 'subscribe',
@@ -166,6 +183,7 @@ export const useStocksRealtime = (symbols: string[]) => {
     if (fallbackIntervalRef.current) return;
 
     fallbackIntervalRef.current = setInterval(async () => {
+      if (!isWindowActive()) return; // don't poll while hidden/blurred
       try {
         const { data, error } = await supabase.functions.invoke('get-stocks', {
           body: { symbols },
@@ -193,14 +211,12 @@ export const useStocksRealtime = (symbols: string[]) => {
 
     return () => {
       if (wsRef.current) {
+        wsRef.current.onclose = null; // prevent reconnect scheduling on teardown
         wsRef.current.close();
       }
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-      if (fallbackIntervalRef.current) {
-        clearInterval(fallbackIntervalRef.current);
-      }
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      if (fallbackIntervalRef.current) clearInterval(fallbackIntervalRef.current);
+      if (stableTimerRef.current) clearTimeout(stableTimerRef.current);
     };
   }, [initializeStocks, connectWebSocket]);
 
