@@ -32,10 +32,44 @@ function handleFocusChange(focused: boolean) {
     blurTimer = null;
   }
   if (focused) {
-    emit(true);
+    windowFocused = true;
+    // Regaining focus is user activity — clear idle immediately
+    onUserInput();
+    recomputeActive();
   } else {
-    blurTimer = setTimeout(() => emit(false), BLUR_GRACE_MS);
+    blurTimer = setTimeout(() => {
+      windowFocused = false;
+      recomputeActive();
+    }, BLUR_GRACE_MS);
   }
+}
+
+// Idle detection: a frontmost window never blurs — display sleep included —
+// so an app left open overnight would poll/stream for hours (this is exactly
+// how the WKWebView Networking process once grew to ~5GB). No user input for
+// IDLE_TIMEOUT_MS counts as inactive; any input reactivates instantly.
+const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
+let idleTimer: ReturnType<typeof setTimeout> | null = null;
+let isIdle = false;
+let windowFocused = true;
+
+function recomputeActive() {
+  emit(windowFocused && !isIdle);
+}
+
+function armIdleTimer() {
+  if (idleTimer) clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    isIdle = true;
+    recomputeActive();
+  }, IDLE_TIMEOUT_MS);
+}
+
+function onUserInput() {
+  const wasIdle = isIdle;
+  isIdle = false;
+  armIdleTimer();
+  if (wasIdle) recomputeActive();
 }
 
 function start() {
@@ -43,12 +77,16 @@ function start() {
   started = true;
 
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-      emit(false);
-    } else {
-      emit(true);
-    }
+    windowFocused = !document.hidden;
+    if (blurTimer) { clearTimeout(blurTimer); blurTimer = null; }
+    recomputeActive();
   });
+
+  // Input listeners (passive — no scroll/render cost)
+  for (const evt of ['pointermove', 'pointerdown', 'keydown', 'wheel'] as const) {
+    window.addEventListener(evt, onUserInput, { passive: true });
+  }
+  armIdleTimer();
 
   if (isTauri) {
     // Dynamic import so the browser build never touches the Tauri API
