@@ -4,7 +4,8 @@
    expanded panels, auth, home, core…) are the design's own CSS, unchanged so
    the React port renders pixel-identically.
    ========================================================================== */
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&family=Manrope:wght@400;500;600;700&display=swap');
+/* Fonts load from index.html <link> (parallel with the bundle) — the old
+   @import here serialized font fetch behind CSS parse. */
 
 /* --- Design component styles (verbatim) --- */
 body{margin:0;background:hsl(240 28% 7%);color:hsl(240 30% 96%);font-family:'Manrope',system-ui,sans-serif;-webkit-font-smoothing:antialiased}

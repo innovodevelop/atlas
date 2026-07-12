@@ -4,7 +4,7 @@ import { Cpu, LayoutGrid, Mic, ArrowUp } from 'lucide-react';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useUnifiedChat } from '@/hooks/useUnifiedChat';
 import { useDashboardVoice } from '@/hooks/useDashboardVoice';
-import { AtlasSphere } from '@/components/atlas/AtlasSphere';
+import { AtlasSphereLazy as AtlasSphere } from '@/components/atlas/AtlasSphereLazy';
 import { timeOfDayGreeting } from './auroraHelpers';
 
 const CHIPS = [

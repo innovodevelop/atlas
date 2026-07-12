@@ -7,7 +7,7 @@ import { useWeather } from '@/hooks/useWeather';
 import { useCalendarEvents } from '@/hooks/useCalendarEvents';
 import { useUnifiedChat } from '@/hooks/useUnifiedChat';
 import { useDashboardVoice } from '@/hooks/useDashboardVoice';
-import { AtlasSphere } from '@/components/atlas/AtlasSphere';
+import { AtlasSphereLazy as AtlasSphere } from '@/components/atlas/AtlasSphereLazy';
 import { timeOfDayGreeting } from './auroraHelpers';
 import {
   AuroraWeatherCard, AuroraCalendarCard, AuroraTasksCard,

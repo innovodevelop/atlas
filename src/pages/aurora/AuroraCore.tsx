@@ -4,7 +4,7 @@ import {
   ArrowLeft, Sparkles, Brain, Search, AlertTriangle, Activity, TrendingUp, TrendingDown,
   Database, DownloadCloud, Cpu, CheckCircle2, FileText, BookOpen, Loader, Clock, Radio, Bot, Zap,
 } from 'lucide-react';
-import { AtlasSphere } from '@/components/atlas/AtlasSphere';
+import { AtlasSphereLazy as AtlasSphere } from '@/components/atlas/AtlasSphereLazy';
 import { useAtlasHealth } from '@/hooks/useAtlasHealth';
 
 const TABS = [

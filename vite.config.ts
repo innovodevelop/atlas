@@ -3,7 +3,11 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
+  esbuild: {
+    // Strip debug output from production builds; keep it in dev.
+    drop: command === "build" ? (["console", "debugger"] as ("console" | "debugger")[]) : [],
+  },
   server: {
     host: "::",
     port: 8080,
@@ -15,6 +19,9 @@ export default defineConfig({
     },
   },
   build: {
+    // WKWebView (macOS 13+) and modern browsers only — skips legacy
+    // transforms and shrinks output.
+    target: "safari16",
     rollupOptions: {
       output: {
         // Keep heavyweight libraries out of the entry chunk. mermaid is only
@@ -27,4 +34,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

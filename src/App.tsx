@@ -7,20 +7,23 @@ import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import AuroraDashboard from "./pages/aurora/AuroraDashboard";
-import AuroraHome from "./pages/aurora/AuroraHome";
-import AuroraCore from "./pages/aurora/AuroraCore";
-import Dashboard from "./pages/Dashboard";
-import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
 import { useRealtimePauseOnInactivity } from "./hooks/useRealtimePauseOnInactivity";
 
-// Lazy load heavy pages
+// Only the default route (AuroraDashboard) is eager — everything else is
+// code-split so the entry chunk stays small and the startup paint is instant.
+// The legacy Dashboard especially must stay lazy: it drags 9 realtime hooks
+// and the whole legacy card stack into whatever chunk it lands in.
+const AuroraHome = lazy(() => import("./pages/aurora/AuroraHome"));
+const AuroraCore = lazy(() => import("./pages/aurora/AuroraCore"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Auth = lazy(() => import("./pages/Auth"));
 const LegacyIndex = lazy(() => import("./pages/Index"));
 const AtlasDemo = lazy(() => import("./pages/AtlasDemo"));
 const AtlasCore = lazy(() => import("./pages/AtlasCore"));
 const AtlasTeach = lazy(() => import("./pages/AtlasTeach"));
- const AtlasArchitecture = lazy(() => import("./pages/AtlasArchitecture"));
+const AtlasArchitecture = lazy(() => import("./pages/AtlasArchitecture"));
 
 // Instant startup: dashboard data (weather, stocks, news, tasks…) is
 // persisted to disk-backed localStorage, so the app paints with last-known
@@ -89,6 +92,8 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <RouteErrorBoundary>
+        {/* One suspense boundary for every lazy route */}
+        <Suspense fallback={<PageLoader />}>
         <Routes>
           {/* Aurora screens */}
           <Route path="/" element={<AuroraDashboard />} />
@@ -145,6 +150,7 @@ const App = () => (
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </Suspense>
         </RouteErrorBoundary>
       </BrowserRouter>
     </TooltipProvider>
