@@ -114,9 +114,11 @@ export interface AtlasCoreProps {
   }>>>;
 }
 
-// Bloom wrapper - lower quality for performance
+// Bloom wrapper - lower quality for performance. frameBufferType must stay
+// HalfFloat: integer buffers drop the alpha channel and the composer then
+// paints an opaque square over transparent canvases (the "boxed sphere" bug).
 const BloomEffect = memo(({ intensity }: { intensity: number }) => (
-  <EffectComposer multisampling={0}>
+  <EffectComposer multisampling={0} frameBufferType={THREE.HalfFloatType}>
     <Bloom
       intensity={intensity}
       luminanceThreshold={0.2}
@@ -466,7 +468,7 @@ export const AtlasCore = memo(forwardRef<HTMLDivElement, AtlasCoreProps>(({
     >
       <Canvas
         camera={{ position: [0, 0, cameraZ], fov: 45 }}
-        gl={{ antialias: false, alpha: true, powerPreference: 'default', failIfMajorPerformanceCaveat: false }}
+        gl={{ antialias: false, alpha: true, premultipliedAlpha: false, powerPreference: 'default', failIfMajorPerformanceCaveat: false }}
         style={{ background: 'transparent' }}
         dpr={pixelRatio}
         frameloop={windowActive ? 'always' : 'never'}

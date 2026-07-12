@@ -111,6 +111,14 @@ const AtlasSphereComponent = ({
       ref={containerRef}
       className={cn('relative w-full h-full flex items-center justify-center cursor-pointer', className)}
       onClick={onClick}
+      style={{
+        // Defensive circular mask: if any composer/driver regression paints an
+        // opaque background into the square canvas, clip it to the orb shape.
+        // closest-side keeps the fade inside the container; the bloom halo
+        // lives well within the inner 70%, so nothing visible is lost.
+        WebkitMaskImage: 'radial-gradient(closest-side, black 70%, transparent 100%)',
+        maskImage: 'radial-gradient(closest-side, black 70%, transparent 100%)',
+      }}
     >
       {renderState.isReady && (
         <AtlasCore
