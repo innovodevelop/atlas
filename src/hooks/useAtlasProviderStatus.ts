@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { isWindowActive } from '@/hooks/useWindowActivity';
 
 export type ProviderName = 'lovable_ai' | 'perplexity' | 'anthropic' | 'jina' | 'openai';
 export type ProviderStatusType = 'healthy' | 'degraded' | 'error' | 'rate_limited' | 'credits_exhausted' | 'unknown';
@@ -72,7 +73,9 @@ export function useAtlasProviderStatus() {
       if (error) throw error;
       return (data || []) as ProviderStatus[];
     },
-    refetchInterval: 30000, // Refresh every 30 seconds
+    // Gated: React Query keeps constant intervals firing even when the
+    // window is inactive — that churn heats the Networking process.
+    refetchInterval: () => (isWindowActive() ? 30000 : false),
   });
 
   // Fetch system settings
@@ -88,7 +91,7 @@ export function useAtlasProviderStatus() {
       if (error) throw error;
       return data as SystemSettings;
     },
-    refetchInterval: 10000,
+    refetchInterval: () => (isWindowActive() ? 10000 : false),
   });
 
   // Fetch recent learning logs
@@ -104,7 +107,7 @@ export function useAtlasProviderStatus() {
       if (error) throw error;
       return (data || []) as LearningLog[];
     },
-    refetchInterval: 15000,
+    refetchInterval: () => (isWindowActive() ? 15000 : false),
   });
 
   // Subscribe to realtime updates

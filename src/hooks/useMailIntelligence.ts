@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -39,6 +39,45 @@ export interface MailAlert {
 
 const ACCOUNT_COLUMNS = 'id, provider, email_address, status, last_synced_at';
 
+// --- Shared alert stream -----------------------------------------------
+// The hook is mounted by BOTH the Inbox card (always) and the expanded Mail
+// view. Each opening its own channel on the same topic makes two Phoenix
+// joins on one socket — a join/rejoin ping-pong that churns the Networking
+// process. One module-level channel per user, refcounted across consumers
+// (same pattern as useWindowActivity's shared listeners).
+type AlertListener = (alert: MailAlert) => void;
+let alertListeners: AlertListener[] = [];
+let alertChannel: ReturnType<typeof supabase.channel> | null = null;
+let alertChannelUserId: string | null = null;
+
+function subscribeAlerts(userId: string, listener: AlertListener): () => void {
+  alertListeners.push(listener);
+  if (!alertChannel || alertChannelUserId !== userId) {
+    if (alertChannel) supabase.removeChannel(alertChannel);
+    alertChannelUserId = userId;
+    alertChannel = supabase
+      .channel(`mail-alerts-${userId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'mail_alerts', filter: `user_id=eq.${userId}` },
+        (payload) => {
+          const alert = payload.new as MailAlert;
+          for (const l of alertListeners) l(alert);
+          notifyNative('Atlas Mail', alert.title);
+        },
+      )
+      .subscribe();
+  }
+  return () => {
+    alertListeners = alertListeners.filter((l) => l !== listener);
+    if (alertListeners.length === 0 && alertChannel) {
+      supabase.removeChannel(alertChannel);
+      alertChannel = null;
+      alertChannelUserId = null;
+    }
+  };
+}
+
 async function notifyNative(title: string, body: string) {
   // macOS notification via the Tauri plugin; silently no-op in the browser.
   if (!('__TAURI_INTERNALS__' in window)) return;
@@ -61,7 +100,6 @@ export function useMailIntelligence() {
   const [alerts, setAlerts] = useState<MailAlert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const refresh = useCallback(async () => {
     if (!user) { setIsLoading(false); return; }
@@ -89,34 +127,14 @@ export function useMailIntelligence() {
     refresh();
   }, [refresh]);
 
-  // Realtime alert stream. Cleanup is owned by the effect itself (the
-  // async-setup-returns-cleanup bug is how channels leaked historically).
+  // Realtime alert stream via the shared refcounted channel (one websocket
+  // topic no matter how many components mount this hook). Cleanup is owned
+  // by the effect itself.
   useEffect(() => {
     if (!user) return;
-    let cancelled = false;
-
-    const channel = supabase
-      .channel(`mail-alerts-${user.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'mail_alerts', filter: `user_id=eq.${user.id}` },
-        (payload) => {
-          if (cancelled) return;
-          const alert = payload.new as MailAlert;
-          setAlerts((prev) => [alert, ...prev].slice(0, 20));
-          notifyNative('Atlas Mail', alert.title);
-        },
-      )
-      .subscribe();
-    channelRef.current = channel;
-
-    return () => {
-      cancelled = true;
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
-    };
+    return subscribeAlerts(user.id, (alert) => {
+      setAlerts((prev) => [alert, ...prev].slice(0, 20));
+    });
   }, [user]);
 
   // One-time connect: open Google's consent in the system browser. Being

@@ -35,6 +35,13 @@ const queryClient = new QueryClient({
       // Evict inactive queries after 30 min. 24h let the in-memory cache grow
       // unbounded across a long-open desktop session.
       gcTime: 30 * 60 * 1000,
+      // A desktop window flaps focus constantly (cmd-tab, display wake) —
+      // the default refetch-on-focus refired EVERY mounted query each time,
+      // hammering the WKWebView Networking process. Cards stay fresh via
+      // their own activity-gated refetchIntervals instead.
+      refetchOnWindowFocus: false,
+      staleTime: 60 * 1000,
+      retry: 2,
     },
   },
 });
