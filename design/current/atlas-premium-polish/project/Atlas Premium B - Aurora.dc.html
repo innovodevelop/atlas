@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@0.462.0/dist/umd/lucide.min.js"></script>
+<style>
+body{margin:0;background:hsl(240 28% 7%);color:hsl(240 30% 96%);font-family:'Manrope',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.page{min-height:100vh;position:relative;overflow-x:hidden}
+.auro{position:fixed;inset:0;pointer-events:none;background:radial-gradient(60% 45% at 50% 12%,hsl(243 75% 58% / .16),transparent 65%),radial-gradient(45% 35% at 78% 0%,hsl(200 80% 55% / .07),transparent 60%),radial-gradient(45% 35% at 20% 4%,hsl(280 70% 60% / .06),transparent 60%)}
+.hdrB{position:relative;z-index:40;display:flex;align-items:center;justify-content:space-between;padding:22px 44px}
+.wordB{font-family:'Sora',sans-serif;font-size:16px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:hsl(240 30% 96%);margin:0}
+.hbtnB{width:36px;height:36px;border-radius:12px;background:hsl(240 33% 13% / .6);border:1px solid hsl(243 60% 70% / .14);color:hsl(240 20% 70%);cursor:pointer;transition:color .2s,border-color .2s}
+.hbtnB:hover{color:#fff;border-color:hsl(243 60% 70% / .35)}
+.avB{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,hsl(243 75% 58% / .35),hsl(280 70% 60% / .25));border:1px solid hsl(243 60% 70% / .3);color:hsl(240 40% 92%);font-size:13px;font-weight:600}
+.statB{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:hsl(240 20% 60%)}
+.bandB{position:relative;z-index:10;display:flex;align-items:center;gap:28px;padding:36px 56px 8px;max-width:1720px;margin:0 auto;animation:riseB 1s cubic-bezier(.22,1,.36,1) both}
+.orbwrapB{width:96px;height:96px;position:relative;flex-shrink:0;cursor:pointer}
+.orbhalo{position:absolute;inset:-32%;border-radius:50%;background:radial-gradient(closest-side,hsl(243 75% 58% / .3),transparent 70%);filter:blur(22px);pointer-events:none}
+.orbcvB{position:relative;width:96px;height:96px;display:block}
+.greetB{font-family:'Sora',sans-serif;font-size:28px;font-weight:300;letter-spacing:-.01em;color:hsl(240 40% 97%);margin:0}
+.gsubB{font-size:14px;color:hsl(240 20% 66%);margin:8px 0 0;line-height:1.55;max-width:640px}
+.bandmetaB{margin-left:auto;text-align:right}
+.bmvB{font-family:'Sora',sans-serif;font-size:22px;font-weight:300;color:hsl(240 40% 97%);margin:0}
+.bmlB{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:hsl(240 20% 54%);margin:4px 0 0}
+.gridB{position:relative;z-index:10;display:grid;gap:16px;padding:28px 56px 60px;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));grid-auto-rows:minmax(120px,auto);grid-auto-flow:dense;max-width:1720px;margin:0 auto}
+.sp2{grid-column:span 2}.rs2{grid-row:span 2}
+@media (max-width:840px){.sp2{grid-column:span 1}}
+.cardB{position:relative;border-radius:24px;height:100%;background:linear-gradient(165deg,hsl(240 33% 14% / .85),hsl(240 30% 10% / .9));backdrop-filter:blur(24px);border:1px solid hsl(243 60% 70% / .13);box-shadow:0 30px 60px -30px rgba(0,0,0,.8),inset 0 1px 0 hsl(240 40% 98% / .07);display:flex;flex-direction:column;overflow:hidden;cursor:pointer;transition:transform .4s cubic-bezier(.22,1,.36,1),border-color .4s,box-shadow .4s;animation:riseB 1s cubic-bezier(.22,1,.36,1) both}
+.cardB:hover{transform:translateY(-4px);border-color:hsl(243 60% 70% / .3);box-shadow:0 40px 80px -30px rgba(0,0,0,.85),0 0 40px -10px hsl(243 75% 58% / .25),inset 0 1px 0 hsl(240 40% 98% / .09)}
+.d1{animation-delay:.15s}.d2{animation-delay:.25s}.d3{animation-delay:.35s}.d4{animation-delay:.45s}.d5{animation-delay:.55s}.d6{animation-delay:.65s}
+@keyframes riseB{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+.chB{display:flex;align-items:center;justify-content:space-between;padding:22px 26px 0}
+.mlblB{font-size:11px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:hsl(240 20% 58%);margin:0}
+.icboxB{width:32px;height:32px;border-radius:10px;background:hsl(243 75% 58% / .12);border:1px solid hsl(243 60% 70% / .18);color:hsl(243 80% 78%)}
+.cbB{flex:1;padding:18px 26px 26px;min-height:0}
+.tnum{font-family:'Sora',sans-serif;font-variant-numeric:tabular-nums}
+.tempB{font-size:56px;font-weight:200;letter-spacing:-.02em;color:hsl(240 40% 97%);line-height:1;margin:0}
+.condB{font-size:14px;color:hsl(240 20% 68%);margin:10px 0 0}
+.hrB{height:1px;background:hsl(243 60% 70% / .1);border:none;margin:20px 0 16px}
+.metaB{font-size:13px;color:hsl(240 20% 62%)}
+.hcolB{display:flex;flex-direction:column;align-items:center;gap:8px;flex:1}
+.htB{font-size:11px;letter-spacing:.08em;color:hsl(240 20% 55%)}
+.hvB{font-size:14px;font-weight:600;color:hsl(240 30% 90%)}
+.iInd{color:hsl(243 80% 78%)}.iMut{color:hsl(240 20% 58%)}
+.rowB{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid hsl(243 60% 70% / .08)}
+.rowB.last{border-bottom:none}
+.evtimeB{font-family:'Sora',sans-serif;font-size:13px;font-variant-numeric:tabular-nums;color:hsl(240 20% 60%);width:70px;flex-shrink:0}
+.evtB{font-size:14px;font-weight:500;color:hsl(240 30% 93%);margin:0}
+.evsB{font-size:12px;color:hsl(240 20% 55%);margin:3px 0 0}
+.nowB{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:hsl(243 90% 80%);background:hsl(243 75% 58% / .18);border:1px solid hsl(243 60% 70% / .3);padding:3px 9px;border-radius:999px}
+.dotB{width:8px;height:8px;border-radius:50%;background:hsl(243 60% 70% / .3);flex-shrink:0}
+.dotB.on{background:hsl(243 75% 65%);box-shadow:0 0 10px hsl(243 75% 60% / .7)}
+.ckB{width:19px;height:19px;border-radius:50%;border:1.5px solid hsl(240 20% 42%);flex-shrink:0}
+.ckB.done{border-color:hsl(243 75% 65%);background:hsl(243 75% 58% / .2)}
+.doneB{text-decoration:line-through;color:hsl(240 20% 48%)}
+.symB{font-family:'Sora',sans-serif;font-size:13px;font-weight:600;color:hsl(240 30% 93%);width:64px}
+.snB{font-size:12px;color:hsl(240 20% 55%)}
+.prcB{font-family:'Sora',sans-serif;font-size:14px;font-variant-numeric:tabular-nums;color:hsl(240 30% 95%)}
+.chgB{font-size:12px;font-variant-numeric:tabular-nums;font-weight:600;width:64px;text-align:right}
+.upB{color:hsl(165 65% 62%)}.dnB{color:hsl(350 75% 68%)}
+.avB2{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,hsl(243 75% 58% / .3),hsl(280 70% 60% / .2));border:1px solid hsl(243 60% 70% / .2);font-size:11px;font-weight:700;color:hsl(240 40% 92%);flex-shrink:0}
+.sndB{font-size:14px;font-weight:600;color:hsl(240 30% 95%)}
+.sbjB{font-size:13px;color:hsl(240 20% 66%)}
+.tmB{font-size:12px;color:hsl(240 20% 48%);font-variant-numeric:tabular-nums;flex-shrink:0}
+.ntagB{font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:hsl(243 80% 78%)}
+.ntB{font-family:'Sora',sans-serif;font-size:15px;font-weight:400;line-height:1.5;color:hsl(240 30% 95%);margin:7px 0 5px}
+.nmB{font-size:12px;color:hsl(240 20% 52%)}
+.i12{width:12px;height:12px;flex-shrink:0}.i14{width:14px;height:14px;flex-shrink:0}.i16{width:16px;height:16px;flex-shrink:0}
+.sw{position:fixed;bottom:20px;left:20px;z-index:80;display:flex;gap:4px;padding:5px;border-radius:12px;background:hsl(240 30% 9% / .85);backdrop-filter:blur(16px);border:1px solid hsl(243 60% 70% / .15)}
+.swl{font-size:12px;font-weight:600;color:hsl(240 20% 62%);text-decoration:none;padding:5px 10px;border-radius:8px}
+.swl:hover{color:#fff;background:hsl(243 75% 58% / .15)}
+.swl.on{color:#fff;background:hsl(243 75% 58% / .3)}
+.backdrop{position:fixed;inset:0;background:hsl(240 40% 3% / .62);backdrop-filter:blur(3px);z-index:60;animation:fadeX .3s ease}
+@keyframes fadeX{from{opacity:0}to{opacity:1}}
+.drawer{position:fixed;right:0;top:0;bottom:0;width:100%;max-width:440px;z-index:70;display:flex;flex-direction:column;background:linear-gradient(180deg,hsl(240 33% 12%),hsl(240 30% 8%));border-left:1px solid hsl(243 60% 70% / .18);box-shadow:-30px 0 80px -20px rgba(0,0,0,.75);animation:slidein .42s cubic-bezier(.32,.72,0,1)}
+@keyframes slidein{from{transform:translateX(100%)}to{transform:translateX(0)}}
+.dhead{display:flex;align-items:center;justify-content:space-between;padding:20px 22px;border-bottom:1px solid hsl(243 60% 70% / .1)}
+.dtitle{font-family:'Sora',sans-serif;font-size:16px;font-weight:500;letter-spacing:.02em;color:hsl(240 40% 96%);margin:0}
+.dstate{font-size:12px;color:hsl(243 82% 80%);text-transform:capitalize;margin:4px 0 0;letter-spacing:.06em}
+.xbtn{width:36px;height:36px;border-radius:10px;background:transparent;border:1px solid hsl(243 60% 70% / .15);color:hsl(240 20% 70%);cursor:pointer}
+.xbtn:hover{color:#fff;border-color:hsl(243 60% 70% / .35)}
+.msgs{flex:1;overflow-y:auto;padding:22px;display:flex;flex-direction:column;gap:14px}
+.bub{max-width:82%;border-radius:16px;padding:11px 16px;font-size:14px;line-height:1.5;white-space:pre-wrap}
+.bubU{align-self:flex-end;background:hsl(243 75% 58%);color:#fff;border-bottom-right-radius:5px}
+.bubA{align-self:flex-start;background:hsl(240 33% 16%);color:hsl(240 30% 92%);border:1px solid hsl(243 60% 70% / .12);border-bottom-left-radius:5px}
+.tdots{align-self:flex-start;background:hsl(240 33% 16%);border:1px solid hsl(243 60% 70% / .12);border-radius:16px;padding:13px 16px;display:flex;gap:5px}
+.tdot{width:7px;height:7px;border-radius:50%;background:hsl(243 72% 76%);animation:bob 1s infinite}
+.td2{animation-delay:.15s}.td3{animation-delay:.3s}
+@keyframes bob{0%,100%{transform:translateY(0);opacity:.5}50%{transform:translateY(-5px);opacity:1}}
+.din{display:flex;gap:10px;padding:18px 22px;border-top:1px solid hsl(243 60% 70% / .1)}
+.inp{flex:1;background:hsl(240 33% 14%);border:1px solid hsl(243 60% 70% / .16);border-radius:12px;padding:11px 14px;color:#fff;font-size:14px;font-family:inherit;outline:none}
+.inp:focus{border-color:hsl(243 75% 62%)}
+.sendBtn{width:44px;border-radius:12px;background:hsl(243 75% 58%);border:none;color:#fff;cursor:pointer}
+.exp{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;background:hsl(240 28% 7%);animation:fadeX .4s ease;overflow:hidden}
+.skyB{position:absolute;inset:0;opacity:.5;background:linear-gradient(180deg,hsl(220 62% 42%) 0%,hsl(235 55% 26%) 42%,hsl(240 40% 12%) 74%,hsl(240 28% 7%) 100%)}
+.skyfadeB{position:absolute;inset:0;background:radial-gradient(70% 52% at 50% 6%,hsl(243 75% 58% / .2),transparent 60%)}
+.ehead{position:relative;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:22px 44px;border-bottom:1px solid hsl(243 60% 70% / .12);backdrop-filter:blur(16px);background:hsl(240 30% 8% / .4)}
+.accline{width:4px;height:26px;border-radius:999px;background:hsl(var(--acc))}
+.etitle{font-family:'Sora',sans-serif;font-size:24px;font-weight:400;color:hsl(240 40% 96%);margin:0}
+.closeBtn{display:flex;align-items:center;gap:10px;padding:9px 16px;border-radius:12px;background:hsl(240 33% 13% / .6);border:1px solid hsl(243 60% 70% / .16);color:hsl(240 20% 74%);cursor:pointer;font-family:inherit;font-size:14px;font-weight:600}
+.closeBtn:hover{color:#fff;border-color:hsl(243 60% 70% / .35)}
+.kbd{padding:2px 8px;font-size:11px;background:hsl(240 30% 8% / .6);border-radius:5px;border:1px solid hsl(243 60% 70% / .16)}
+.ebody{position:relative;z-index:10;flex:1;overflow-y:auto;padding:26px 44px;display:flex;gap:22px;max-width:1680px;margin:0 auto;width:100%;box-sizing:border-box}
+.gpanel{background:hsl(240 33% 12% / .72);backdrop-filter:blur(24px);border:1px solid hsl(243 60% 70% / .14);border-radius:20px;padding:24px;box-shadow:inset 0 1px 0 hsl(240 40% 98% / .05)}
+.gpanel2{background:hsl(240 33% 12% / .72);backdrop-filter:blur(24px);border:1px solid hsl(243 60% 70% / .14);border-radius:18px;padding:18px;box-shadow:inset 0 1px 0 hsl(240 40% 98% / .05)}
+.bigtemp{font-family:'Sora',sans-serif;font-size:78px;font-weight:200;color:hsl(240 40% 97%);letter-spacing:-.02em;line-height:1}
+.econd{font-size:19px;color:hsl(240 20% 74%);font-weight:300;margin:8px 0 0}
+.efeels{font-size:14px;color:hsl(240 20% 56%);margin:5px 0 0}
+.estat{text-align:center}
+.eslbl{font-size:12px;color:hsl(240 20% 56%);margin:0}
+.esval{font-size:15px;font-weight:600;color:hsl(240 30% 92%);margin:2px 0 0}
+.h24{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px;border-radius:14px;min-width:62px;background:hsl(240 33% 15% / .5)}
+.h24.on{background:hsl(243 75% 58% / .22);border:1px solid hsl(243 60% 70% / .3)}
+.drow{display:flex;align-items:center;justify-content:space-between;padding:11px 12px;border-radius:12px}
+.drow.today{background:hsl(243 75% 58% / .12)}
+.rangebar{width:70px;height:5px;background:hsl(243 60% 70% / .14);border-radius:999px;overflow:hidden}
+.rangefill{height:100%;background:linear-gradient(90deg,hsl(200 70% 60%),hsl(243 75% 66%),hsl(280 60% 68%));border-radius:999px}
+.minicard{position:fixed;bottom:24px;right:24px;z-index:70;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:18px;background:linear-gradient(165deg,hsl(240 33% 14% / .92),hsl(240 30% 9% / .95));backdrop-filter:blur(24px);border:1px solid hsl(243 60% 70% / .18);box-shadow:0 24px 50px -18px rgba(0,0,0,.7);cursor:pointer;animation:popin .3s cubic-bezier(.34,1.56,.64,1)}
+@keyframes popin{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
+.minicv{width:46px;height:46px;display:block}
+.minimic{width:40px;height:40px;border-radius:12px;background:hsl(243 75% 58% / .15);border:1px solid hsl(243 60% 70% / .3);color:hsl(243 82% 82%);cursor:pointer}
+.exp{--acc:243 82% 68%}
+.th-weather{--acc:243 82% 68%}.th-cal{--acc:243 80% 72%}.th-task{--acc:222 74% 70%}.th-stock{--acc:160 58% 56%}.th-mail{--acc:345 74% 70%}.th-news{--acc:275 68% 72%}
+.expwash{position:absolute;inset:0;opacity:.55;background:radial-gradient(58% 44% at 50% 2%,hsl(var(--acc) / .3),transparent 62%),linear-gradient(180deg,hsl(240 33% 12%),hsl(240 28% 7%) 72%)}
+.iAcc{color:hsl(var(--acc))}
+.boxAcc{width:32px;height:32px;border-radius:10px;background:hsl(var(--acc) / .13);border:1px solid hsl(var(--acc) / .28);color:hsl(var(--acc));display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.pillAcc{font-size:11px;font-weight:600;letter-spacing:.04em;color:hsl(var(--acc));background:hsl(var(--acc) / .14);border:1px solid hsl(var(--acc) / .3);padding:4px 10px;border-radius:999px;white-space:nowrap}
+.strokeAcc{stroke:hsl(var(--acc));fill:none}
+.wkbar{width:56%;border-radius:6px;background:hsl(var(--acc) / .32)}
+.wkbar.on{background:hsl(var(--acc))}
+.tkpill{font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.tkHigh{color:hsl(345 72% 74%);background:hsl(345 72% 60% / .14);border:1px solid hsl(345 60% 60% / .28)}
+.tkMed{color:hsl(40 72% 68%);background:hsl(40 72% 58% / .14);border:1px solid hsl(40 60% 58% / .28)}
+.tkLow{color:hsl(240 20% 66%);background:hsl(240 20% 60% / .12);border:1px solid hsl(240 20% 60% / .22)}
+.mailrow{display:flex;align-items:flex-start;gap:14px;padding:14px 12px;border-radius:12px;border-bottom:1px solid hsl(243 60% 70% / .08);cursor:pointer}
+.mailrow:hover{background:hsl(240 33% 16% / .5)}
+.mailrow.last{border-bottom:none}
+.previewline{font-size:13px;color:hsl(240 20% 58%);margin:3px 0 0;line-height:1.5}
+.feat{background:hsl(240 33% 12% / .72);backdrop-filter:blur(24px);border:1px solid hsl(243 60% 70% / .14);border-radius:20px;padding:26px;box-shadow:inset 0 1px 0 hsl(240 40% 98% / .05);display:flex;flex-direction:column}
+.featTitle{font-family:'Sora',sans-serif;font-size:26px;font-weight:400;line-height:1.28;color:hsl(240 40% 96%);margin:14px 0 12px;letter-spacing:-.01em}
+.featBody{font-size:14px;line-height:1.7;color:hsl(240 20% 68%);margin:0}
+.featImg{flex:1;min-height:120px;border-radius:14px;background:linear-gradient(135deg,hsl(var(--acc) / .22),hsl(240 33% 16% / .6));border:1px solid hsl(var(--acc) / .18);margin-top:18px;position:relative;overflow:hidden}
+.featImg::after{content:'';position:absolute;inset:0;background:radial-gradient(60% 80% at 30% 20%,hsl(var(--acc) / .28),transparent 60%)}
+.bigprice{font-family:'Sora',sans-serif;font-size:52px;font-weight:200;color:hsl(240 40% 97%);letter-spacing:-.02em;line-height:1}
+.overlay{position:fixed;inset:0;z-index:55;overflow-y:auto;background:hsl(240 28% 7%)}
+.ovwash{position:fixed;inset:0;pointer-events:none;background:radial-gradient(60% 45% at 50% 8%,hsl(243 75% 58% / .18),transparent 62%),radial-gradient(45% 35% at 82% 4%,hsl(200 80% 55% / .08),transparent 60%),radial-gradient(45% 40% at 16% 92%,hsl(280 70% 60% / .07),transparent 60%)}
+.authwrap{position:relative;z-index:10;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.authcol{width:100%;max-width:412px}
+.authlogo{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:26px}
+.authmk{width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,hsl(243 75% 60%),hsl(280 68% 60%));display:flex;align-items:center;justify-content:center;font-family:'Sora',sans-serif;font-size:20px;font-weight:600;color:#fff;box-shadow:0 10px 30px hsl(243 75% 55% / .4)}
+.authname{font-family:'Sora',sans-serif;font-size:22px;font-weight:600;letter-spacing:.06em;color:hsl(240 40% 96%);margin:0}
+.authtag{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:hsl(240 20% 58%);margin:3px 0 0}
+.authcard{position:relative;border-radius:24px;padding:32px;background:linear-gradient(165deg,hsl(240 33% 14% / .85),hsl(240 30% 10% / .92));backdrop-filter:blur(24px);border:1px solid hsl(243 60% 70% / .16);box-shadow:0 40px 80px -30px rgba(0,0,0,.8),inset 0 1px 0 hsl(240 40% 98% / .07)}
+.authseg{display:flex;gap:4px;padding:4px;border-radius:12px;background:hsl(240 30% 9% / .6);border:1px solid hsl(243 60% 70% / .1);margin-bottom:24px}
+.segbtn{flex:1;padding:9px;border-radius:9px;background:transparent;border:none;color:hsl(240 20% 62%);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:color .2s,background .2s}
+.segbtn.on{color:#fff;background:hsl(243 75% 58% / .28)}
+.authh{font-family:'Sora',sans-serif;font-size:21px;font-weight:500;color:hsl(240 40% 96%);margin:0;text-align:center}
+.auths{font-size:13px;color:hsl(240 20% 62%);margin:6px 0 22px;text-align:center}
+.fld{margin-bottom:16px}
+.lbl{display:block;font-size:12px;font-weight:600;color:hsl(240 25% 78%);margin-bottom:7px}
+.field{width:100%;box-sizing:border-box;background:hsl(240 33% 10% / .7);border:1px solid hsl(243 60% 70% / .16);border-radius:11px;padding:12px 14px;color:hsl(240 40% 96%);font-size:14px;font-family:inherit;outline:none;transition:border-color .2s}
+.field:focus{border-color:hsl(243 75% 62%)}
+.field::placeholder{color:hsl(240 15% 46%)}
+.pwwrap{position:relative}
+.eye{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:hsl(240 20% 58%);cursor:pointer;padding:2px}
+.eye:hover{color:hsl(240 30% 82%)}
+.authbtn{width:100%;padding:13px;border-radius:12px;background:linear-gradient(135deg,hsl(243 75% 58%),hsl(258 70% 60%));border:none;color:#fff;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 12px 30px -8px hsl(243 75% 55% / .6);transition:transform .15s}
+.authbtn:hover{transform:translateY(-1px)}
+.authswap{text-align:center;font-size:13px;color:hsl(240 20% 62%);margin:20px 0 0}
+.linkA{color:hsl(243 82% 80%);background:none;border:none;font:inherit;font-weight:600;cursor:pointer;padding:0}
+.linkA:hover{text-decoration:underline}
+.authterms{text-align:center;font-size:11px;color:hsl(240 15% 48%);margin:20px 0 0;line-height:1.5}
+.oauth{display:flex;gap:10px;margin:20px 0}
+.oauthbtn{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:11px;border-radius:11px;background:hsl(240 33% 13% / .6);border:1px solid hsl(243 60% 70% / .14);color:hsl(240 25% 80%);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer}
+.oauthbtn:hover{border-color:hsl(243 60% 70% / .3)}
+.ordiv{display:flex;align-items:center;gap:12px;margin:4px 0 4px;color:hsl(240 15% 46%);font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+.ordiv::before,.ordiv::after{content:'';flex:1;height:1px;background:hsl(243 60% 70% / .12)}
+.homewrap{position:relative;z-index:10;min-height:100vh;display:flex;flex-direction:column}
+.homeorbwrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;padding-bottom:200px;z-index:1}
+.homeorb{width:min(52vmin,460px);height:min(52vmin,460px);position:relative}
+.homeorbglow{position:absolute;inset:-16%;border-radius:50%;background:radial-gradient(closest-side,hsl(243 75% 58% / .26),transparent 70%);filter:blur(40px)}
+.homehead{position:relative;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:22px 44px}
+.homebtn{width:38px;height:38px;border-radius:12px;background:hsl(240 33% 13% / .55);border:1px solid hsl(243 60% 70% / .14);color:hsl(240 20% 72%);cursor:pointer;transition:color .2s,border-color .2s;display:flex;align-items:center;justify-content:center}
+.homebtn:hover{color:#fff;border-color:hsl(243 60% 70% / .32)}
+.stind{display:flex;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;background:hsl(240 33% 13% / .5);border:1px solid hsl(243 60% 70% / .14);font-size:12px;color:hsl(240 25% 76%)}
+.stpulse{width:7px;height:7px;border-radius:50%;background:hsl(243 82% 70%);box-shadow:0 0 10px hsl(243 82% 66% / .8);animation:stp 2s ease-in-out infinite}
+@keyframes stp{0%,100%{opacity:1}50%{opacity:.4}}
+.homemid{position:relative;z-index:20;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 24px;pointer-events:none}
+.homehi{font-family:'Sora',sans-serif;font-size:38px;font-weight:200;letter-spacing:.01em;color:hsl(240 40% 97%);margin:0;text-shadow:0 4px 30px hsl(240 40% 3% / .6)}
+.homesub{font-size:15px;font-weight:300;color:hsl(240 22% 72%);margin:14px 0 0}
+.homesub .hl{font-weight:500;background:linear-gradient(90deg,hsl(243 82% 78%),hsl(280 68% 76%));-webkit-background-clip:text;background-clip:text;color:transparent}
+.homepanel{position:relative;z-index:20;width:100%;max-width:640px;margin:0 auto;padding:0 24px 12px;pointer-events:auto}
+.homemsg{border-radius:16px;padding:12px 16px;font-size:14px;line-height:1.5;max-width:86%;margin-bottom:10px;backdrop-filter:blur(12px)}
+.hmA{align-self:flex-start;background:hsl(240 33% 15% / .7);border:1px solid hsl(243 60% 70% / .12);color:hsl(240 30% 90%)}
+.hmU{align-self:flex-end;background:hsl(243 75% 58% / .85);color:#fff;margin-left:auto}
+.homefoot{position:fixed;bottom:0;left:0;right:0;z-index:30;padding:18px 24px 24px;background:linear-gradient(180deg,transparent,hsl(240 28% 7% / .85) 40%)}
+.homefootin{max-width:640px;margin:0 auto}
+.homeask{display:flex;align-items:center;gap:10px;padding:9px 10px 9px 20px;border-radius:999px;background:hsl(240 33% 13% / .82);backdrop-filter:blur(20px);border:1px solid hsl(243 60% 70% / .2);box-shadow:0 20px 50px -18px hsl(243 75% 40% / .5),inset 0 1px 0 hsl(240 40% 98% / .06)}
+.homeaskin{flex:1;background:transparent;border:none;outline:none;color:hsl(240 40% 96%);font-size:15px;font-family:inherit}
+.homeaskin::placeholder{color:hsl(240 15% 52%)}
+.homemic{width:40px;height:40px;border-radius:50%;background:hsl(243 75% 58% / .18);border:1px solid hsl(243 60% 70% / .3);color:hsl(243 82% 82%);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.homesend{width:42px;height:42px;border-radius:50%;background:hsl(243 75% 58%);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px hsl(243 75% 58% / .5)}
+.chips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:14px}
+.chip{padding:9px 15px;border-radius:999px;background:hsl(240 33% 13% / .6);backdrop-filter:blur(8px);border:1px solid hsl(243 60% 70% / .14);color:hsl(240 22% 74%);font-size:12px;font-weight:500;cursor:pointer;transition:color .2s,border-color .2s,background .2s}
+.chip:hover{color:#fff;border-color:hsl(243 60% 70% / .35);background:hsl(243 75% 58% / .16)}
+.chip.demo{color:hsl(243 82% 82%);border-color:hsl(243 60% 70% / .28);background:hsl(243 75% 58% / .12)}
+.corehead{position:relative;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:16px 40px;border-bottom:1px solid hsl(243 60% 70% / .1);backdrop-filter:blur(16px);background:hsl(240 30% 8% / .5);position:sticky;top:0}
+.backbtn{display:flex;align-items:center;gap:8px;background:transparent;border:none;color:hsl(240 20% 66%);font-family:inherit;font-size:14px;cursor:pointer}
+.backbtn:hover{color:#fff}
+.corebrand{font-family:'Sora',sans-serif;font-size:19px;font-weight:600;background:linear-gradient(90deg,hsl(243 82% 78%),hsl(280 68% 76%),hsl(200 75% 72%));-webkit-background-clip:text;background-clip:text;color:transparent;margin:0}
+.coretagline{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:hsl(240 20% 54%);margin:2px 0 0;text-align:right}
+.corebody{position:relative;z-index:10;max-width:1500px;margin:0 auto;padding:28px 40px 60px}
+.corehero{display:flex;align-items:center;gap:32px;margin-bottom:28px}
+.coreorb{width:150px;height:150px;position:relative;flex-shrink:0}
+.coreorbglow{position:absolute;inset:-20%;border-radius:50%;background:radial-gradient(closest-side,hsl(243 75% 58% / .28),transparent 70%);filter:blur(26px)}
+.statgrid{flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+@media (max-width:900px){.statgrid{grid-template-columns:repeat(2,1fr)}.corehero{flex-direction:column}}
+.statcard{border-radius:18px;padding:20px;background:hsl(240 33% 12% / .5);backdrop-filter:blur(20px);border:1px solid hsl(243 60% 70% / .13);transition:transform .3s,border-color .3s}
+.statcard:hover{transform:translateY(-2px);border-color:hsl(var(--sc) / .4)}
+.sc-p{--sc:243 75% 66%}.sc-s{--sc:280 68% 70%}.sc-a{--sc:160 58% 56%}.sc-h{--sc:200 75% 62%}
+.statlbl{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:hsl(240 20% 58%);margin:0}
+.statval{font-family:'Sora',sans-serif;font-size:30px;font-weight:300;color:hsl(240 40% 96%);margin:8px 0 0;letter-spacing:-.01em}
+.stattrend{display:flex;align-items:center;gap:4px;font-size:12px;margin-top:8px}
+.statico{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:hsl(var(--sc) / .14);border:1px solid hsl(var(--sc) / .26);color:hsl(var(--sc));flex-shrink:0}
+.coretabs{display:flex;gap:4px;padding:5px;border-radius:16px;background:hsl(240 30% 9% / .6);backdrop-filter:blur(16px);border:1px solid hsl(243 60% 70% / .1);overflow-x:auto;margin-bottom:22px}
+.ctab{display:flex;align-items:center;gap:7px;padding:9px 14px;border-radius:11px;background:transparent;border:none;color:hsl(240 20% 62%);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;transition:color .2s,background .2s;position:relative}
+.ctab:hover{color:hsl(240 30% 84%)}
+.ctab.on{color:#fff;background:hsl(243 75% 58% / .2)}
+.ctab .badge{position:absolute;top:2px;right:4px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:hsl(40 90% 58%);color:hsl(30 40% 10%);font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.ctab .live{position:absolute;top:5px;right:6px;width:7px;height:7px;border-radius:50%;background:hsl(345 80% 62%);animation:stp 1.5s ease-in-out infinite}
+.coretools{display:flex;gap:8px;flex-shrink:0}
+.tbtn{display:flex;align-items:center;gap:7px;padding:9px 14px;border-radius:11px;background:hsl(240 33% 13% / .6);border:1px solid hsl(243 60% 70% / .14);color:hsl(240 22% 74%);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer}
+.tbtn:hover{color:#fff;border-color:hsl(243 60% 70% / .3)}
+.coregrid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media (max-width:900px){.coregrid{grid-template-columns:1fr}}
+.cpanel{border-radius:20px;padding:22px;background:hsl(240 33% 12% / .5);backdrop-filter:blur(20px);border:1px solid hsl(243 60% 70% / .12);transition:border-color .3s}
+.cpanel:hover{border-color:hsl(var(--pc,243 60% 70%) / .3)}
+.cph{display:flex;align-items:center;gap:10px;font-family:'Sora',sans-serif;font-size:16px;font-weight:500;color:hsl(240 35% 90%);margin:0 0 18px}
+.flowrow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid hsl(243 60% 70% / .07)}
+.flowrow.last{border-bottom:none}
+.flownode{display:flex;align-items:center;gap:10px}
+.flowdot{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:hsl(var(--fc) / .14);border:1px solid hsl(var(--fc) / .26);color:hsl(var(--fc))}
+.flowbar{flex:1;height:5px;border-radius:999px;background:hsl(240 30% 20%);overflow:hidden;margin:0 4px}
+.flowfill{height:100%;border-radius:999px;background:hsl(var(--fc))}
+.kbrow{display:flex;align-items:flex-start;gap:12px;padding:11px 0;border-bottom:1px solid hsl(243 60% 70% / .07)}
+.kbrow.last{border-bottom:none}
+.kbico{width:32px;height:32px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:hsl(280 68% 60% / .14);border:1px solid hsl(280 60% 66% / .24);color:hsl(280 72% 78%)}
+.kbtitle{font-size:14px;font-weight:500;color:hsl(240 30% 90%);margin:0}
+.kbmeta{font-size:12px;color:hsl(240 20% 56%);margin:3px 0 0}
+.qrow{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid hsl(243 60% 70% / .07)}
+.qrow.last{border-bottom:none}
+.qbar{flex:1;height:6px;border-radius:999px;background:hsl(240 30% 20%);overflow:hidden}
+.qfill{height:100%;border-radius:999px;background:linear-gradient(90deg,hsl(190 75% 55%),hsl(200 75% 60%))}
+.qpct{font-family:'Sora',sans-serif;font-size:12px;font-variant-numeric:tabular-nums;color:hsl(240 25% 80%);width:36px;text-align:right}
+.errrow{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid hsl(243 60% 70% / .07)}
+.errrow.last{border-bottom:none}
+.errsev{width:8px;height:8px;border-radius:50%;margin-top:6px;flex-shrink:0}
+.sev-e{background:hsl(345 80% 62%)}.sev-w{background:hsl(40 90% 60%)}.sev-i{background:hsl(200 75% 62%)}
+.errmsg{font-size:13px;color:hsl(240 30% 86%);margin:0;font-family:'Sora',sans-serif}
+.errmeta{font-size:11px;color:hsl(240 20% 52%);margin:2px 0 0;font-variant-numeric:tabular-nums}
+.corestat{font-size:12px;font-variant-numeric:tabular-nums}
+.scrn{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:85;display:flex;gap:3px;padding:5px;border-radius:14px;background:hsl(240 30% 9% / .85);backdrop-filter:blur(16px);border:1px solid hsl(243 60% 70% / .16);box-shadow:0 16px 40px -16px rgba(0,0,0,.6)}
+.scrnl{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:hsl(240 20% 64%);background:transparent;border:none;font-family:inherit;padding:7px 13px;border-radius:9px;cursor:pointer;transition:color .2s,background .2s}
+.scrnl:hover{color:#fff;background:hsl(243 75% 58% / .12)}
+.scrnl.on{color:#fff;background:hsl(243 75% 58% / .3)}
+</style>
+</helmet>
+<div class="page" data-screen-label="Atlas Premium B — Aurora">
+<div class="auro"></div>
+<header class="hdrB"><div class="fx ac gap12 pointer" onClick="{{ goHome }}"><div class="mk"></div><h1 class="wordB">Atlas</h1></div><div class="fx ac gap8 statB"><span>Listening for "Hey Atlas"</span></div><div class="fx ac gap10"><button class="hbtnB fx ac jc" onClick="{{ goCore }}" aria-label="Atlas Core"><i data-lucide="cpu" class="i14"></i></button><button class="hbtnB fx ac jc" aria-label="Voice"><i data-lucide="mic" class="i14"></i></button><div class="avB fx ac jc pointer" onClick="{{ goAuth }}">M</div></div></header>
+<section class="bandB"><div class="orbwrapB" onClick="{{ openDrawer }}"><div class="orbhalo"></div><canvas class="orbcvB" width="200" height="200" ref="{{ orbRef }}"></canvas></div>
+<div><h2 class="greetB">Good afternoon, Marcus.</h2><p class="gsubB">Four meetings today · Paris in 6 days · 2 messages that look important.</p></div>
+<div class="bandmetaB"><p class="bmvB tnum">68°</p><p class="bmlB">San Francisco · Partly cloudy</p></div>
+</section>
+<main class="gridB">
+<div class="cardB rs2 d1" onClick="{{ openWeather }}"><div class="chB"><p class="mlblB">Weather</p><div class="icboxB fx ac jc"><i data-lucide="cloud-sun" class="i14"></i></div></div><div class="cbB">
+<p class="tempB tnum">68°</p><p class="condB">Partly cloudy · San Francisco</p>
+<div class="fx ac gap16 mt16 metaB"><span class="fx ac" style="gap:6px"><i data-lucide="droplets" class="i12"></i>62%</span><span class="fx ac" style="gap:6px"><i data-lucide="wind" class="i12"></i>8 mph</span><span class="fx ac" style="gap:6px"><i data-lucide="sun" class="i12"></i>UV 6</span></div>
+<hr class="hrB">
+<div class="fx"><div class="hcolB"><span class="htB iInd">Now</span><i data-lucide="sun" class="i16 iInd"></i><span class="hvB tnum">68°</span></div><div class="hcolB"><span class="htB">1p</span><i data-lucide="sun" class="i16 iMut"></i><span class="hvB tnum">69°</span></div><div class="hcolB"><span class="htB">2p</span><i data-lucide="sun" class="i16 iMut"></i><span class="hvB tnum">70°</span></div><div class="hcolB"><span class="htB">3p</span><i data-lucide="cloud-sun" class="i16 iMut"></i><span class="hvB tnum">69°</span></div><div class="hcolB"><span class="htB">4p</span><i data-lucide="cloud" class="i16 iMut"></i><span class="hvB tnum">67°</span></div><div class="hcolB"><span class="htB">5p</span><i data-lucide="cloud" class="i16 iMut"></i><span class="hvB tnum">65°</span></div></div>
+<hr class="hrB">
+<div class="fx ac jb metaB"><span class="fx ac" style="gap:6px"><i data-lucide="sunrise" class="i12"></i>6:02 AM</span><span class="fx ac" style="gap:6px"><i data-lucide="sunset" class="i12"></i>8:34 PM</span></div>
+</div></div>
+<div class="cardB rs2 d2" onClick="{{ openCalendar }}"><div class="chB"><p class="mlblB">Today</p><div class="icboxB fx ac jc"><i data-lucide="calendar" class="i14"></i></div></div><div class="cbB">
+<div class="rowB"><div class="dotB"></div><span class="evtimeB">9:30 AM</span><div class="f1" style="min-width:0"><p class="evtB">Design sync</p><p class="evsB">30 min · Zoom</p></div></div>
+<div class="rowB"><div class="dotB on"></div><span class="evtimeB">11:00 AM</span><div class="f1" style="min-width:0"><p class="evtB">1:1 with Maya</p><p class="evsB">45 min · Meet</p></div><span class="nowB">Now</span></div>
+<div class="rowB"><div class="dotB"></div><span class="evtimeB">12:30 PM</span><div class="f1" style="min-width:0"><p class="evtB">Lunch with investors</p><p class="evsB">1h 30m · Nopa</p></div></div>
+<div class="rowB last"><div class="dotB"></div><span class="evtimeB">3:00 PM</span><div class="f1" style="min-width:0"><p class="evtB">Product review</p><p class="evsB">1 hour</p></div></div>
+</div></div>
+<div class="cardB rs2 d3" onClick="{{ openTasks }}"><div class="chB"><p class="mlblB">Tasks · 1 of 5</p><div class="icboxB fx ac jc"><i data-lucide="check" class="i14"></i></div></div><div class="cbB">
+<div class="rowB"><div class="ckB"></div><p class="evtB f1 trunc" style="min-width:0">Send Q4 budget notes to Sarah</p></div>
+<div class="rowB"><div class="ckB"></div><p class="evtB f1 trunc" style="min-width:0">Review brand guidelines</p></div>
+<div class="rowB"><div class="ckB"></div><p class="evtB f1 trunc" style="min-width:0">Book Paris airport transfer</p></div>
+<div class="rowB"><div class="ckB done fx ac jc"><i data-lucide="check" class="i12 iInd"></i></div><p class="evtB f1 trunc doneB" style="min-width:0">Prep product review deck</p></div>
+<div class="rowB last"><div class="ckB"></div><p class="evtB f1 trunc" style="min-width:0">Renew passport</p></div>
+</div></div>
+<div class="cardB sp2 rs2 d4" onClick="{{ openStocks }}"><div class="chB"><p class="mlblB">Watchlist · Market open</p><div class="icboxB fx ac jc"><i data-lucide="activity" class="i14"></i></div></div><div class="cbB">
+<div class="rowB"><span class="symB">AAPL</span><span class="snB f1 trunc" style="min-width:0">Apple Inc.</span><svg width="72" height="22"><polyline points="0,14 6,15 13,12 19,13 26,10 32,11 39,9 45,10 52,7 58,8 65,5 72,4" fill="none" stroke="hsl(165 65% 62%)" stroke-width="1.5"></polyline></svg><span class="prcB" style="width:76px;text-align:right">247.31</span><span class="chgB upB">+1.24%</span></div>
+<div class="rowB"><span class="symB">GOOGL</span><span class="snB f1 trunc" style="min-width:0">Alphabet Inc.</span><svg width="72" height="22"><polyline points="0,6 6,8 13,7 19,10 26,9 32,12 39,11 45,14 52,13 58,16 65,15 72,17" fill="none" stroke="hsl(350 75% 68%)" stroke-width="1.5"></polyline></svg><span class="prcB" style="width:76px;text-align:right">186.42</span><span class="chgB dnB">−0.58%</span></div>
+<div class="rowB"><span class="symB">MSFT</span><span class="snB f1 trunc" style="min-width:0">Microsoft Corp.</span><svg width="72" height="22"><polyline points="0,16 6,14 13,15 19,12 26,13 32,10 39,11 45,8 52,9 58,7 65,6 72,5" fill="none" stroke="hsl(165 65% 62%)" stroke-width="1.5"></polyline></svg><span class="prcB" style="width:76px;text-align:right">512.88</span><span class="chgB upB">+0.92%</span></div>
+<div class="rowB last"><span class="symB">NVDA</span><span class="snB f1 trunc" style="min-width:0">NVIDIA Corp.</span><svg width="72" height="22"><polyline points="0,18 6,16 13,17 19,13 26,14 32,11 39,12 45,8 52,9 58,5 65,6 72,3" fill="none" stroke="hsl(165 65% 62%)" stroke-width="1.5"></polyline></svg><span class="prcB" style="width:76px;text-align:right">138.07</span><span class="chgB upB">+2.31%</span></div>
+</div></div>
+<div class="cardB rs2 d5" onClick="{{ openEmail }}"><div class="chB"><p class="mlblB">Inbox · 2 unread</p><div class="icboxB fx ac jc"><i data-lucide="mail" class="i14"></i></div></div><div class="cbB">
+<div class="rowB"><div class="avB2 fx ac jc">SC</div><div class="f1" style="min-width:0"><div class="fx ac gap8"><div class="dotB on" style="width:6px;height:6px"></div><span class="sndB trunc">Sarah Chen</span></div><p class="sbjB trunc m0" style="margin-top:3px">Q4 Budget Review</p></div><span class="tmB">10:32</span></div>
+<div class="rowB"><div class="avB2 fx ac jc">MJ</div><div class="f1" style="min-width:0"><div class="fx ac gap8"><div class="dotB on" style="width:6px;height:6px"></div><span class="sndB trunc">Mike Johnson</span></div><p class="sbjB trunc m0" style="margin-top:3px">Re: Project Timeline</p></div><span class="tmB">9:15</span></div>
+<div class="rowB"><div class="avB2 fx ac jc">DT</div><div class="f1" style="min-width:0"><span class="sndB trunc" style="color:hsl(240 20% 66%)">Design Team</span><p class="sbjB trunc m0" style="margin-top:3px;color:hsl(240 20% 52%)">Brand Guidelines Released</p></div><span class="tmB">Yest</span></div>
+<div class="rowB last"><div class="avB2 fx ac jc">AR</div><div class="f1" style="min-width:0"><span class="sndB trunc" style="color:hsl(240 20% 66%)">Alex Rivera</span><p class="sbjB trunc m0" style="margin-top:3px;color:hsl(240 20% 52%)">Meeting Notes</p></div><span class="tmB">Yest</span></div>
+</div></div>
+<div class="cardB rs2 d6" onClick="{{ openNews }}"><div class="chB"><p class="mlblB">Briefing</p><div class="icboxB fx ac jc"><i data-lucide="newspaper" class="i14"></i></div></div><div class="cbB">
+<div class="rowB" style="display:block"><span class="ntagB">Technology</span><h4 class="ntB">AI Breakthrough: New Language Models Show Human-Level Reasoning</h4><span class="nmB">TechCrunch · 2h ago</span></div>
+<div class="rowB" style="display:block"><span class="ntagB">Finance</span><h4 class="ntB">Global Markets Rally on Positive Economic Data</h4><span class="nmB">Bloomberg · 4h ago</span></div>
+<div class="rowB last" style="display:block"><span class="ntagB">Science</span><h4 class="ntB">Space Agency Announces New Moon Mission Timeline</h4><span class="nmB">Reuters · 6h ago</span></div>
+</div></div>
+</main>
+<sc-if value="{{ isAuth }}" hint-placeholder-val="{{ false }}">
+<div class="overlay" data-screen-label="Aurora — Auth"><div class="ovwash"></div>
+<div class="authwrap"><div class="authcol">
+<div class="authlogo"><div class="authmk">A</div><div><h1 class="authname">Atlas</h1><p class="authtag">AI Assistant</p></div></div>
+<div class="authcard">
+<div class="authseg"><button class="segbtn {{ signinCls }}" onClick="{{ toggleAuth }}">Sign In</button><button class="segbtn {{ signupCls }}" onClick="{{ toggleAuth }}">Sign Up</button></div>
+<h2 class="authh">{{ authTitle }}</h2><p class="auths">{{ authSub }}</p>
+<sc-if value="{{ isSignup }}" hint-placeholder-val="{{ false }}"><div class="fld"><label class="lbl">Display Name</label><input class="field" placeholder="How should Atlas call you?"></div></sc-if>
+<div class="fld"><label class="lbl">Email</label><input class="field" type="email" placeholder="you@example.com" value="marcus@atlas.ai"></div>
+<div class="fld"><label class="lbl">Password</label><div class="pwwrap"><input class="field" type="{{ pwType }}" placeholder="••••••••" value="supersecret" style="padding-right:42px"><button class="eye" onClick="{{ togglePw }}"><i data-lucide="{{ eyeIcon }}" class="i16"></i></button></div></div>
+<button class="authbtn" onClick="{{ goHome }}">{{ authCta }}</button>
+<div class="ordiv">or</div>
+<div class="oauth"><button class="oauthbtn"><i data-lucide="chrome" class="i16"></i>Google</button><button class="oauthbtn"><i data-lucide="github" class="i16"></i>GitHub</button></div>
+<p class="authswap">{{ authQ }} <button class="linkA" onClick="{{ toggleAuth }}">{{ authSwap }}</button></p>
+</div>
+<p class="authterms">By continuing, you agree to our Terms of Service and Privacy Policy.</p>
+</div></div></div>
+</sc-if>
+<sc-if value="{{ isHome }}" hint-placeholder-val="{{ false }}">
+<div class="overlay" data-screen-label="Aurora — Home / Voice"><div class="ovwash"></div>
+<div class="homeorbwrap"><div class="homeorb"><div class="homeorbglow"></div><canvas class="orbcvB w100" width="460" height="460" style="width:100%;height:100%;display:block" ref="{{ homeRef }}"></canvas></div></div>
+<div class="homewrap">
+<header class="homehead"><div class="fx ac gap12"><div class="mk"></div><h1 class="wordB">Atlas</h1></div>
+<div class="fx ac gap10"><div class="stind"><span class="stpulse"></span>Listening</div><button class="homebtn" onClick="{{ goCore }}" title="Atlas Core"><i data-lucide="cpu" class="i16"></i></button><button class="homebtn" onClick="{{ goDash }}" title="Dashboard"><i data-lucide="layout-grid" class="i16"></i></button><div class="avB fx ac jc">M</div></div></header>
+<div class="homemid"><h2 class="homehi">Good afternoon, Marcus</h2><p class="homesub">I'm <span class="hl">Atlas</span>, your neural interface — ask me anything.</p></div>
+<div class="homepanel col"><sc-for list="{{ msgs }}" as="m" hint-placeholder-count="1"><div class="{{ m.cls }}">{{ m.content }}</div></sc-for><sc-if value="{{ thinking }}" hint-placeholder-val="{{ false }}"><div class="tdots"><span class="tdot"></span><span class="tdot td2"></span><span class="tdot td3"></span></div></sc-if></div>
+</div>
+<div class="homefoot"><div class="homefootin">
+<div class="homeask"><button class="homemic"><i data-lucide="mic" class="i16"></i></button><input class="homeaskin" placeholder="Message Atlas…" value="{{ input }}" onChange="{{ setInput }}" onKeyDown="{{ keyInput }}"><button class="homesend" onClick="{{ send }}"><i data-lucide="arrow-up" class="i16"></i></button></div>
+<div class="chips"><button class="chip" data-q="Check my emails" onClick="{{ sendQuick }}">Check emails</button><button class="chip" data-q="Search flights to Paris" onClick="{{ sendQuick }}">Search flights</button><button class="chip" data-q="Give me a stock analysis" onClick="{{ sendQuick }}">Stock analysis</button><button class="chip" data-q="Create a document" onClick="{{ sendQuick }}">Create document</button><button class="chip demo" onClick="{{ goCore }}"><i data-lucide="sparkles" class="i12" style="display:inline;vertical-align:-2px;margin-right:5px"></i>Atlas Core</button></div>
+</div></div>
+</div>
+</sc-if>
+<sc-if value="{{ isCore }}" hint-placeholder-val="{{ false }}">
+<div class="overlay" data-screen-label="Aurora — Atlas Core"><div class="ovwash"></div>
+<header class="corehead"><button class="backbtn" onClick="{{ goDash }}"><i data-lucide="arrow-left" class="i16"></i>Back to Dashboard</button><div class="fx ac gap12"><div><h1 class="corebrand">Atlas Core</h1><p class="coretagline">Intelligence Center</p></div><i data-lucide="sparkles" class="i20" style="color:hsl(243 82% 78%)"></i></div></header>
+<div class="corebody">
+<div class="corehero"><div class="coreorb"><div class="coreorbglow"></div><canvas class="orbcvB" width="300" height="300" style="width:150px;height:150px;display:block" ref="{{ miniRef }}"></canvas></div>
+<div class="statgrid">
+<div class="statcard sc-p"><div class="fx jb" style="align-items:flex-start"><div><p class="statlbl">Knowledge</p><p class="statval tnum">14,882</p><div class="stattrend upB"><i data-lucide="trending-up" class="i12"></i><span>+12% from last period</span></div></div><div class="statico"><i data-lucide="brain" class="i20"></i></div></div></div>
+<div class="statcard sc-s"><div class="fx jb" style="align-items:flex-start"><div><p class="statlbl">Research</p><p class="statval tnum">37</p><div class="stattrend" style="color:hsl(240 20% 58%)"><span>active topics</span></div></div><div class="statico"><i data-lucide="search" class="i20"></i></div></div></div>
+<div class="statcard sc-a"><div class="fx jb" style="align-items:flex-start"><div><p class="statlbl">Error Rate</p><p class="statval tnum">0.8%</p><div class="stattrend upB"><i data-lucide="trending-down" class="i12"></i><span>−2% from last period</span></div></div><div class="statico"><i data-lucide="alert-triangle" class="i20"></i></div></div></div>
+<div class="statcard sc-h"><div class="fx jb" style="align-items:flex-start"><div><p class="statlbl">Health</p><p class="statval tnum">98%</p><div class="stattrend upB"><i data-lucide="activity" class="i12"></i><span>all systems nominal</span></div></div><div class="statico"><i data-lucide="activity" class="i20"></i></div></div></div>
+</div></div>
+<div class="coretabs">
+<button class="ctab {{ tabSearch }}" data-t="search" onClick="{{ setCoreTab }}"><i data-lucide="search" class="i14"></i>Search</button>
+<button class="ctab {{ tabOverview }}" data-t="overview" onClick="{{ setCoreTab }}"><i data-lucide="activity" class="i14"></i>Overview</button>
+<button class="ctab {{ tabLive }}" data-t="live" onClick="{{ setCoreTab }}"><i data-lucide="radio" class="i14"></i>Live<span class="live"></span></button>
+<button class="ctab {{ tabAgent }}" data-t="agent" onClick="{{ setCoreTab }}"><i data-lucide="bot" class="i14"></i>Agent<span class="badge">3</span></button>
+<button class="ctab {{ tabKnowledge }}" data-t="knowledge" onClick="{{ setCoreTab }}"><i data-lucide="brain" class="i14"></i>Knowledge</button>
+<button class="ctab {{ tabResearch }}" data-t="research" onClick="{{ setCoreTab }}"><i data-lucide="book-open" class="i14"></i>Research</button>
+<button class="ctab {{ tabLearning }}" data-t="learning" onClick="{{ setCoreTab }}"><i data-lucide="zap" class="i14"></i>Learning</button>
+<button class="ctab {{ tabMemory }}" data-t="memory" onClick="{{ setCoreTab }}"><i data-lucide="database" class="i14"></i>Memory</button>
+<button class="ctab {{ tabErrors }}" data-t="errors" onClick="{{ setCoreTab }}"><i data-lucide="alert-triangle" class="i14"></i>Errors</button>
+</div>
+<div class="coregrid">
+<div class="cpanel" style="--pc:243 75% 66%"><h3 class="cph"><i data-lucide="database" class="i16" style="color:hsl(243 82% 78%)"></i>Real-time Data Flow</h3>
+<div class="flowrow"><div class="flownode"><div class="flowdot" style="--fc:200 75% 60%"><i data-lucide="download-cloud" class="i16"></i></div><div><p class="kbtitle">Ingestion</p><p class="kbmeta">1,204 docs/hr</p></div></div><div class="flowbar"><div class="flowfill" style="--fc:200 75% 60%;width:82%"></div></div></div>
+<div class="flowrow"><div class="flownode"><div class="flowdot" style="--fc:280 68% 68%"><i data-lucide="cpu" class="i16"></i></div><div><p class="kbtitle">Processing</p><p class="kbmeta">18 pipelines</p></div></div><div class="flowbar"><div class="flowfill" style="--fc:280 68% 68%;width:64%"></div></div></div>
+<div class="flowrow"><div class="flownode"><div class="flowdot" style="--fc:160 58% 56%"><i data-lucide="check-circle-2" class="i16"></i></div><div><p class="kbtitle">Validation</p><p class="kbmeta">99.2% pass</p></div></div><div class="flowbar"><div class="flowfill" style="--fc:160 58% 56%;width:99%"></div></div></div>
+<div class="flowrow last"><div class="flownode"><div class="flowdot" style="--fc:243 75% 66%"><i data-lucide="database" class="i16"></i></div><div><p class="kbtitle">Indexed</p><p class="kbmeta">14,882 total</p></div></div><div class="flowbar"><div class="flowfill" style="--fc:243 75% 66%;width:74%"></div></div></div>
+</div>
+<div class="cpanel" style="--pc:280 68% 66%"><h3 class="cph"><i data-lucide="brain" class="i16" style="color:hsl(280 72% 78%)"></i>Recent Knowledge</h3>
+<div class="kbrow"><div class="kbico"><i data-lucide="file-text" class="i16"></i></div><div class="f1"><p class="kbtitle">Transformer scaling laws — 2026 review</p><p class="kbmeta">arXiv · indexed 4 min ago · 0.94 relevance</p></div></div>
+<div class="kbrow"><div class="kbico"><i data-lucide="file-text" class="i16"></i></div><div class="f1"><p class="kbtitle">EU AI Act — compliance summary</p><p class="kbmeta">Policy · indexed 22 min ago · 0.89 relevance</p></div></div>
+<div class="kbrow"><div class="kbico"><i data-lucide="file-text" class="i16"></i></div><div class="f1"><p class="kbtitle">Vector DB benchmarks Q2</p><p class="kbmeta">Engineering · indexed 1h ago · 0.86 relevance</p></div></div>
+<div class="kbrow last"><div class="kbico"><i data-lucide="file-text" class="i16"></i></div><div class="f1"><p class="kbtitle">Retrieval-augmented agents survey</p><p class="kbmeta">arXiv · indexed 2h ago · 0.83 relevance</p></div></div>
+</div>
+<div class="cpanel" style="--pc:190 75% 58%"><h3 class="cph"><i data-lucide="book-open" class="i16" style="color:hsl(190 75% 64%)"></i>Research Queue</h3>
+<div class="qrow"><i data-lucide="loader" class="i16" style="color:hsl(190 75% 62%)"></i><div class="f1"><p class="kbtitle">Multimodal reasoning benchmarks</p><p class="kbmeta">running · 3 sources</p></div><div class="qbar"><div class="qfill" style="width:72%"></div></div><span class="qpct">72%</span></div>
+<div class="qrow"><i data-lucide="loader" class="i16" style="color:hsl(190 75% 62%)"></i><div class="f1"><p class="kbtitle">On-device inference costs</p><p class="kbmeta">running · 5 sources</p></div><div class="qbar"><div class="qfill" style="width:41%"></div></div><span class="qpct">41%</span></div>
+<div class="qrow"><i data-lucide="clock" class="i16" style="color:hsl(240 20% 56%)"></i><div class="f1"><p class="kbtitle">Agent memory architectures</p><p class="kbmeta">queued · 2 sources</p></div><div class="qbar"><div class="qfill" style="width:8%"></div></div><span class="qpct">8%</span></div>
+<div class="qrow last"><i data-lucide="clock" class="i16" style="color:hsl(240 20% 56%)"></i><div class="f1"><p class="kbtitle">Prompt caching strategies</p><p class="kbmeta">queued · 4 sources</p></div><div class="qbar"><div class="qfill" style="width:0%"></div></div><span class="qpct">0%</span></div>
+</div>
+<div class="cpanel" style="--pc:345 74% 64%"><h3 class="cph"><i data-lucide="alert-triangle" class="i16" style="color:hsl(345 80% 72%)"></i>Recent Errors</h3>
+<div class="errrow"><span class="errsev sev-w"></span><div class="f1"><p class="errmsg">Rate limit approached — provider openai</p><p class="errmeta">warning · 11:42:08 · auto-throttled</p></div></div>
+<div class="errrow"><span class="errsev sev-i"></span><div class="f1"><p class="errmsg">Cache miss on embedding batch #4821</p><p class="errmeta">info · 11:38:51 · recomputed</p></div></div>
+<div class="errrow"><span class="errsev sev-e"></span><div class="f1"><p class="errmsg">Timeout fetching source (retry 2/3)</p><p class="errmeta">error · 11:31:20 · recovered</p></div></div>
+<div class="errrow last"><span class="errsev sev-i"></span><div class="f1"><p class="errmsg">Schedule "nightly-index" completed</p><p class="errmeta">info · 03:00:04 · 8,204 docs</p></div></div>
+</div>
+</div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ drawer }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Aurora — Conversation"><div class="backdrop" onClick="{{ closeDrawer }}"></div>
+<aside class="drawer"><div class="dhead"><div><h2 class="dtitle">Atlas</h2><p class="dstate">{{ aiStateLabel }}</p></div><button class="xbtn fx ac jc" onClick="{{ closeDrawer }}"><i data-lucide="x" class="i16"></i></button></div>
+<div class="msgs"><sc-for list="{{ msgs }}" as="m" hint-placeholder-count="1"><div class="{{ m.cls }}">{{ m.content }}</div></sc-for><sc-if value="{{ thinking }}" hint-placeholder-val="{{ false }}"><div class="tdots"><span class="tdot"></span><span class="tdot td2"></span><span class="tdot td3"></span></div></sc-if></div>
+<div class="din"><input class="inp" placeholder="Ask Atlas anything…" value="{{ input }}" onChange="{{ setInput }}" onKeyDown="{{ keyInput }}"><button class="sendBtn fx ac jc" onClick="{{ send }}"><i data-lucide="arrow-up" class="i16"></i></button></div>
+</aside></div>
+</sc-if>
+<sc-if value="{{ isWeather }}" hint-placeholder-val="{{ false }}">
+<div class="exp th-weather" data-screen-label="Aurora — Expanded Weather"><div class="skyB"></div><div class="skyfadeB"></div>
+<header class="ehead"><div class="fx ac gap16"><div class="accline"></div><h1 class="etitle">Weather</h1></div><button class="closeBtn" onClick="{{ closeExpanded }}"><i data-lucide="minimize-2" class="i16"></i><span>Close</span><span class="kbd">Esc</span></button></header>
+<div class="ebody">
+<div class="col gap16" style="width:34%;min-width:340px">
+<div class="gpanel f1 col"><div class="fx ac jb mb16"><div class="fx ac gap8"><i data-lucide="map-pin" class="i16 iInd"></i><span class="t14" style="color:hsl(240 30% 82%)">San Francisco</span></div><button class="xbtn fx ac jc"><i data-lucide="refresh-cw" class="i14"></i></button></div>
+<div class="f1 col ac jc"><i data-lucide="cloud-sun" class="iInd" style="width:104px;height:104px"></i><div class="tc" style="margin-top:20px"><div class="bigtemp tnum">68°</div><div class="econd">Partly Cloudy</div><div class="efeels">Feels like 66°</div></div></div>
+<div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:22px;padding-top:22px;border-top:1px solid hsl(243 60% 70% / .1)"><div class="estat"><i data-lucide="droplets" class="i20 iInd" style="margin:0 auto 5px"></i><div class="esval tnum">62%</div><div class="eslbl">Humidity</div></div><div class="estat"><i data-lucide="wind" class="i20 iInd" style="margin:0 auto 5px"></i><div class="esval tnum">13 km/h</div><div class="eslbl">Wind</div></div><div class="estat"><i data-lucide="eye" class="i20 iInd" style="margin:0 auto 5px"></i><div class="esval tnum">10 km</div><div class="eslbl">Visibility</div></div></div></div>
+<div class="gpanel2 fx ac jb"><div class="fx ac gap12"><div class="icboxB fx ac jc"><i data-lucide="sunrise" class="i16"></i></div><div><div class="eslbl">Sunrise</div><div class="esval tnum">6:02 AM</div></div></div><div class="f1" style="margin:0 16px"><div class="rangebar" style="width:100%"><div class="rangefill" style="width:52%"></div></div></div><div class="fx ac gap12"><div class="icboxB fx ac jc"><i data-lucide="sunset" class="i16"></i></div><div><div class="eslbl">Sunset</div><div class="esval tnum">8:34 PM</div></div></div></div>
+</div>
+<div class="f1 col gap16">
+<div class="gpanel2"><h3 class="t14 fw6 mb12" style="color:hsl(240 30% 82%)">24-Hour Forecast</h3><div class="fx gap12" style="overflow-x:auto;padding-bottom:6px">
+<div class="h24 on"><span class="fs12" style="color:hsl(240 20% 66%)">Now</span><i data-lucide="sun" class="i20 iInd"></i><span class="t14 fw6 tnum" style="color:hsl(240 30% 92%)">68°</span></div>
+<div class="h24"><span class="fs12" style="color:hsl(240 20% 60%)">1 PM</span><i data-lucide="sun" class="i20 iMut"></i><span class="t14 fw6 tnum" style="color:hsl(240 30% 88%)">69°</span></div>
+<div class="h24"><span class="fs12" style="color:hsl(240 20% 60%)">2 PM</span><i data-lucide="sun" class="i20 iMut"></i><span class="t14 fw6 tnum" style="color:hsl(240 30% 88%)">70°</span></div>
+<div class="h24"><span class="fs12" style="color:hsl(240 20% 60%)">3 PM</span><i data-lucide="cloud-sun" class="i20 iMut"></i><span class="t14 fw6 tnum" style="color:hsl(240 30% 88%)">69°</span></div>
+<div class="h24"><span class="fs12" style="color:hsl(240 20% 60%)">4 PM</span><i data-lucide="cloud" class="i20 iMut"></i><span class="t14 fw6 tnum" style="color:hsl(240 30% 88%)">67°</span></div>
+<div class="h24"><span class="fs12" style="color:hsl(240 20% 60%)">5 PM</span><i data-lucide="cloud" class="i20 iMut"></i><span class="t14 fw6 tnum" style="color:hsl(240 30% 88%)">65°</span></div>
+<div class="h24"><span class="fs12" style="color:hsl(240 20% 60%)">6 PM</span><i data-lucide="cloud" class="i20 iMut"></i><span class="t14 fw6 tnum" style="color:hsl(240 30% 88%)">63°</span></div>
+<div class="h24"><span class="fs12" style="color:hsl(240 20% 60%)">7 PM</span><i data-lucide="cloud-sun" class="i20 iMut"></i><span class="t14 fw6 tnum" style="color:hsl(240 30% 88%)">61°</span></div>
+</div></div>
+<div class="gpanel2 f1"><h3 class="t14 fw6 mb12" style="color:hsl(240 30% 82%)">7-Day Outlook</h3>
+<div class="drow today"><div class="t14 fw6" style="width:56px;color:hsl(240 30% 92%)">Today</div><div class="fx ac gap12 f1 jc"><i data-lucide="sun" class="i20 iInd"></i><span class="fs12" style="color:hsl(240 20% 64%);width:100px">Sunny</span></div><div class="fx ac gap12 t14"><span class="fw6 tnum" style="width:32px;text-align:right;color:hsl(240 30% 92%)">70°</span><div class="rangebar"><div class="rangefill" style="width:80%"></div></div><span class="tnum" style="color:hsl(240 20% 56%);width:32px">58°</span></div></div>
+<div class="drow"><div class="t14 fw6" style="width:56px;color:hsl(240 30% 88%)">Mon</div><div class="fx ac gap12 f1 jc"><i data-lucide="cloud-sun" class="i20 iMut"></i><span class="fs12" style="color:hsl(240 20% 64%);width:100px">Partly Cloudy</span></div><div class="fx ac gap12 t14"><span class="fw6 tnum" style="width:32px;text-align:right;color:hsl(240 30% 88%)">69°</span><div class="rangebar"><div class="rangefill" style="width:72%"></div></div><span class="tnum" style="color:hsl(240 20% 56%);width:32px">57°</span></div></div>
+<div class="drow"><div class="t14 fw6" style="width:56px;color:hsl(240 30% 88%)">Tue</div><div class="fx ac gap12 f1 jc"><i data-lucide="cloud" class="i20 iMut"></i><span class="fs12" style="color:hsl(240 20% 64%);width:100px">Cloudy</span></div><div class="fx ac gap12 t14"><span class="fw6 tnum" style="width:32px;text-align:right;color:hsl(240 30% 88%)">66°</span><div class="rangebar"><div class="rangefill" style="width:60%"></div></div><span class="tnum" style="color:hsl(240 20% 56%);width:32px">56°</span></div></div>
+<div class="drow"><div class="t14 fw6" style="width:56px;color:hsl(240 30% 88%)">Wed</div><div class="fx ac gap12 f1 jc"><i data-lucide="sun" class="i20 iInd"></i><span class="fs12" style="color:hsl(240 20% 64%);width:100px">Sunny</span></div><div class="fx ac gap12 t14"><span class="fw6 tnum" style="width:32px;text-align:right;color:hsl(240 30% 88%)">71°</span><div class="rangebar"><div class="rangefill" style="width:84%"></div></div><span class="tnum" style="color:hsl(240 20% 56%);width:32px">58°</span></div></div>
+<div class="drow"><div class="t14 fw6" style="width:56px;color:hsl(240 30% 88%)">Thu</div><div class="fx ac gap12 f1 jc"><i data-lucide="cloud-rain" class="i20 iMut"></i><span class="fs12" style="color:hsl(240 20% 64%);width:100px">Rain</span></div><div class="fx ac gap12 t14"><span class="fw6 tnum" style="width:32px;text-align:right;color:hsl(240 30% 88%)">62°</span><div class="rangebar"><div class="rangefill" style="width:44%"></div></div><span class="tnum" style="color:hsl(240 20% 56%);width:32px">54°</span></div></div>
+<div class="drow"><div class="t14 fw6" style="width:56px;color:hsl(240 30% 88%)">Fri</div><div class="fx ac gap12 f1 jc"><i data-lucide="cloud" class="i20 iMut"></i><span class="fs12" style="color:hsl(240 20% 64%);width:100px">Cloudy</span></div><div class="fx ac gap12 t14"><span class="fw6 tnum" style="width:32px;text-align:right;color:hsl(240 30% 88%)">64°</span><div class="rangebar"><div class="rangefill" style="width:56%"></div></div><span class="tnum" style="color:hsl(240 20% 56%);width:32px">55°</span></div></div>
+<div class="drow"><div class="t14 fw6" style="width:56px;color:hsl(240 30% 88%)">Sat</div><div class="fx ac gap12 f1 jc"><i data-lucide="sun" class="i20 iInd"></i><span class="fs12" style="color:hsl(240 20% 64%);width:100px">Sunny</span></div><div class="fx ac gap12 t14"><span class="fw6 tnum" style="width:32px;text-align:right;color:hsl(240 30% 88%)">72°</span><div class="rangebar"><div class="rangefill" style="width:88%"></div></div><span class="tnum" style="color:hsl(240 20% 56%);width:32px">59°</span></div></div>
+</div>
+<div class="grid" style="grid-template-columns:repeat(4,1fr);gap:12px">
+<div class="gpanel2"><div class="fx ac gap8 mb8"><div class="icboxB fx ac jc"><i data-lucide="gauge" class="i14"></i></div><span class="eslbl">Pressure</span></div><div class="fs16 fw6 tnum white" style="color:hsl(240 30% 92%)">1013 hPa</div></div>
+<div class="gpanel2"><div class="fx ac gap8 mb8"><div class="icboxB fx ac jc"><i data-lucide="sun" class="i14"></i></div><span class="eslbl">UV Index</span></div><div class="fs16 fw6" style="color:hsl(240 30% 92%)">6 High</div></div>
+<div class="gpanel2"><div class="fx ac gap8 mb8"><div class="icboxB fx ac jc"><i data-lucide="thermometer" class="i14"></i></div><span class="eslbl">Dew Point</span></div><div class="fs16 fw6 tnum" style="color:hsl(240 30% 92%)">55°</div></div>
+<div class="gpanel2"><div class="fx ac gap8 mb8"><div class="icboxB fx ac jc"><i data-lucide="wind" class="i14"></i></div><span class="eslbl">Air Quality</span></div><div class="fs16 fw6" style="color:hsl(240 30% 92%)">Good</div></div>
+</div>
+</div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ isCalendar }}" hint-placeholder-val="{{ false }}">
+<div class="exp th-cal" data-screen-label="Aurora — Expanded Calendar"><div class="expwash"></div>
+<header class="ehead"><div class="fx ac gap16"><div class="accline"></div><h1 class="etitle">Calendar</h1></div><button class="closeBtn" onClick="{{ closeExpanded }}"><i data-lucide="minimize-2" class="i16"></i><span>Close</span><span class="kbd">Esc</span></button></header>
+<div class="ebody">
+<div class="col gap16" style="width:34%;min-width:340px">
+<div class="gpanel f1 col"><div class="fx ac jb mb16"><div class="fx ac gap8"><i data-lucide="calendar" class="i16 iAcc"></i><span class="t14" style="color:hsl(240 30% 82%)">Sunday, July 5</span></div><button class="xbtn fx ac jc"><i data-lucide="plus" class="i14"></i></button></div>
+<div class="f1 col ac jc"><div class="bigtemp tnum">4</div><div class="econd">events today</div><div class="efeels">Next · 1:1 with Maya in 20 min</div></div>
+<div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:22px;padding-top:22px;border-top:1px solid hsl(243 60% 70% / .1)"><div class="estat"><div class="esval tnum">3h 15m</div><div class="eslbl">Booked</div></div><div class="estat"><div class="esval tnum">4h</div><div class="eslbl">Free</div></div><div class="estat"><div class="esval tnum">2</div><div class="eslbl">Video</div></div></div></div>
+<div class="gpanel2"><h3 class="t14 fw6 mb12" style="color:hsl(240 30% 82%)">This Week</h3><div class="fx jb gap8" style="align-items:flex-end;height:76px">
+<div class="col ac gap8 f1" style="height:100%"><div class="wkbar" style="height:34%"></div><span class="fs12" style="color:hsl(240 20% 58%)">M</span></div>
+<div class="col ac gap8 f1" style="height:100%"><div class="wkbar" style="height:62%"></div><span class="fs12" style="color:hsl(240 20% 58%)">T</span></div>
+<div class="col ac gap8 f1" style="height:100%"><div class="wkbar" style="height:46%"></div><span class="fs12" style="color:hsl(240 20% 58%)">W</span></div>
+<div class="col ac gap8 f1" style="height:100%"><div class="wkbar" style="height:80%"></div><span class="fs12" style="color:hsl(240 20% 58%)">T</span></div>
+<div class="col ac gap8 f1" style="height:100%"><div class="wkbar" style="height:54%"></div><span class="fs12" style="color:hsl(240 20% 58%)">F</span></div>
+<div class="col ac gap8 f1" style="height:100%"><div class="wkbar" style="height:24%"></div><span class="fs12" style="color:hsl(240 20% 58%)">S</span></div>
+<div class="col ac gap8 f1" style="height:100%"><div class="wkbar on" style="height:44%"></div><span class="fs12 iAcc">S</span></div>
+</div></div>
+</div>
+<div class="f1 col gap16">
+<div class="gpanel2 f1"><h3 class="t14 fw6 mb12" style="color:hsl(240 30% 82%)">Schedule</h3>
+<div class="rowB"><span class="evtimeB">9:30 AM</span><div class="f1" style="min-width:0"><p class="evtB">Design sync</p><p class="evsB">30 min · Zoom</p></div><span class="pillAcc">Zoom</span></div>
+<div class="rowB"><span class="evtimeB">11:00 AM</span><div class="f1" style="min-width:0"><p class="evtB">1:1 with Maya</p><p class="evsB">45 min · Meet</p></div><span class="nowB">Now</span></div>
+<div class="rowB"><span class="evtimeB">12:30 PM</span><div class="f1" style="min-width:0"><p class="evtB">Lunch with investors</p><p class="evsB">1h 30m · Nopa</p></div></div>
+<div class="rowB"><span class="evtimeB">3:00 PM</span><div class="f1" style="min-width:0"><p class="evtB">Product review</p><p class="evsB">1 hour · Boardroom</p></div></div>
+<div class="rowB"><span class="evtimeB">4:30 PM</span><div class="f1" style="min-width:0"><p class="evtB">Eng standup</p><p class="evsB">30 min · Meet</p></div></div>
+<div class="rowB last"><span class="evtimeB">6:00 PM</span><div class="f1" style="min-width:0"><p class="evtB">Gym</p><p class="evsB">1 hour</p></div></div>
+</div>
+<div class="gpanel2"><h3 class="t14 fw6 mb12" style="color:hsl(240 30% 82%)">Tomorrow</h3>
+<div class="rowB"><span class="evtimeB">10:00 AM</span><div class="f1" style="min-width:0"><p class="evtB">Brand review</p><p class="evsB">1 hour · Zoom</p></div></div>
+<div class="rowB last"><span class="evtimeB">2:00 PM</span><div class="f1" style="min-width:0"><p class="evtB">Vendor call</p><p class="evsB">30 min · Phone</p></div></div>
+</div>
+</div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ isTasks }}" hint-placeholder-val="{{ false }}">
+<div class="exp th-task" data-screen-label="Aurora — Expanded Tasks"><div class="expwash"></div>
+<header class="ehead"><div class="fx ac gap16"><div class="accline"></div><h1 class="etitle">Tasks</h1></div><button class="closeBtn" onClick="{{ closeExpanded }}"><i data-lucide="minimize-2" class="i16"></i><span>Close</span><span class="kbd">Esc</span></button></header>
+<div class="ebody">
+<div class="col gap16" style="width:34%;min-width:340px">
+<div class="gpanel f1 col ac jc"><svg width="152" height="152" viewBox="0 0 42 42"><circle cx="21" cy="21" r="15.9" fill="none" stroke="hsl(240 33% 20%)" stroke-width="3"></circle><circle cx="21" cy="21" r="15.9" fill="none" class="strokeAcc" stroke-width="3" stroke-dasharray="20 100" stroke-linecap="round" transform="rotate(-90 21 21)"></circle></svg><div class="tc" style="margin-top:14px"><div class="bigtemp tnum" style="font-size:40px">20%</div><div class="econd">1 of 5 complete</div></div></div>
+<div class="gpanel2 grid" style="grid-template-columns:1fr 1fr 1fr;gap:16px"><div class="estat"><div class="esval tnum">1</div><div class="eslbl">High</div></div><div class="estat"><div class="esval tnum">1</div><div class="eslbl">Due today</div></div><div class="estat"><div class="esval tnum">0</div><div class="eslbl">Overdue</div></div></div>
+</div>
+<div class="f1 col gap16">
+<div class="gpanel2 f1"><h3 class="t14 fw6 mb12" style="color:hsl(240 30% 82%)">Active</h3>
+<div class="rowB"><div class="ckB"></div><div class="f1" style="min-width:0"><p class="evtB">Send Q4 budget notes to Sarah</p><p class="evsB">Due today · 2:00 PM</p></div><span class="tkpill tkHigh">High</span></div>
+<div class="rowB"><div class="ckB"></div><div class="f1" style="min-width:0"><p class="evtB">Review brand guidelines</p><p class="evsB">Jul 6 · 10:00 AM</p></div><span class="tkpill tkMed">Med</span></div>
+<div class="rowB"><div class="ckB"></div><div class="f1" style="min-width:0"><p class="evtB">Book Paris airport transfer</p><p class="evsB">Jul 8 · 5:00 PM</p></div><span class="tkpill tkMed">Med</span></div>
+<div class="rowB last"><div class="ckB"></div><div class="f1" style="min-width:0"><p class="evtB">Renew passport</p><p class="evsB">No due date</p></div><span class="tkpill tkLow">Low</span></div>
+</div>
+<div class="gpanel2"><h3 class="t14 fw6 mb12" style="color:hsl(240 30% 82%)">Completed</h3>
+<div class="rowB last"><div class="ckB done fx ac jc"><i data-lucide="check" class="i12 iAcc"></i></div><div class="f1" style="min-width:0"><p class="evtB doneB">Prep product review deck</p><p class="evsB">Completed 1h ago</p></div></div>
+</div>
+</div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ isStocks }}" hint-placeholder-val="{{ false }}">
+<div class="exp th-stock" data-screen-label="Aurora — Expanded Watchlist"><div class="expwash"></div>
+<header class="ehead"><div class="fx ac gap16"><div class="accline"></div><h1 class="etitle">Watchlist</h1></div><button class="closeBtn" onClick="{{ closeExpanded }}"><i data-lucide="minimize-2" class="i16"></i><span>Close</span><span class="kbd">Esc</span></button></header>
+<div class="ebody">
+<div class="col gap16" style="width:38%;min-width:360px">
+<div class="gpanel f1 col"><div class="fx ac jb mb16"><div><div class="fx ac gap8"><span class="symB" style="width:auto;font-size:15px">AAPL</span><span class="fx ac gap8 fs12 upB"><span class="dotB on" style="width:6px;height:6px;background:hsl(160 58% 56%);box-shadow:0 0 8px hsl(160 58% 56% / .7)"></span>Live</span></div><span class="snB">Apple Inc.</span></div></div>
+<div class="fx" style="align-items:flex-end;gap:12px"><div class="bigprice tnum">247.31</div><div class="fx ac gap4 upB fw6" style="margin-bottom:8px"><i data-lucide="trending-up" class="i16"></i><span class="tnum">+3.02 (+1.24%)</span></div></div>
+<svg viewBox="0 0 100 40" preserveAspectRatio="none" style="width:100%;height:120px;margin-top:16px"><polyline points="0,32 8,30 16,33 24,27 32,29 40,23 48,25 56,19 64,21 72,14 80,16 88,9 100,6" class="strokeAcc" stroke-width="1.5" vector-effect="non-scaling-stroke"></polyline></svg>
+<div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:20px;padding-top:20px;border-top:1px solid hsl(243 60% 70% / .1)"><div class="estat"><div class="esval tnum">244.10</div><div class="eslbl">Open</div></div><div class="estat"><div class="esval tnum">248.02</div><div class="eslbl">High</div></div><div class="estat"><div class="esval tnum">243.55</div><div class="eslbl">Low</div></div><div class="estat"><div class="esval tnum">52.3M</div><div class="eslbl">Volume</div></div><div class="estat"><div class="esval tnum">3.74T</div><div class="eslbl">Mkt Cap</div></div><div class="estat"><div class="esval tnum">31.2</div><div class="eslbl">P/E</div></div></div>
+</div>
+</div>
+<div class="f1 col gap16">
+<div class="gpanel2 f1"><h3 class="t14 fw6 mb12" style="color:hsl(240 30% 82%)">Watchlist</h3>
+<div class="rowB"><span class="symB">AAPL</span><span class="snB f1 trunc" style="min-width:0">Apple Inc.</span><svg width="72" height="22"><polyline points="0,14 6,15 13,12 19,13 26,10 32,11 39,9 45,10 52,7 58,8 65,5 72,4" fill="none" stroke="hsl(160 58% 56%)" stroke-width="1.5"></polyline></svg><span class="prcB" style="width:76px;text-align:right">247.31</span><span class="chgB upB">+1.24%</span></div>
+<div class="rowB"><span class="symB">GOOGL</span><span class="snB f1 trunc" style="min-width:0">Alphabet Inc.</span><svg width="72" height="22"><polyline points="0,6 6,8 13,7 19,10 26,9 32,12 39,11 45,14 52,13 58,16 65,15 72,17" fill="none" stroke="hsl(350 75% 68%)" stroke-width="1.5"></polyline></svg><span class="prcB" style="width:76px;text-align:right">186.42</span><span class="chgB dnB">−0.58%</span></div>
+<div class="rowB"><span class="symB">MSFT</span><span class="snB f1 trunc" style="min-width:0">Microsoft Corp.</span><svg width="72" height="22"><polyline points="0,16 6,14 13,15 19,12 26,13 32,10 39,11 45,8 52,9 58,7 65,6 72,5" fill="none" stroke="hsl(160 58% 56%)" stroke-width="1.5"></polyline></svg><span class="prcB" style="width:76px;text-align:right">512.88</span><span class="chgB upB">+0.92%</span></div>
+<div class="rowB"><span class="symB">NVDA</span><span class="snB f1 trunc" style="min-width:0">NVIDIA Corp.</span><svg width="72" height="22"><polyline points="0,18 6,16 13,17 19,13 26,14 32,11 39,12 45,8 52,9 58,5 65,6 72,3" fill="none" stroke="hsl(160 58% 56%)" stroke-width="1.5"></polyline></svg><span class="prcB" style="width:76px;text-align:right">138.07</span><span class="chgB upB">+2.31%</span></div>
+<div class="rowB"><span class="symB">AMZN</span><span class="snB f1 trunc" style="min-width:0">Amazon.com</span><svg width="72" height="22"><polyline points="0,15 6,14 13,16 19,12 26,13 32,11 39,12 45,9 52,10 58,8 65,9 72,7" fill="none" stroke="hsl(160 58% 56%)" stroke-width="1.5"></polyline></svg><span class="prcB" style="width:76px;text-align:right">231.14</span><span class="chgB upB">+0.44%</span></div>
+<div class="rowB last"><span class="symB">META</span><span class="snB f1 trunc" style="min-width:0">Meta Platforms</span><svg width="72" height="22"><polyline points="0,8 6,9 13,8 19,11 26,10 32,13 39,12 45,14 52,13 58,15 65,16 72,17" fill="none" stroke="hsl(350 75% 68%)" stroke-width="1.5"></polyline></svg><span class="prcB" style="width:76px;text-align:right">712.60</span><span class="chgB dnB">−0.91%</span></div>
+</div>
+<div class="gpanel2 grid" style="grid-template-columns:1fr 1fr 1fr;gap:16px"><div class="estat"><div class="esval tnum">6,284</div><div class="eslbl upB">S&P +0.6%</div></div><div class="estat"><div class="esval tnum">20,910</div><div class="eslbl upB">Nasdaq +0.8%</div></div><div class="estat"><div class="esval tnum">44,120</div><div class="eslbl dnB">Dow −0.1%</div></div></div>
+</div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ isEmail }}" hint-placeholder-val="{{ false }}">
+<div class="exp th-mail" data-screen-label="Aurora — Expanded Inbox"><div class="expwash"></div>
+<header class="ehead"><div class="fx ac gap16"><div class="accline"></div><h1 class="etitle">Inbox</h1></div><button class="closeBtn" onClick="{{ closeExpanded }}"><i data-lucide="minimize-2" class="i16"></i><span>Close</span><span class="kbd">Esc</span></button></header>
+<div class="ebody">
+<div class="col gap16" style="width:32%;min-width:320px">
+<div class="gpanel col"><button class="fx ac jc gap8 fw6" style="width:100%;padding:12px;border-radius:12px;background:hsl(var(--acc) / .16);border:1px solid hsl(var(--acc) / .3);color:hsl(var(--acc));cursor:pointer;font-family:inherit;font-size:14px"><i data-lucide="pen-line" class="i16"></i>Compose</button>
+<div class="col gap8" style="margin-top:18px">
+<div class="fx ac jb" style="padding:10px 12px;border-radius:10px;background:hsl(var(--acc) / .1)"><span class="fx ac gap10 t14 fw5" style="color:hsl(240 30% 90%)"><i data-lucide="inbox" class="i16 iAcc"></i>Primary</span><span class="pillAcc">2</span></div>
+<div class="fx ac jb" style="padding:10px 12px"><span class="fx ac gap10 t14" style="color:hsl(240 20% 70%)"><i data-lucide="star" class="i16" style="color:hsl(240 20% 55%)"></i>Starred</span><span class="fs12" style="color:hsl(240 20% 55%)">2</span></div>
+<div class="fx ac jb" style="padding:10px 12px"><span class="fx ac gap10 t14" style="color:hsl(240 20% 70%)"><i data-lucide="send" class="i16" style="color:hsl(240 20% 55%)"></i>Sent</span><span class="fs12" style="color:hsl(240 20% 55%)">18</span></div>
+<div class="fx ac jb" style="padding:10px 12px"><span class="fx ac gap10 t14" style="color:hsl(240 20% 70%)"><i data-lucide="archive" class="i16" style="color:hsl(240 20% 55%)"></i>Archive</span><span class="fs12" style="color:hsl(240 20% 55%)">204</span></div>
+</div></div>
+<div class="gpanel2"><div class="fx ac jb"><span class="eslbl">Unread</span><span class="esval tnum">2</span></div><div class="fx ac jb mt12"><span class="eslbl">Today</span><span class="esval tnum">4 received</span></div></div>
+</div>
+<div class="gpanel2 f1" style="padding:8px">
+<div class="mailrow"><div class="avB2 fx ac jc">SC</div><div class="f1" style="min-width:0"><div class="fx ac jb gap8"><span class="fx ac gap8"><span class="dotB on" style="width:6px;height:6px"></span><span class="sndB">Sarah Chen</span></span><span class="tmB">10:32 AM</span></div><p class="sbjB m0" style="margin-top:2px">Q4 Budget Review</p><p class="previewline">Hi — I need your input on the Q4 budget before Friday's board meeting. Can you review the marketing line items?</p></div></div>
+<div class="mailrow"><div class="avB2 fx ac jc">MJ</div><div class="f1" style="min-width:0"><div class="fx ac jb gap8"><span class="fx ac gap8"><span class="dotB on" style="width:6px;height:6px"></span><span class="sndB">Mike Johnson</span></span><span class="tmB">9:15 AM</span></div><p class="sbjB m0" style="margin-top:2px">Re: Project Timeline</p><p class="previewline">Thanks for the update. The timeline works on our end — we'll have the design handoff ready by Wednesday.</p></div></div>
+<div class="mailrow"><div class="avB2 fx ac jc">DT</div><div class="f1" style="min-width:0"><div class="fx ac jb gap8"><span class="sndB" style="color:hsl(240 20% 66%)">Design Team</span><span class="tmB">Yesterday</span></div><p class="sbjB m0" style="margin-top:2px;color:hsl(240 20% 58%)">Brand Guidelines Released</p><p class="previewline">The updated brand guidelines are now live in Figma. Highlights include the new type scale and color tokens.</p></div></div>
+<div class="mailrow"><div class="avB2 fx ac jc">AR</div><div class="f1" style="min-width:0"><div class="fx ac jb gap8"><span class="fx ac gap8"><span class="sndB" style="color:hsl(240 20% 66%)">Alex Rivera</span><i data-lucide="star" class="i12" style="color:hsl(40 72% 62%)"></i></span><span class="tmB">Yesterday</span></div><p class="sbjB m0" style="margin-top:2px;color:hsl(240 20% 58%)">Meeting Notes</p><p class="previewline">Key takeaways from yesterday's sync: ship the sphere perf fix, finalize onboarding copy, and confirm the data model.</p></div></div>
+<div class="mailrow"><div class="avB2 fx ac jc">FN</div><div class="f1" style="min-width:0"><div class="fx ac jb gap8"><span class="sndB" style="color:hsl(240 20% 66%)">Finance</span><span class="tmB">Wed</span></div><p class="sbjB m0" style="margin-top:2px;color:hsl(240 20% 58%)">Expense report approved</p><p class="previewline">Your June expense report has been approved and will be reimbursed in the next payroll cycle.</p></div></div>
+<div class="mailrow last"><div class="avB2 fx ac jc">TR</div><div class="f1" style="min-width:0"><div class="fx ac jb gap8"><span class="sndB" style="color:hsl(240 20% 66%)">Air France</span><span class="tmB">Wed</span></div><p class="sbjB m0" style="margin-top:2px;color:hsl(240 20% 58%)">Your trip to Paris — check-in opens soon</p><p class="previewline">Online check-in for flight AF 083 opens 48 hours before departure. Select your seats and add baggage now.</p></div></div>
+</div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ isNews }}" hint-placeholder-val="{{ false }}">
+<div class="exp th-news" data-screen-label="Aurora — Expanded Briefing"><div class="expwash"></div>
+<header class="ehead"><div class="fx ac gap16"><div class="accline"></div><h1 class="etitle">Briefing</h1></div><button class="closeBtn" onClick="{{ closeExpanded }}"><i data-lucide="minimize-2" class="i16"></i><span>Close</span><span class="kbd">Esc</span></button></header>
+<div class="ebody">
+<div class="feat" style="width:40%;min-width:360px"><div class="fx ac gap8"><span class="pillAcc">Technology</span><span class="fx ac gap4 fs12 upB"><i data-lucide="trending-up" class="i12"></i>Trending</span></div>
+<h2 class="featTitle">AI Breakthrough: New Language Models Show Human-Level Reasoning</h2>
+<p class="featBody">Researchers unveiled a new class of models that match human performance on multi-step reasoning benchmarks, with early results suggesting stronger generalization to unfamiliar problems. Analysts expect rapid adoption across enterprise tooling over the coming quarters.</p>
+<div class="featImg"></div>
+<div class="fx ac gap8 fs12 mut" style="margin-top:16px;color:hsl(240 20% 56%)"><span>TechCrunch</span><span>·</span><span>2h ago</span><span>·</span><span>4 min read</span></div>
+</div>
+<div class="gpanel2 f1"><h3 class="t14 fw6 mb12" style="color:hsl(240 30% 82%)">More stories</h3>
+<div class="rowB"><div class="f1" style="min-width:0"><div class="fx ac gap8 mb8"><span class="pillAcc">Finance</span><span class="fx ac gap4 fs12 upB"><i data-lucide="trending-up" class="i12"></i>Trending</span></div><h4 class="ntB" style="margin:0">Global Markets Rally on Positive Economic Data</h4><span class="nmB">Bloomberg · 4h ago</span></div></div>
+<div class="rowB"><div class="f1" style="min-width:0"><div class="fx ac gap8 mb8"><span class="pillAcc">Science</span></div><h4 class="ntB" style="margin:0">Space Agency Announces New Moon Mission Timeline</h4><span class="nmB">Reuters · 6h ago</span></div></div>
+<div class="rowB"><div class="f1" style="min-width:0"><div class="fx ac gap8 mb8"><span class="pillAcc">Business</span></div><h4 class="ntB" style="margin:0">Major Airlines Report Record Summer Travel Demand</h4><span class="nmB">WSJ · 7h ago</span></div></div>
+<div class="rowB"><div class="f1" style="min-width:0"><div class="fx ac gap8 mb8"><span class="pillAcc">Technology</span></div><h4 class="ntB" style="margin:0">Chipmakers Expand Capacity Amid Surging AI Demand</h4><span class="nmB">The Verge · 9h ago</span></div></div>
+<div class="rowB last"><div class="f1" style="min-width:0"><div class="fx ac gap8 mb8"><span class="pillAcc">World</span></div><h4 class="ntB" style="margin:0">Climate Summit Reaches Agreement on Emissions Targets</h4><span class="nmB">AP · 11h ago</span></div></div>
+</div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ expOpen }}" hint-placeholder-val="{{ false }}">
+<div class="minicard" onClick="{{ openDrawer }}"><canvas class="minicv" width="96" height="96" ref="{{ miniRef }}"></canvas><button class="minimic fx ac jc"><i data-lucide="mic" class="i16"></i></button></div>
+</sc-if>
+<nav class="scrn"><button class="scrnl {{ scAuth }}" onClick="{{ goAuth }}"><i data-lucide="log-in" class="i14"></i>Sign in</button><button class="scrnl {{ scHome }}" onClick="{{ goHome }}"><i data-lucide="mic" class="i14"></i>Home</button><button class="scrnl {{ scDash }}" onClick="{{ goDash }}"><i data-lucide="layout-grid" class="i14"></i>Dashboard</button><button class="scrnl {{ scCore }}" onClick="{{ goCore }}"><i data-lucide="cpu" class="i14"></i>Core</button></nav>
+<nav class="sw"><a class="swl" href="Atlas Dashboard (Current).dc.html">Current</a><a class="swl" href="Atlas Premium A — Graphite.dc.html">A · Graphite</a><a class="swl on" href="Atlas Premium B — Aurora.dc.html">B · Aurora</a><a class="swl" href="Atlas Premium C — Champagne.dc.html">C · Champagne</a></nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { screen: 'dashboard', authMode: 'signin', showPw: false, drawer: false, expanded: null, input: '', thinking: false, msgs: [
+    { role: 'a', content: "Good afternoon, Marcus. Four meetings today and Paris is 6 days out. Anything you'd like me to handle?" }
+  ]};
+  componentDidMount() {
+    this.icons();
+    this._key = (e) => { if (e.key === 'Escape') this.setState({ drawer: false, expanded: null }); };
+    window.addEventListener('keydown', this._key);
+  }
+  componentDidUpdate() { this.icons(); }
+  componentWillUnmount() { clearTimeout(this._it); clearTimeout(this._rt); window.removeEventListener('keydown', this._key); }
+  push(v) {
+    if (!v) return;
+    this.setState(s => ({ msgs: [...s.msgs, { role: 'u', content: v }], input: '', thinking: true }));
+    clearTimeout(this._rt);
+    this._rt = setTimeout(() => {
+      this.setState(s => ({ msgs: [...s.msgs, { role: 'a', content: "On it — I'll surface the details on your dashboard in a moment." }], thinking: false }));
+    }, 1200);
+  }
+  doSend() { this.push(this.state.input.trim()); }
+  icons() {
+    if (window.lucide) { try { window.lucide.createIcons(); } catch (e) {} }
+    else { clearTimeout(this._it); this._it = setTimeout(() => this.icons(), 300); }
+  }
+  orb(el) {
+    if (!el || el.__run) return;
+    el.__run = 1;
+    const ctx = el.getContext('2d');
+    const S = el.width, N = 2000, pts = [];
+    for (let i = 0; i < N; i++) {
+      const th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1);
+      const r = Math.pow(Math.random(), 0.42);
+      pts.push({ x: r * Math.sin(ph) * Math.cos(th), y: r * Math.sin(ph) * Math.sin(th), z: r * Math.cos(ph), rn: Math.random() });
+    }
+    let rot = 0;
+    const tick = (t) => {
+      if (!el.isConnected) { el.__run = 0; return; }
+      ctx.clearRect(0, 0, S, S);
+      ctx.globalCompositeOperation = 'lighter';
+      rot += 0.0028;
+      const cx = Math.cos(rot), sx = Math.sin(rot);
+      const breathe = 1 + Math.sin(t * 0.0006) * 0.03;
+      for (const p of pts) {
+        const w = (1 + Math.sin(t * 0.001 + p.rn * 8) * 0.07) * breathe;
+        const x = p.x * w, y = p.y * w, z = p.z * w;
+        const X = x * cx + z * sx, Z = -x * sx + z * cx;
+        const px = S / 2 + X * S * 0.44, py = S / 2 + y * S * 0.44;
+        const depth = (Z + 1) / 2;
+        const sz = (1.25 + p.rn * 1.7) * (0.6 + depth * 0.7) * (S / 200);
+        const d = Math.sqrt(X * X + y * y + Z * Z);
+        const a = Math.max(0, 0.95 * (1 - Math.max(0, (d - 0.38) / 0.52))) * (0.42 + depth * 0.58);
+        if (a <= 0.01) continue;
+        const mix = p.rn;
+        const R = Math.round(116 + 80 * mix), G = Math.round(104 + 72 * mix), B = Math.round(214 + 41 * mix);
+        ctx.fillStyle = 'rgba(' + R + ',' + G + ',' + B + ',' + a.toFixed(3) + ')';
+        ctx.beginPath(); ctx.arc(px, py, sz, 0, 6.2832); ctx.fill();
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+  renderVals() {
+    const st = this.state;
+    const id = st.expanded;
+    const signup = st.authMode === 'signup';
+    const ct = st.coreTab || 'overview';
+    return {
+      orbRef: (el) => this.orb(el),
+      miniRef: (el) => this.orb(el),
+      homeRef: (el) => this.orb(el),
+      screen: st.screen,
+      isAuth: st.screen === 'auth',
+      isHome: st.screen === 'home',
+      isDash: st.screen === 'dashboard',
+      isCore: st.screen === 'core',
+      scAuth: st.screen === 'auth' ? 'on' : '',
+      scHome: st.screen === 'home' ? 'on' : '',
+      scDash: st.screen === 'dashboard' ? 'on' : '',
+      scCore: st.screen === 'core' ? 'on' : '',
+      setCoreTab: (e) => this.setState({ coreTab: e.currentTarget.getAttribute('data-t') }),
+      tabSearch: ct === 'search' ? 'on' : '',
+      tabOverview: ct === 'overview' ? 'on' : '',
+      tabLive: ct === 'live' ? 'on' : '',
+      tabAgent: ct === 'agent' ? 'on' : '',
+      tabKnowledge: ct === 'knowledge' ? 'on' : '',
+      tabResearch: ct === 'research' ? 'on' : '',
+      tabLearning: ct === 'learning' ? 'on' : '',
+      tabMemory: ct === 'memory' ? 'on' : '',
+      tabErrors: ct === 'errors' ? 'on' : '',
+      isSignup: signup,
+      signinCls: signup ? '' : 'on',
+      signupCls: signup ? 'on' : '',
+      showPw: st.showPw,
+      pwType: st.showPw ? 'text' : 'password',
+      eyeIcon: st.showPw ? 'eye-off' : 'eye',
+      authTitle: signup ? 'Create your account' : 'Welcome back',
+      authSub: signup ? 'Start your journey with Atlas' : 'Sign in to access your assistant',
+      authCta: signup ? 'Create Account' : 'Sign In',
+      authQ: signup ? 'Already have an account?' : "Don't have an account?",
+      authSwap: signup ? 'Sign in' : 'Sign up',
+      goAuth: () => this.setState({ screen: 'auth', drawer: false, expanded: null }),
+      goHome: () => this.setState({ screen: 'home', drawer: false, expanded: null }),
+      goDash: () => this.setState({ screen: 'dashboard', drawer: false, expanded: null }),
+      goCore: () => this.setState({ screen: 'core', drawer: false, expanded: null }),
+      toggleAuth: () => this.setState(s => ({ authMode: s.authMode === 'signin' ? 'signup' : 'signin' })),
+      togglePw: () => this.setState(s => ({ showPw: !s.showPw })),
+      sendQuick: (e) => { const t = e.currentTarget.getAttribute('data-q'); this.setState({ screen: 'home' }); this.push(t); },
+      drawer: st.drawer,
+      expOpen: !!id,
+      isWeather: id === 'weather',
+      isCalendar: id === 'calendar',
+      isTasks: id === 'tasks',
+      isStocks: id === 'stocks',
+      isEmail: id === 'email',
+      isNews: id === 'news',
+      input: st.input,
+      thinking: st.thinking,
+      aiStateLabel: st.thinking ? 'thinking' : 'idle',
+      msgs: st.msgs.map(m => ({ content: m.content, cls: 'bub ' + (m.role === 'u' ? 'bubU' : 'bubA') })),
+      openDrawer: () => this.setState({ drawer: true }),
+      closeDrawer: () => this.setState({ drawer: false }),
+      openWeather: () => this.setState({ expanded: 'weather' }),
+      openCalendar: () => this.setState({ expanded: 'calendar' }),
+      openTasks: () => this.setState({ expanded: 'tasks' }),
+      openStocks: () => this.setState({ expanded: 'stocks' }),
+      openEmail: () => this.setState({ expanded: 'email' }),
+      openNews: () => this.setState({ expanded: 'news' }),
+      closeExpanded: () => this.setState({ expanded: null }),
+      setInput: (e) => this.setState({ input: e.target.value }),
+      keyInput: (e) => { if (e.key === 'Enter') this.doSend(); },
+      send: () => this.doSend()
+    };
+  }
+}
+</script>
+</body>
+</html>
