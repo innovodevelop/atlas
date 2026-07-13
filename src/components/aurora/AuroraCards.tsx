@@ -10,6 +10,7 @@ import { useStocks } from '@/hooks/useStocks';
 import { useNews } from '@/hooks/useNews';
 import { useTasks } from '@/hooks/useTasks';
 import { useCalendarEvents } from '@/hooks/useCalendarEvents';
+import { useMailIntelligence } from '@/hooks/useMailIntelligence';
 
 // Each card faithfully reproduces the Aurora design's card face, wired to the
 // real data hooks. Card chrome (cardB / chB / icboxB / cbB) comes from aurora.css.
@@ -123,32 +124,52 @@ export const AuroraStocksCard = memo(({ onOpen }: { onOpen: () => void }) => {
 });
 AuroraStocksCard.displayName = 'AuroraStocksCard';
 
+const senderName = (from: string | null) => (from || '').replace(/<.*>/, '').replace(/"/g, '').trim() || 'Unknown';
+const senderInitials = (from: string | null) => {
+  const parts = senderName(from).split(/\s+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? '?') + (parts[1]?.[0] ?? '')).toUpperCase();
+};
+const mailTime = (iso: string | null) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return Date.now() - d.getTime() < 24 * 60 * 60 * 1000
+    ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+};
+
 export const AuroraInboxCard = memo(({ onOpen }: { onOpen: () => void }) => {
-  // Email isn't a live hook yet — use the design's representative inbox.
-  const rows = [
-    { initials: 'SC', name: 'Sarah Chen', subject: 'Q4 Budget Review', time: '10:32', unread: true },
-    { initials: 'MJ', name: 'Mike Johnson', subject: 'Re: Project Timeline', time: '9:15', unread: true },
-    { initials: 'DT', name: 'Design Team', subject: 'Brand Guidelines Released', time: 'Yest', unread: false },
-    { initials: 'AR', name: 'Alex Rivera', subject: 'Meeting Notes', time: 'Yest', unread: false },
-  ];
-  const unread = rows.filter((r) => r.unread).length;
+  const { messages, alerts, isConnected, isLoading } = useMailIntelligence();
+  const rows = messages.slice(0, 4);
   return (
     <div className="cardB rs2 d5" onClick={onOpen}>
-      <div className="chB"><p className="mlblB">Inbox · {unread} unread</p><div className="icboxB fx ac jc"><Mail className="i14" /></div></div>
+      <div className="chB">
+        <p className="mlblB">{isConnected ? `Mail · ${alerts.length} alert${alerts.length === 1 ? '' : 's'}` : 'Mail'}</p>
+        <div className="icboxB fx ac jc"><Mail className="i14" /></div>
+      </div>
       <div className="cbB">
-        {rows.map((r, i) => (
-          <div className={`rowB ${i === rows.length - 1 ? 'last' : ''}`} key={i}>
-            <div className="avB2 fx ac jc">{r.initials}</div>
-            <div className="f1" style={{ minWidth: 0 }}>
-              <div className="fx ac gap8">
-                {r.unread && <div className="dotB on" style={{ width: 6, height: 6 }} />}
-                <span className="sndB trunc" style={r.unread ? undefined : { color: 'hsl(240 20% 66%)' }}>{r.name}</span>
-              </div>
-              <p className="sbjB trunc m0" style={{ marginTop: 3, ...(r.unread ? {} : { color: 'hsl(240 20% 52%)' }) }}>{r.subject}</p>
-            </div>
-            <span className="tmB">{r.time}</span>
+        {!isConnected && !isLoading && (
+          <div className="col ac jc" style={{ padding: '18px 0', textAlign: 'center' }}>
+            <p className="condB" style={{ marginBottom: 6 }}>No mailbox connected</p>
+            <p className="metaB">Open to connect Gmail — Atlas scans read-only and alerts you to bills and deadlines.</p>
           </div>
-        ))}
+        )}
+        {isConnected && rows.length === 0 && <p className="condB">Scanning your inbox…</p>}
+        {rows.map((m, i) => {
+          const hot = m.category === 'bills' || m.importance >= 0.7;
+          return (
+            <div className={`rowB ${i === rows.length - 1 ? 'last' : ''}`} key={m.id}>
+              <div className="avB2 fx ac jc">{senderInitials(m.from_address)}</div>
+              <div className="f1" style={{ minWidth: 0 }}>
+                <div className="fx ac gap8">
+                  {hot && <div className="dotB on" style={{ width: 6, height: 6 }} />}
+                  <span className="sndB trunc" style={hot ? undefined : { color: 'hsl(240 20% 66%)' }}>{senderName(m.from_address)}</span>
+                </div>
+                <p className="sbjB trunc m0" style={{ marginTop: 3, ...(hot ? {} : { color: 'hsl(240 20% 52%)' }) }}>{m.subject}</p>
+              </div>
+              <span className="tmB">{mailTime(m.received_at)}</span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

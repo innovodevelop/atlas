@@ -102,3 +102,15 @@ verify_jwt = false
 # Cron jobs: [[cron_jobs]] was Lovable Cloud syntax and is not valid for the
 # standalone Supabase CLI. The two schedules (record-usage-snapshot at 00:00,
 # atlas-daily-digest at 06:00) are created via pg_cron — see CONVERSION.md.
+
+[functions.mail-oauth-start]
+verify_jwt = false
+
+[functions.mail-oauth-callback]
+verify_jwt = false
+
+[functions.mail-sync]
+verify_jwt = false
+
+[functions.mail-disconnect]
+verify_jwt = false

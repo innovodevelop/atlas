@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Minimize2, MapPin, RefreshCw, Droplets, Wind, Eye, Sunrise, Sunset,
   Calendar as CalIcon, Plus, TrendingUp, Gauge, Sun, Thermometer,
-  Inbox, Star, Send, Archive, PenLine, TrendingDown,
+  Inbox, Star, Send, Archive, PenLine, TrendingDown, Mail,
 } from 'lucide-react';
 import { WeatherIcon } from './auroraIcons';
 import { sparklinePoints, fmtPct, fmtEventTime } from '@/pages/aurora/auroraHelpers';
@@ -11,6 +11,7 @@ import { useStocks } from '@/hooks/useStocks';
 import { useNews } from '@/hooks/useNews';
 import { useTasks } from '@/hooks/useTasks';
 import { useCalendarEvents } from '@/hooks/useCalendarEvents';
+import { useMailIntelligence } from '@/hooks/useMailIntelligence';
 import type { WakeWordState, AIState } from '@/types';
 import type { AuroraExpandedKey } from '@/pages/aurora/AuroraDashboard';
 
@@ -233,40 +234,140 @@ function StocksView({ onClose }: { onClose: () => void }) {
   );
 }
 
+const MAIL_CATEGORIES = [
+  { key: 'bills', label: 'Bills' },
+  { key: 'important', label: 'Important' },
+  { key: 'documents', label: 'Documents' },
+  { key: 'personal', label: 'Personal' },
+  { key: 'newsletters', label: 'Newsletters' },
+  { key: 'other', label: 'Other' },
+] as const;
+
 function EmailView({ onClose }: { onClose: () => void }) {
-  const rows = [
-    { i: 'SC', n: 'Sarah Chen', s: 'Q4 Budget Review', t: '10:32 AM', unread: true, p: 'Hi — I need your input on the Q4 budget before Friday\'s board meeting. Can you review the marketing line items?' },
-    { i: 'MJ', n: 'Mike Johnson', s: 'Re: Project Timeline', t: '9:15 AM', unread: true, p: 'Thanks for the update. The timeline works on our end — we\'ll have the design handoff ready by Wednesday.' },
-    { i: 'DT', n: 'Design Team', s: 'Brand Guidelines Released', t: 'Yesterday', unread: false, p: 'The updated brand guidelines are now live in Figma. Highlights include the new type scale and color tokens.' },
-    { i: 'AR', n: 'Alex Rivera', s: 'Meeting Notes', t: 'Yesterday', unread: false, p: 'Key takeaways: ship the sphere perf fix, finalize onboarding copy, and confirm the data model.' },
-  ];
+  const {
+    messages, alerts, accounts, isConnected, isConnecting,
+    connect, disconnect, acknowledge, syncNow,
+  } = useMailIntelligence();
+  const [filter, setFilter] = useState<string>('all');
+
+  const senderName = (from: string | null) => (from || '').replace(/<.*>/, '').replace(/"/g, '').trim() || 'Unknown';
+  const initials = (from: string | null) => {
+    const parts = senderName(from).split(/\s+/).filter(Boolean);
+    return ((parts[0]?.[0] ?? '?') + (parts[1]?.[0] ?? '')).toUpperCase();
+  };
+  const counts = messages.reduce<Record<string, number>>((acc, m) => {
+    acc[m.category] = (acc[m.category] ?? 0) + 1;
+    return acc;
+  }, {});
+  const rows = filter === 'all' ? messages : messages.filter((m) => m.category === filter);
+
   return (
-    <div className="exp th-mail" data-screen-label="Aurora — Inbox">
+    <div className="exp th-mail" data-screen-label="Aurora — Mail">
       <div className="expwash" />
-      <Head title="Inbox" onClose={onClose} />
+      <Head title="Mail" onClose={onClose} />
       <div className="ebody">
         <div className="col gap16" style={{ width: '32%', minWidth: 320 }}>
           <div className="gpanel col">
-            <button className="fx ac jc gap8 fw6" style={{ width: '100%', padding: 12, borderRadius: 12, background: 'hsl(var(--acc) / .16)', border: '1px solid hsl(var(--acc) / .3)', color: 'hsl(var(--acc))', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14 }}><PenLine className="i16" />Compose</button>
+            {!isConnected ? (
+              <>
+                <p className="t14 fw6 mb8" style={{ color: 'hsl(240 30% 88%)' }}>Connect your mailbox</p>
+                <p className="fs12 mb12" style={{ color: 'hsl(240 20% 62%)', lineHeight: 1.5 }}>
+                  One-time, read-only connection. Your browser's existing Google session means it's usually a single "Allow" click — Atlas then scans automatically, sorts everything here, and alerts you to bills, deadlines and documents. Your mailbox is never modified.
+                </p>
+                <button
+                  className="fx ac jc gap8 fw6"
+                  onClick={() => connect().catch(() => {})}
+                  disabled={isConnecting}
+                  style={{ width: '100%', padding: 12, borderRadius: 12, background: 'hsl(var(--acc) / .16)', border: '1px solid hsl(var(--acc) / .3)', color: 'hsl(var(--acc))', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, opacity: isConnecting ? 0.6 : 1 }}
+                >
+                  <Mail className="i16" />{isConnecting ? 'Waiting for Google…' : 'Connect Gmail'}
+                </button>
+              </>
+            ) : (
+              <>
+                {accounts.map((a) => (
+                  <div className="fx ac jb mb8" key={a.id}>
+                    <div style={{ minWidth: 0 }}>
+                      <p className="t14 fw6 trunc m0" style={{ color: 'hsl(240 30% 88%)' }}>{a.email_address}</p>
+                      <p className="fs12 m0" style={{ color: a.status === 'active' ? 'hsl(160 58% 56%)' : 'hsl(350 75% 68%)' }}>
+                        {a.status === 'active' ? `Synced ${a.last_synced_at ? fmtEventTime(a.last_synced_at) : 'pending'}` : a.status}
+                      </p>
+                    </div>
+                    <button className="xbtn fx ac jc" title="Disconnect" onClick={() => disconnect(a.id)}><Archive className="i14" /></button>
+                  </div>
+                ))}
+                <button className="xbtn fx ac jc gap8" style={{ width: '100%', marginTop: 6 }} onClick={syncNow} title="Scan now">
+                  <Send className="i14" /><span className="fs12">Scan now</span>
+                </button>
+              </>
+            )}
             <div className="col gap8" style={{ marginTop: 18 }}>
-              <div className="fx ac jb" style={{ padding: '10px 12px', borderRadius: 10, background: 'hsl(var(--acc) / .1)' }}><span className="fx ac gap10 t14 fw5" style={{ color: 'hsl(240 30% 90%)' }}><Inbox className="i16 iAcc" />Primary</span><span className="pillAcc">2</span></div>
-              <div className="fx ac jb" style={{ padding: '10px 12px' }}><span className="fx ac gap10 t14" style={{ color: 'hsl(240 20% 70%)' }}><Star className="i16" style={{ color: 'hsl(240 20% 55%)' }} />Starred</span><span className="fs12" style={{ color: 'hsl(240 20% 55%)' }}>2</span></div>
-              <div className="fx ac jb" style={{ padding: '10px 12px' }}><span className="fx ac gap10 t14" style={{ color: 'hsl(240 20% 70%)' }}><Send className="i16" style={{ color: 'hsl(240 20% 55%)' }} />Sent</span><span className="fs12" style={{ color: 'hsl(240 20% 55%)' }}>18</span></div>
-              <div className="fx ac jb" style={{ padding: '10px 12px' }}><span className="fx ac gap10 t14" style={{ color: 'hsl(240 20% 70%)' }}><Archive className="i16" style={{ color: 'hsl(240 20% 55%)' }} />Archive</span><span className="fs12" style={{ color: 'hsl(240 20% 55%)' }}>204</span></div>
+              <div
+                className="fx ac jb" onClick={() => setFilter('all')}
+                style={{ padding: '10px 12px', borderRadius: 10, cursor: 'pointer', background: filter === 'all' ? 'hsl(var(--acc) / .1)' : 'transparent' }}
+              >
+                <span className="fx ac gap10 t14 fw5" style={{ color: 'hsl(240 30% 90%)' }}><Inbox className="i16 iAcc" />All scanned</span>
+                <span className="pillAcc">{messages.length}</span>
+              </div>
+              {MAIL_CATEGORIES.map((c) => (
+                <div
+                  key={c.key} className="fx ac jb" onClick={() => setFilter(c.key)}
+                  style={{ padding: '10px 12px', borderRadius: 10, cursor: 'pointer', background: filter === c.key ? 'hsl(var(--acc) / .1)' : 'transparent' }}
+                >
+                  <span className="fx ac gap10 t14" style={{ color: 'hsl(240 20% 70%)' }}><Star className="i16" style={{ color: 'hsl(240 20% 55%)' }} />{c.label}</span>
+                  <span className="fs12" style={{ color: 'hsl(240 20% 55%)' }}>{counts[c.key] ?? 0}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
-        <div className="gpanel2 f1" style={{ padding: 8 }}>
-          {rows.map((r, i) => (
-            <div className={`mailrow ${i === rows.length - 1 ? 'last' : ''}`} key={i}>
-              <div className="avB2 fx ac jc">{r.i}</div>
-              <div className="f1" style={{ minWidth: 0 }}>
-                <div className="fx ac jb gap8"><span className="fx ac gap8">{r.unread && <span className="dotB on" style={{ width: 6, height: 6 }} />}<span className="sndB" style={r.unread ? undefined : { color: 'hsl(240 20% 66%)' }}>{r.n}</span></span><span className="tmB">{r.t}</span></div>
-                <p className="sbjB m0" style={{ marginTop: 2, ...(r.unread ? {} : { color: 'hsl(240 20% 58%)' }) }}>{r.s}</p>
-                <p className="previewline">{r.p}</p>
-              </div>
+        <div className="f1 col gap16">
+          {alerts.length > 0 && (
+            <div className="gpanel2">
+              <h3 className="t14 fw6 mb12" style={{ color: 'hsl(240 30% 82%)' }}>Needs your attention</h3>
+              {alerts.map((a, i) => (
+                <div className={`rowB ${i === alerts.length - 1 ? 'last' : ''}`} key={a.id}>
+                  <span className="pillAcc" style={{ textTransform: 'capitalize' }}>{a.alert_type}</span>
+                  <div className="f1" style={{ minWidth: 0 }}>
+                    <p className="evtB trunc">{a.title}</p>
+                    {a.body && <p className="evsB trunc">{a.body}</p>}
+                  </div>
+                  <button className="xbtn fx ac jc" title="Dismiss" onClick={() => acknowledge(a.id)}><PenLine className="i14" /></button>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
+          <div className="gpanel2 f1" style={{ padding: 8, overflowY: 'auto' }}>
+            {rows.length === 0 && (
+              <p className="evsB" style={{ padding: 16 }}>
+                {isConnected ? 'Nothing scanned in this category yet.' : 'Connect a mailbox to start scanning.'}
+              </p>
+            )}
+            {rows.map((m, i) => {
+              const hot = m.category === 'bills' || m.importance >= 0.7;
+              const extractedBits = [
+                m.extracted?.amount ? `${m.extracted.amount} ${m.extracted.currency ?? ''}`.trim() : null,
+                m.extracted?.due_date ? `due ${m.extracted.due_date}` : null,
+              ].filter(Boolean).join(' · ');
+              return (
+                <div className={`mailrow ${i === rows.length - 1 ? 'last' : ''}`} key={m.id}>
+                  <div className="avB2 fx ac jc">{initials(m.from_address)}</div>
+                  <div className="f1" style={{ minWidth: 0 }}>
+                    <div className="fx ac jb gap8">
+                      <span className="fx ac gap8">
+                        {hot && <span className="dotB on" style={{ width: 6, height: 6 }} />}
+                        <span className="sndB" style={hot ? undefined : { color: 'hsl(240 20% 66%)' }}>{senderName(m.from_address)}</span>
+                        <span className="pillAcc" style={{ textTransform: 'capitalize' }}>{m.category}</span>
+                      </span>
+                      <span className="tmB">{m.received_at ? new Date(m.received_at).toLocaleDateString([], { month: 'short', day: 'numeric' }) : ''}</span>
+                    </div>
+                    <p className="sbjB m0" style={{ marginTop: 2, ...(hot ? {} : { color: 'hsl(240 20% 58%)' }) }}>{m.subject}</p>
+                    <p className="previewline">{extractedBits ? `${extractedBits} — ` : ''}{m.snippet}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

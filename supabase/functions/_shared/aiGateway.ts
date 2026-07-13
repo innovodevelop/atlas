@@ -126,3 +126,39 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   const norm = Math.sqrt(embedding.reduce((sum, v) => sum + v * v, 0)) || 1;
   return embedding.map((v) => v / norm);
 }
+
+/**
+ * Document understanding (PDF/image → text answer). The OpenAI-compatible
+ * endpoint does not accept PDFs, so this calls the native Gemini
+ * generateContent API with inline data. Used by mail-sync to extract invoice
+ * fields from attachments. Requires GEMINI_API_KEY.
+ */
+export async function aiDocumentExtract(
+  prompt: string,
+  mimeType: string,
+  base64Data: string,
+): Promise<string> {
+  const geminiKey = Deno.env.get("GEMINI_API_KEY");
+  if (!geminiKey) throw new Error("GEMINI_API_KEY is required for document extraction");
+  const response = await fetch(
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+    {
+      method: "POST",
+      headers: { "x-goog-api-key": geminiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { inline_data: { mime_type: mimeType, data: base64Data } },
+            { text: prompt },
+          ],
+        }],
+      }),
+    },
+  );
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`Document extraction failed: ${response.status} ${detail.slice(0, 200)}`);
+  }
+  const data = await response.json();
+  return data.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";
+}
