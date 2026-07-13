@@ -168,6 +168,64 @@ serve(async (req) => {
       }
     }
 
+    // Memory v2 maintenance (docs/architecture-memory-v2.md):
+    // (a) re-verify the oldest validated knowledge entries against their
+    //     stored sources — facts go stale; grounding catches drift.
+    if (userId) {
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: staleEntries } = await supabase
+        .from("atlas_knowledge_entries")
+        .select("id, topic, content, source")
+        .eq("user_id", userId)
+        .eq("is_validated", true)
+        .eq("is_fake", false)
+        .lt("validated_at", thirtyDaysAgo)
+        .order("validated_at", { ascending: true })
+        .limit(5);
+      if (staleEntries && staleEntries.length > 0) {
+        await fetch(`${SUPABASE_URL}/functions/v1/validation-engine`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            entries: staleEntries.map((e: { id: string; topic: string; content: string; source: string | null }) => ({
+              entryId: e.id,
+              entryType: "knowledge",
+              topic: e.topic,
+              content: e.content,
+              source: e.source,
+            })),
+            immediate: false,
+          }),
+        }).catch((e) => console.error("[daily-digest] re-verification failed:", e));
+      }
+
+      // (b) decay importance (floor 1, never delete) of memories whose
+      //     vectors haven't been recalled in 60 days — keeps recall clean.
+      const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: coldVectors } = await supabase
+        .from("memory_vectors")
+        .select("memory_item_id")
+        .eq("user_id", userId)
+        .lt("last_accessed", sixtyDaysAgo)
+        .not("memory_item_id", "is", null)
+        .limit(50);
+      const coldIds = [...new Set((coldVectors || []).map((v: { memory_item_id: string }) => v.memory_item_id))];
+      if (coldIds.length > 0) {
+        const { data: coldMemories } = await supabase
+          .from("ai_memory")
+          .select("id, importance")
+          .in("id", coldIds)
+          .gt("importance", 1);
+        for (const m of coldMemories || []) {
+          await supabase.from("ai_memory").update({ importance: m.importance - 1 }).eq("id", m.id);
+        }
+        console.log(`[daily-digest] Decayed ${coldMemories?.length || 0} cold memories`);
+      }
+    }
+
     // Same run: memory consolidation + synthesized insights (birthdays,
     // follow-ups, patterns). These functions existed but had no cron.
     await fetch(`${SUPABASE_URL}/functions/v1/memory-scheduler`, {

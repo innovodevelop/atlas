@@ -11,7 +11,7 @@ import {
   isProviderHealthy
 } from "../_shared/providerStatus.ts";
 import { isLovableAIEnabled } from "../_shared/providerStatus.ts";
-import { aiChatCompletion, hasAIKey } from "../_shared/aiGateway.ts";
+import { aiChatCompletion, hasAIKey, generateEmbedding } from "../_shared/aiGateway.ts";
 import { findOrCreateSession } from "../_shared/learningGuards.ts";
 
 interface Memory {
@@ -719,8 +719,13 @@ serve(async (req) => {
     // Generate a session ID for working memory (use existing or create new)
     const sessionId = req.headers.get("x-session-id") || `session_${Date.now()}`;
 
+    // Semantic recall input: the latest user message drives what we remember
+    const recallQueryText: string = [...(messages || [])].reverse().find(
+      (m: { role: string; content: unknown }) => m.role === "user" && typeof m.content === "string"
+    )?.content ?? "";
+
     // Parallelize all database queries for faster response - including session context
-    const [profileResult, memoriesResult, knowledgeResult, upcomingResult, recentResult, sessionContextResult, styleResult, summaryResult] = await Promise.all([
+    const [profileResult, memoriesResult, knowledgeResult, upcomingResult, recentResult, sessionContextResult, styleResult, summaryResult, recallResult] = await Promise.all([
       // Fetch user profile
       userId 
         ? supabase.from("profiles").select("first_name, nickname, birthday, timezone, communication_style").eq("user_id", userId).single()
@@ -768,6 +773,29 @@ serve(async (req) => {
       userId
         ? supabase.from("ai_memory").select("key, value, created_at").eq("user_id", userId).eq("category", "conversation_summary").order("created_at", { ascending: false }).limit(3)
         : Promise.resolve({ data: [] }),
+
+      // Unified semantic recall: hybrid vector+FTS retrieval scored by
+      // relevance x recency x importance (memory v2 — the only query-relevant
+      // memory path). Embed-then-recall runs inside this arm so it stays
+      // parallel with everything above; failures degrade to static context.
+      userId && recallQueryText.length > 2
+        ? (async () => {
+            try {
+              const queryEmbedding = await generateEmbedding(recallQueryText);
+              const { data, error } = await supabase.rpc("recall_memories", {
+                query_embedding: queryEmbedding,
+                query_text: recallQueryText,
+                p_user_id: userId,
+                match_count: 10,
+              });
+              if (error) throw error;
+              return data || [];
+            } catch (e) {
+              console.error("[chat-with-memory] recall failed, static context only:", e);
+              return [];
+            }
+          })()
+        : Promise.resolve([]),
     ]);
 
     // Get session context string
@@ -794,6 +822,17 @@ serve(async (req) => {
     const conversationSummaries = ((summaryResult as { data?: Array<{ key: string; value: unknown; created_at: string }> }).data || []);
     let systemPrompt = systemPromptOverride || buildPersonalizedPrompt(profile, memories, upcomingEvents, recentEvents, knowledgeBank, hasTools, styleNotes, conversationSummaries);
     
+    // Query-relevant recalled memories (memory v2)
+    const recalled = (recallResult || []) as Array<{ id: string; chunk_text: string; score: number }>;
+    if (recalled.length > 0) {
+      systemPrompt +=
+        "\n\n## Relevant memories for this message\n" +
+        recalled.map((r) => `- ${r.chunk_text}`).join("\n");
+      // Fire-and-forget access bump — consolidation decays what never recalls
+      supabase.rpc("touch_memory_vectors", { p_ids: recalled.map((r) => r.id) })
+        .then(() => {}, () => {});
+    }
+
     // Inject session context into the system prompt for conversation continuity
     if (sessionContextStr) {
       systemPrompt += sessionContextStr;

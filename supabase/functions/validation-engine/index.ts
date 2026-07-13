@@ -1,19 +1,39 @@
+// Validation engine v2 — GROUNDED fact checking (docs/architecture-memory-v2.md).
+//
+// v1 asked an LLM "does this sound accurate?" with no source text — that
+// validates fluency, not truth (and it still called the dead Lovable gateway
+// directly). v2 checks each claim AGAINST ITS STORED SOURCE: fetch the
+// source_url the claim came from (atlas-research persists one per finding),
+// and ask whether the source text actually supports the claim. Entries with
+// no reachable source fall back to plausibility checking but are explicitly
+// marked grounding:"none" and their confidence is capped — the UI and prompts
+// must not present them as verified (invariant #3).
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
-import { getSupabaseClient } from "../_shared/supabase.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { aiChatCompletion, hasAIKey } from "../_shared/aiGateway.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+// deno-lint-ignore no-explicit-any
+type SupabaseClient = any;
 
 interface ValidationRequest {
   entryId: string;
-  entryType: "knowledge" | "research" | "memory" | "context";
+  entryType: "knowledge" | "research" | "memory";
   topic: string;
   content: string;
   source?: string;
-  userId?: string;
+  source_url?: string;
 }
+
+type Grounding = "source" | "web" | "none";
 
 interface ValidationResult {
   model: string;
+  grounding: Grounding;
   verdict: "valid" | "suspicious" | "fake";
   confidence: number;
   reasoning: string;
@@ -21,288 +41,258 @@ interface ValidationResult {
   processingTimeMs: number;
 }
 
+function getSupabaseClient(): SupabaseClient {
+  return createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+}
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function errorResponse(message: string, status = 500) {
+  return jsonResponse({ error: message }, status);
+}
+
+function extractSourceUrl(entry: ValidationRequest): string | null {
+  const candidate = entry.source_url || entry.source || "";
+  try {
+    const url = new URL(candidate);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+// Fetch the source text a claim was derived from (Firecrawl → markdown).
+async function fetchSourceText(url: string): Promise<string | null> {
+  const key = Deno.env.get("FIRECRAWL_API_KEY");
+  if (!key) return null;
+  try {
+    const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ url, formats: ["markdown"], onlyMainContent: true }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const markdown: string | undefined = data?.data?.markdown;
+    if (!markdown || markdown.length < 100) return null;
+    // Cap the excerpt: enough to judge a claim, small enough to stay cheap.
+    return markdown.slice(0, 8000);
+  } catch {
+    return null;
+  }
+}
+
+async function runJudge(prompt: string, model: string): Promise<{ verdict: string; confidence: number; reasoning: string }> {
+  const response = await aiChatCompletion({
+    model,
+    messages: [
+      {
+        role: "system",
+        content: "You are a rigorous fact-checker. Respond ONLY with valid JSON matching the requested schema.",
+      },
+      { role: "user", content: prompt },
+    ],
+  });
+  if (!response.ok) throw new Error(`AI gateway error: ${response.status}`);
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content || "{}";
+  const jsonMatch = content.match(/\{[\s\S]*\}/);
+  return jsonMatch
+    ? JSON.parse(jsonMatch[0])
+    : { verdict: "suspicious", confidence: 0.5, reasoning: "Parse error" };
+}
+
+// Grounded: does the stored source actually support the claim?
+async function validateAgainstSource(
+  entry: ValidationRequest,
+  sourceUrl: string,
+  sourceText: string,
+): Promise<ValidationResult> {
+  const startTime = Date.now();
+  try {
+    const parsed = await runJudge(
+      `SOURCE TEXT (from ${sourceUrl}):\n"""\n${sourceText}\n"""\n\n` +
+        `CLAIM (topic: ${entry.topic}):\n"""\n${entry.content}\n"""\n\n` +
+        `Does the source text support the claim? Judge ONLY from the source text above — ` +
+        `not from your own knowledge.\n` +
+        `Respond with JSON: {"verdict": "supported" | "partial" | "unsupported", ` +
+        `"confidence": 0.0-1.0, "reasoning": "one or two sentences citing the source"}`,
+      "google/gemini-2.5-flash",
+    );
+    const verdictMap: Record<string, ValidationResult["verdict"]> = {
+      supported: "valid",
+      partial: "suspicious",
+      unsupported: "fake",
+    };
+    return {
+      model: "gemini-2.5-flash",
+      grounding: "source",
+      verdict: verdictMap[parsed.verdict] || "suspicious",
+      confidence: Math.min(Math.max(parsed.confidence ?? 0.5, 0), 1),
+      reasoning: parsed.reasoning || "No reasoning provided",
+      sourcesChecked: [sourceUrl],
+      processingTimeMs: Date.now() - startTime,
+    };
+  } catch (error) {
+    return {
+      model: "gemini-2.5-flash",
+      grounding: "source",
+      verdict: "suspicious",
+      confidence: 0.3,
+      reasoning: `Grounded validation error: ${error instanceof Error ? error.message : "unknown"}`,
+      sourcesChecked: [sourceUrl],
+      processingTimeMs: Date.now() - startTime,
+    };
+  }
+}
+
+// Web-grounded second opinion when a Perplexity key exists (real-time search).
+async function validateWithPerplexity(
+  entry: ValidationRequest,
+  perplexityKey: string,
+): Promise<ValidationResult> {
+  const startTime = Date.now();
+  try {
+    const response = await fetch("https://api.perplexity.ai/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${perplexityKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "sonar-pro",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a fact-checker with access to real-time web information. Verify the claim and respond with JSON only: { \"verdict\": \"valid\"|\"suspicious\"|\"fake\", \"confidence\": 0-1, \"reasoning\": string }",
+          },
+          { role: "user", content: `Verify: Topic: ${entry.topic}\nClaim: ${entry.content}` },
+        ],
+      }),
+    });
+    if (!response.ok) throw new Error(`Perplexity API error: ${response.status}`);
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || "{}";
+    const citations: string[] = data.citations || [];
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const parsed = jsonMatch
+      ? JSON.parse(jsonMatch[0])
+      : { verdict: "suspicious", confidence: 0.5, reasoning: "Parse error" };
+    const verdict: ValidationResult["verdict"] = ["valid", "suspicious", "fake"].includes(parsed.verdict)
+      ? parsed.verdict
+      : "suspicious";
+    return {
+      model: "perplexity-sonar-pro",
+      grounding: "web",
+      verdict,
+      confidence: parsed.confidence ?? 0.5,
+      reasoning: parsed.reasoning || "No reasoning provided",
+      sourcesChecked: citations,
+      processingTimeMs: Date.now() - startTime,
+    };
+  } catch (error) {
+    return {
+      model: "perplexity-sonar-pro",
+      grounding: "web",
+      verdict: "suspicious",
+      confidence: 0.3,
+      reasoning: `Validation error: ${error instanceof Error ? error.message : "unknown"}`,
+      sourcesChecked: [],
+      processingTimeMs: Date.now() - startTime,
+    };
+  }
+}
+
+// Ungrounded fallback — plausibility only. Confidence is CAPPED because
+// nothing was checked against a source (invariant #3).
+async function validatePlausibility(entry: ValidationRequest): Promise<ValidationResult> {
+  const startTime = Date.now();
+  try {
+    const parsed = await runJudge(
+      `No source is available for this claim, so judge plausibility only.\n` +
+        `Topic: ${entry.topic}\nClaim: ${entry.content}\n\n` +
+        `Respond with JSON: {"verdict": "valid" | "suspicious" | "fake", ` +
+        `"confidence": 0.0-1.0, "reasoning": "brief"}`,
+      "google/gemini-2.5-flash",
+    );
+    const verdict: ValidationResult["verdict"] = ["valid", "suspicious", "fake"].includes(parsed.verdict)
+      ? (parsed.verdict as ValidationResult["verdict"])
+      : "suspicious";
+    return {
+      model: "gemini-2.5-flash",
+      grounding: "none",
+      verdict,
+      confidence: Math.min(parsed.confidence ?? 0.5, 0.6),
+      reasoning: `[ungrounded] ${parsed.reasoning || "No reasoning provided"}`,
+      sourcesChecked: [],
+      processingTimeMs: Date.now() - startTime,
+    };
+  } catch (error) {
+    return {
+      model: "gemini-2.5-flash",
+      grounding: "none",
+      verdict: "suspicious",
+      confidence: 0.3,
+      reasoning: `Validation error: ${error instanceof Error ? error.message : "unknown"}`,
+      sourcesChecked: [],
+      processingTimeMs: Date.now() - startTime,
+    };
+  }
+}
+
 interface ConsensusResult {
   finalVerdict: "valid" | "suspicious" | "fake";
   consensusScore: number;
-  agreementCount: number;
+  grounding: Grounding;
   validatorResults: ValidationResult[];
 }
 
-// Provider configuration for multi-model validation
-const PROVIDERS = {
-  anthropic: {
-    url: "https://api.anthropic.com/v1/messages",
-    model: "claude-sonnet-4-20250514",
-  },
-  lovable: {
-    url: "https://ai.gateway.lovable.dev/v1/chat/completions",
-    model: "google/gemini-2.5-pro",
-  },
-  perplexity: {
-    url: "https://api.perplexity.ai/chat/completions",
-    model: "sonar-pro",
-  },
-};
-
-const VALIDATION_PROMPT = `You are a rigorous fact-checker and validator. Analyze the following information for accuracy and reliability.
-
-Topic: {topic}
-Content: {content}
-Source: {source}
-
-Evaluate based on:
-1. **Factual Accuracy**: Can this be verified with known facts?
-2. **Logical Coherence**: Does it make logical sense?
-3. **Source Credibility**: Is the source reliable?
-4. **Consistency**: Does it contradict well-established knowledge?
-5. **Bias Detection**: Are there signs of misinformation or bias?
-
-Respond ONLY with valid JSON:
-{
-  "verdict": "valid" | "suspicious" | "fake",
-  "confidence": 0.0-1.0,
-  "reasoning": "Brief explanation of your assessment",
-  "red_flags": ["list of any concerns"],
-  "sources_to_verify": ["suggested sources to cross-reference"]
-}`;
-
-// Validate with Claude
-async function validateWithClaude(
-  entry: ValidationRequest,
-  anthropicKey: string
-): Promise<ValidationResult> {
-  const startTime = Date.now();
-  
-  try {
-    const prompt = VALIDATION_PROMPT
-      .replace("{topic}", entry.topic)
-      .replace("{content}", entry.content)
-      .replace("{source}", entry.source || "unknown");
-
-    const response = await fetch(PROVIDERS.anthropic.url, {
-      method: "POST",
-      headers: {
-        "x-api-key": anthropicKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: PROVIDERS.anthropic.model,
-        max_tokens: 1024,
-        messages: [
-          { role: "user", content: prompt }
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      console.error("[validation-engine] Claude error:", response.status);
-      throw new Error(`Claude API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const content = data.content?.[0]?.text || "{}";
-    
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { verdict: "suspicious", confidence: 0.5, reasoning: "Parse error" };
-
-    return {
-      model: "claude-sonnet-4",
-      verdict: parsed.verdict || "suspicious",
-      confidence: parsed.confidence || 0.5,
-      reasoning: parsed.reasoning || "No reasoning provided",
-      sourcesChecked: parsed.sources_to_verify || [],
-      processingTimeMs: Date.now() - startTime,
-    };
-  } catch (error) {
-    console.error("[validation-engine] Claude validation error:", error);
-    return {
-      model: "claude-sonnet-4",
-      verdict: "suspicious",
-      confidence: 0.3,
-      reasoning: `Validation error: ${error instanceof Error ? error.message : "unknown"}`,
-      sourcesChecked: [],
-      processingTimeMs: Date.now() - startTime,
-    };
-  }
-}
-
-// Validate with Gemini
-async function validateWithGemini(
-  entry: ValidationRequest
-): Promise<ValidationResult> {
-  const startTime = Date.now();
-
-  try {
-    const prompt = VALIDATION_PROMPT
-      .replace("{topic}", entry.topic)
-      .replace("{content}", entry.content)
-      .replace("{source}", entry.source || "unknown");
-
-    const response = await aiChatCompletion({
-        model: PROVIDERS.lovable.model,
-        messages: [
-          { role: "system", content: "You are a fact-checker. Always respond with valid JSON only." },
-          { role: "user", content: prompt }
-        ],
-    });
-
-    if (!response.ok) {
-      console.error("[validation-engine] Gemini error:", response.status);
-      throw new Error(`Gemini API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || "{}";
-    
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { verdict: "suspicious", confidence: 0.5, reasoning: "Parse error" };
-
-    return {
-      model: "gemini-2.5-pro",
-      verdict: parsed.verdict || "suspicious",
-      confidence: parsed.confidence || 0.5,
-      reasoning: parsed.reasoning || "No reasoning provided",
-      sourcesChecked: parsed.sources_to_verify || [],
-      processingTimeMs: Date.now() - startTime,
-    };
-  } catch (error) {
-    console.error("[validation-engine] Gemini validation error:", error);
-    return {
-      model: "gemini-2.5-pro",
-      verdict: "suspicious",
-      confidence: 0.3,
-      reasoning: `Validation error: ${error instanceof Error ? error.message : "unknown"}`,
-      sourcesChecked: [],
-      processingTimeMs: Date.now() - startTime,
-    };
-  }
-}
-
-// Validate with Perplexity
-async function validateWithPerplexity(
-  entry: ValidationRequest,
-  perplexityKey: string
-): Promise<ValidationResult> {
-  const startTime = Date.now();
-
-  try {
-    const response = await fetch(PROVIDERS.perplexity.url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${perplexityKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: PROVIDERS.perplexity.model,
-        messages: [
-          { 
-            role: "system", 
-            content: "You are a fact-checker with access to real-time web information. Verify the following claim and respond with JSON only: { verdict: 'valid'|'suspicious'|'fake', confidence: 0-1, reasoning: string, sources_checked: string[] }" 
-          },
-          { 
-            role: "user", 
-            content: `Verify this information:\nTopic: ${entry.topic}\nClaim: ${entry.content}\nSource: ${entry.source || "unknown"}` 
-          }
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      console.error("[validation-engine] Perplexity error:", response.status);
-      throw new Error(`Perplexity API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || "{}";
-    const citations = data.citations || [];
-    
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { verdict: "suspicious", confidence: 0.5, reasoning: "Parse error" };
-
-    return {
-      model: "perplexity-sonar-pro",
-      verdict: parsed.verdict || "suspicious",
-      confidence: parsed.confidence || 0.5,
-      reasoning: parsed.reasoning || "No reasoning provided",
-      sourcesChecked: [...(parsed.sources_checked || []), ...citations],
-      processingTimeMs: Date.now() - startTime,
-    };
-  } catch (error) {
-    console.error("[validation-engine] Perplexity validation error:", error);
-    return {
-      model: "perplexity-sonar-pro",
-      verdict: "suspicious",
-      confidence: 0.3,
-      reasoning: `Validation error: ${error instanceof Error ? error.message : "unknown"}`,
-      sourcesChecked: [],
-      processingTimeMs: Date.now() - startTime,
-    };
-  }
-}
-
-// Calculate consensus from multiple validators
+// The grounded (source-text) verdict dominates; web/plausibility results are
+// logged and only override when the grounded check errored out (conf <= 0.3).
 function calculateConsensus(results: ValidationResult[]): ConsensusResult {
-  const validVotes = results.filter(r => r.verdict === "valid").length;
-  const suspiciousVotes = results.filter(r => r.verdict === "suspicious").length;
-  const fakeVotes = results.filter(r => r.verdict === "fake").length;
-
-  const avgConfidence = results.reduce((sum, r) => sum + r.confidence, 0) / results.length;
-
-  let finalVerdict: "valid" | "suspicious" | "fake";
-  let agreementCount: number;
-
-  if (fakeVotes >= 2) {
-    finalVerdict = "fake";
-    agreementCount = fakeVotes;
-  } else if (validVotes >= 2) {
-    finalVerdict = "valid";
-    agreementCount = validVotes;
-  } else if (suspiciousVotes >= 2) {
-    finalVerdict = "suspicious";
-    agreementCount = suspiciousVotes;
-  } else {
-    finalVerdict = "suspicious";
-    agreementCount = Math.max(validVotes, suspiciousVotes, fakeVotes);
-  }
-
-  const consensusScore = (agreementCount / results.length) * avgConfidence;
-
+  const grounded = results.find((r) => r.grounding === "source");
+  const primary =
+    grounded && grounded.confidence > 0.3
+      ? grounded
+      : results.slice().sort((a, b) => b.confidence - a.confidence)[0];
   return {
-    finalVerdict,
-    consensusScore,
-    agreementCount,
+    finalVerdict: primary.verdict,
+    consensusScore: primary.confidence,
+    grounding: primary.grounding,
     validatorResults: results,
   };
 }
 
-// Store validation logs
 async function storeValidationLogs(
-  supabase: ReturnType<typeof getSupabaseClient>,
+  supabase: SupabaseClient,
   entryId: string,
   entryType: string,
-  results: ValidationResult[]
+  results: ValidationResult[],
 ) {
-  const logs = results.map(r => ({
+  const logs = results.map((r) => ({
     entry_id: entryId,
     entry_type: entryType,
-    validator_model: r.model,
+    validator_model: `${r.model} (${r.grounding})`,
     verdict: r.verdict,
     confidence: r.confidence,
     reasoning: r.reasoning,
     sources_checked: r.sourcesChecked,
     processing_time_ms: r.processingTimeMs,
   }));
-
   await supabase.from("validation_logs").insert(logs);
 }
 
-// Update entry with validation results
 async function updateEntryValidation(
-  supabase: ReturnType<typeof getSupabaseClient>,
+  supabase: SupabaseClient,
   entryId: string,
   entryType: string,
-  consensus: ConsensusResult
+  consensus: ConsensusResult,
 ) {
   const updates = {
     is_validated: true,
@@ -310,9 +300,10 @@ async function updateEntryValidation(
     validation_score: consensus.consensusScore,
     validation_consensus: {
       verdict: consensus.finalVerdict,
-      agreement: consensus.agreementCount,
-      validators: consensus.validatorResults.map(r => ({
+      grounding: consensus.grounding,
+      validators: consensus.validatorResults.map((r) => ({
         model: r.model,
+        grounding: r.grounding,
         verdict: r.verdict,
         confidence: r.confidence,
       })),
@@ -325,7 +316,6 @@ async function updateEntryValidation(
     research: "atlas_research_topics",
     memory: "ai_memory",
   };
-
   const table = tableMap[entryType];
   if (table) {
     await supabase.from(table).update(updates).eq("id", entryId);
@@ -333,13 +323,12 @@ async function updateEntryValidation(
 }
 
 serve(async (req) => {
-  const corsResponse = handleCors(req);
-  if (corsResponse) return corsResponse;
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
 
   try {
     const { entries, immediate = false } = await req.json();
-    
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
     const PERPLEXITY_API_KEY = Deno.env.get("PERPLEXITY_API_KEY");
 
     if (!hasAIKey()) {
@@ -347,66 +336,63 @@ serve(async (req) => {
     }
 
     const supabase = getSupabaseClient();
-
     const validationEntries: ValidationRequest[] = Array.isArray(entries) ? entries : [entries];
-    const results: Array<{ entryId: string; consensus: ConsensusResult }> = [];
 
-    console.log(`[validation-engine] Validating ${validationEntries.length} entries`);
+    console.log(`[validation-engine] Validating ${validationEntries.length} entries (grounded v2)`);
 
     const processEntry = async (entry: ValidationRequest) => {
-      const validationPromises: Promise<ValidationResult>[] = [];
+      const results: ValidationResult[] = [];
 
-      validationPromises.push(validateWithGemini(entry));
-
-      if (ANTHROPIC_API_KEY) {
-        validationPromises.push(validateWithClaude(entry, ANTHROPIC_API_KEY));
+      // Primary: check the claim against its own stored source.
+      const sourceUrl = extractSourceUrl(entry);
+      const sourceText = sourceUrl ? await fetchSourceText(sourceUrl) : null;
+      if (sourceUrl && sourceText) {
+        results.push(await validateAgainstSource(entry, sourceUrl, sourceText));
       }
 
+      // Secondary: real-time web check when available.
       if (PERPLEXITY_API_KEY) {
-        validationPromises.push(validateWithPerplexity(entry, PERPLEXITY_API_KEY));
+        results.push(await validateWithPerplexity(entry, PERPLEXITY_API_KEY));
       }
 
-      if (validationPromises.length < 2) {
-        validationPromises.push(validateWithGemini(
-          { ...entry, content: `STRICT VERIFICATION: ${entry.content}` }
-        ));
+      // Fallback so there is always at least one verdict.
+      if (results.length === 0) {
+        results.push(await validatePlausibility(entry));
       }
 
-      const validatorResults = await Promise.all(validationPromises);
-      const consensus = calculateConsensus(validatorResults);
-
-      console.log(`[validation-engine] Entry ${entry.entryId}: ${consensus.finalVerdict} (score: ${consensus.consensusScore.toFixed(2)})`);
+      const consensus = calculateConsensus(results);
+      console.log(
+        `[validation-engine] ${entry.entryId}: ${consensus.finalVerdict} ` +
+          `(${consensus.grounding}, ${consensus.consensusScore.toFixed(2)})`,
+      );
 
       await Promise.all([
-        storeValidationLogs(supabase, entry.entryId, entry.entryType, validatorResults),
+        storeValidationLogs(supabase, entry.entryId, entry.entryType, results),
         updateEntryValidation(supabase, entry.entryId, entry.entryType, consensus),
       ]);
 
       return { entryId: entry.entryId, consensus };
     };
 
-    if (immediate) {
-      const allResults = await Promise.all(validationEntries.map(processEntry));
-      results.push(...allResults);
-    } else {
+    if (!immediate) {
       Promise.all(validationEntries.map(processEntry))
-        .then(r => console.log(`[validation-engine] Background validation complete: ${r.length} entries`))
-        .catch(e => console.error("[validation-engine] Background validation error:", e));
-
-      return jsonResponse({ 
+        .then((r) => console.log(`[validation-engine] Background validation complete: ${r.length}`))
+        .catch((e) => console.error("[validation-engine] Background validation error:", e));
+      return jsonResponse({
         message: `Validation queued for ${validationEntries.length} entries`,
         queued: true,
       });
     }
 
+    const allResults = await Promise.all(validationEntries.map(processEntry));
     return jsonResponse({
       success: true,
-      validated: results.length,
-      results: results.map(r => ({
+      validated: allResults.length,
+      results: allResults.map((r) => ({
         entryId: r.entryId,
         verdict: r.consensus.finalVerdict,
+        grounding: r.consensus.grounding,
         score: r.consensus.consensusScore,
-        agreement: `${r.consensus.agreementCount}/${r.consensus.validatorResults.length}`,
       })),
     });
   } catch (error) {
