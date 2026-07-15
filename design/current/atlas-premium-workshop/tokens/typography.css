@@ -1,0 +1,24 @@
+:root{
+  --font-display:'Hanken Grotesk','Geist',system-ui,sans-serif;
+  --font-ui:'Geist',system-ui,sans-serif;
+  --font-editorial:'Newsreader',Georgia,serif;
+  --font-mono:ui-monospace,'SF Mono',Menlo,monospace;
+  --text-display:clamp(46px,7vw,86px);
+  --text-h1:32px;
+  --text-h2:24px;
+  --text-lead:16px;
+  --text-body:14px;
+  --text-label:13px;
+  --text-meta:12px;
+  --text-micro:11px;
+  --weight-regular:400;
+  --weight-medium:500;
+  --weight-semibold:600;
+  --weight-bold:700;
+  --tracking-display:-.045em;
+  --tracking-tight:-.03em;
+  --tracking-snug:-.01em;
+  --tracking-caps:.14em;
+  --leading-body:1.6;
+  --leading-tight:1.05;
+}

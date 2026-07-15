@@ -1,7 +1,8 @@
 {
-  "source": "downloads-zip",
-  "name": "Atlas premium polish-handoff.zip",
-  "sha256": "116e3ea513bebe89dcb0aa0c5ae980fe8492702fb1c5d67b218e431d2e3bfef6",
-  "syncedAt": "2026-07-06T20:02:00+02:00",
-  "note": "Baseline: the Aurora reskin, implemented July 2026 (branch aurora-redesign)"
+  "source": "designsync-project",
+  "projectId": "c3c44c02-3188-4835-8e6a-f50349d78608",
+  "name": "Atlas premium polish / Atlas Premium D - Workshop.dc.html",
+  "sha256": "c29a64875d86392da25f2065a2d614fdc69033c72e688802600a870c1481794b",
+  "syncedAt": "2026-07-15T00:45:00+02:00",
+  "note": "Workshop reskin: warm paper base, Atlas Orange, frosted glass, Hanken Grotesk/Geist"
 }
