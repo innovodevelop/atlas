@@ -1,5 +1,15 @@
 // Small shared helpers for the Aurora screens.
 
+/** Header status label — mirrors the Workshop design's Atlas state readout. */
+export function atlasStateLabel(state: string): string {
+  switch (state) {
+    case 'listening': return 'Listening…';
+    case 'thinking': return 'Thinking…';
+    case 'speaking': return 'Speaking…';
+    default: return 'Listening for "Hey Atlas"';
+  }
+}
+
 export function timeOfDayGreeting(d = new Date()): string {
   const h = d.getHours();
   if (h < 12) return 'Good morning';

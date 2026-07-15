@@ -8,7 +8,7 @@ import { useCalendarEvents } from '@/hooks/useCalendarEvents';
 import { useUnifiedChat } from '@/hooks/useUnifiedChat';
 import { useDashboardVoice } from '@/hooks/useDashboardVoice';
 import { AtlasSphereLazy as AtlasSphere } from '@/components/atlas/AtlasSphereLazy';
-import { timeOfDayGreeting } from './auroraHelpers';
+import { timeOfDayGreeting, atlasStateLabel } from './auroraHelpers';
 import {
   AuroraWeatherCard, AuroraCalendarCard, AuroraTasksCard,
   AuroraStocksCard, AuroraInboxCard, AuroraBriefingCard,
@@ -76,14 +76,18 @@ const AuroraDashboard = () => {
   const initials = (name[0] || 'A').toUpperCase();
 
   return (
-    <div className="page" data-screen-label="Atlas — Aurora">
+    <div className="page" data-screen-label="Atlas — Workshop">
       <div className="auro" />
+      <div className="grain" />
 
       <header className="hdrB">
         <div className="fx ac gap12 pointer" onClick={() => navigate('/')}>
           <div className="mk" /><h1 className="wordB">Atlas</h1>
         </div>
-        <div className="fx ac gap8 statB"><span>Listening for "Hey Atlas"</span></div>
+        <div className="stind">
+          <span className="eq"><span className="eqb" /><span className="eqb" /><span className="eqb" /><span className="eqb" /><span className="eqb" /></span>
+          {atlasStateLabel(effectiveAtlasState)}
+        </div>
         <div className="fx ac gap10">
           <button className="hbtnB fx ac jc" onClick={() => navigate('/atlas-core')} aria-label="Atlas Core"><Cpu className="i14" /></button>
           <button className="hbtnB fx ac jc" onClick={handleManualActivate} aria-label="Voice"><Mic className="i14" /></button>
