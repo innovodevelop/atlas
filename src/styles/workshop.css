@@ -416,3 +416,30 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 .authmk{width:44px;height:44px;border-radius:13px;background:var(--ink);color:var(--dkf);font-family:'Hanken Grotesk','Geist',sans-serif;font-size:20px;font-weight:600;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 32px -20px rgba(30,30,36,.24)}
 .mk{width:30px;height:30px;border-radius:9px;background:var(--ink);box-shadow:none;flex-shrink:0}
 .auro{position:fixed;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(255,231,200,.85),rgba(249,247,244,0) 48%)}
+
+/* Kill the last Aurora-indigo utility tints — icon wells, icon colors, small
+   chrome — remapped to the Workshop design's own values (sunken-paper wells,
+   ink icons, orange = active). These utilities are used verbatim across the
+   port's TSX so overriding here reskins every screen at once. */
+.icboxB{background:var(--sk);border:1px solid var(--bd);color:var(--ink)}
+.iInd{color:var(--acc)}
+.iMut{color:var(--ink3)}
+.iAcc{color:var(--acc)}
+.hbtnB{background:var(--wt);border:1px solid var(--bd);color:var(--ink2)}
+.hbtnB:hover{color:var(--ink);border-color:var(--ink3)}
+.statB{color:var(--ink2)}
+.boxAcc{background:var(--sk);border:1px solid var(--bd);color:var(--acc)}
+.statico{background:var(--sk);border:1px solid var(--bd);color:var(--ink)}
+.kbico,.flowdot{background:var(--sk);border:1px solid var(--bd);color:var(--ink)}
+
+/* --acc collision fix: aurora.css treats --acc as an HSL triplet, the Workshop
+   design defines it as hex #ff6a00 (which wins, loading last). These are the
+   aurora rules that used hsl(var(--acc) / a) — rewritten with the orange hex +
+   rgba alpha, and dark expwash/featImg backdrops swapped to warm paper. */
+.accline{background:var(--acc)}
+.pillAcc{color:var(--acc);background:rgba(255,106,0,.12);border:1px solid rgba(255,106,0,.28)}
+.strokeAcc{stroke:var(--acc);fill:none}
+.wkbar{background:rgba(255,106,0,.32)}
+.on{background:var(--acc);box-shadow:0 0 10px rgba(255,106,0,.45)}
+.expwash{background:radial-gradient(58% 44% at 50% 2%,rgba(255,106,0,.10),transparent 62%),linear-gradient(180deg,var(--wt),var(--pg) 72%)}
+.featImg{background:linear-gradient(135deg,rgba(255,106,0,.16),var(--sk));border:1px solid rgba(255,106,0,.18)}
