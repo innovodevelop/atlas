@@ -6,41 +6,45 @@
 
 @layer base {
   :root {
-    /* Core backgrounds - Aurora deep indigo theme */
-    --background: 240 28% 7%;
-    --foreground: 240 30% 96%;
+    /* Core backgrounds — Workshop warm paper (design: Atlas Premium D) */
+    --background: 36 29% 97%;      /* #f9f7f4 page */
+    --foreground: 240 9% 13%;      /* #1e1e24 ink */
 
-    /* Cards with glassmorphic feel */
-    --card: 240 33% 12%;
-    --card-foreground: 240 30% 96%;
+    /* Raised warm-white surfaces */
+    --card: 36 100% 99%;           /* #fffdfa */
+    --card-foreground: 240 9% 13%;
 
-    --popover: 240 33% 11%;
-    --popover-foreground: 240 30% 96%;
+    --popover: 36 100% 99%;
+    --popover-foreground: 240 9% 13%;
 
-    /* Primary - Aurora indigo */
-    --primary: 243 75% 58%;
-    --primary-foreground: 0 0% 100%;
+    /* Primary — Atlas Orange, the single accent */
+    --primary: 25 100% 50%;        /* #ff6a00 */
+    --primary-foreground: 36 100% 99%;
 
-    /* Secondary - deep violet */
-    --secondary: 258 60% 45%;
-    --secondary-foreground: 240 30% 96%;
+    /* Secondary — sunken paper */
+    --secondary: 40 14% 92%;       /* #edebe7 */
+    --secondary-foreground: 240 9% 13%;
 
-    /* Muted tones */
-    --muted: 240 30% 16%;
-    --muted-foreground: 240 20% 62%;
+    /* Muted warm tones */
+    --muted: 34 20% 93%;           /* #f1eeea */
+    --muted-foreground: 30 3% 42%; /* #6d6a67 */
 
-    /* Accent - Aurora violet */
-    --accent: 280 70% 60%;
-    --accent-foreground: 240 30% 96%;
+    /* Accent role = warm hover tint (design forbids a second accent hue) */
+    --accent: 40 14% 92%;
+    --accent-foreground: 240 9% 13%;
 
-    --destructive: 350 75% 55%;
-    --destructive-foreground: 240 40% 98%;
+    --destructive: 9 57% 48%;      /* #c14a35 */
+    --destructive-foreground: 36 100% 99%;
 
-    --border: 243 30% 22%;
-    --input: 240 33% 14%;
-    --ring: 243 75% 62%;
+    --border: 38 16% 86%;          /* #e2ded7 hairline */
+    --input: 36 100% 99%;
+    --ring: 25 100% 50%;
 
-    --radius: 1rem;
+    --radius: 1.125rem;            /* cards 18px */
+
+    /* Workshop signal colors (visualizations only) */
+    --signal: 227 88% 58%;         /* #3461f2 */
+    --positive: 158 45% 34%;       /* #2f7d4f */
 
     /* Custom glassmorphic variables */
     --glass-bg: 230 25% 12%;
