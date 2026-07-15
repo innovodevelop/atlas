@@ -22,7 +22,7 @@ export function Toaster() {
               title={typeof toast.title === 'string' ? toast.title : undefined}
               description={typeof toast.description === 'string' ? toast.description : undefined}
               action={toast.action}
-              variant={(toast as any).variant || "default"}
+              variant={(toast as { variant?: string }).variant || "default"}
               onDismiss={() => dismiss(toast.id)}
               duration={5000}
             />

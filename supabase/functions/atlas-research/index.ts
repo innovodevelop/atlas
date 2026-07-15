@@ -424,7 +424,7 @@ CRITICAL RULES:
     const toolCall = result.choices?.[0]?.message?.tool_calls?.[0];
     if (toolCall?.function?.arguments) {
       const parsed = JSON.parse(toolCall.function.arguments);
-      let findings = validateFindingsRelevance(parsed.findings || [], context);
+      const findings = validateFindingsRelevance(parsed.findings || [], context);
       return {
         findings,
         subTopics: depth < 3 ? (parsed.subTopics || []) : [],
@@ -744,7 +744,7 @@ serve(async (req) => {
             conversation_id: topicData.conversation_id || conversationId
           }));
 
-          let createdSubTopics: Array<{ id: string }> = [];
+          const createdSubTopics: Array<{ id: string }> = [];
           if (subTopicEntries.length > 0) {
             // Insert one at a time so the session-limit trigger can reject
             // individual rows without voiding the whole batch.

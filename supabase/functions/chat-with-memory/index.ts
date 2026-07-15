@@ -845,9 +845,9 @@ serve(async (req) => {
     ];
 
     // Tool execution loop - make non-streaming request first to check for tool calls
-    let allToolResults: Array<{ name: string; result: unknown; citations?: string[] }> = [];
+    const allToolResults: Array<{ name: string; result: unknown; citations?: string[] }> = [];
     let maxToolIterations = teachingMode ? 0 : 3; // Skip tool loop entirely in teaching mode
-    let currentMessages = [...conversationMessages];
+    const currentMessages = [...conversationMessages];
 
     // TEACHING MODE: Fast path - skip tool checking, go directly to streaming
     // The model will handle memory_store via its response which we'll process later
@@ -897,7 +897,7 @@ serve(async (req) => {
 
       const teachData = await teachResponse.json();
       const choice = teachData.choices?.[0];
-      let responseText = choice?.message?.content || "I understand. Tell me more.";
+      const responseText = choice?.message?.content || "I understand. Tell me more.";
       
       // Process any memory_store tool calls
       const toolCalls = choice?.message?.tool_calls;

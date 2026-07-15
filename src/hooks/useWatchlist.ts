@@ -50,8 +50,8 @@ export const useWatchlist = () => {
       } else {
         setWatchlist(data);
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error');
     } finally {
       setIsLoading(false);
     }
@@ -74,8 +74,8 @@ export const useWatchlist = () => {
       if (error) throw error;
       setWatchlist(prev => [...prev, data]);
       return data;
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error');
       return null;
     }
   }, [user]);
@@ -90,8 +90,8 @@ export const useWatchlist = () => {
       if (error) throw error;
       setWatchlist(prev => prev.filter(item => item.symbol !== symbol.toUpperCase()));
       return true;
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error');
       return false;
     }
   }, []);

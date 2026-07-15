@@ -233,7 +233,7 @@ export const useBrainSearch = (options: BrainSearchOptions = {}) => {
         return;
       }
       
-      const results: BrainSearchResult[] = (data?.results || []).map((r: any) => ({
+      const results: BrainSearchResult[] = (data?.results || []).map((r: Record<string, unknown>) => ({
         id: r.id,
         type: r.type === 'memory' ? 'knowledge' : r.type,
         title: r.title,

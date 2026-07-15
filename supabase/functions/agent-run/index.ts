@@ -447,9 +447,9 @@ Task types help route to the best AI model:
     }).eq("id", run.id);
 
     // Step 2: Execute plan steps with intelligent model routing
-    let stepResults: unknown[] = [];
-    let totalTokens = { planner: 0, worker: 0, reasoner: 0 };
-    let allCitations: string[] = [];
+    const stepResults: unknown[] = [];
+    const totalTokens = { planner: 0, worker: 0, reasoner: 0 };
+    const allCitations: string[] = [];
 
     for (let i = 0; i < Math.min(plan.plan?.length || 0, agent.max_steps || 20); i++) {
       const planStep = plan.plan[i];

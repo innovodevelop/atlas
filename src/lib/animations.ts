@@ -350,7 +350,7 @@ export const createSpring = (stiffness: number, damping: number): Transition => 
 });
 
 // Combine multiple animations
-export const combineAnimations = (...animations: Record<string, any>[]) =>
+export const combineAnimations = (...animations: Record<string, unknown>[]) =>
   animations.reduce((acc, anim) => ({ ...acc, ...anim }), {});
 
 // ============================================

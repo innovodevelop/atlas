@@ -8,7 +8,7 @@ export interface Schedule {
   name: string;
   description: string | null;
   cron_expression: string;
-  payload_json: any;
+  payload_json: unknown;
   enabled: boolean;
   last_run_at: string | null;
   last_run_status: string | null;

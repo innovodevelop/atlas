@@ -35,7 +35,7 @@ serve(async (req) => {
     const { socket, response } = Deno.upgradeWebSocket(req);
     
     let finnhubSocket: WebSocket | null = null;
-    let subscribedSymbols: Set<string> = new Set();
+    const subscribedSymbols: Set<string> = new Set();
 
     socket.onopen = () => {
       console.log('Client connected');

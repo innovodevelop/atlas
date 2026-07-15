@@ -22,8 +22,8 @@ interface RunStep {
   run_id: string;
   step_index: number;
   kind: string;
-  input_json: any;
-  output_json: any;
+  input_json: unknown;
+  output_json: unknown;
   model_used: string | null;
   model_tier: string | null;
   tokens_used: number;
@@ -84,7 +84,7 @@ export function LiveRunTimeline() {
           id: run.id,
           goal_text: run.goal_text,
           status: run.status,
-          agent_name: (run.agent as any)?.name,
+          agent_name: (run.agent as { name?: string } | null)?.name,
         });
 
         // Fetch steps for active run

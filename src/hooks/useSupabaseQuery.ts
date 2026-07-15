@@ -5,14 +5,14 @@ import { useDataFetching, UseDataFetchingReturn } from './useDataFetching';
 export interface UseSupabaseQueryOptions<T> {
   select?: string;
   orderBy?: { column: string; ascending?: boolean };
-  filter?: Record<string, any>;
+  filter?: Record<string, unknown>;
   enabled?: boolean;
   fallbackData?: T[];
   refreshInterval?: number;
   onSuccess?: (data: T[]) => void;
   onError?: (error: Error) => void;
   /** Transform each row before storing */
-  transform?: (row: any) => T;
+  transform?: (row: unknown) => T;
 }
 
 export function useSupabaseQuery<T>(
@@ -55,7 +55,7 @@ export function useSupabaseQuery<T>(
     if (error) throw error;
 
     if (transform && data) {
-      return (data as any[]).map(transform);
+      return (data as unknown[]).map(transform);
     }
 
     return (data || []) as T[];

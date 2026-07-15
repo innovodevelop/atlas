@@ -15,7 +15,7 @@ export const useHolographicToast = () => {
   const showToast = (variant: ToastVariant, options: ToastOptions) => {
     return toast({
       ...options,
-      // @ts-ignore - custom variant property
+      // @ts-expect-error - custom variant property
       variant,
     });
   };

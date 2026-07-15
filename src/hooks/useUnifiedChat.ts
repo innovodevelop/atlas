@@ -67,7 +67,7 @@ const stripForSpeech = (text: string): string =>
 
 /** Extract URLs from text and convert to citations */
 const extractUrlsAsCitations = (text: string): Citation[] => {
-  const urlRegex = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/g;
+  const urlRegex = /https?:\/\/[^\s<>"{}|\\^`[\]]+/g;
   const matches = text.match(urlRegex) || [];
   const uniqueUrls = [...new Set(matches)];
   

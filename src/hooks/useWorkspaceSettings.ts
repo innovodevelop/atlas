@@ -9,7 +9,7 @@ export interface WorkspaceSettings {
   daily_tool_call_limit: number;
   auto_approve_low_risk: boolean;
   require_approval_for_risky: boolean;
-  settings_json: any;
+  settings_json: unknown;
 }
 
 export interface UsageStats {
@@ -39,6 +39,7 @@ export function useWorkspaceSettings() {
     
     try {
       // Get or create workspace settings
+      // eslint-disable-next-line prefer-const -- `data` is reassigned below when creating defaults
       let { data, error } = await supabase
         .from('workspace_settings')
         .select('*')

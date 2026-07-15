@@ -178,7 +178,7 @@ const AVAILABLE_TOOLS: Record<string, (args: Record<string, unknown>, supabase: 
     
     const searchResult = await AVAILABLE_TOOLS.web_search({ query }, supabase) as { result: string; citations: string[] };
     
-    let scrapedContent: { url: string; content: string }[] = [];
+    const scrapedContent: { url: string; content: string }[] = [];
     if (scrapeFirst && searchResult.citations?.length > 0) {
       const urlsToScrape = searchResult.citations.slice(0, 3);
       

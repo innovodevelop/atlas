@@ -5,7 +5,7 @@ export interface UseCrudOperationsOptions<T> {
   table: string;
   userId: string | undefined;
   /** Transform data from DB format to app format */
-  transform?: (row: any) => T;
+  transform?: (row: unknown) => T;
   /** Sort function for the items array */
   sortFn?: (a: T, b: T) => number;
 }
@@ -53,10 +53,10 @@ export function useCrudOperations<T extends { id: string }>(
     try {
       const result = await serverFn();
       return result;
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Rollback on error
       rollbackFn();
-      setError(err.message);
+      setError(err instanceof Error ? err.message : 'Error');
       return null;
     }
   }, [items, setError]);

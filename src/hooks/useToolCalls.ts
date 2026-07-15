@@ -7,8 +7,8 @@ export interface ToolCall {
   run_id: string | null;
   step_id: string | null;
   tool_name: string;
-  args_json: any;
-  result_json: any;
+  args_json: unknown;
+  result_json: unknown;
   status: string;
   cost_estimate: number;
   error_message: string | null;

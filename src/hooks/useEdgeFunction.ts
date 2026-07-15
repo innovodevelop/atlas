@@ -10,12 +10,12 @@ export interface UseEdgeFunctionOptions<T> {
   onError?: (error: Error) => void;
   retryCount?: number;
   /** Transform the response data before storing */
-  transform?: (data: any) => T;
+  transform?: (data: unknown) => T;
 }
 
 export function useEdgeFunction<T>(
   functionName: string,
-  body?: Record<string, any>,
+  body?: Record<string, unknown>,
   options: UseEdgeFunctionOptions<T> = {}
 ): UseDataFetchingReturn<T> {
   const { transform, ...dataFetchingOptions } = options;

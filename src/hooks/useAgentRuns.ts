@@ -24,8 +24,8 @@ export interface RunStep {
   run_id: string;
   step_index: number;
   kind: string;
-  input_json: any;
-  output_json: any;
+  input_json: unknown;
+  output_json: unknown;
   model_used: string | null;
   model_tier: string | null;
   tokens_used: number;

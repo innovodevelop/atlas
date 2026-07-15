@@ -17,12 +17,12 @@ export interface CalendarEvent {
   updated_at: string;
 }
 
-const transformEvent = (data: any): CalendarEvent => ({
+const transformEvent = (data: Record<string, unknown>): CalendarEvent => ({
   ...data,
-  attendees: Array.isArray(data.attendees) 
-    ? data.attendees.map((a: any) => String(a)) 
+  attendees: Array.isArray(data.attendees)
+    ? data.attendees.map((a: unknown) => String(a))
     : []
-});
+} as CalendarEvent);
 
 const sortByStartTime = (a: CalendarEvent, b: CalendarEvent) => 
   new Date(a.start_time).getTime() - new Date(b.start_time).getTime();

@@ -153,7 +153,7 @@ export const useCardPriority = (): CardPriorityResult => {
           score = 85;
           break;
 
-        case 'stocks':
+        case 'stocks': {
           // Stocks are relevant during market hours
           const hour = now.getHours();
           if (hour >= 9 && hour <= 16) {
@@ -164,6 +164,7 @@ export const useCardPriority = (): CardPriorityResult => {
             score = 65;
           }
           break;
+        }
 
         case 'news':
           // News is always medium priority
