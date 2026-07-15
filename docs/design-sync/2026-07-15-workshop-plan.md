@@ -75,12 +75,14 @@ design side-by-side) → commit; finish with atlas-ship.
 - **Part 4 — Atlas Core:** 6 tab views wired to real hooks (Search/Live/Agent/Knowledge/Research/Learning) with honest empty states; overview keeps curated panels.
 - **Part 3 (partial):** accent greeting name, tasks card progress bar, tasks expanded stat trio (High/Due-today/Overdue).
 
-**Remaining — needs backend/edge-function data (not styling):**
-- 7-day weather outlook + card H/L → `get-weather` must return a daily forecast (hourly only today).
-- Watchlist stat grid (open/high/low/vol/mcap/PE) + index panel (S&P/Nasdaq/Dow) → `get-stocks` field extension + an index-quote source.
-- Portfolio hero ($ value, day change, area chart) → **no holdings data source exists in Atlas** (needs a product decision).
-- Calendar week bar-chart + Booked/Free/Video trio + Tomorrow panel → event duration/type parsing.
-- Home/Voice floating memory cards → surface `recall_memories` output to the home screen.
-- Expanded Inbox counts panel, Briefing real body excerpt → mail/news field additions.
+**Also done (backend + wiring):**
+- Weather **7-day outlook** + card H/L — `get-weather` now derives a daily forecast from the free 5-day/3-hour endpoint.
+- Watchlist **stat grid** (open/high/low/prev/mkt-cap/range) + **market indices** (S&P/Nasdaq/Dow via ETF proxies) — `get-stocks` extended, zero extra API calls, resilient fallbacks.
+- Calendar **Booked/Free/Video trio** + **week bar-chart** + **Tomorrow panel** — derived from real events.
+- Briefing **real story excerpt** (`get-news` description) + Inbox **Alerts/Today counts panel**.
 
-Core Memory/Errors tabs stay folded into Overview (the port never listed them in TABS).
+**Still open (need a decision or are decorative):**
+- **Portfolio hero** ($ value, day change, area chart) — **no holdings data source exists in Atlas**; needs a product decision (manual holdings entry? brokerage integration? drop it?).
+- **Home floating memory cards** — decorative layer around the voice orb; needs a recent-insights query surfaced and can't be verified without real insight data. Low priority.
+
+**Environment note:** `FINNHUB_API_KEY` is currently rate-limited, so live stock prices/fundamentals fall back to representative values until it recovers (pre-existing). Everything else pulls live data.
