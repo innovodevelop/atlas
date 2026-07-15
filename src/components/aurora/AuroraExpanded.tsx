@@ -125,11 +125,36 @@ function WeatherView({ onClose }: { onClose: () => void }) {
   );
 }
 
+const VIDEO_RE = /zoom|meet\.google|teams\.microsoft|whereby|https?:\/\//i;
+
 function CalendarView({ onClose }: { onClose: () => void }) {
   const { events } = useCalendarEvents();
   const now = Date.now();
   const nowIdx = events.findIndex((e) => new Date(e.start_time).getTime() >= now);
   const dateLabel = new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
+
+  // Derive the day stat trio + week distribution from real events.
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const isSameDay = (iso: string, dayStr: string) => iso.slice(0, 10) === dayStr;
+  const durationH = (e: { start_time: string; end_time: string | null }) =>
+    e.end_time ? Math.max(0, (new Date(e.end_time).getTime() - new Date(e.start_time).getTime()) / 3.6e6) : 0.5;
+  const todayEvents = events.filter((e) => isSameDay(e.start_time, todayStr));
+  const bookedH = todayEvents.reduce((s, e) => s + durationH(e), 0);
+  const freeH = Math.max(0, 10 - bookedH); // ~10h working window
+  const videoCount = todayEvents.filter((e) => e.location && VIDEO_RE.test(e.location)).length;
+  const fmtH = (h: number) => (h >= 1 ? `${Math.floor(h)}h${h % 1 >= 0.25 ? ' ' + Math.round((h % 1) * 60) + 'm' : ''}` : `${Math.round(h * 60)}m`);
+
+  // Week distribution: event count per weekday (Mon–Sun) from the fetched set.
+  const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const weekCounts = weekDays.map((_, i) => {
+    // JS getDay: 0=Sun..6=Sat; map to Mon-first index
+    return events.filter((e) => ((new Date(e.start_time).getDay() + 6) % 7) === i).length;
+  });
+  const maxWeek = Math.max(1, ...weekCounts);
+  const todayColIdx = (new Date().getDay() + 6) % 7;
+
+  const tomorrowStr = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const tomorrowEvents = events.filter((e) => isSameDay(e.start_time, tomorrowStr));
   return (
     <div className="exp th-cal" data-screen-label="Aurora — Calendar">
       <div className="expwash" />
@@ -138,7 +163,12 @@ function CalendarView({ onClose }: { onClose: () => void }) {
         <div className="col gap16" style={{ width: '34%', minWidth: 340 }}>
           <div className="gpanel f1 col">
             <div className="fx ac jb mb16"><div className="fx ac gap8"><CalIcon className="i16 iAcc" /><span className="t14" style={{ color: 'hsl(240 30% 82%)' }}>{dateLabel}</span></div><button className="xbtn fx ac jc"><Plus className="i14" /></button></div>
-            <div className="f1 col ac jc"><div className="bigtemp tnum">{events.length}</div><div className="econd">events today</div>{events[nowIdx] && <div className="efeels">Next · {events[nowIdx].title}</div>}</div>
+            <div className="f1 col ac jc"><div className="bigtemp tnum">{todayEvents.length}</div><div className="econd">events today</div>{events[nowIdx] && <div className="efeels">Next · {events[nowIdx].title}</div>}</div>
+          </div>
+          <div className="gpanel2 grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+            <div className="estat"><div className="esval tnum">{fmtH(bookedH)}</div><div className="eslbl">Booked</div></div>
+            <div className="estat"><div className="esval tnum">{fmtH(freeH)}</div><div className="eslbl">Free</div></div>
+            <div className="estat"><div className="esval tnum">{videoCount}</div><div className="eslbl">Video</div></div>
           </div>
         </div>
         <div className="f1 col gap16">
@@ -153,6 +183,30 @@ function CalendarView({ onClose }: { onClose: () => void }) {
               </div>
             ))}
           </div>
+          <div className="gpanel2">
+            <h3 className="t14 fw6 mb12" style={{ color: 'hsl(240 30% 82%)' }}>This week</h3>
+            <div className="fx" style={{ alignItems: 'flex-end', gap: 10, height: 90 }}>
+              {weekDays.map((d, i) => (
+                <div key={d} className="f1 col ac" style={{ gap: 6 }}>
+                  <div style={{ width: '100%', display: 'flex', alignItems: 'flex-end', height: 64 }}>
+                    <div style={{ width: '100%', height: `${Math.max(6, (weekCounts[i] / maxWeek) * 64)}px`, borderRadius: 6, background: i === todayColIdx ? 'var(--acc)' : 'var(--sk)' }} />
+                  </div>
+                  <span className="fs12" style={{ color: i === todayColIdx ? 'var(--acc)' : 'hsl(30 3% 55%)' }}>{d}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          {tomorrowEvents.length > 0 && (
+            <div className="gpanel2">
+              <h3 className="t14 fw6 mb12" style={{ color: 'hsl(240 30% 82%)' }}>Tomorrow</h3>
+              {tomorrowEvents.map((e, i) => (
+                <div className={`rowB ${i === tomorrowEvents.length - 1 ? 'last' : ''}`} key={e.id ?? i}>
+                  <span className="evtimeB">{fmtEventTime(e.start_time)}</span>
+                  <div className="f1" style={{ minWidth: 0 }}><p className="evtB">{e.title}</p>{e.location && <p className="evsB">{e.location}</p>}</div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
