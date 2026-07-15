@@ -65,3 +65,22 @@ The WebGL sphere stays (standing decision) — re-tinted to warm light/orange.
 Part 1: ~1 session · Part 2: ~1 · Part 3: ~2 · Part 4: ~2 (largest — 8 tab
 views) · Part 5: folded into 2-4. Every part: preview-verify (screenshot vs
 design side-by-side) → commit; finish with atlas-ship.
+
+---
+## Implementation status (updated as built)
+
+**Done & verified (committed):**
+- **Part 1 — full reskin:** warm-paper tokens, Geist/Hanken/Newsreader fonts, design CSS ported verbatim + 36 compat aliases, indigo-utility remap, `--acc` HSL/hex collision fix. All screens now Workshop-warm.
+- **Part 2 — chrome:** floating header pill, dynamic state readout + CSS equalizer, grain overlay, bottom dock (Core/Voice/New-chat CTA/avatar).
+- **Part 4 — Atlas Core:** 6 tab views wired to real hooks (Search/Live/Agent/Knowledge/Research/Learning) with honest empty states; overview keeps curated panels.
+- **Part 3 (partial):** accent greeting name, tasks card progress bar, tasks expanded stat trio (High/Due-today/Overdue).
+
+**Remaining — needs backend/edge-function data (not styling):**
+- 7-day weather outlook + card H/L → `get-weather` must return a daily forecast (hourly only today).
+- Watchlist stat grid (open/high/low/vol/mcap/PE) + index panel (S&P/Nasdaq/Dow) → `get-stocks` field extension + an index-quote source.
+- Portfolio hero ($ value, day change, area chart) → **no holdings data source exists in Atlas** (needs a product decision).
+- Calendar week bar-chart + Booked/Free/Video trio + Tomorrow panel → event duration/type parsing.
+- Home/Voice floating memory cards → surface `recall_memories` output to the home screen.
+- Expanded Inbox counts panel, Briefing real body excerpt → mail/news field additions.
+
+Core Memory/Errors tabs stay folded into Overview (the port never listed them in TABS).
