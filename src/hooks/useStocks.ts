@@ -8,6 +8,22 @@ export interface StockData {
   change: number;
   changePercent: number;
   sparkline: number[];
+  open?: number | null;
+  high?: number | null;
+  low?: number | null;
+  prevClose?: number | null;
+  marketCap?: number | null;
+}
+
+export interface MarketIndex {
+  label: string;
+  price: number;
+  changePercent: number;
+}
+
+interface StocksResponse {
+  stocks: StockData[];
+  indices?: MarketIndex[];
 }
 
 const MOCK_STOCKS: StockData[] = [
@@ -27,19 +43,25 @@ export const useStocks = (symbols: string[]) => {
     [stableSymbols]
   );
 
-  const { data, isLoading, error, refetch } = useEdgeFunction<StockData[]>(
+  const fallbackResponse = useMemo<StocksResponse>(
+    () => ({ stocks: fallbackData, indices: [] }),
+    [fallbackData]
+  );
+
+  const { data, isLoading, error, refetch } = useEdgeFunction<StocksResponse>(
     'get-stocks',
     { symbols: stableSymbols },
     {
-      fallbackData,
+      fallbackData: fallbackResponse,
       refreshInterval: 5 * 60 * 1000, // 5 minutes
       enabled: stableSymbols.length > 0,
-      transform: (response) => response?.stocks || [],
+      transform: (response) => (response ?? { stocks: [], indices: [] }) as StocksResponse,
     }
   );
 
   return {
-    stocks: data || [],
+    stocks: data?.stocks ?? [],
+    indices: data?.indices ?? [],
     isLoading,
     error,
     refetch,

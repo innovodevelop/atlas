@@ -217,9 +217,25 @@ function TasksView({ onClose }: { onClose: () => void }) {
   );
 }
 
+const fmtMktCap = (v?: number | null) => {
+  if (v == null) return '—';
+  if (v >= 1e12) return `${(v / 1e12).toFixed(2)}T`;
+  if (v >= 1e9) return `${(v / 1e9).toFixed(1)}B`;
+  if (v >= 1e6) return `${(v / 1e6).toFixed(0)}M`;
+  return `${v}`;
+};
+
 function StocksView({ onClose }: { onClose: () => void }) {
-  const { stocks } = useStocks(['AAPL', 'GOOGL', 'MSFT', 'NVDA', 'AMZN', 'META']);
+  const { stocks, indices } = useStocks(['AAPL', 'GOOGL', 'MSFT', 'NVDA', 'AMZN', 'META']);
   const lead = stocks[0];
+  const gridCells = lead ? [
+    { label: 'Open', value: lead.open != null ? lead.open.toFixed(2) : '—' },
+    { label: 'High', value: lead.high != null ? lead.high.toFixed(2) : '—' },
+    { label: 'Low', value: lead.low != null ? lead.low.toFixed(2) : '—' },
+    { label: 'Prev close', value: lead.prevClose != null ? lead.prevClose.toFixed(2) : '—' },
+    { label: 'Mkt cap', value: fmtMktCap(lead.marketCap) },
+    { label: 'Day range', value: lead.high != null && lead.low != null ? (lead.high - lead.low).toFixed(2) : '—' },
+  ] : [];
   return (
     <div className="exp th-stock" data-screen-label="Aurora — Watchlist">
       <div className="expwash" />
@@ -231,6 +247,26 @@ function StocksView({ onClose }: { onClose: () => void }) {
               <div className="fx ac jb mb16"><div><div className="fx ac gap8"><span className="symB" style={{ width: 'auto', fontSize: 15 }}>{lead.symbol}</span><span className="fx ac gap8 fs12 upB"><span className="dotB on" style={{ width: 6, height: 6, background: 'hsl(160 58% 56%)', boxShadow: '0 0 8px hsl(160 58% 56% / .7)' }} />Live</span></div><span className="snB">{lead.name}</span></div></div>
               <div className="fx" style={{ alignItems: 'flex-end', gap: 12 }}><div className="bigprice tnum">{lead.price.toFixed(2)}</div><div className={`fx ac gap4 fw6 ${lead.changePercent >= 0 ? 'upB' : 'dnB'}`} style={{ marginBottom: 8 }}>{lead.changePercent >= 0 ? <TrendingUp className="i16" /> : <TrendingDown className="i16" />}<span className="tnum">{lead.change >= 0 ? '+' : ''}{lead.change.toFixed(2)} ({fmtPct(lead.changePercent)})</span></div></div>
               <svg viewBox="0 0 100 40" preserveAspectRatio="none" style={{ width: '100%', height: 120, marginTop: 16 }}><polyline points={sparklinePoints(lead.sparkline, 100, 40, 4)} className="strokeAcc" strokeWidth="1.5" vectorEffect="non-scaling-stroke" /></svg>
+              <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 18, paddingTop: 18, borderTop: '1px solid var(--bd)' }}>
+                {gridCells.map((c) => (
+                  <div className="estat" key={c.label}><div className="esval tnum">{c.value}</div><div className="eslbl">{c.label}</div></div>
+                ))}
+              </div>
+            </div>
+          )}
+          {indices.length > 0 && (
+            <div className="gpanel2">
+              <h3 className="t14 fw6 mb12" style={{ color: 'hsl(240 30% 82%)' }}>Indices</h3>
+              {indices.map((ix, i) => {
+                const up = ix.changePercent >= 0;
+                return (
+                  <div className={`rowB ${i === indices.length - 1 ? 'last' : ''}`} key={ix.label}>
+                    <span className="snB f1">{ix.label}</span>
+                    <span className="prcB tnum" style={{ width: 76, textAlign: 'right' }}>{ix.price.toLocaleString()}</span>
+                    <span className={`chgB ${up ? 'upB' : 'dnB'}`}>{fmtPct(ix.changePercent)}</span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

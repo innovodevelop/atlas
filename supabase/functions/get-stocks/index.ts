@@ -47,10 +47,22 @@ serve(async (req) => {
           change: stock.change,
           changePercent: stock.changePercent,
           sparkline: generateSparkline(stock.change >= 0),
+          open: parseFloat((stock.price - stock.change).toFixed(2)),
+          high: parseFloat((stock.price * 1.012).toFixed(2)),
+          low: parseFloat((stock.price * 0.991).toFixed(2)),
+          prevClose: parseFloat((stock.price - stock.change).toFixed(2)),
+          marketCap: null,
         };
       });
 
-      return jsonResponse({ stocks: mockResults });
+      return jsonResponse({
+        stocks: mockResults,
+        indices: [
+          { label: 'S&P 500', price: 6284, changePercent: 0.6 },
+          { label: 'Nasdaq', price: 20910, changePercent: 0.8 },
+          { label: 'Dow', price: 44120, changePercent: -0.1 },
+        ],
+      });
     }
 
     // Fetch real data from Finnhub
@@ -79,6 +91,13 @@ serve(async (req) => {
           change: parseFloat(change.toFixed(2)),
           changePercent: parseFloat(changePercent.toFixed(2)),
           sparkline: generateSparkline(change >= 0),
+          // Extra fundamentals for the expanded stat grid (no extra API calls —
+          // open/high/low/prevClose come from the quote, mktCap from profile2).
+          open: quote.o ?? null,
+          high: quote.h ?? null,
+          low: quote.l ?? null,
+          prevClose: quote.pc ?? null,
+          marketCap: profile.marketCapitalization ? profile.marketCapitalization * 1e6 : null,
         };
       } catch (error) {
         console.error(`Error fetching ${symbol}:`, error);
@@ -90,12 +109,48 @@ serve(async (req) => {
           change: mock.change,
           changePercent: mock.changePercent,
           sparkline: generateSparkline(mock.change >= 0),
+          open: parseFloat((mock.price - mock.change).toFixed(2)),
+          high: parseFloat((mock.price * 1.012).toFixed(2)),
+          low: parseFloat((mock.price * 0.991).toFixed(2)),
+          prevClose: parseFloat((mock.price - mock.change).toFixed(2)),
+          marketCap: null,
         };
       }
     });
 
     const stocks = await Promise.all(stockPromises);
-    return jsonResponse({ stocks });
+
+    // Market indices via liquid ETF proxies (SPY→S&P 500, QQQ→Nasdaq, DIA→Dow).
+    const INDEX_MAP = [
+      { etf: 'SPY', label: 'S&P 500' },
+      { etf: 'QQQ', label: 'Nasdaq' },
+      { etf: 'DIA', label: 'Dow' },
+    ];
+    const MOCK_INDICES: Record<string, { price: number; changePercent: number }> = {
+      'S&P 500': { price: 6284, changePercent: 0.6 },
+      'Nasdaq': { price: 20910, changePercent: 0.8 },
+      'Dow': { price: 44120, changePercent: -0.1 },
+    };
+    let indices: Array<{ label: string; price: number; changePercent: number }> = [];
+    try {
+      indices = await Promise.all(INDEX_MAP.map(async ({ etf, label }) => {
+        try {
+          const r = await fetch(`https://finnhub.io/api/v1/quote?symbol=${etf}&token=${FINNHUB_API_KEY}`);
+          const q = r.ok ? await r.json() : null;
+          // Finnhub returns c=0 on failure/rate-limit — fall back to mock so the
+          // index panel never shows zeros.
+          if (q && q.c > 0 && q.pc > 0) {
+            return { label, price: q.c, changePercent: parseFloat((((q.c - q.pc) / q.pc) * 100).toFixed(2)) };
+          }
+        } catch { /* fall through to mock */ }
+        return { label, ...MOCK_INDICES[label] };
+      }));
+    } catch (e) {
+      console.error('Index fetch failed:', e);
+      indices = INDEX_MAP.map(({ label }) => ({ label, ...MOCK_INDICES[label] }));
+    }
+
+    return jsonResponse({ stocks, indices });
 
   } catch (error: unknown) {
     console.error('Stocks function error:', error);
