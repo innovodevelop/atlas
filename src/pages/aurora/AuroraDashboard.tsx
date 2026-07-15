@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Cpu, Mic } from 'lucide-react';
+import { Cpu, Mic, Sparkles } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWeather } from '@/hooks/useWeather';
@@ -88,11 +88,6 @@ const AuroraDashboard = () => {
           <span className="eq"><span className="eqb" /><span className="eqb" /><span className="eqb" /><span className="eqb" /><span className="eqb" /></span>
           {atlasStateLabel(effectiveAtlasState)}
         </div>
-        <div className="fx ac gap10">
-          <button className="hbtnB fx ac jc" onClick={() => navigate('/atlas-core')} aria-label="Atlas Core"><Cpu className="i14" /></button>
-          <button className="hbtnB fx ac jc" onClick={handleManualActivate} aria-label="Voice"><Mic className="i14" /></button>
-          <div className="avB fx ac jc pointer" onClick={() => navigate('/atlas-core')}>{initials}</div>
-        </div>
       </header>
 
       <section className="bandB">
@@ -109,6 +104,20 @@ const AuroraDashboard = () => {
           <p className="bmlB">{weather.location} · {weather.condition}</p>
         </div>
       </section>
+
+      {/* Bottom dock — Workshop's fixed centered pill with hover-expanding labels */}
+      <div className="dock">
+        <button className="dockb" onClick={() => navigate('/atlas-core')} aria-label="Atlas Core">
+          <Cpu className="i16" /><span className="dockl">Core</span>
+        </button>
+        <button className="dockb" onClick={handleManualActivate} aria-label="Voice">
+          <Mic className="i16" /><span className="dockl">Voice</span>
+        </button>
+        <button className="dockb dockcta" onClick={() => setDrawerOpen(true)} aria-label="New chat">
+          <Sparkles className="i16" /><span className="dockl">New chat</span>
+        </button>
+        <button className="dockav" onClick={() => navigate('/atlas-core')} aria-label="Profile">{initials}</button>
+      </div>
 
       <main className="gridB">
         <AuroraWeatherCard onOpen={() => setExpanded('weather')} />
