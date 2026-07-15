@@ -5,6 +5,7 @@ import {
   Database, DownloadCloud, Cpu, CheckCircle2, FileText, BookOpen, Loader, Clock, Radio, Bot, Zap,
 } from 'lucide-react';
 import { AtlasSphereLazy as AtlasSphere } from '@/components/atlas/AtlasSphereLazy';
+import { AuroraCoreTabs } from '@/components/aurora/AuroraCoreTabs';
 import { useAtlasHealth } from '@/hooks/useAtlasHealth';
 
 const TABS = [
@@ -62,6 +63,9 @@ const AuroraCore = () => {
           })}
         </div>
 
+        {tab !== 'overview' && <AuroraCoreTabs tab={tab} />}
+
+        {tab === 'overview' && (
         <div className="coregrid">
           <div className="cpanel" style={{ ['--pc' as string]: '243 75% 66%' }}>
             <h3 className="cph"><Database className="i16" style={{ color: 'hsl(243 82% 78%)' }} />Real-time Data Flow</h3>
@@ -95,6 +99,7 @@ const AuroraCore = () => {
             <ErrRow sev="i" msg='Schedule "daily-digest" completed' meta="info · 06:00:04 · 3 insights" last />
           </div>
         </div>
+        )}
       </div>
     </div>
   );

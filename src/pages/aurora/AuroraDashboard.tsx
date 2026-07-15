@@ -66,7 +66,7 @@ const AuroraDashboard = () => {
   }, [input, sendMessage]);
 
   const name = profile?.nickname || profile?.first_name || profile?.display_name || 'there';
-  const greeting = `${timeOfDayGreeting()}, ${name}.`;
+  const greetingPrefix = `${timeOfDayGreeting()}, `;
   const eventCount = events.length;
   const subline = [
     eventCount > 0 ? `${eventCount} ${eventCount === 1 ? 'event' : 'events'} today` : 'Nothing on your calendar',
@@ -96,7 +96,7 @@ const AuroraDashboard = () => {
           <AtlasSphere state={effectiveAtlasState} audioLevel={audioLevel} context="dashboard" className="orbcvB" />
         </div>
         <div>
-          <h2 className="greetB">{greeting}</h2>
+          <h2 className="greetB">{greetingPrefix}<span className="accw">{name}.</span></h2>
           <p className="gsubB">{subline}</p>
         </div>
         <div className="bandmetaB">
