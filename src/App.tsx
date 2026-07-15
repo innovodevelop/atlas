@@ -17,9 +17,7 @@ import { useRealtimePauseOnInactivity } from "./hooks/useRealtimePauseOnInactivi
 // and the whole legacy card stack into whatever chunk it lands in.
 const AuroraHome = lazy(() => import("./pages/aurora/AuroraHome"));
 const AuroraCore = lazy(() => import("./pages/aurora/AuroraCore"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Auth = lazy(() => import("./pages/Auth"));
-const LegacyIndex = lazy(() => import("./pages/Index"));
 const AtlasDemo = lazy(() => import("./pages/AtlasDemo"));
 const AtlasCore = lazy(() => import("./pages/AtlasCore"));
 const AtlasTeach = lazy(() => import("./pages/AtlasTeach"));
@@ -107,10 +105,10 @@ const App = () => (
           <Route path="/dashboard" element={<AuroraDashboard />} />
           <Route path="/home" element={<AuroraHome />} />
           <Route path="/atlas-core" element={<AuroraCore />} />
-          <Route path="/legacy-dashboard" element={<Dashboard />} />
           <Route path="/auth" element={<Auth />} />
 
-          {/* Legacy Atlas Core health dashboard */}
+          {/* Legacy Atlas Core health dashboard (settings still live here until
+              wired into the Workshop app) */}
           <Route
             path="/atlas-core-legacy"
             element={
@@ -119,7 +117,7 @@ const App = () => (
             </Suspense>
             }
           />
-           <Route 
+           <Route
              path="/atlas-architecture" 
              element={
                <Suspense fallback={<PageLoader />}>
@@ -136,17 +134,8 @@ const App = () => (
             }
           />
           
-          {/* Legacy routes with lazy loading */}
-          <Route 
-            path="/legacy" 
-            element={
-              <Suspense fallback={<PageLoader />}>
-                <LegacyIndex />
-              </Suspense>
-            } 
-          />
-          <Route 
-            path="/atlas-demo" 
+          <Route
+            path="/atlas-demo"
             element={
               <Suspense fallback={<PageLoader />}>
                 <AtlasDemo />

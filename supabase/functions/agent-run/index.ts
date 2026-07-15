@@ -91,9 +91,10 @@ function selectModel(taskType: string, agentConfig: Record<string, unknown> | nu
       break;
     
     // Tier 3: Perplexity for research
+    // (deep_analysis is handled above under reasoning — removed here, it was an
+    // unreachable duplicate case)
     case "research":
     case "web_research":
-    case "deep_analysis":
       // Use Perplexity for research tasks (grounded with citations)
       if (Deno.env.get("PERPLEXITY_API_KEY")) {
         return { provider: "perplexity", model: PROVIDERS.perplexity.models.research, url: PROVIDERS.perplexity.url };
