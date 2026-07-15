@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Cpu, Mic, Sparkles } from 'lucide-react';
+import { Cpu, Mic, Sparkles, Settings } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWeather } from '@/hooks/useWeather';
@@ -15,6 +15,7 @@ import {
 } from '@/components/aurora/AuroraCards';
 import { AuroraDrawer } from '@/components/aurora/AuroraDrawer';
 import { AuroraExpanded } from '@/components/aurora/AuroraExpanded';
+import { AuroraSettings } from './AuroraSettings';
 
 export type AuroraExpandedKey = 'weather' | 'calendar' | 'tasks' | 'stocks' | 'email' | 'news' | null;
 
@@ -27,6 +28,7 @@ const AuroraDashboard = () => {
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [expanded, setExpanded] = useState<AuroraExpandedKey>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [input, setInput] = useState('');
 
   // Sentence-streamed speech bridge (same pattern as the legacy dashboard)
@@ -53,7 +55,7 @@ const AuroraDashboard = () => {
 
   // Esc closes drawer / expanded
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setDrawerOpen(false); setExpanded(null); } };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setDrawerOpen(false); setExpanded(null); setSettingsOpen(false); } };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
@@ -113,6 +115,9 @@ const AuroraDashboard = () => {
         <button className="dockb" onClick={handleManualActivate} aria-label="Voice">
           <Mic className="i16" /><span className="dockl">Voice</span>
         </button>
+        <button className="dockb" onClick={() => setSettingsOpen(true)} aria-label="Settings">
+          <Settings className="i16" /><span className="dockl">Settings</span>
+        </button>
         <button className="dockb dockcta" onClick={() => setDrawerOpen(true)} aria-label="New chat">
           <Sparkles className="i16" /><span className="dockl">New chat</span>
         </button>
@@ -138,6 +143,8 @@ const AuroraDashboard = () => {
         onInput={setInput}
         onSend={send}
       />
+
+      {settingsOpen && <AuroraSettings onClose={() => setSettingsOpen(false)} />}
 
       <AuroraExpanded
         which={expanded}

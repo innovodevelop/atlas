@@ -744,3 +744,22 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 
 /* 7-day outlook active row — orange tint (aurora used broken indigo hsl(var(--acc))) */
 .drow.today{background:rgba(255,106,0,.12)}
+
+/* ---- Workshop retint of the expanded-view + settings chrome ----
+   These classes (.exp/.ehead/.gpanel/.gpanel2/.closeBtn/.esval/.xbtn) were
+   left dark-indigo from the original Aurora theme, so every expanded card view
+   and the Settings overlay rendered dark on the warm page. Warm-paper values. */
+.exp{background:var(--pg)}
+.ehead{border-bottom:1px solid var(--bd);background:hsl(36 100% 99% / .6)}
+.etitle{color:var(--ink)}
+.closeBtn{background:var(--wt);border:1px solid var(--bd);color:var(--ink2)}
+.closeBtn:hover{color:var(--ink);border-color:var(--ink3)}
+.closeBtn .kbd,.kbd{background:var(--sk);border:1px solid var(--bd);color:var(--ink2)}
+.gpanel,.gpanel2{background:var(--surface-card,rgba(255,253,250,.72));backdrop-filter:blur(12px) saturate(1.06);border:1px solid var(--bd);box-shadow:var(--elevation-card,0 1px 2px rgba(30,30,36,.05),0 12px 32px -20px rgba(30,30,36,.24))}
+.esval{color:var(--ink)}
+.eslbl{color:var(--ink2)}
+.xbtn{background:var(--wt);border:1px solid var(--bd);color:var(--ink2)}
+.xbtn:hover{color:var(--acc);border-color:hsl(var(--acc) / .4)}
+.bigtemp,.bigprice,.econd,.efeels{color:var(--ink)}
+.h24{background:var(--sk);border:1px solid var(--bd)}
+.h24.on{background:hsl(var(--acc) / .12);border-color:hsl(var(--acc) / .3)}
