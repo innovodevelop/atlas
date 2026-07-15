@@ -410,3 +410,9 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 .tempB{font-size:52px;font-weight:500;color:var(--ink);line-height:1;margin:0}
 .tmB{font-size:12px;color:var(--ink3);flex-shrink:0;font-variant-numeric:tabular-nums}
 .upB{color:var(--grn)}
+
+/* Hand-authored Workshop equivalents for aurora-only classes that had no
+   name-match in the design (values from the design's own .mk and .bgwash). */
+.authmk{width:44px;height:44px;border-radius:13px;background:var(--ink);color:var(--dkf);font-family:'Hanken Grotesk','Geist',sans-serif;font-size:20px;font-weight:600;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 32px -20px rgba(30,30,36,.24)}
+.mk{width:30px;height:30px;border-radius:9px;background:var(--ink);box-shadow:none;flex-shrink:0}
+.auro{position:fixed;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(255,231,200,.85),rgba(249,247,244,0) 48%)}
