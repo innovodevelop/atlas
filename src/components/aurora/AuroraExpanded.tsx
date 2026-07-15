@@ -153,6 +153,11 @@ function TasksView({ onClose }: { onClose: () => void }) {
   const done = tasks.filter((t) => t.completed);
   const pct = Math.round(progress || 0);
   const pill = (p: string) => p === 'high' ? 'tkHigh' : p === 'low' ? 'tkLow' : 'tkMed';
+  // Stat trio from real tasks (design: High / Due today / Overdue)
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const highCount = active.filter((t) => t.priority === 'high').length;
+  const dueTodayCount = active.filter((t) => t.due_date && t.due_date.slice(0, 10) === todayStr).length;
+  const overdueCount = active.filter((t) => t.due_date && t.due_date.slice(0, 10) < todayStr).length;
   return (
     <div className="exp th-task" data-screen-label="Aurora — Tasks">
       <div className="expwash" />
@@ -165,6 +170,11 @@ function TasksView({ onClose }: { onClose: () => void }) {
               <circle cx="21" cy="21" r="15.9" fill="none" className="strokeAcc" strokeWidth="3" strokeDasharray={`${pct} 100`} strokeLinecap="round" transform="rotate(-90 21 21)" />
             </svg>
             <div className="tc" style={{ marginTop: 14 }}><div className="bigtemp tnum" style={{ fontSize: 40 }}>{pct}%</div><div className="econd">{completedCount} of {tasks.length} complete</div></div>
+          </div>
+          <div className="gpanel2 grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+            <div className="estat"><div className="esval tnum">{highCount}</div><div className="eslbl">High</div></div>
+            <div className="estat"><div className="esval tnum">{dueTodayCount}</div><div className="eslbl">Due today</div></div>
+            <div className="estat"><div className="esval tnum" style={overdueCount ? { color: 'hsl(9 57% 48%)' } : undefined}>{overdueCount}</div><div className="eslbl">Overdue</div></div>
           </div>
         </div>
         <div className="f1 col gap16">

@@ -79,12 +79,20 @@ export const AuroraCalendarCard = memo(({ onOpen }: { onOpen: () => void }) => {
 AuroraCalendarCard.displayName = 'AuroraCalendarCard';
 
 export const AuroraTasksCard = memo(({ onOpen }: { onOpen: () => void }) => {
-  const { tasks, completedCount } = useTasks();
+  const { tasks, completedCount, progress } = useTasks();
   const rows = tasks.slice(0, 5);
+  const pct = Math.round(progress || 0);
   return (
     <div className="cardB rs2 d3" onClick={onOpen}>
       <div className="chB"><p className="mlblB">Tasks · {completedCount} of {tasks.length}</p><div className="icboxB fx ac jc"><Check className="i14" /></div></div>
       <div className="cbB">
+        {tasks.length > 0 && (
+          <div style={{ margin: '4px 0 14px' }}>
+            <div style={{ height: 6, borderRadius: 999, background: 'var(--sk)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${pct}%`, borderRadius: 999, background: 'var(--acc)', transition: 'width .3s var(--ease-spring)' }} />
+            </div>
+          </div>
+        )}
         {rows.map((t, i) => (
           <div className={`rowB ${i === rows.length - 1 ? 'last' : ''}`} key={t.id ?? i}>
             <div className={`ckB ${t.completed ? 'done fx ac jc' : ''}`}>{t.completed && <Check className="i12 iInd" />}</div>
