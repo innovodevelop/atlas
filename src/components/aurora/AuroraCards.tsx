@@ -23,7 +23,12 @@ export const AuroraWeatherCard = memo(({ onOpen }: { onOpen: () => void }) => {
       <div className="chB"><p className="mlblB">Weather</p><div className="icboxB fx ac jc"><CloudSun className="i14" /></div></div>
       <div className="cbB">
         <p className="tempB tnum">{Math.round(weather.temp)}°</p>
-        <p className="condB">{weather.condition} · {weather.location}</p>
+        <p className="condB">
+          {weather.condition} · {weather.location}
+          {weather.high != null && weather.low != null && (
+            <span className="tnum" style={{ marginLeft: 8, color: 'var(--ink3)' }}>H {weather.high}° · L {weather.low}°</span>
+          )}
+        </p>
         <div className="fx ac gap16 mt16 metaB">
           <span className="fx ac" style={{ gap: 6 }}><Droplets className="i12" />{weather.humidity}%</span>
           <span className="fx ac" style={{ gap: 6 }}><Wind className="i12" />{Math.round(weather.windSpeed)} mph</span>

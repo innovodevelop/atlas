@@ -15,6 +15,14 @@ export interface WeatherData {
     temp: number;
     icon: string;
   }>;
+  daily?: Array<{
+    day: string;
+    high: number;
+    low: number;
+    icon: string;
+  }>;
+  high?: number;
+  low?: number;
 }
 
 const FALLBACK_WEATHER: WeatherData = {
@@ -33,6 +41,17 @@ const FALLBACK_WEATHER: WeatherData = {
     { time: '6PM', temp: 69, icon: 'partly-cloudy' },
     { time: '9PM', temp: 64, icon: 'cloudy' },
   ],
+  daily: [
+    { day: 'Today', high: 72, low: 58, icon: 'partly-cloudy' },
+    { day: 'Tue', high: 70, low: 57, icon: 'sunny' },
+    { day: 'Wed', high: 68, low: 56, icon: 'cloudy' },
+    { day: 'Thu', high: 66, low: 55, icon: 'rainy' },
+    { day: 'Fri', high: 69, low: 56, icon: 'partly-cloudy' },
+    { day: 'Sat', high: 71, low: 58, icon: 'sunny' },
+    { day: 'Sun', high: 73, low: 59, icon: 'sunny' },
+  ],
+  high: 72,
+  low: 58,
 };
 
 export const useWeather = (city: string = 'San Francisco') => {

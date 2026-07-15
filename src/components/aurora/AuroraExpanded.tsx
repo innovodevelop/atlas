@@ -101,6 +101,18 @@ function WeatherView({ onClose }: { onClose: () => void }) {
               ))}
             </div>
           </div>
+          {weather.daily && weather.daily.length > 0 && (
+            <div className="gpanel2">
+              <h3 className="t14 fw6 mb12" style={{ color: 'hsl(240 30% 82%)' }}>7-day outlook</h3>
+              {weather.daily.slice(0, 7).map((d, i) => (
+                <div className={`drow ${i === 0 ? 'today' : ''}`} key={i}>
+                  <div className="t14 fw6" style={{ width: 56 }}>{d.day}</div>
+                  <div className="fx ac gap12 f1 jc"><WeatherIcon icon={d.icon} className={`i20 ${i === 0 ? 'iInd' : 'iMut'}`} /></div>
+                  <div className="fx ac gap10 tnum"><span className="t14 fw6">{d.high}°</span><span className="t14" style={{ color: 'hsl(30 3% 55%)' }}>{d.low}°</span></div>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="grid" style={{ gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
             <div className="gpanel2"><div className="fx ac gap8 mb8"><div className="icboxB fx ac jc"><Gauge className="i14" /></div><span className="eslbl">Pressure</span></div><div className="fs16 fw6 tnum" style={{ color: 'hsl(240 30% 92%)' }}>1013 hPa</div></div>
             <div className="gpanel2"><div className="fx ac gap8 mb8"><div className="icboxB fx ac jc"><Sun className="i14" /></div><span className="eslbl">UV Index</span></div><div className="fs16 fw6" style={{ color: 'hsl(240 30% 92%)' }}>6 High</div></div>

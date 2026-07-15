@@ -443,3 +443,6 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 .on{background:var(--acc);box-shadow:0 0 10px rgba(255,106,0,.45)}
 .expwash{background:radial-gradient(58% 44% at 50% 2%,rgba(255,106,0,.10),transparent 62%),linear-gradient(180deg,var(--wt),var(--pg) 72%)}
 .featImg{background:linear-gradient(135deg,rgba(255,106,0,.16),var(--sk));border:1px solid rgba(255,106,0,.18)}
+
+/* 7-day outlook active row — orange tint (aurora used broken indigo hsl(var(--acc))) */
+.drow.today{background:rgba(255,106,0,.12)}
