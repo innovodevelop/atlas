@@ -372,6 +372,8 @@ function EmailView({ onClose }: { onClose: () => void }) {
     return acc;
   }, {});
   const rows = filter === 'all' ? messages : messages.filter((m) => m.category === filter);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const receivedToday = messages.filter((m) => m.received_at && m.received_at.slice(0, 10) === todayStr).length;
 
   return (
     <div className="exp th-mail" data-screen-label="Aurora — Mail">
@@ -431,6 +433,12 @@ function EmailView({ onClose }: { onClose: () => void }) {
                 </div>
               ))}
             </div>
+            {isConnected && (
+              <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
+                <div className="estat"><div className="esval tnum">{alerts.length}</div><div className="eslbl">Alerts</div></div>
+                <div className="estat"><div className="esval tnum">{receivedToday}</div><div className="eslbl">Today</div></div>
+              </div>
+            )}
           </div>
         </div>
         <div className="f1 col gap16">
@@ -498,7 +506,7 @@ function NewsView({ onClose }: { onClose: () => void }) {
           <div className="feat" style={{ width: '40%', minWidth: 360 }}>
             <div className="fx ac gap8"><span className="pillAcc">{lead.category}</span><span className="fx ac gap4 fs12 upB"><TrendingUp className="i12" />Trending</span></div>
             <h2 className="featTitle">{lead.title}</h2>
-            <p className="featBody">Atlas surfaced this as your top story. Open the source for the full report and related coverage.</p>
+            <p className="featBody">{lead.description || 'Atlas surfaced this as your top story. Open the source for the full report and related coverage.'}</p>
             <div className="featImg" />
             <div className="fx ac gap8 fs12" style={{ marginTop: 16, color: 'hsl(240 20% 56%)' }}><span>{lead.source}</span><span>·</span><span>{lead.time}</span></div>
           </div>

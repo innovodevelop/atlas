@@ -3,6 +3,7 @@ import { useEdgeFunction } from './useEdgeFunction';
 export interface NewsItem {
   id: string;
   title: string;
+  description?: string;
   source: string;
   time: string;
   url: string;

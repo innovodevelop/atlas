@@ -81,6 +81,7 @@ serve(async (req) => {
     const articles = data.articles?.map((article: any, index: number) => ({
       id: String(index + 1),
       title: article.title,
+      description: article.description || '',
       source: article.source?.name || 'Unknown',
       time: getTimeAgo(article.publishedAt),
       url: article.url,
