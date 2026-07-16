@@ -3,7 +3,7 @@ import { WakeWordState } from '@/types';
 import { NebulaStateConfig, NEBULA_STATE_CONFIGS } from '@/components/atlas/utils/nebulaStateConfigs';
 
 const STORAGE_KEY = 'atlas-demo-settings';
-const SETTINGS_VERSION = 11; // Bump for nebulaParticleMode addition
+const SETTINGS_VERSION = 12; // Bump: Workshop warm sphere palette (reset old indigo nebula colors)
 
 // Keys that can be customized per-state (nebula visual properties)
 export const NEBULA_CUSTOMIZABLE_KEYS = [
@@ -178,7 +178,7 @@ export const defaultAtlasSettings: AtlasSettings = {
   trailOpacity: 0.4,
   trailColorGradient: true,
   trailStartColor: '#ff9500',
-  trailEndColor: '#1a0a2e',
+  trailEndColor: '#7a2e00',
   particleCount: 1250,
   particleSize: 0.085,
   density: 1.0,
@@ -217,9 +217,9 @@ export const defaultAtlasSettings: AtlasSettings = {
   nebulaBreathingSpeed: 0.5,
   nebulaBreathingAmount: 0.05,
   nebulaRadiusNoise: 0.15,
-  nebulaColorStart: '#1a0a3e',
-  nebulaColorMid: '#8b5cf6',
-  nebulaColorEnd: '#67e8f9',
+  nebulaColorStart: '#ff5f00',
+  nebulaColorMid: '#ff9440',
+  nebulaColorEnd: '#ffd2a6',
   // Enhanced Nebula defaults
   nebulaParticleCount: 6700,
   nebulaParticleSize: 0.055,

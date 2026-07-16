@@ -6,6 +6,7 @@ mod snaptrade;
 mod portfolio_db;
 mod portfolio;
 
+const BUNDLE_ID: &str = "com.magnuspilegaard.atlas";
 const CACHE_PURGE_THRESHOLD_BYTES: u64 = 200 * 1024 * 1024; // 200 MB
 
 fn dir_size(path: &Path) -> u64 {
@@ -24,29 +25,45 @@ fn dir_size(path: &Path) -> u64 {
     size
 }
 
-// WKWebView's URL cache is unbounded and lives in the "Atlas Networking"
-// helper process — once it grows to gigabytes, that process burns CPU
-// thrashing cache lookups/eviction (and bloats memory). Purging oversized
-// cache directories BEFORE the webview starts keeps it slim; WebKit
-// recreates them cleanly. localStorage/auth (WebsiteData) is untouched.
-fn purge_oversized_webview_caches() {
-    let Some(home) = std::env::var_os("HOME") else { return };
-    let webkit_caches = Path::new(&home)
-        .join("Library/Caches/com.magnuspilegaard.atlas/WebKit");
-    for cache_dir in ["NetworkCache", "MediaCache"] {
-        let dir = webkit_caches.join(cache_dir);
-        if !dir.is_dir() {
-            continue;
+fn webkit_cache_dir() -> Option<std::path::PathBuf> {
+    let home = std::env::var_os("HOME")?;
+    Some(Path::new(&home).join(format!("Library/Caches/{}/WebKit", BUNDLE_ID)))
+}
+
+// After an app UPDATE, WKWebView can keep serving the previous build's cached
+// JS/CSS bundle (making the new UI look like the old one — missing dock, stale
+// visuals). Detect updates by stamping the running binary's mtime; when it
+// changes, purge the whole WebKit HTTP/code cache so the fresh embedded assets
+// load. localStorage/auth (WebsiteData, a separate dir) is untouched.
+fn purge_webview_cache_on_update() {
+    let Some(cache) = webkit_cache_dir() else { return };
+    let Some(marker_parent) = cache.parent().map(|p| p.to_path_buf()) else { return };
+    let marker = marker_parent.join(".atlas-build-stamp");
+
+    let current = std::env::current_exe().ok()
+        .and_then(|p| fs::metadata(&p).ok())
+        .and_then(|m| m.modified().ok())
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs().to_string())
+        .unwrap_or_default();
+    let previous = fs::read_to_string(&marker).unwrap_or_default();
+
+    if current != previous && !current.is_empty() {
+        if cache.is_dir() {
+            match fs::remove_dir_all(&cache) {
+                Ok(()) => eprintln!("[atlas] app updated — purged WebKit cache so fresh assets load"),
+                Err(e) => eprintln!("[atlas] cache purge (update) failed: {e}"),
+            }
         }
-        let size = dir_size(&dir);
-        if size > CACHE_PURGE_THRESHOLD_BYTES {
-            match fs::remove_dir_all(&dir) {
-                Ok(()) => eprintln!(
-                    "[atlas] purged {} ({} MB) — WebKit recreates it bounded-fresh",
-                    cache_dir,
-                    size / (1024 * 1024)
-                ),
-                Err(e) => eprintln!("[atlas] cache purge failed for {cache_dir}: {e}"),
+        let _ = fs::create_dir_all(&marker_parent);
+        let _ = fs::write(&marker, &current);
+    } else {
+        // Not an update: still trim the network cache if it grew unbounded
+        // (the original 5GB-Networking-process fix).
+        for sub in ["NetworkCache", "MediaCache"] {
+            let dir = cache.join(sub);
+            if dir.is_dir() && dir_size(&dir) > CACHE_PURGE_THRESHOLD_BYTES {
+                let _ = fs::remove_dir_all(&dir);
             }
         }
     }
@@ -54,7 +71,7 @@ fn purge_oversized_webview_caches() {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-  purge_oversized_webview_caches();
+  purge_webview_cache_on_update();
   tauri::Builder::default()
     // Mail alerts -> macOS notifications; opener launches the OAuth consent
     // in the system browser (where the user's Google session lives).
