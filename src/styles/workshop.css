@@ -548,7 +548,11 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 .homeorbwrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;padding-bottom:210px;z-index:1}
 .homeorb{width:min(54vmin,480px);height:min(54vmin,480px)}
 .homehead{position:relative;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:20px 32px}
-.stind{display:flex;align-items:center;gap:9px;font-size:12px;letter-spacing:.02em;color:transparent;background:linear-gradient(100deg,var(--ink2) 20%,var(--acc) 42%,#ffb277 50%,var(--acc) 58%,var(--ink2) 80%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;animation:shmr 3.4s linear infinite}
+.stind{display:flex;align-items:center;gap:9px;font-size:12px;letter-spacing:.02em}
+/* Shimmer applies ONLY to the text span — background-clip:text on the whole
+   .stind clipped its non-text children (the .eq bars / .stpulse dot) away in
+   WebKit, so they vanished in the Mac app. */
+.stshimmer{color:transparent;background:linear-gradient(100deg,var(--ink2) 20%,var(--acc) 42%,#ffb277 50%,var(--acc) 58%,var(--ink2) 80%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;animation:shmr 3.4s linear infinite;white-space:nowrap}
 .homemid{position:relative;z-index:20;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 24px;pointer-events:none}
 .homemid{transition:opacity .8s ease,transform 1.1s cubic-bezier(.22,1,.36,1),filter .8s ease}
 .mgone{opacity:0;transform:translateY(-44px) scale(.94);filter:blur(10px)}
@@ -763,3 +767,13 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 .bigtemp,.bigprice,.econd,.efeels{color:var(--ink)}
 .h24{background:var(--sk);border:1px solid var(--bd)}
 .h24.on{background:hsl(var(--acc) / .12);border-color:hsl(var(--acc) / .3)}
+
+/* ---- WebKit position:fixed fix (bottom dock) ----
+   The design's body{} rule (ported verbatim) made the document <body> a
+   `display:flex; overflow-y:auto` scroll container. WebKit then resolved the
+   fixed-position .dock against that scroll box (off-screen) instead of the
+   viewport, so the dock disappeared in the Mac app (it rendered fine in
+   Chromium). The inner containers (.hdrB/.bandB/.gridB) already self-center
+   with their own max-width + margin:auto, so body's layout props are redundant.
+   Reset body to a clean full-width block; keep an outer gutter via padding. */
+body{display:block;overflow-x:hidden;overflow-y:visible;max-width:none;flex:none;width:auto}

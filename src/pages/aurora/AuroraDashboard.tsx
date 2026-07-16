@@ -88,7 +88,7 @@ const AuroraDashboard = () => {
         </div>
         <div className="stind">
           <span className="eq"><span className="eqb" /><span className="eqb" /><span className="eqb" /><span className="eqb" /><span className="eqb" /></span>
-          {atlasStateLabel(effectiveAtlasState)}
+          <span className="stshimmer">{atlasStateLabel(effectiveAtlasState)}</span>
         </div>
       </header>
 

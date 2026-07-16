@@ -50,7 +50,7 @@ const AuroraHome = () => {
         <header className="homehead">
           <div className="fx ac gap12"><div className="mk" /><h1 className="wordB">Atlas</h1></div>
           <div className="fx ac gap10">
-            <div className="stind"><span className="stpulse" />Listening</div>
+            <div className="stind"><span className="stpulse" /><span className="stshimmer">Listening</span></div>
             <button className="homebtn" onClick={() => navigate('/atlas-core')} title="Atlas Core"><Cpu className="i16" /></button>
             <button className="homebtn" onClick={() => navigate('/')} title="Dashboard"><LayoutGrid className="i16" /></button>
             <div className="avB fx ac jc">{(name[0] || 'A').toUpperCase()}</div>
