@@ -12,6 +12,7 @@ import { useNews } from '@/hooks/useNews';
 import { useTasks } from '@/hooks/useTasks';
 import { useCalendarEvents } from '@/hooks/useCalendarEvents';
 import { useMailIntelligence } from '@/hooks/useMailIntelligence';
+import { usePortfolio, type HistoryPoint } from '@/hooks/usePortfolio';
 import type { WakeWordState, AIState } from '@/types';
 import type { AuroraExpandedKey } from '@/pages/aurora/AuroraDashboard';
 
@@ -279,6 +280,90 @@ const fmtMktCap = (v?: number | null) => {
   return `${v}`;
 };
 
+// Gradient area chart path from a value time-series (portfolio hero).
+function areaPaths(points: HistoryPoint[], w = 100, h = 40) {
+  if (points.length < 2) return null;
+  const vals = points.map((p) => p.value);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const span = max - min || 1;
+  const xy = points.map((p, i) => {
+    const x = (i / (points.length - 1)) * w;
+    const y = h - ((p.value - min) / span) * h;
+    return `${x.toFixed(2)},${y.toFixed(2)}`;
+  });
+  return { line: `M ${xy.join(' L ')}`, area: `M 0,${h} L ${xy.join(' L ')} L ${w},${h} Z` };
+}
+
+const fmtMoney = (v: number, ccy = 'USD') => {
+  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: ccy, maximumFractionDigits: 0 }).format(v); }
+  catch { return `$${Math.round(v).toLocaleString()}`; }
+};
+
+function PortfolioHero() {
+  const { available, connected, summary, history, holdings, isSyncing, sync } = usePortfolio();
+  if (!available) {
+    return (
+      <div className="gpanel col" style={{ gap: 8 }}>
+        <p className="t14 fw6" style={{ color: 'hsl(240 30% 20%)' }}>Portfolio</p>
+        <p className="fs12" style={{ color: 'hsl(240 20% 50%)', lineHeight: 1.5 }}>Connect a brokerage in the desktop app to see your live portfolio value, holdings and performance here.</p>
+      </div>
+    );
+  }
+  if (!connected) {
+    return (
+      <div className="gpanel col" style={{ gap: 8 }}>
+        <p className="t14 fw6" style={{ color: 'hsl(240 30% 20%)' }}>Portfolio</p>
+        <p className="fs12" style={{ color: 'hsl(240 20% 50%)', lineHeight: 1.5 }}>No brokerage linked yet. Open <b>Settings → Portfolio</b> to connect — your holdings sync locally, priced on-device.</p>
+      </div>
+    );
+  }
+  const up = (summary?.unrealized_pnl ?? 0) >= 0;
+  const paths = areaPaths(history);
+  return (
+    <div className="gpanel col">
+      <div className="fx ac jb mb16">
+        <div>
+          <p className="eslbl">Portfolio value</p>
+          <div className="bigprice tnum">{summary ? fmtMoney(summary.total_value, summary.currency) : '—'}</div>
+        </div>
+        <button className="xbtn fx ac jc" title="Sync now" onClick={sync} disabled={isSyncing}><RefreshCw className="i14" /></button>
+      </div>
+      <div className={`fx ac gap4 fw6 ${up ? 'upB' : 'dnB'}`}>
+        {up ? <TrendingUp className="i16" /> : <TrendingDown className="i16" />}
+        <span className="tnum">{up ? '+' : ''}{fmtMoney(summary?.unrealized_pnl ?? 0, summary?.currency)} ({fmtPct(summary?.unrealized_pct ?? 0)})</span>
+        <span className="fs12" style={{ color: 'hsl(240 20% 55%)', marginLeft: 4 }}>unrealized</span>
+      </div>
+      {paths && (
+        <svg viewBox="0 0 100 40" preserveAspectRatio="none" style={{ width: '100%', height: 96, marginTop: 16 }}>
+          <defs><linearGradient id="pfGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="hsl(25 100% 50% / .28)" /><stop offset="100%" stopColor="hsl(25 100% 50% / 0)" />
+          </linearGradient></defs>
+          <path d={paths.area} fill="url(#pfGrad)" />
+          <path d={paths.line} className="strokeAcc" strokeWidth="1.5" fill="none" vectorEffect="non-scaling-stroke" />
+        </svg>
+      )}
+      <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--bd)' }}>
+        <div className="estat"><div className="esval tnum">{summary?.holdings_count ?? 0}</div><div className="eslbl">Holdings</div></div>
+        <div className="estat"><div className="esval tnum">{summary?.accounts_count ?? 0}</div><div className="eslbl">Accounts</div></div>
+        <div className="estat"><div className="esval tnum">{summary ? fmtMoney(summary.cash, summary.currency) : '—'}</div><div className="eslbl">Cash</div></div>
+      </div>
+      {holdings.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <h3 className="t14 fw6 mb12" style={{ color: 'hsl(240 30% 30%)' }}>Top holdings</h3>
+          {holdings.slice(0, 6).map((h, i) => (
+            <div className={`rowB ${i === 5 ? 'last' : ''}`} key={h.symbol}>
+              <span className="symB">{h.symbol}</span>
+              <span className="snB f1 trunc" style={{ minWidth: 0 }}>{h.description || h.account}</span>
+              <span className="prcB tnum" style={{ width: 90, textAlign: 'right' }}>{fmtMoney(h.market_value, summary?.currency)}</span>
+              <span className={`chgB ${h.pnl >= 0 ? 'upB' : 'dnB'}`}>{h.pnl >= 0 ? '+' : ''}{fmtMoney(h.pnl, summary?.currency)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StocksView({ onClose }: { onClose: () => void }) {
   const { stocks, indices } = useStocks(['AAPL', 'GOOGL', 'MSFT', 'NVDA', 'AMZN', 'META']);
   const lead = stocks[0];
@@ -296,6 +381,7 @@ function StocksView({ onClose }: { onClose: () => void }) {
       <Head title="Watchlist" onClose={onClose} />
       <div className="ebody">
         <div className="col gap16" style={{ width: '38%', minWidth: 360 }}>
+          <PortfolioHero />
           {lead && (
             <div className="gpanel f1 col">
               <div className="fx ac jb mb16"><div><div className="fx ac gap8"><span className="symB" style={{ width: 'auto', fontSize: 15 }}>{lead.symbol}</span><span className="fx ac gap8 fs12 upB"><span className="dotB on" style={{ width: 6, height: 6, background: 'hsl(160 58% 56%)', boxShadow: '0 0 8px hsl(160 58% 56% / .7)' }} />Live</span></div><span className="snB">{lead.name}</span></div></div>

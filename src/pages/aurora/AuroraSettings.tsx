@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Minimize2, Mic, Mail, SlidersHorizontal, Wallet, Plus, Check, RefreshCw, Trash2 } from 'lucide-react';
+import { Minimize2, Mic, Mail, Wallet, LineChart, Plus, Check, RefreshCw, Trash2, Link2 } from 'lucide-react';
 import { VoiceSettingsPanel } from '@/components/atlas-health/VoiceSettingsPanel';
 import { BudgetSettingsPanel } from '@/components/atlas-health/BudgetSettingsPanel';
 import { useMailIntelligence } from '@/hooks/useMailIntelligence';
+import { usePortfolio } from '@/hooks/usePortfolio';
 
 // Workshop-native Settings overlay. Hosts the app's real settings (voice, mail,
 // budget) behind one entry point — before this, AtlasSettingsPanel was only
@@ -11,11 +12,12 @@ import { useMailIntelligence } from '@/hooks/useMailIntelligence';
 // Workshop palette without bespoke restyling. This is also the home for the
 // brokerage/portfolio Connections panel (Phase C).
 
-type SettingsTab = 'voice' | 'mail' | 'budget';
+type SettingsTab = 'voice' | 'mail' | 'portfolio' | 'budget';
 
 const TABS: { key: SettingsTab; label: string; icon: typeof Mic }[] = [
   { key: 'voice', label: 'Voice', icon: Mic },
   { key: 'mail', label: 'Mail', icon: Mail },
+  { key: 'portfolio', label: 'Portfolio', icon: LineChart },
   { key: 'budget', label: 'Budget & AI', icon: Wallet },
 ];
 
@@ -66,6 +68,7 @@ export const AuroraSettings = ({ onClose }: { onClose: () => void }) => {
           <div className="gpanel2 f1">
             {tab === 'voice' && <VoiceSettingsPanel />}
             {tab === 'mail' && <MailSettings />}
+            {tab === 'portfolio' && <PortfolioSettings />}
             {tab === 'budget' && <BudgetSettingsPanel />}
           </div>
         </div>
@@ -112,6 +115,68 @@ function MailSettings() {
       >
         <Plus className="i16" />{isConnecting ? 'Waiting for Google…' : isConnected ? 'Connect another mailbox' : 'Connect Gmail'}
       </button>
+    </div>
+  );
+}
+
+// Brokerage connections for the local portfolio engine (SnapTrade → DuckDB,
+// all on-device). The link happens in SnapTrade's own portal; Atlas never sees
+// brokerage credentials.
+function PortfolioSettings() {
+  const { available, hasCredentials, connected, summary, isConnecting, isSyncing, error, connect, sync, disconnect } = usePortfolio();
+  return (
+    <div className="col gap16">
+      <div>
+        <h3 className="t14 fw6" style={{ color: 'hsl(240 30% 20%)', marginBottom: 6 }}>Brokerage connection</h3>
+        <p className="fs12" style={{ color: 'hsl(240 20% 50%)', lineHeight: 1.5 }}>
+          Link your brokerage to sync holdings and transactions. Everything is pulled read-only and stored & analyzed locally on this Mac — never in the cloud. You sign in inside your broker's own window; Atlas never sees your brokerage password.
+        </p>
+      </div>
+
+      {!available && (
+        <div className="gpanel fs12" style={{ padding: 14, color: 'hsl(240 20% 50%)' }}>
+          Portfolio linking runs in the Atlas desktop app. Open Atlas on your Mac to connect a brokerage.
+        </div>
+      )}
+
+      {available && !hasCredentials && (
+        <div className="gpanel fs12" style={{ padding: 14, color: 'var(--negative)' }}>
+          SnapTrade credentials aren't configured. See docs/portfolio-setup.md.
+        </div>
+      )}
+
+      {available && hasCredentials && (
+        <>
+          {connected ? (
+            <div className="fx ac jb gpanel" style={{ padding: 14 }}>
+              <div>
+                <p className="t14 fw6 m0" style={{ color: 'hsl(240 30% 20%)' }}>Brokerage linked</p>
+                <p className="fs12 m0 fx ac gap6" style={{ color: 'var(--positive)' }}>
+                  <Check className="i12" />{summary?.accounts_count ?? 0} account{(summary?.accounts_count ?? 0) === 1 ? '' : 's'} · {summary?.holdings_count ?? 0} holdings · read-only
+                </p>
+              </div>
+              <div className="fx ac gap8">
+                <button className="xbtn fx ac jc" title="Sync now" onClick={sync} disabled={isSyncing}><RefreshCw className="i14" /></button>
+                <button className="xbtn fx ac jc" title="Disconnect" onClick={disconnect}><Trash2 className="i14" /></button>
+              </div>
+            </div>
+          ) : (
+            <button
+              className="fx ac jc gap8 fw6"
+              onClick={() => connect().catch(() => {})}
+              disabled={isConnecting}
+              style={{
+                width: '100%', padding: 12, borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit', fontSize: 14,
+                background: 'hsl(var(--acc) / .12)', border: '1px solid hsl(var(--acc) / .3)', color: 'hsl(var(--acc))',
+                opacity: isConnecting ? 0.6 : 1,
+              }}
+            >
+              <Link2 className="i16" />{isConnecting ? 'Opening your broker…' : 'Connect a brokerage'}
+            </button>
+          )}
+          {error && <p className="fs12" style={{ color: 'var(--negative)' }}>{error}</p>}
+        </>
+      )}
     </div>
   );
 }
