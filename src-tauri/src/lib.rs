@@ -1,6 +1,11 @@
 use std::fs;
 use std::path::Path;
 
+mod secrets;
+mod snaptrade;
+mod portfolio_db;
+mod portfolio;
+
 const CACHE_PURGE_THRESHOLD_BYTES: u64 = 200 * 1024 * 1024; // 200 MB
 
 fn dir_size(path: &Path) -> u64 {
@@ -55,6 +60,16 @@ pub fn run() {
     // in the system browser (where the user's Google session lives).
     .plugin(tauri_plugin_notification::init())
     .plugin(tauri_plugin_opener::init())
+    .invoke_handler(tauri::generate_handler![
+      portfolio::portfolio_status,
+      portfolio::portfolio_connect_url,
+      portfolio::portfolio_sync,
+      portfolio::portfolio_summary,
+      portfolio::portfolio_holdings,
+      portfolio::portfolio_history,
+      portfolio::portfolio_allocation,
+      portfolio::portfolio_disconnect,
+    ])
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
