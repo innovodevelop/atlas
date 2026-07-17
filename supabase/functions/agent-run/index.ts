@@ -278,6 +278,8 @@ serve(async (req) => {
     }
 
     const supabaseUrl = getSupabaseUrl();
+    // service-role: verifies the JWT below and scopes all queries by the
+    // verified user.id; needs cross-table run/step writes beyond user RLS.
     const supabase = getSupabaseClient();
 
     // Check if Lovable AI is enabled (master kill switch)

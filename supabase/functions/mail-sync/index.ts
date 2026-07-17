@@ -7,6 +7,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { aiChatCompletion, aiDocumentExtract, hasAIKey } from "../_shared/aiGateway.ts";
 import { decryptToken, googleAccessToken, type SupabaseClient } from "../_shared/mailShared.ts";
+import { requireUserOrInternal, authErrorResponse } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -308,8 +309,13 @@ serve(async (req) => {
 
   try {
     if (!hasAIKey()) throw new Error("No AI key configured (GEMINI_API_KEY)");
-    const { userId = null } = await req.json().catch(() => ({}));
+    // WS-A: cron/internal callers sync all accounts; users sync only their own.
+    let auth: { userId: string | null; internal: boolean };
+    try { auth = await requireUserOrInternal(req); } catch (e) { return authErrorResponse(e); }
+    const userId = auth.internal ? null : auth.userId;
 
+    // service-role: must read encrypted_refresh_token (column revoked from
+    // clients) and iterate accounts across users on the cron path.
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,

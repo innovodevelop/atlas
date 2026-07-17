@@ -31,6 +31,8 @@ serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization");
     const supabaseUrl = getSupabaseUrl();
+    // service-role: JWT verified below; queries scoped by verified user.id.
+    // Cron trigger path calls agent-run with the service key.
     const supabase = getSupabaseClient();
 
     const url = new URL(req.url);

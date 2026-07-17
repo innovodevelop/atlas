@@ -1,3 +1,4 @@
+import { requireUser, authErrorResponse } from "../_shared/auth.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -7,6 +8,9 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  // WS-A: defense in depth alongside verify_jwt — any logged-in user only.
+  try { await requireUser(req); } catch (e) { return authErrorResponse(e); }
 
   try {
     const { query, options } = await req.json();

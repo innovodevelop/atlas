@@ -1,14 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { generateEmbedding } from "../_shared/aiGateway.ts";
+import { getUserClient } from "../_shared/supabase.ts";
+import { requireUser, AuthError, authErrorResponse } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -16,7 +14,9 @@ serve(async (req) => {
   }
 
   try {
-    const { query, threshold = 0.3, limit = 20, userId } = await req.json();
+    // Identity from the verified JWT — never from the body.
+    const { userId, token } = await requireUser(req);
+    const { query, threshold = 0.3, limit = 20 } = await req.json();
 
     if (!query || typeof query !== "string") {
       return new Response(
@@ -30,8 +30,8 @@ serve(async (req) => {
     // Generate embedding for the query
     const queryEmbedding = await generateEmbedding(query);
 
-    // Create Supabase client
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    // User-scoped client — RLS applies to the vector match and the joins below.
+    const supabase = getUserClient(token);
 
     // Search for similar vectors using RPC
     const { data: vectorResults, error: vectorError } = await supabase.rpc(
@@ -40,7 +40,7 @@ serve(async (req) => {
         query_embedding: `[${queryEmbedding.join(",")}]`,
         match_threshold: threshold,
         match_count: limit,
-        p_user_id: userId || null,
+        p_user_id: userId,
       }
     );
 
@@ -163,6 +163,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
+    if (error instanceof AuthError) return authErrorResponse(error);
     console.error("Semantic search error:", error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),

@@ -10,11 +10,16 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 import { generateEmbedding } from "../_shared/aiGateway.ts";
+import { requireUserOrInternal, AuthError, authErrorResponse } from "../_shared/auth.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  // WS-A: user JWT (identity from token) or internal cron-secret caller.
+  let auth: { userId: string | null; token: string | null; internal: boolean };
+  try { auth = await requireUserOrInternal(req); } catch (e) { return authErrorResponse(e); }
 
   try {
     const { batchSize = 10, source = "all" } = await req.json().catch(() => ({}));

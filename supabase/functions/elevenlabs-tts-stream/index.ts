@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { requireUser, authErrorResponse } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,6 +10,9 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  // WS-A: defense in depth alongside verify_jwt — any logged-in user only.
+  try { await requireUser(req); } catch (e) { return authErrorResponse(e); }
 
   try {
     const { text, voiceId = "EXAVITQu4vr4xnSDxMaL", modelId = "eleven_turbo_v2_5" } = await req.json();

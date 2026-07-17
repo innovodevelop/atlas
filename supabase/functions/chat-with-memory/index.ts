@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
-import { getSupabaseClient, getSupabaseUrl } from "../_shared/supabase.ts";
+import { getSupabaseClient, getSupabaseUrl, getUserClient } from "../_shared/supabase.ts";
+import { requireUser, AuthError, authErrorResponse } from "../_shared/auth.ts";
 import { 
   isLearningEnabled, 
   detectLearningIntent, 
@@ -449,7 +450,8 @@ async function triggerKnowledgeExtraction(
   source: string,
   supabase: any,
   learningIntent: ReturnType<typeof detectLearningIntent>,
-  conversationId: string | null
+  conversationId: string | null,
+  userToken: string,
 ) {
   try {
     // Check if learning is enabled in system settings
@@ -499,10 +501,11 @@ async function triggerKnowledgeExtraction(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        // Forward the caller's JWT — atlas-knowledge now derives identity from it.
+        Authorization: `Bearer ${userToken}`,
       },
       body: JSON.stringify({
         conversation,
-        userId,
         source,
         learningTopic: learningIntent.topic,
         maxTopics: learningSettings.maxTopics,
@@ -687,20 +690,26 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, userId, source = "text_chat", enableTools = true, teachingMode = false, systemPromptOverride, conversationId = null } = await req.json();
+    // Identity comes from the verified JWT — never from the request body.
+    const { userId, token } = await requireUser(req);
+
+    const { messages, source = "text_chat", enableTools = true, teachingMode = false, systemPromptOverride, conversationId = null } = await req.json();
     const hasKey = hasAIKey();
     const PERPLEXITY_API_KEY = Deno.env.get("PERPLEXITY_API_KEY");
     const SUPABASE_URL = getSupabaseUrl();
-    
+
     if (!hasKey) {
       throw new Error("No AI key configured (GEMINI_API_KEY)");
     }
 
-    // Initialize Supabase client
-    const supabase = getSupabaseClient();
+    // User-scoped client: all reads/writes of the caller's data go through RLS.
+    const supabase = getUserClient(token);
+    // service-role: atlas_provider_status / atlas_system_settings / learning
+    // tables are system-level and have no per-user RLS policies.
+    const systemDb = getSupabaseClient();
 
     // Check if Lovable AI is enabled (master kill switch)
-    const lovableAIStatus = await isLovableAIEnabled(supabase);
+    const lovableAIStatus = await isLovableAIEnabled(systemDb);
     if (!lovableAIStatus.enabled) {
       console.log("[chat-with-memory] Lovable AI is disabled");
       return new Response(
@@ -948,7 +957,7 @@ serve(async (req) => {
 
       if (!checkResponse.ok) {
         const errorText = await checkResponse.text();
-        await recordError(supabase, 'lovable_ai', checkResponse.status, errorText);
+        await recordError(systemDb, 'lovable_ai', checkResponse.status, errorText);
         
         if (checkResponse.status === 429) {
           return new Response(JSON.stringify({ error: "Rate limits exceeded, please try again later." }), {
@@ -966,7 +975,7 @@ serve(async (req) => {
       }
 
       // Record successful call
-      await recordSuccess(supabase, 'lovable_ai');
+      await recordSuccess(systemDb, 'lovable_ai');
 
       const checkData = await checkResponse.json();
       const choice = checkData.choices?.[0];
@@ -1033,12 +1042,12 @@ serve(async (req) => {
     if (!streamResponse.ok) {
       const errorText = await streamResponse.text();
       console.error("[chat-with-memory] Stream error:", streamResponse.status, errorText);
-      await recordError(supabase, 'lovable_ai', streamResponse.status, errorText);
+      await recordError(systemDb, 'lovable_ai', streamResponse.status, errorText);
       throw new Error(`AI gateway error: ${streamResponse.status}`);
     }
 
     // Record successful stream
-    await recordSuccess(supabase, 'lovable_ai');
+    await recordSuccess(systemDb, 'lovable_ai');
 
     // Detect learning intent from the latest user message
     const latestUserMessage = messages.filter((m: any) => m.role === 'user').pop();
@@ -1050,7 +1059,8 @@ serve(async (req) => {
 
     // Trigger knowledge extraction ONLY if learning intent detected and learning is enabled
     if (messages.length >= 2 && SUPABASE_URL && learningIntent.hasIntent) {
-      triggerKnowledgeExtraction(SUPABASE_URL, messages, userId, source, supabase, learningIntent, conversationId);
+      // systemDb: learning settings/session tables are system-level (no user RLS).
+      triggerKnowledgeExtraction(SUPABASE_URL, messages, userId, source, systemDb, learningIntent, conversationId, token);
     }
     
     // Track session context for working memory (non-blocking)
@@ -1098,6 +1108,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (error) {
+    if (error instanceof AuthError) return authErrorResponse(error);
     console.error("[chat-with-memory] Error:", error);
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
       status: 500,

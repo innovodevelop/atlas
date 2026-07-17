@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment (public-safe VITE_ values, but untracked as of WS-A)
+.env
+.env.local

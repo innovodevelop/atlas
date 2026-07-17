@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { handleCors, corsHeaders, jsonResponse, errorResponse } from "../_shared/cors.ts";
 import { getSupabaseClient } from "../_shared/supabase.ts";
 import { aiChatCompletion } from "../_shared/aiGateway.ts";
+import { requireUserOrInternal, authErrorResponse } from "../_shared/auth.ts";
 
 interface MemoryItem {
   id: string;
@@ -216,20 +217,16 @@ serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   try {
+    // service-role: synthesis writes memory aggregates; identity is enforced
+    // below (JWT for users, cron secret + explicit user_id for the scheduler).
     const supabase = getSupabaseClient();
 
-    // Check for auth if user_id not provided
-    let userId: string | null = null;
-    const authHeader = req.headers.get("Authorization");
-    
-    if (authHeader) {
-      const token = authHeader.replace("Bearer ", "");
-      const { data: { user } } = await supabase.auth.getUser(token);
-      userId = user?.id || null;
-    }
+    // WS-A: user JWT wins; internal (cron-secret) callers may target a user.
+    let auth: { userId: string | null; internal: boolean };
+    try { auth = await requireUserOrInternal(req); } catch (e) { return authErrorResponse(e); }
 
     const body: SynthesisRequest = await req.json();
-    userId = body.user_id || userId;
+    const userId = auth.internal ? (body.user_id ?? null) : auth.userId;
 
     if (!userId) {
       return errorResponse("User ID required", 400);

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
+import { requireUser, authErrorResponse } from "../_shared/auth.ts";
 
 const OPENWEATHER_API_KEY = Deno.env.get('OPENWEATHER_API_KEY');
 
@@ -7,6 +8,9 @@ serve(async (req) => {
   // Handle CORS preflight
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
+
+  // WS-A: defense in depth alongside verify_jwt — any logged-in user only.
+  try { await requireUser(req); } catch (e) { return authErrorResponse(e); }
 
   try {
     const { city = 'San Francisco', lat, lon } = await req.json();

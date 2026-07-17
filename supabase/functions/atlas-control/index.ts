@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { requireUserOrInternal, AuthError, authErrorResponse } from "../_shared/auth.ts";
 import { corsHeaders, handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
 import { getSupabaseClient, getSupabaseUrl } from "../_shared/supabase.ts";
 import { 
@@ -15,6 +16,10 @@ import {
 serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
+
+  // WS-A: user JWT (identity from token) or internal cron-secret caller.
+  let auth: { userId: string | null; token: string | null; internal: boolean };
+  try { auth = await requireUserOrInternal(req); } catch (e) { return authErrorResponse(e); }
 
   try {
     const url = new URL(req.url);
@@ -108,7 +113,8 @@ serve(async (req) => {
 
       case 'check_learning_intent': {
         const body = await req.json();
-        const { message, userId, sessionId } = body;
+        const { message, sessionId } = body;
+        const userId = auth.internal ? (body.userId ?? null) : auth.userId;
 
         if (!message) {
           return errorResponse('Message is required', 400);
@@ -184,7 +190,16 @@ serve(async (req) => {
           const supabaseUrl = getSupabaseUrl();
           fetch(`${supabaseUrl}/functions/v1/atlas-research`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              // Forward the caller's JWT (user path) or mark internal.
+              ...(auth.token
+                ? { Authorization: `Bearer ${auth.token}` }
+                : {
+                    Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+                    'x-cron-secret': Deno.env.get('CRON_SECRET') ?? '',
+                  }),
+            },
             body: JSON.stringify({
               action: 'create',
               topic,

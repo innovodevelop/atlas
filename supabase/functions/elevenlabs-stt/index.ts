@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
+import { getUserClient } from "../_shared/supabase.ts";
+import { requireUser, AuthError, authErrorResponse } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,10 +13,10 @@ serve(async (req) => {
   }
 
   try {
-    const { audio, userId, storeTranscript = true, mimeType = "audio/webm", extension = "webm", isolate = false } = await req.json();
+    // Identity from the verified JWT — never from the body.
+    const { userId, token } = await requireUser(req);
+    const { audio, storeTranscript = true, mimeType = "audio/webm", extension = "webm", isolate = false } = await req.json();
     const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
     if (!ELEVENLABS_API_KEY) {
       throw new Error("ELEVENLABS_API_KEY is not configured");
@@ -91,15 +92,16 @@ serve(async (req) => {
     console.log("STT successful, text length:", transcriptText.length);
 
     // Store the transcript in the knowledge bank if enabled
-    if (storeTranscript && transcriptText.length > 10 && SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+    if (storeTranscript && transcriptText.length > 10) {
       try {
-        const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-        
+        // User-scoped write — RLS applies.
+        const supabase = getUserClient(token);
+
         // Store the voice transcript as a knowledge entry
         const { error: insertError } = await supabase
           .from("atlas_knowledge_entries")
           .insert([{
-            user_id: userId || null,
+            user_id: userId,
             topic: `Voice message - ${new Date().toLocaleString()}`,
             content: {
               transcript: transcriptText,
@@ -133,6 +135,7 @@ serve(async (req) => {
       }
     );
   } catch (error) {
+    if (error instanceof AuthError) return authErrorResponse(error);
     console.error("STT error:", error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),

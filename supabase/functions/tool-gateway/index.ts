@@ -261,6 +261,8 @@ serve(async (req) => {
       return errorResponse("Missing authorization", 401);
     }
 
+    // service-role: JWT verified below; every tool runs with the verified
+    // user.id forced into args. Needs tool_calls/approvals system writes.
     const supabase = getSupabaseClient();
 
     const token = authHeader.replace("Bearer ", "");

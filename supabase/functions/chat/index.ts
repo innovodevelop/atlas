@@ -1,10 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { handleCors, corsHeaders, jsonResponse, errorResponse } from "../_shared/cors.ts";
 import { aiChatCompletion, hasAIKey } from "../_shared/aiGateway.ts";
+import { requireUser, authErrorResponse } from "../_shared/auth.ts";
 
 serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
+
+  // WS-A: defense in depth alongside verify_jwt — any logged-in user only.
+  try { await requireUser(req); } catch (e) { return authErrorResponse(e); }
 
   try {
     const { messages } = await req.json();

@@ -9,6 +9,7 @@ import {
 } from "../_shared/providerStatus.ts";
 import { isLovableAIEnabled } from "../_shared/providerStatus.ts";
 import { aiChatCompletion, hasAIKey } from "../_shared/aiGateway.ts";
+import { requireUserOrInternal, AuthError, authErrorResponse } from "../_shared/auth.ts";
 
 interface KnowledgeExtraction {
   topic: string;
@@ -121,8 +122,13 @@ serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
+  // WS-A: user JWT (identity from token) or internal cron-secret caller.
+  let auth: { userId: string | null; token: string | null; internal: boolean };
+  try { auth = await requireUserOrInternal(req); } catch (e) { return authErrorResponse(e); }
+
   try {
-    const { conversation, userId, source = "conversation", learningTopic, maxTopics, learningSessionId = null, conversationId = null } = await req.json();
+    const { conversation, userId: bodyUserId, source = "conversation", learningTopic, maxTopics, learningSessionId = null, conversationId = null } = await req.json();
+    const userId = auth.internal ? (bodyUserId ?? null) : auth.userId;
 
     const supabase = getSupabaseClient();
 

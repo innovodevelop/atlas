@@ -17,6 +17,8 @@ serve(async (req) => {
     }
 
     const supabaseUrl = getSupabaseUrl();
+    // service-role: JWT verified below; queries scoped by verified user.id.
+    // Approval state transitions are system-level writes.
     const supabase = getSupabaseClient();
 
     const token = authHeader.replace("Bearer ", "");

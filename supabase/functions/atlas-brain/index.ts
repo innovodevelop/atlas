@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
 import { getSupabaseClient, getSupabaseUrl } from "../_shared/supabase.ts";
 import { checkSessionBudget } from "../_shared/learningGuards.ts";
+import { requireUserOrInternal, AuthError, authErrorResponse } from "../_shared/auth.ts";
 
 // atlas-brain used to be the engine of the endless-research loop: every cycle
 // it fanned out to atlas-news-pulse and atlas-topic-discovery (which invented
@@ -25,6 +26,10 @@ interface BrainRunMetrics {
 serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
+
+  // WS-A: user JWT (identity from token) or internal cron-secret caller.
+  let auth: { userId: string | null; token: string | null; internal: boolean };
+  try { auth = await requireUserOrInternal(req); } catch (e) { return authErrorResponse(e); }
 
   const startTime = Date.now();
   const metrics: BrainRunMetrics = {

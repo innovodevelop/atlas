@@ -3,6 +3,7 @@ import { handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
 import { getSupabaseClient, getSupabaseUrl } from "../_shared/supabase.ts";
 import { isLearningEnabled, isLovableAIEnabled } from "../_shared/providerStatus.ts";
 import { findOrCreateSession } from "../_shared/learningGuards.ts";
+import { requireCronSecret, authErrorResponse } from "../_shared/auth.ts";
 
 // The one scheduled learning cycle. Runs once a day (cron) and ONLY follows
 // up on topics the user actually discussed recently — it never invents topics
@@ -21,6 +22,8 @@ serve(async (req) => {
   if (corsResponse) return corsResponse;
 
   try {
+    // WS-A: cron target — only pg_cron/internal callers with the secret.
+    try { requireCronSecret(req); } catch (e) { return authErrorResponse(e); }
     const { dryRun = false } = await req.json().catch(() => ({}));
     const supabase = getSupabaseClient();
     const SUPABASE_URL = getSupabaseUrl();
@@ -116,6 +119,7 @@ serve(async (req) => {
         method: "POST",
         headers: {
           Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          "x-cron-secret": Deno.env.get("CRON_SECRET") ?? "",
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -187,6 +191,7 @@ serve(async (req) => {
           method: "POST",
           headers: {
             Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          "x-cron-secret": Deno.env.get("CRON_SECRET") ?? "",
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -232,6 +237,7 @@ serve(async (req) => {
       method: "POST",
       headers: {
         Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          "x-cron-secret": Deno.env.get("CRON_SECRET") ?? "",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ operation: "full" }),

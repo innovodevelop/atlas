@@ -4,6 +4,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { decryptToken } from "../_shared/mailShared.ts";
+import { requireUser, AuthError, authErrorResponse } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,9 +15,14 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { accountId, userId } = await req.json();
-    if (!accountId || !userId) throw new Error("accountId and userId are required");
+    // Identity from the verified JWT — never from the body.
+    const { userId } = await requireUser(req);
+    const { accountId } = await req.json();
+    if (!accountId) throw new Error("accountId is required");
 
+    // service-role: must read encrypted_refresh_token (column is revoked from
+    // clients) to revoke the Google grant. Ownership enforced by the
+    // user_id filter below, with userId derived from the JWT.
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -48,6 +54,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
+    if (error instanceof AuthError) return authErrorResponse(error);
     console.error("[mail-disconnect]", error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),

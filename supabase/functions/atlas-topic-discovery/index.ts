@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { aiChatCompletion, hasAIKey } from "../_shared/aiGateway.ts";
+import { requireUserOrInternal, AuthError, authErrorResponse } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,8 +27,13 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // WS-A: user JWT (identity from token) or internal cron-secret caller.
+  let auth: { userId: string | null; token: string | null; internal: boolean };
+  try { auth = await requireUserOrInternal(req); } catch (e) { return authErrorResponse(e); }
+
   try {
-    const { maxTopics = 5, userId = null } = await req.json().catch(() => ({}));
+    const { maxTopics = 5, userId: bodyUserId = null } = await req.json().catch(() => ({}));
+    const userId = auth.internal ? (bodyUserId ?? null) : auth.userId;
 
     const PERPLEXITY_API_KEY = Deno.env.get("PERPLEXITY_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;

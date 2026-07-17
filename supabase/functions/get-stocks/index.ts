@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
+import { requireUser, authErrorResponse } from "../_shared/auth.ts";
 
 const FINNHUB_API_KEY = Deno.env.get('FINNHUB_API_KEY');
 
@@ -26,6 +27,9 @@ const generateSparkline = (positive: boolean) => {
 serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
+
+  // WS-A: defense in depth alongside verify_jwt — any logged-in user only.
+  try { await requireUser(req); } catch (e) { return authErrorResponse(e); }
 
   try {
     const { symbols = ['AAPL', 'GOOGL', 'MSFT', 'NVDA'] } = await req.json();

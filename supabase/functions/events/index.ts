@@ -13,6 +13,8 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    // service-role: JWT verified per-route below with user.id scoping; the
+    // inbox processor iterates events across users (system-level).
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -23,9 +25,12 @@ serve(async (req) => {
     // POST /events/ingest - Ingest external events
     if (req.method === "POST" && action === "ingest") {
       const authHeader = req.headers.get("Authorization");
-      
-      // Allow API key auth for webhooks
+
+      // Webhook auth: X-API-Key must MATCH the EVENTS_WEBHOOK_KEY secret.
+      // (Previously any non-empty header was accepted — that was a hole.)
       const apiKey = req.headers.get("X-API-Key");
+      const webhookKey = Deno.env.get("EVENTS_WEBHOOK_KEY");
+      const validWebhook = Boolean(apiKey && webhookKey && apiKey === webhookKey);
       let userId: string | null = null;
 
       if (authHeader) {
@@ -34,7 +39,7 @@ serve(async (req) => {
         userId = user?.id || null;
       }
 
-      if (!userId && !apiKey) {
+      if (!userId && !validWebhook) {
         return new Response(JSON.stringify({ error: "Missing authorization" }), {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -81,6 +86,24 @@ serve(async (req) => {
 
     // POST /events/process - Process pending events (worker)
     if (req.method === "POST" && action === "process") {
+      // System-level processor (iterates all users' pending events): only an
+      // internal caller with the cron secret, or a logged-in user, may trigger.
+      const cronSecret = Deno.env.get("CRON_SECRET");
+      const gotSecret = req.headers.get("x-cron-secret");
+      let processorAuthed = Boolean(cronSecret && gotSecret === cronSecret);
+      if (!processorAuthed) {
+        const hdr = req.headers.get("Authorization");
+        if (hdr) {
+          const { data: { user } } = await supabase.auth.getUser(hdr.replace("Bearer ", ""));
+          processorAuthed = Boolean(user);
+        }
+      }
+      if (!processorAuthed) {
+        return new Response(JSON.stringify({ error: "Missing authorization" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       console.log("[events] Processing pending events");
 
       // Get pending events

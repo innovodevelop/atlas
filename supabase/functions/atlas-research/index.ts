@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { requireUserOrInternal, AuthError, authErrorResponse } from "../_shared/auth.ts";
 import { corsHeaders, handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
 import { getSupabaseClient, getSupabaseUrl } from "../_shared/supabase.ts";
 import { 
@@ -443,17 +444,22 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // WS-A: user JWT (identity from token) or internal cron-secret caller.
+  let auth: { userId: string | null; token: string | null; internal: boolean };
+  try { auth = await requireUserOrInternal(req); } catch (e) { return authErrorResponse(e); }
+
   try {
     const {
       topicId,
       action,
       topic,
       description,
-      userId,
+      userId: bodyUserId,
       autoDeepen = true,
       conversationId = null,
       learningSessionId = null
     } = await req.json();
+    const userId = auth.internal ? (bodyUserId ?? null) : auth.userId;
     // NOTE: client-supplied maxDepth is intentionally ignored — the depth
     // limit comes from atlas_system_settings only (see effectiveMaxDepth).
     
@@ -770,7 +776,8 @@ serve(async (req) => {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
-                  Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+                  Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+                  "x-cron-secret": Deno.env.get("CRON_SECRET") ?? "",
                 },
                 body: JSON.stringify({
                   topicId: subTopic.id,
@@ -874,7 +881,8 @@ serve(async (req) => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            "x-cron-secret": Deno.env.get("CRON_SECRET") ?? "",
           },
           body: JSON.stringify({
             topicId: newTopic.id,

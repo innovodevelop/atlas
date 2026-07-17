@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
+import { requireUserOrInternal, AuthError, authErrorResponse } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -145,7 +146,11 @@ async function extractInsights(
   try {
     const response = await fetch(`${supabaseUrl}/functions/v1/memory-synthesize`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+        "x-cron-secret": Deno.env.get("CRON_SECRET") ?? "",
+      },
       body: JSON.stringify({
         operation: "insight",
         memories: memories.slice(0, 20),
@@ -200,7 +205,11 @@ async function triggerValidation(
   try {
     fetch(`${supabaseUrl}/functions/v1/validation-engine`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+        "x-cron-secret": Deno.env.get("CRON_SECRET") ?? "",
+      },
       body: JSON.stringify({
         entries: validationEntries,
         immediate: false,
@@ -242,6 +251,10 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  // WS-A: user JWT (identity from token) or internal cron-secret caller.
+  let auth: { userId: string | null; token: string | null; internal: boolean };
+  try { auth = await requireUserOrInternal(req); } catch (e) { return authErrorResponse(e); }
 
   try {
     const config: SchedulerConfig = req.method === "GET" 

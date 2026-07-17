@@ -87,6 +87,7 @@ serve(async (req) => {
       method: "POST",
       headers: {
         Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+        "x-cron-secret": Deno.env.get("CRON_SECRET") ?? "",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ userId: stateRow.user_id }),

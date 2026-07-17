@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { handleCors, jsonResponse } from "../_shared/cors.ts";
+import { requireUser, authErrorResponse } from "../_shared/auth.ts";
 
 const NEWS_API_KEY = Deno.env.get('NEWS_API_KEY');
 
@@ -59,6 +60,9 @@ const getTimeAgo = (dateStr: string) => {
 serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
+
+  // WS-A: defense in depth alongside verify_jwt — any logged-in user only.
+  try { await requireUser(req); } catch (e) { return authErrorResponse(e); }
 
   try {
     const { category = 'general' } = await req.json();

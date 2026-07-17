@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { handleCors, jsonResponse, errorResponse } from "../_shared/cors.ts";
 import { getSupabaseClient, getSupabaseUrl } from "../_shared/supabase.ts";
+import { requireUserOrInternal, AuthError, authErrorResponse } from "../_shared/auth.ts";
 
 interface RetrieveRequest {
   query: string;
@@ -334,7 +335,11 @@ async function storeEntry(
     try {
       fetch(`${supabaseUrl}/functions/v1/validation-engine`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          "x-cron-secret": Deno.env.get("CRON_SECRET") ?? "",
+        },
         body: JSON.stringify({
           entries: [{
             entryId: insertedId,
@@ -358,6 +363,10 @@ async function storeEntry(
 serve(async (req) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
+
+  // WS-A: user JWT (identity from token) or internal cron-secret caller.
+  let auth: { userId: string | null; token: string | null; internal: boolean };
+  try { auth = await requireUserOrInternal(req); } catch (e) { return authErrorResponse(e); }
 
   try {
     const url = new URL(req.url);

@@ -1,101 +1,102 @@
-project_id = "gyfllxzecctdnmxqgazo"
+project_id = "gdhdqetwlinlpimpxokp"
 
 [functions.chat]
-verify_jwt = false
+verify_jwt = true
 
 [functions.chat-with-memory]
-verify_jwt = false
+verify_jwt = true
 
 [functions.elevenlabs-tts]
-verify_jwt = false
+verify_jwt = true
 
 [functions.elevenlabs-tts-stream]
-verify_jwt = false
+verify_jwt = true
 
 [functions.elevenlabs-stt]
-verify_jwt = false
+verify_jwt = true
 
 [functions.elevenlabs-scribe-token]
-verify_jwt = false
+verify_jwt = true
 
 [functions.get-news]
-verify_jwt = false
+verify_jwt = true
 
 [functions.get-stocks]
-verify_jwt = false
+verify_jwt = true
 
 [functions.get-weather]
-verify_jwt = false
-
-[functions.stocks-realtime]
-verify_jwt = false
+verify_jwt = true
 
 [functions.atlas-knowledge]
-verify_jwt = false
+verify_jwt = true
 
 [functions.atlas-research]
-verify_jwt = false
+verify_jwt = true
 
 [functions.atlas-knowledge-validator]
-verify_jwt = false
+verify_jwt = true
 
 [functions.tool-gateway]
-verify_jwt = false
+verify_jwt = true
 
 [functions.agent-run]
-verify_jwt = false
+verify_jwt = true
 
 [functions.approvals]
-verify_jwt = false
+verify_jwt = true
 
 [functions.schedules]
-verify_jwt = false
+verify_jwt = true
 
 [functions.events]
-verify_jwt = false
+verify_jwt = true
 
 [functions.memory-embed]
-verify_jwt = false
+verify_jwt = true
 
 [functions.memory-synthesize]
-verify_jwt = false
+verify_jwt = true
 
 [functions.validation-engine]
-verify_jwt = false
+verify_jwt = true
 
 [functions.knowledge-layer]
-verify_jwt = false
+verify_jwt = true
 
 [functions.memory-scheduler]
-verify_jwt = false
+verify_jwt = true
 
 [functions.atlas-brain]
-verify_jwt = false
+verify_jwt = true
 
 [functions.atlas-news-pulse]
-verify_jwt = false
+verify_jwt = true
 
 [functions.atlas-topic-discovery]
-verify_jwt = false
+verify_jwt = true
 
 [functions.firecrawl-scrape]
-verify_jwt = false
+verify_jwt = true
 
 [functions.firecrawl-search]
-verify_jwt = false
+verify_jwt = true
 
 [functions.semantic-search]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-embeddings]
-verify_jwt = false
+verify_jwt = true
 
 [functions.atlas-control]
-verify_jwt = false
+verify_jwt = true
 
+# verify_jwt=false: pg_cron target with no user JWT. In-code guard requires
+# the x-cron-secret header (see _shared/auth.ts requireCronSecret).
 [functions.record-usage-snapshot]
 verify_jwt = false
 
+# verify_jwt=false: pg_cron target with no user JWT. In-code guard requires
+# the x-cron-secret header (see _shared/auth.ts requireCronSecret).
 [functions.atlas-daily-digest]
 verify_jwt = false
 
@@ -104,13 +105,17 @@ verify_jwt = false
 # atlas-daily-digest at 06:00) are created via pg_cron — see CONVERSION.md.
 
 [functions.mail-oauth-start]
-verify_jwt = false
+verify_jwt = true
 
+# verify_jwt=false: Google redirects the user's browser here without a JWT.
+# Authenticated by the single-use server-held PKCE state row (10 min TTL).
 [functions.mail-oauth-callback]
 verify_jwt = false
 
+# verify_jwt=false: pg_cron target (syncs all accounts with x-cron-secret).
+# User-initiated syncs pass a JWT and are scoped to their own accounts in code.
 [functions.mail-sync]
 verify_jwt = false
 
 [functions.mail-disconnect]
-verify_jwt = false
+verify_jwt = true
