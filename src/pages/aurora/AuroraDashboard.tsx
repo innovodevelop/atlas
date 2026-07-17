@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Cpu, Mic, Sparkles, Settings } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -6,7 +6,8 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWeather } from '@/hooks/useWeather';
 import { useCalendarEvents } from '@/hooks/useCalendarEvents';
 import { useUnifiedChat } from '@/hooks/useUnifiedChat';
-import { useDashboardVoice } from '@/hooks/useDashboardVoice';
+import { useVoiceSession } from '@/hooks/useVoiceSession';
+import { useAtlasSettings } from '@/hooks/useAtlasSettings';
 import { AtlasSphereLazy as AtlasSphere } from '@/components/atlas/AtlasSphereLazy';
 import { timeOfDayGreeting, atlasStateLabel } from './auroraHelpers';
 import {
@@ -31,21 +32,21 @@ const AuroraDashboard = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [input, setInput] = useState('');
 
-  // Sentence-streamed speech bridge (same pattern as the legacy dashboard)
-  const speakSentenceRef = useRef<(s: string) => void>(() => {});
-  const handleSpeakSentence = useCallback((s: string) => speakSentenceRef.current(s), []);
-
-  const { messages, aiState, setAiState, isLoading, sendMessage } = useUnifiedChat({
+  // Text chat (drawer). Speech is entirely the gateway session's job now.
+  const { messages, isLoading, sendMessage } = useUnifiedChat({
     enableMemory: true,
-    onSpeakSentence: handleSpeakSentence,
   });
 
+  // Duplex voice loop via the local gateway (WS-B): capture, VAD barge-in,
+  // streamed TTS playback — one hook, same AIState contract as before.
+  const { settings: atlasSettings } = useAtlasSettings();
   const {
-    audioLevel, effectiveAtlasState, speakSentence,
+    audioLevel, effectiveAtlasState,
     handleManualActivate,
-  } = useDashboardVoice({ sendMessage, stopAudio: undefined, aiState, isLoading, setAiState });
-
-  useEffect(() => { speakSentenceRef.current = speakSentence; }, [speakSentence]);
+  } = useVoiceSession({
+    voiceId: atlasSettings.voiceId,
+    ttsModelId: atlasSettings.ttsModel,
+  });
 
   // Auth gate (same behavior as the current dashboard)
   useEffect(() => {

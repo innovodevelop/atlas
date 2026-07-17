@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Cpu, LayoutGrid, Mic, ArrowUp } from 'lucide-react';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useUnifiedChat } from '@/hooks/useUnifiedChat';
-import { useDashboardVoice } from '@/hooks/useDashboardVoice';
+import { useVoiceSession } from '@/hooks/useVoiceSession';
+import { useAtlasSettings } from '@/hooks/useAtlasSettings';
 import { AtlasSphereLazy as AtlasSphere } from '@/components/atlas/AtlasSphereLazy';
 import { timeOfDayGreeting } from './auroraHelpers';
 
@@ -20,14 +21,15 @@ const AuroraHome = () => {
   const { profile } = useUserProfile();
   const [input, setInput] = useState('');
 
-  const speakSentenceRef = useRef<(s: string) => void>(() => {});
-  const handleSpeakSentence = useCallback((s: string) => speakSentenceRef.current(s), []);
-  const { messages, aiState, setAiState, isLoading, sendMessage } = useUnifiedChat({
-    enableMemory: true, source: 'voice_chat', onSpeakSentence: handleSpeakSentence,
+  const { messages, isLoading, sendMessage } = useUnifiedChat({
+    enableMemory: true, source: 'voice_chat',
   });
-  const { audioLevel, effectiveAtlasState, speakSentence, handleManualActivate } =
-    useDashboardVoice({ sendMessage, stopAudio: undefined, aiState, isLoading, setAiState });
-  useEffect(() => { speakSentenceRef.current = speakSentence; }, [speakSentence]);
+  // Duplex voice via the local gateway (speech is the session's job now).
+  const { settings: atlasSettings } = useAtlasSettings();
+  const { audioLevel, effectiveAtlasState, handleManualActivate } = useVoiceSession({
+    voiceId: atlasSettings.voiceId,
+    ttsModelId: atlasSettings.ttsModel,
+  });
 
   const send = useCallback((text?: string) => {
     const v = (text ?? input).trim();
