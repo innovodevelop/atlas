@@ -1,0 +1,153 @@
+/**
+ * Voice activity detection over the inbound 16 kHz mono Int16 stream.
+ *
+ * Primary engine: Silero VAD (ONNX, via onnxruntime-node) — the real deal,
+ * robust to noise, runs CONTINUOUSLY including during TTS playback (that is
+ * what barge-in is). Fallback engine: RMS energy thresholding, auto-selected
+ * if the ONNX runtime or model fails to load (e.g. N-API quirk under Bun),
+ * so the gateway always boots. The active engine is reported at startup.
+ *
+ * Model file: models/silero_vad.onnx — fetched by `bun run fetch-models`.
+ *
+ * Silero expects 512-sample frames at 16 kHz (32 ms). We re-frame the ~20 ms
+ * wire frames internally.
+ */
+
+export interface VadEvents {
+  onSpeechStart: () => void;
+  onSpeechEnd: () => void;
+}
+
+export interface VadEngine {
+  readonly name: string;
+  /** Feed PCM; emits events via the constructor callbacks. */
+  process(frame: Int16Array): Promise<void>;
+  /** Reset internal state (start of a new turn). */
+  reset(): void;
+}
+
+const SILERO_FRAME = 512; // samples @16k
+const SPEECH_THRESHOLD = 0.5;
+const SILENCE_THRESHOLD = 0.35;
+/** Endpointing: constant to start; adaptive tuning is future work (ADR 001). */
+export const TRAILING_SILENCE_MS = 700;
+/** Debounce: require this much continuous speech before speech-start fires. */
+const MIN_SPEECH_MS = 96; // 3 silero frames
+
+abstract class BaseVad implements VadEngine {
+  abstract readonly name: string;
+  protected speaking = false;
+  protected speechMs = 0;
+  protected silenceMs = 0;
+
+  constructor(protected events: VadEvents) {}
+
+  abstract scoreFrame(frame: Float32Array): Promise<number>;
+
+  private pending: number[] = [];
+
+  async process(frame: Int16Array): Promise<void> {
+    // Accumulate into 512-sample silero frames.
+    for (let i = 0; i < frame.length; i++) this.pending.push(frame[i] / 32768);
+    while (this.pending.length >= SILERO_FRAME) {
+      const chunk = new Float32Array(this.pending.slice(0, SILERO_FRAME));
+      this.pending = this.pending.slice(SILERO_FRAME);
+      const score = await this.scoreFrame(chunk);
+      this.update(score, (SILERO_FRAME / 16000) * 1000);
+    }
+  }
+
+  private update(score: number, frameMs: number) {
+    if (score >= SPEECH_THRESHOLD) {
+      this.speechMs += frameMs;
+      this.silenceMs = 0;
+      if (!this.speaking && this.speechMs >= MIN_SPEECH_MS) {
+        this.speaking = true;
+        this.events.onSpeechStart();
+      }
+    } else if (score < SILENCE_THRESHOLD) {
+      this.silenceMs += frameMs;
+      if (this.speaking && this.silenceMs >= TRAILING_SILENCE_MS) {
+        this.speaking = false;
+        this.speechMs = 0;
+        this.events.onSpeechEnd();
+      } else if (!this.speaking) {
+        this.speechMs = 0;
+      }
+    }
+  }
+
+  reset(): void {
+    this.speaking = false;
+    this.speechMs = 0;
+    this.silenceMs = 0;
+    this.pending = [];
+  }
+}
+
+/** Silero VAD v5 via onnxruntime-node. Stateful model (h/c LSTM state). */
+class SileroVad extends BaseVad {
+  readonly name = "silero";
+  private session: any;
+  private state: any;
+  private sr: any;
+  private ort: any;
+
+  private constructor(events: VadEvents, ort: any, session: any) {
+    super(events);
+    this.ort = ort;
+    this.session = session;
+    this.state = new ort.Tensor("float32", new Float32Array(2 * 1 * 128), [2, 1, 128]);
+    this.sr = new ort.Tensor("int64", BigInt64Array.from([16000n]), []);
+  }
+
+  static async create(events: VadEvents, modelPath: string): Promise<SileroVad> {
+    const ort = await import("onnxruntime-node");
+    const session = await ort.InferenceSession.create(modelPath, {
+      interOpNumThreads: 1,
+      intraOpNumThreads: 1,
+    });
+    return new SileroVad(events, ort, session);
+  }
+
+  async scoreFrame(frame: Float32Array): Promise<number> {
+    const input = new this.ort.Tensor("float32", frame, [1, frame.length]);
+    const out = await this.session.run({ input, state: this.state, sr: this.sr });
+    this.state = out.stateN ?? out.state ?? this.state;
+    const prob = out.output?.data?.[0];
+    return typeof prob === "number" ? prob : 0;
+  }
+
+  reset(): void {
+    super.reset();
+    this.state = new this.ort.Tensor("float32", new Float32Array(2 * 1 * 128), [2, 1, 128]);
+  }
+}
+
+/** RMS-energy fallback — crude but keeps the loop functional. */
+class EnergyVad extends BaseVad {
+  readonly name = "energy";
+  private noiseFloor = 0.008;
+
+  async scoreFrame(frame: Float32Array): Promise<number> {
+    let sum = 0;
+    for (let i = 0; i < frame.length; i++) sum += frame[i] * frame[i];
+    const rms = Math.sqrt(sum / frame.length);
+    // Slowly track the noise floor while quiet.
+    if (rms < this.noiseFloor * 1.5) {
+      this.noiseFloor = this.noiseFloor * 0.995 + rms * 0.005;
+    }
+    return rms > Math.max(0.015, this.noiseFloor * 3) ? 1 : 0;
+  }
+}
+
+export async function createVad(events: VadEvents, modelPath: string): Promise<VadEngine> {
+  try {
+    const vad = await SileroVad.create(events, modelPath);
+    console.log("[vad] Silero VAD loaded");
+    return vad;
+  } catch (e) {
+    console.warn(`[vad] Silero unavailable (${(e as Error).message}) — falling back to energy VAD`);
+    return new EnergyVad(events);
+  }
+}
