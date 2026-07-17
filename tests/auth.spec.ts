@@ -154,16 +154,17 @@ describe("A2 — body userId is ignored; identity comes from the JWT", () => {
 describe("A3 — config.toml discipline (static)", () => {
   test("at most 4 functions remain verify_jwt = false, each with a justification comment", async () => {
     const toml = await Bun.file(new URL("../supabase/config.toml", import.meta.url)).text();
-    const blocks = toml.split(/\n(?=\[functions\.)/);
     const offenders: string[] = [];
     const undocumented: string[] = [];
-    for (const block of blocks) {
-      const name = block.match(/^\[functions\.([^\]]+)\]/)?.[1];
-      if (!name) continue;
-      if (/verify_jwt\s*=\s*false/.test(block)) {
-        offenders.push(name);
-        if (!/#/.test(block)) undocumented.push(name);
-      }
+    // A justification comment precedes the [functions.X] header, so check the
+    // line above each offender's header rather than naive block-splitting.
+    const re = /\[functions\.([^\]]+)\]\nverify_jwt\s*=\s*false/g;
+    for (const m of toml.matchAll(re)) {
+      const name = m[1];
+      offenders.push(name);
+      const before = toml.slice(0, m.index);
+      const prevLine = before.split("\n").at(-2) ?? "";
+      if (!prevLine.trimStart().startsWith("#")) undocumented.push(name);
     }
     expect(offenders.length).toBeLessThanOrEqual(4);
     expect(undocumented).toHaveLength(0);
