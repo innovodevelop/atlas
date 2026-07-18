@@ -16,8 +16,24 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { AIState } from "@/types";
 
-const GATEWAY_URL =
+const DEFAULT_GATEWAY_URL =
   (import.meta.env.VITE_VOICE_GATEWAY_URL as string | undefined) ?? "ws://127.0.0.1:4820/ws";
+
+/**
+ * In the packaged app the gateway is a Tauri-spawned sidecar guarded by a
+ * per-launch token; fetch {port, token} from Rust. In the browser/dev the
+ * default URL + no token is used (dev gateway runs without SIDECAR_TOKEN).
+ */
+async function gatewayTarget(): Promise<{ url: string; sessionToken?: string }> {
+  if (!("__TAURI_INTERNALS__" in window)) return { url: DEFAULT_GATEWAY_URL };
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const info = await invoke<{ port: number; token: string; running: boolean }>("voice_gateway_info");
+    return { url: `ws://127.0.0.1:${info.port}/ws`, sessionToken: info.token };
+  } catch {
+    return { url: DEFAULT_GATEWAY_URL };
+  }
+}
 
 interface ServerMsg {
   type: string;
@@ -149,7 +165,8 @@ export function useVoiceSession(options?: {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return; // not logged in — voice stays dormant
 
-    const ws = new WebSocket(GATEWAY_URL);
+    const target = await gatewayTarget();
+    const ws = new WebSocket(target.url);
     ws.binaryType = "arraybuffer";
     wsRef.current = ws;
 
@@ -157,9 +174,14 @@ export function useVoiceSession(options?: {
       ws.send(JSON.stringify({
         type: "hello",
         jwt: session.access_token,
+        sessionToken: target.sessionToken,
         sampleRate: 16000,
         voiceId: optionsRef.current?.voiceId,
         ttsModelId: optionsRef.current?.ttsModelId,
+        // The sidecar is spawned with zero Supabase env — supply the public
+        // connection values (env wins in dev).
+        supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
+        anonKey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
       }));
     };
 

@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 let starts = 0, ends = 0;
 const vad = await createVad(
   { onSpeechStart: () => { starts++; }, onSpeechEnd: () => { ends++; } },
-  fileURLToPath(new URL("../models/silero_vad.onnx", import.meta.url)),
+  { model: fileURLToPath(new URL("../models/silero_vad.onnx", import.meta.url)) },
 );
 console.log("engine:", vad.name);
 const frame = (fill: (i: number) => number) => Int16Array.from({ length: 320 }, (_, i) => fill(i));

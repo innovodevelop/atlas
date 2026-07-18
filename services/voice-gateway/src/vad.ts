@@ -85,29 +85,55 @@ abstract class BaseVad implements VadEngine {
   }
 }
 
-/** Silero VAD v5 via onnxruntime-node. Stateful model (h/c LSTM state). */
+/**
+ * Silero VAD v5 (stateful LSTM model) over either ONNX Runtime backend —
+ * the node (native) and web (WASM) packages expose the same Tensor/run API.
+ */
 class SileroVad extends BaseVad {
-  readonly name = "silero";
+  readonly name: string;
   private session: any;
   private state: any;
   private sr: any;
   private ort: any;
 
-  private constructor(events: VadEvents, ort: any, session: any) {
+  private constructor(events: VadEvents, name: string, ort: any, session: any) {
     super(events);
+    this.name = name;
     this.ort = ort;
     this.session = session;
     this.state = new ort.Tensor("float32", new Float32Array(2 * 1 * 128), [2, 1, 128]);
     this.sr = new ort.Tensor("int64", BigInt64Array.from([16000n]), []);
   }
 
-  static async create(events: VadEvents, modelPath: string): Promise<SileroVad> {
+  /** Native backend (onnxruntime-node) — fastest, but needs its dylib. */
+  static async createNative(events: VadEvents, model: string | Uint8Array): Promise<SileroVad> {
     const ort = await import("onnxruntime-node");
-    const session = await ort.InferenceSession.create(modelPath, {
+    const session = await ort.InferenceSession.create(model as any, {
       interOpNumThreads: 1,
       intraOpNumThreads: 1,
     });
-    return new SileroVad(events, ort, session);
+    return new SileroVad(events, "silero", ort, session);
+  }
+
+  /**
+   * WASM backend (onnxruntime-web) — no native libraries, survives
+   * `bun build --compile`. ~100x realtime for Silero: plenty.
+   */
+  static async createWasm(
+    events: VadEvents,
+    modelBytes: Uint8Array,
+    wasmDir?: string,
+  ): Promise<SileroVad> {
+    const ort = await import("onnxruntime-web");
+    ort.env.wasm.numThreads = 1;
+    if (wasmDir) {
+      // Compiled binary: extracted embedded runtime under canonical names.
+      ort.env.wasm.wasmPaths = wasmDir.endsWith("/") ? wasmDir : `${wasmDir}/`;
+    }
+    const session = await ort.InferenceSession.create(modelBytes, {
+      executionProviders: ["wasm"],
+    });
+    return new SileroVad(events, "silero-wasm", ort, session);
   }
 
   async scoreFrame(frame: Float32Array): Promise<number> {
@@ -141,13 +167,31 @@ class EnergyVad extends BaseVad {
   }
 }
 
-export async function createVad(events: VadEvents, modelPath: string): Promise<VadEngine> {
+export interface VadAssets {
+  /** Model as path (dev) or bytes (compiled). */
+  model: string | Uint8Array;
+  /** Dir holding the ORT wasm runtime under canonical names (compiled). */
+  ortWasmDir?: string;
+}
+
+/** Tiered engine selection: native → WASM → energy. Always returns something. */
+export async function createVad(events: VadEvents, assets: VadAssets): Promise<VadEngine> {
   try {
-    const vad = await SileroVad.create(events, modelPath);
-    console.log("[vad] Silero VAD loaded");
+    const vad = await SileroVad.createNative(events, assets.model);
+    console.log("[vad] Silero VAD loaded (native)");
     return vad;
   } catch (e) {
-    console.warn(`[vad] Silero unavailable (${(e as Error).message}) — falling back to energy VAD`);
+    console.warn(`[vad] native ORT unavailable (${(e as Error).message}) — trying WASM`);
+  }
+  try {
+    const modelBytes = typeof assets.model === "string"
+      ? new Uint8Array(await Bun.file(assets.model).arrayBuffer())
+      : assets.model;
+    const vad = await SileroVad.createWasm(events, modelBytes, assets.ortWasmDir);
+    console.log("[vad] Silero VAD loaded (wasm)");
+    return vad;
+  } catch (e) {
+    console.warn(`[vad] WASM ORT unavailable (${(e as Error).message}) — falling back to energy VAD`);
     return new EnergyVad(events);
   }
 }

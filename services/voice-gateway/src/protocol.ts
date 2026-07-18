@@ -24,6 +24,12 @@ export interface HelloMsg {
   /** Voice/model settings mirrored from useAtlasSettings. */
   voiceId?: string;
   ttsModelId?: string;
+  /**
+   * Supabase connection (public values). The compiled sidecar is spawned
+   * with zero Supabase env — the app provides these; env wins in dev.
+   */
+  supabaseUrl?: string;
+  anonKey?: string;
 }
 
 /** Wake word fired client-side — start a listening turn. */

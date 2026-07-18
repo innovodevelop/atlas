@@ -1,5 +1,9 @@
 use std::fs;
 use std::path::Path;
+use std::process::{Child, Command};
+use std::sync::Mutex;
+
+use tauri::Manager;
 
 mod secrets;
 mod snaptrade;
@@ -7,6 +11,57 @@ mod portfolio_db;
 mod portfolio;
 
 const BUNDLE_ID: &str = "com.magnuspilegaard.atlas";
+
+// ---------------------------------------------------------------------------
+// Voice gateway sidecar (WS-B): a compiled Bun server running the duplex
+// voice loop on 127.0.0.1. Spawned per app launch with a random session
+// token; the webview fetches {port, token} via voice_gateway_info and must
+// present the token in its WS hello — no other local process can connect.
+
+const VOICE_GATEWAY_PORT: u16 = 4820;
+
+struct VoiceGateway {
+    child: Mutex<Option<Child>>,
+    token: String,
+}
+
+fn spawn_voice_gateway(token: &str) -> Option<Child> {
+    // externalBin lands next to the app executable (Contents/MacOS/).
+    let exe = std::env::current_exe().ok()?;
+    let dir = exe.parent()?;
+    let bin = dir.join("atlas-voice-gateway");
+    if !bin.exists() {
+        eprintln!(
+            "[atlas] voice gateway binary not found ({}) — dev mode? run `bun run dev` in services/voice-gateway",
+            bin.display()
+        );
+        return None;
+    }
+    match Command::new(&bin)
+        .env("SIDECAR_TOKEN", token)
+        .env("VOICE_GATEWAY_PORT", VOICE_GATEWAY_PORT.to_string())
+        .spawn()
+    {
+        Ok(child) => {
+            eprintln!("[atlas] voice gateway spawned (pid {})", child.id());
+            Some(child)
+        }
+        Err(e) => {
+            eprintln!("[atlas] voice gateway spawn failed: {e}");
+            None
+        }
+    }
+}
+
+#[tauri::command]
+fn voice_gateway_info(state: tauri::State<VoiceGateway>) -> serde_json::Value {
+    let running = state.child.lock().ok().map(|g| g.is_some()).unwrap_or(false);
+    serde_json::json!({
+        "port": VOICE_GATEWAY_PORT,
+        "token": state.token,
+        "running": running,
+    })
+}
 const CACHE_PURGE_THRESHOLD_BYTES: u64 = 200 * 1024 * 1024; // 200 MB
 
 fn dir_size(path: &Path) -> u64 {
@@ -72,12 +127,21 @@ fn purge_webview_cache_on_update() {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   purge_webview_cache_on_update();
+
+  let gateway_token = uuid::Uuid::new_v4().to_string();
+  let gateway = VoiceGateway {
+    child: Mutex::new(spawn_voice_gateway(&gateway_token)),
+    token: gateway_token,
+  };
+
   tauri::Builder::default()
     // Mail alerts -> macOS notifications; opener launches the OAuth consent
     // in the system browser (where the user's Google session lives).
     .plugin(tauri_plugin_notification::init())
     .plugin(tauri_plugin_opener::init())
+    .manage(gateway)
     .invoke_handler(tauri::generate_handler![
+      voice_gateway_info,
       portfolio::portfolio_status,
       portfolio::portfolio_connect_url,
       portfolio::portfolio_sync,
@@ -97,6 +161,20 @@ pub fn run() {
       }
       Ok(())
     })
-    .run(tauri::generate_context!())
-    .expect("error while running tauri application");
+    .build(tauri::generate_context!())
+    .expect("error while building tauri application")
+    .run(|app_handle, event| {
+      // Kill the sidecar when the app exits — never leave an orphan gateway.
+      if let tauri::RunEvent::Exit = event {
+        if let Some(gw) = app_handle.try_state::<VoiceGateway>() {
+          if let Ok(mut guard) = gw.child.lock() {
+            if let Some(mut child) = guard.take() {
+              let _ = child.kill();
+              let _ = child.wait();
+              eprintln!("[atlas] voice gateway stopped");
+            }
+          }
+        }
+      }
+    });
 }

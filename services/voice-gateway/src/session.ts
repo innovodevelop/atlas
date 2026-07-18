@@ -14,7 +14,7 @@
 
 import "./denoShim.ts";
 import { runChat, type ChatMessage } from "../../../supabase/functions/_shared/orchestrator.ts";
-import { createVad, type VadEngine } from "./vad.ts";
+import { createVad, type VadEngine, type VadAssets } from "./vad.ts";
 import { RealtimeStt } from "./stt.ts";
 import { TtsPipeline, EdgeFnTtsProvider } from "./tts.ts";
 import { SentenceChunker, stripForSpeech, type SentenceChunk } from "./sentence.ts";
@@ -27,7 +27,8 @@ export interface SessionConfig {
   userId: string;
   /** User-scoped supabase client (RLS). Also passed as systemDb — see note. */
   supabase: any;
-  vadModelPath: string;
+  /** VAD model + ORT wasm assets (paths in dev, embedded in the sidecar). */
+  vadAssets: VadAssets;
   voiceId?: string;
   ttsModelId?: string;
   languageCode?: string;
@@ -69,7 +70,7 @@ export class VoiceSession {
         onSpeechStart: () => s.onSpeechStart(),
         onSpeechEnd: () => void s.onSpeechEnd(),
       },
-      cfg.vadModelPath,
+      cfg.vadAssets,
     );
     return s;
   }

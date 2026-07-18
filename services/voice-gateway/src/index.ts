@@ -44,9 +44,33 @@ const PORT = Number(process.env.VOICE_GATEWAY_PORT ?? 4820);
 const SIDECAR_TOKEN = process.env.SIDECAR_TOKEN;
 const VAD_MODEL_PATH = process.env.VAD_MODEL_PATH ?? join(HERE, "../models/silero_vad.onnx");
 
+// Compiled sidecar: env carries no Supabase config — the app supplies the
+// public URL + anon key in the hello message instead. Env wins in dev.
 if (!SUPABASE_URL || !ANON_KEY) {
-  console.error("[gateway] Missing SUPABASE_URL / SUPABASE_ANON_KEY");
-  process.exit(1);
+  console.log("[gateway] No Supabase env — expecting connection config in hello");
+}
+
+/**
+ * VAD assets. Dev: files on disk. Compiled binary: embedded via
+ * embeddedAssets.ts (Bun inlines `with { type: "file" }` imports and hands
+ * back extracted paths at runtime).
+ */
+import { sileroModelPath, prepareOrtWasmDir } from "./embeddedAssets.ts";
+import type { VadAssets } from "./vad.ts";
+
+const { existsSync } = await import("node:fs");
+const VAD_ASSETS: VadAssets = {
+  model: existsSync(VAD_MODEL_PATH) ? VAD_MODEL_PATH : (sileroModelPath as string),
+  ortWasmDir: await prepareOrtWasmDir(),
+};
+
+// Startup self-test: report which VAD engine this build actually runs
+// (silero/silero-wasm = ONNX loaded; energy = fallback). Sessions create
+// their own instance.
+{
+  const { createVad } = await import("./vad.ts");
+  const probe = await createVad({ onSpeechStart: () => {}, onSpeechEnd: () => {} }, VAD_ASSETS);
+  console.log(`[gateway] VAD engine: ${probe.name}`);
 }
 
 interface SocketData {
@@ -96,8 +120,16 @@ const server = Bun.serve<SocketData>({
           ws.close(4001);
           return;
         }
+        // Connection config: env (dev) wins; else the app-supplied values.
+        const supabaseUrl = SUPABASE_URL ?? msg.supabaseUrl;
+        const anonKey = ANON_KEY ?? msg.anonKey;
+        if (!supabaseUrl || !anonKey) {
+          ws.send(JSON.stringify({ type: "error", message: "missing supabase config" }));
+          ws.close(4002);
+          return;
+        }
         // Validate the user JWT — same trust model as the edge functions.
-        const authClient = createClient(SUPABASE_URL!, ANON_KEY!);
+        const authClient = createClient(supabaseUrl, anonKey);
         const { data, error } = await authClient.auth.getUser(msg.jwt);
         if (error || !data.user) {
           ws.send(JSON.stringify({ type: "error", message: "invalid jwt" }));
@@ -106,18 +138,18 @@ const server = Bun.serve<SocketData>({
         }
 
         // User-scoped client: RLS applies to everything the session touches.
-        const supabase = createClient(SUPABASE_URL!, ANON_KEY!, {
+        const supabase = createClient(supabaseUrl, anonKey, {
           global: { headers: { Authorization: `Bearer ${msg.jwt}` } },
           auth: { persistSession: false, autoRefreshToken: false },
         });
 
         const session = await VoiceSession.create({
-          supabaseUrl: SUPABASE_URL!,
-          anonKey: ANON_KEY!,
+          supabaseUrl,
+          anonKey,
           userJwt: msg.jwt,
           userId: data.user.id,
           supabase,
-          vadModelPath: VAD_MODEL_PATH,
+          vadAssets: VAD_ASSETS,
           voiceId: msg.voiceId,
           ttsModelId: msg.ttsModelId,
           languageCode: undefined, // auto-detect; Danish benchmarked in bench/
