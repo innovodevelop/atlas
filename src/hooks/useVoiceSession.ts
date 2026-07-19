@@ -14,6 +14,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { WakeWordDetector } from "@/lib/wakeWord";
 import type { AIState } from "@/types";
 
 const DEFAULT_GATEWAY_URL =
@@ -77,6 +78,12 @@ export function useVoiceSession(options?: {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
+
+  // Wake word (B2): openWakeWord runs locally on every frame while IDLE;
+  // frames stream to the gateway only during an active turn. Pre-wake audio
+  // never leaves the process.
+  const wakeRef = useRef<WakeWordDetector | null>(null);
+  const inTurnRef = useRef(false);
 
   // Playback bookkeeping
   const chunkQueueRef = useRef<ChunkPlayback[]>([]);
@@ -198,10 +205,15 @@ export function useVoiceSession(options?: {
         case "ready":
           setConnected(true);
           break;
-        case "state":
-          setState(msg.state as AIState);
-          if (msg.state !== "listening") setPartialTranscript("");
+        case "state": {
+          const s = msg.state as AIState;
+          setState(s);
+          if (s !== "listening") setPartialTranscript("");
+          // Frame routing: gateway during a turn, local wake detector when idle.
+          inTurnRef.current = s !== "idle";
+          if (s === "idle") wakeRef.current?.reset();
           break;
+        }
         case "partial_transcript":
           setPartialTranscript(String(msg.text ?? ""));
           break;
@@ -283,8 +295,14 @@ export function useVoiceSession(options?: {
     const node = new AudioWorkletNode(ctx, "pcm-capture");
     node.port.onmessage = (ev) => {
       const { pcm, rms } = ev.data as { pcm: ArrayBuffer; rms: number };
-      const ws = wsRef.current;
-      if (ws && ws.readyState === WebSocket.OPEN) ws.send(pcm);
+      if (inTurnRef.current) {
+        // Active turn: frames go to the gateway (STT + server VAD barge-in).
+        const ws = wsRef.current;
+        if (ws && ws.readyState === WebSocket.OPEN) ws.send(pcm);
+      } else {
+        // Idle: frames feed ONLY the local wake detector.
+        void wakeRef.current?.push(new Int16Array(pcm));
+      }
       // Drive the level from the mic while listening (playback drives it
       // while speaking).
       if (!playingRef.current) setAudioLevel(Math.min(1, rms * 4));
@@ -292,6 +310,21 @@ export function useVoiceSession(options?: {
     source.connect(node);
     // Worklet is a sink — no need to connect to destination.
     workletNodeRef.current = node;
+
+    // Arm the wake detector once capture exists (first user activation
+    // granted the mic — from here "Hey Atlas" works hands-free).
+    if (!wakeRef.current) {
+      try {
+        wakeRef.current = await WakeWordDetector.create(() => {
+          if (inTurnRef.current) return;
+          inTurnRef.current = true; // route frames to the gateway immediately
+          wsRef.current?.send(JSON.stringify({ type: "wake" }));
+        });
+        console.log("[voice] wake word armed (openWakeWord)");
+      } catch (e) {
+        console.warn("[voice] wake word unavailable:", (e as Error).message);
+      }
+    }
   }, []);
 
   const stopCapture = useCallback(() => {
@@ -299,6 +332,8 @@ export function useVoiceSession(options?: {
     workletNodeRef.current = null;
     micStreamRef.current?.getTracks().forEach((t) => t.stop());
     micStreamRef.current = null;
+    wakeRef.current?.destroy();
+    wakeRef.current = null;
   }, []);
 
   // ---------------------------------------------------------------------
@@ -307,6 +342,7 @@ export function useVoiceSession(options?: {
   const handleManualActivate = useCallback(() => {
     void (async () => {
       await connect();
+      inTurnRef.current = true; // route frames gateway-ward before the state round-trip
       await startCapture();
       wsRef.current?.send(JSON.stringify({ type: "activate" }));
     })();

@@ -1,0 +1,66 @@
+<!doctype html>
+<!-- WS-B B2 WebKit gate: does the openWakeWord ORT-WASM pipeline run in
+     Safari/WKWebView? Open /wake-test.html on a served build. PASS/FAIL is
+     printed big enough to read from a screenshot. Dev-only page; harmless in
+     production builds (not linked from anywhere). -->
+<html>
+<head><meta charset="utf-8"><title>wake pipeline probe</title>
+<style>body{font:16px -apple-system,sans-serif;padding:32px}#r{font-size:40px;font-weight:700}pre{background:#f4f2ee;padding:12px;border-radius:8px}</style>
+</head>
+<body>
+<div id="r">running…</div>
+<pre id="log"></pre>
+<script type="module">
+const log = (m) => { document.getElementById("log").textContent += m + "\n"; };
+const result = (ok, msg) => {
+  const el = document.getElementById("r");
+  el.textContent = (ok ? "PASS " : "FAIL ") + msg;
+  el.style.color = ok ? "#0a7a3d" : "#c02020";
+};
+try {
+  const t0 = performance.now();
+  const ort = await import("/ort/ort-wasm-simd-threaded.mjs").catch(() => null);
+  // Import the bundled API instead (the .mjs above is the emscripten glue,
+  // not the API) — use the CDN-free local bundle path via the app bundle:
+  const ortApi = await import("/ort/ort.bundle.min.mjs").catch(() => null);
+  const rt = ortApi ?? ort;
+  if (!rt || !rt.InferenceSession) throw new Error("ORT API module not served — see /ort/");
+  rt.env.wasm.numThreads = 1;
+  rt.env.wasm.wasmPaths = "/ort/";
+  log(`ort loaded in ${(performance.now() - t0).toFixed(0)}ms`);
+
+  const load = async (u) => {
+    const r = await fetch(u);
+    if (!r.ok) throw new Error(`${u}: HTTP ${r.status}`);
+    return rt.InferenceSession.create(new Uint8Array(await r.arrayBuffer()), { executionProviders: ["wasm"] });
+  };
+  const [mel, emb, wake] = await Promise.all([
+    load("/models/melspectrogram.onnx"),
+    load("/models/embedding_model.onnx"),
+    load("/models/hey_jarvis_v0.1.onnx"),
+  ]);
+  log("models loaded: mel/emb/wake");
+
+  // Synthetic 80ms chunk → mel → fabricate windows → wake score.
+  const chunk = new Float32Array(1280).map(() => (Math.random() - 0.5) * 2000);
+  const melOut = await mel.run({ [mel.inputNames[0]]: new rt.Tensor("float32", chunk, [1, 1280]) });
+  const melT = melOut[mel.outputNames[0]];
+  log(`mel dims: [${melT.dims}]`);
+
+  const flat = new Float32Array(76 * 32).fill(1);
+  const embOut = await emb.run({ [emb.inputNames[0]]: new rt.Tensor("float32", flat, [1, 76, 32, 1]) });
+  const e = embOut[emb.outputNames[0]];
+  log(`embedding dims: [${e.dims}]`);
+
+  const flatE = new Float32Array(16 * 96).fill(0.1);
+  const wOut = await wake.run({ [wake.inputNames[0]]: new rt.Tensor("float32", flatE, [1, 16, 96]) });
+  const score = wOut[wake.outputNames[0]].data[0];
+  log(`wake score on synthetic input: ${score.toFixed(4)}`);
+
+  result(true, `pipeline OK (${(performance.now() - t0).toFixed(0)}ms total)`);
+} catch (err) {
+  result(false, String(err?.message ?? err));
+}
+</script>
+</body>
+</html>
