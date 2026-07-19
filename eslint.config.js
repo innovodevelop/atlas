@@ -29,12 +29,14 @@ export default tseslint.config(
   {
     // Genuine dynamic boundaries where `any` is unavoidable: the generic
     // Supabase CRUD wrappers hit the client's deep-type-instantiation limit
-    // on dynamic table names, and the Web Speech API has no TS DOM types.
+    // on dynamic table names, the scribe SDK lacks types, and the voice
+    // gateway wraps dynamically imported ONNX runtimes + an injected
+    // Supabase client (runtime-neutral module contract).
     files: [
       "src/hooks/useCrudOperations.ts",
       "src/hooks/useSupabaseQuery.ts",
-      "src/hooks/useWakeWordCore.ts",
       "src/hooks/useRealtimeScribeStable.ts",
+      "services/voice-gateway/**/*.ts",
     ],
     rules: { "@typescript-eslint/no-explicit-any": "off" },
   },
