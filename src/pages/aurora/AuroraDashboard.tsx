@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Cpu, Mic, Sparkles, Settings } from 'lucide-react';
+import { Cpu, Mic, Sparkles, Settings, Shield } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWeather } from '@/hooks/useWeather';
@@ -14,6 +14,11 @@ import {
   AuroraWeatherCard, AuroraCalendarCard, AuroraTasksCard,
   AuroraStocksCard, AuroraInboxCard, AuroraBriefingCard,
 } from '@/components/aurora/AuroraCards';
+import {
+  AuroraAirQualityCard, AuroraNowPlayingCard, AuroraActivityCard, AuroraWorldClockCard,
+} from '@/components/aurora/AuroraExtraCards';
+import { HeaderWave } from '@/components/aurora/HeaderWave';
+import { AtmosphereCanvas } from '@/components/aurora/AtmosphereCanvas';
 import { AuroraDrawer } from '@/components/aurora/AuroraDrawer';
 import { AuroraExpanded } from '@/components/aurora/AuroraExpanded';
 import { AuroraSettings } from './AuroraSettings';
@@ -81,15 +86,23 @@ const AuroraDashboard = () => {
   return (
     <div className="page" data-screen-label="Atlas — Workshop">
       <div className="auro" />
+      <AtmosphereCanvas />
       <div className="grain" />
 
+      {/* Design "Atlas Dashboard (Current)": floating pill header with the
+          animated glow wash + full-width audio-wave canvas; the shimmer label
+          and eq bars float centered over the wave. */}
       <header className="hdrB">
-        <div className="fx ac gap12 pointer" onClick={() => navigate('/')}>
-          <div className="mk" /><h1 className="wordB">Atlas</h1>
+        <div className="hdrbg" />
+        <HeaderWave state={effectiveAtlasState} audioLevel={audioLevel} />
+        <div className="fx ac gap10 pointer" style={{ position: 'relative' }} onClick={() => navigate('/')}>
+          <span className="wm" style={{ fontFamily: "'Geist',system-ui,sans-serif", fontWeight: 500, letterSpacing: '-.035em' }}>atlas</span>
         </div>
-        <div className="stind">
-          <span className="eq"><span className="eqb" /><span className="eqb" /><span className="eqb" /><span className="eqb" /><span className="eqb" /></span>
-          <span className="stshimmer">{atlasStateLabel(effectiveAtlasState)}</span>
+        <div className="hdrviz" title="Speak to Atlas" onClick={handleManualActivate}>
+          <span className="wavelbl">
+            <span className="eq"><span className="eqb" /><span className="eqb" /><span className="eqb" /><span className="eqb" /><span className="eqb" /></span>
+            <span className="stshimmer">{atlasStateLabel(effectiveAtlasState)}</span>
+          </span>
         </div>
       </header>
 
@@ -113,6 +126,9 @@ const AuroraDashboard = () => {
         <button className="dockb" onClick={() => navigate('/atlas-core')} aria-label="Atlas Core">
           <Cpu className="i16" /><span className="dockl">Core</span>
         </button>
+        <button className="dockb" onClick={() => navigate('/atlas-core')} aria-label="Control">
+          <Shield className="i16" /><span className="dockl">Control</span>
+        </button>
         <button className="dockb" onClick={handleManualActivate} aria-label="Voice">
           <Mic className="i16" /><span className="dockl">Voice</span>
         </button>
@@ -132,6 +148,10 @@ const AuroraDashboard = () => {
         <AuroraStocksCard onOpen={() => setExpanded('stocks')} />
         <AuroraInboxCard onOpen={() => setExpanded('email')} />
         <AuroraBriefingCard onOpen={() => setExpanded('news')} />
+        <AuroraAirQualityCard />
+        <AuroraNowPlayingCard />
+        <AuroraActivityCard />
+        <AuroraWorldClockCard />
       </main>
 
       <AuroraDrawer

@@ -1,12 +1,15 @@
-import { memo } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import {
   CloudSun, Calendar, Check, Activity, Mail, Newspaper,
   Droplets, Wind, Sun, Sunrise, Sunset,
 } from 'lucide-react';
 import { WeatherIcon } from './auroraIcons';
 import { sparklinePoints, fmtPct, fmtEventTime } from '@/pages/aurora/auroraHelpers';
+import { startWxCanvas, presetFor } from '@/lib/wxAtmosphere';
+import { useWindowActivity } from '@/hooks/useWindowActivity';
 import { useWeather } from '@/hooks/useWeather';
 import { useStocks } from '@/hooks/useStocks';
+import { usePortfolio } from '@/hooks/usePortfolio';
 import { useNews } from '@/hooks/useNews';
 import { useTasks } from '@/hooks/useTasks';
 import { useCalendarEvents } from '@/hooks/useCalendarEvents';
@@ -15,11 +18,40 @@ import { useMailIntelligence } from '@/hooks/useMailIntelligence';
 // Each card faithfully reproduces the Aurora design's card face, wired to the
 // real data hooks. Card chrome (cardB / chB / icboxB / cbB) comes from aurora.css.
 
+/** Masked weather-atmosphere canvas behind the weather card's content
+    (design .wxbg — the card content sits at z-index:2 via .wxcard rules). */
+const WeatherCardCanvas = memo(({ condition }: { condition: string }) => {
+  const ref = useRef<HTMLCanvasElement | null>(null);
+  const conditionRef = useRef(condition);
+  conditionRef.current = condition;
+  const active = useWindowActivity();
+  const activeRef = useRef(active);
+  activeRef.current = active;
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let frozen = false;
+    const handle = startWxCanvas(
+      el,
+      () => presetFor(conditionRef.current),
+      () => {
+        if (reduced) { if (frozen) return true; frozen = true; return false; }
+        return !activeRef.current;
+      },
+    );
+    return () => handle.stop();
+  }, []);
+  return <canvas ref={ref} className="wxbg" aria-hidden />;
+});
+WeatherCardCanvas.displayName = 'WeatherCardCanvas';
+
 export const AuroraWeatherCard = memo(({ onOpen }: { onOpen: () => void }) => {
   const { weather } = useWeather();
   const hourly = weather.hourly.slice(0, 6);
   return (
-    <div className="cardB rs2 d1" onClick={onOpen}>
+    <div className="cardB rs2 d1 wxcard" onClick={onOpen}>
+      <WeatherCardCanvas condition={weather.condition} />
       <div className="chB"><p className="mlblB">Weather</p><div className="icboxB fx ac jc"><CloudSun className="i14" /></div></div>
       <div className="cbB">
         <p className="tempB tnum">{Math.round(weather.temp)}°</p>
@@ -111,13 +143,78 @@ export const AuroraTasksCard = memo(({ onOpen }: { onOpen: () => void }) => {
 AuroraTasksCard.displayName = 'AuroraTasksCard';
 
 const WATCHLIST = ['AAPL', 'GOOGL', 'MSFT', 'NVDA'];
+
+/** Area chart for the watchlist hero (design .stkchart geometry). */
+const areaPath = (series: number[]) => {
+  if (series.length < 2) return { area: '', line: '' };
+  const min = Math.min(...series), max = Math.max(...series), span = max - min || 1;
+  const pts = series.map((v, i) => {
+    const x = (i / (series.length - 1)) * 600;
+    const y = 74 - ((v - min) / span) * 62; // 12..74 inside the 82-high viewBox
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  return { area: `M${pts.join(' L')} L600,82 L0,82 Z`, line: pts.join(' ') };
+};
+
 export const AuroraStocksCard = memo(({ onOpen }: { onOpen: () => void }) => {
-  const { stocks } = useStocks(WATCHLIST);
+  const { stocks, indices } = useStocks(WATCHLIST);
+  const { available, connected, summary, history } = usePortfolio();
   const rows = stocks.slice(0, 4);
+
+  // Hero value: real SnapTrade portfolio when linked; otherwise an aggregate
+  // watchlist view so the card still leads with a number.
+  const usePortfolioHero = available && connected && summary != null;
+  const heroValue = usePortfolioHero
+    ? summary.total_value
+    : rows.reduce((n, s) => n + s.price, 0);
+  const heroChangePct = usePortfolioHero
+    ? (summary.unrealized_pct ?? 0)
+    : rows.length > 0
+      ? rows.reduce((n, s) => n + s.changePercent, 0) / rows.length
+      : 0;
+  const heroUp = heroChangePct >= 0;
+  const heroSeries = usePortfolioHero && history.length > 1
+    ? history.map((h) => h.value)
+    : rows[0]?.sparkline ?? [];
+  const { area, line } = areaPath(heroSeries);
+  const chartColor = heroUp ? '#2f7d4f' : '#c14a35';
+
   return (
     <div className="cardB sp2 rs2 d4" onClick={onOpen}>
       <div className="chB"><p className="mlblB">Watchlist · Market open</p><div className="icboxB fx ac jc"><Activity className="i14" /></div></div>
       <div className="cbB">
+        <div className="stkhero">
+          <div>
+            <p className="stkval tnum m0">
+              ${heroValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+            </p>
+            <p className="stksub m0">
+              <span className={heroUp ? 'upB' : 'dnB'} style={{ fontWeight: 600 }}>{fmtPct(heroChangePct)}</span>
+              {' '}{usePortfolioHero ? `overall · ${summary.holdings_count} holding${summary.holdings_count === 1 ? '' : 's'} live` : `today · ${rows.length} tickers watched`}
+            </p>
+          </div>
+          {indices.length > 0 && (
+            <div className="idxchips">
+              {indices.map((ix) => (
+                <span className={`idxchip ${ix.changePercent >= 0 ? 'upB' : 'dnB'}`} key={ix.label}>
+                  {ix.label} {fmtPct(ix.changePercent)}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        {line && (
+          <svg className="stkchart" viewBox="0 0 600 82" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="stkgrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor={chartColor} stopOpacity="0.26" />
+                <stop offset="1" stopColor={chartColor} stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <path d={area} fill="url(#stkgrad)" />
+            <polyline points={line} fill="none" stroke={chartColor} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+          </svg>
+        )}
         {rows.map((s, i) => {
           const up = s.changePercent >= 0;
           const stroke = up ? 'hsl(165 65% 62%)' : 'hsl(350 75% 68%)';

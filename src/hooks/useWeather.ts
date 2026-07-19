@@ -23,6 +23,8 @@ export interface WeatherData {
   }>;
   high?: number;
   low?: number;
+  /** OpenWeather air quality: aqi 1–5 scale + PM2.5 µg/m³. */
+  air?: { aqi: number; pm25: number } | null;
 }
 
 const FALLBACK_WEATHER: WeatherData = {

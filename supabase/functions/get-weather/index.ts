@@ -132,6 +132,21 @@ serve(async (req) => {
       console.log('Could not fetch forecast:', e);
     }
 
+    // Air quality (free endpoint, same key). aqi 1–5 (OpenWeather scale) plus
+    // PM2.5 so the client can show a US-style number and band.
+    let air: { aqi: number; pm25: number } | null = null;
+    try {
+      const airUrl = `https://api.openweathermap.org/data/2.5/air_pollution?appid=${OPENWEATHER_API_KEY}&lat=${data.coord.lat}&lon=${data.coord.lon}`;
+      const airRes = await fetch(airUrl);
+      if (airRes.ok) {
+        const airData = await airRes.json();
+        const item = airData.list?.[0];
+        if (item) air = { aqi: item.main?.aqi ?? 0, pm25: item.components?.pm2_5 ?? 0 };
+      }
+    } catch (e) {
+      console.log('Could not fetch air quality:', e);
+    }
+
     const result = {
       location: data.name,
       temp: Math.round(data.main.temp),
@@ -145,6 +160,7 @@ serve(async (req) => {
       daily: dailyData,
       high: todayHigh,
       low: todayLow,
+      air,
     };
 
     return jsonResponse(result);

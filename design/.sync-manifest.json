@@ -4,5 +4,11 @@
   "name": "Atlas premium polish / Atlas Premium D - Workshop.dc.html",
   "sha256": "c29a64875d86392da25f2065a2d614fdc69033c72e688802600a870c1481794b",
   "syncedAt": "2026-07-15T00:45:00+02:00",
-  "note": "Workshop reskin: warm paper base, Atlas Orange, frosted glass, Hanken Grotesk/Geist"
+  "note": "Workshop reskin: warm paper base, Atlas Orange, frosted glass, Hanken Grotesk/Geist",
+  "lastFile": {
+    "name": "Atlas Dashboard (Current).dc.html",
+    "source": "claude.ai DesignSync",
+    "sha256": "c29a64875d86392da25f2065a2d614fdc69033c72e688802600a870c1481794b",
+    "syncedAt": "2026-07-20T00:00:00Z"
+  }
 }

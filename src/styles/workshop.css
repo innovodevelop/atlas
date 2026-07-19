@@ -777,3 +777,16 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
    with their own max-width + margin:auto, so body's layout props are redundant.
    Reset body to a clean full-width block; keep an outer gutter via padding. */
 body{display:block;overflow-x:hidden;overflow-y:visible;max-width:none;flex:none;width:auto}
+
+/* Design-parity pass (Atlas Dashboard (Current)): .wavelbl in the handoff
+   clips its own background to text, which in WebKit also hides the .eq bars
+   inside it (the same engine bug fixed on .stind — see atlas-verify skill).
+   Keep the label's geometry but move the shimmer clip to the inner
+   .stshimmer span; the bars stay in an unclipped parent. */
+.wavelbl{color:inherit;background:none;-webkit-background-clip:initial;background-clip:initial;animation:none}
+.wavelbl .stshimmer{font-size:12px}
+
+/* Design-parity: card kicker + meta text were still Aurora lavender — remap
+   to the design's .lbl0 / .mtx values (warm ink tiers). */
+.mlblB{font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--ink2);margin:0}
+.metaB{font-size:13px;color:var(--ink2)}
