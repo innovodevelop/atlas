@@ -34,9 +34,10 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? fileEnv.VITE_SUPABASE_URL;
 const PUBLISHABLE_KEY =
   process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? fileEnv.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-if (!SUPABASE_URL || !PUBLISHABLE_KEY) {
-  throw new Error("Missing VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY (.env or env)");
-}
+// Live tests hit the deployed project and need the URL/key (.env is
+// untracked, so CI doesn't have them). The static config-discipline tests
+// always run; the live ones skip cleanly when unconfigured.
+const haveLiveTarget = Boolean(SUPABASE_URL && PUBLISHABLE_KEY);
 
 const FN = (name: string) => `${SUPABASE_URL}/functions/v1/${name}`;
 
@@ -64,7 +65,7 @@ async function signIn(email: string, password: string) {
 }
 
 describe("A1 — anonymous callers are rejected", () => {
-  test("chat-with-memory with NO Authorization header → 401", async () => {
+  test.skipIf(!haveLiveTarget)("chat-with-memory with NO Authorization header → 401", async () => {
     const res = await fetch(FN("chat-with-memory"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -73,7 +74,7 @@ describe("A1 — anonymous callers are rejected", () => {
     expect(res.status).toBe(401);
   });
 
-  test("chat-with-memory with only the publishable key as bearer → 401", async () => {
+  test.skipIf(!haveLiveTarget)("chat-with-memory with only the publishable key as bearer → 401", async () => {
     // The publishable key is NOT a user identity. Pre-fix the app called this way.
     const res = await fetch(FN("chat-with-memory"), {
       method: "POST",
@@ -88,7 +89,7 @@ describe("A1 — anonymous callers are rejected", () => {
   });
 
   for (const fn of USER_SCOPED_SAMPLE) {
-    test(`${fn} anonymous POST → 401`, async () => {
+    test.skipIf(!haveLiveTarget)(`${fn} anonymous POST → 401`, async () => {
       const res = await fetch(FN(fn), {
         method: "POST",
         headers: { "Content-Type": "application/json", apikey: PUBLISHABLE_KEY! },
@@ -100,7 +101,7 @@ describe("A1 — anonymous callers are rejected", () => {
 });
 
 describe("A2 — body userId is ignored; identity comes from the JWT", () => {
-  test.skipIf(!haveTwoUsers)(
+  test.skipIf(!haveTwoUsers || !haveLiveTarget)(
     "user A sending B's userId in the body still gets A-scoped behavior",
     async () => {
       const a = await signIn(A_EMAIL!, A_PASSWORD!);
@@ -138,7 +139,7 @@ describe("A2 — body userId is ignored; identity comes from the JWT", () => {
     },
   );
 
-  test.skipIf(!haveTwoUsers)("A's JWT cannot read B's ai_memory rows via REST", async () => {
+  test.skipIf(!haveTwoUsers || !haveLiveTarget)("A's JWT cannot read B's ai_memory rows via REST", async () => {
     const a = await signIn(A_EMAIL!, A_PASSWORD!);
     const b = await signIn(B_EMAIL!, B_PASSWORD!);
     const { data, error } = await a.client
@@ -170,7 +171,7 @@ describe("A3 — config.toml discipline (static)", () => {
     expect(undocumented).toHaveLength(0);
   });
 
-  test("cron-target functions require the CRON_SECRET header", async () => {
+  test.skipIf(!haveLiveTarget)("cron-target functions require the CRON_SECRET header", async () => {
     // Anonymous call to a cron target must be rejected even though verify_jwt=false.
     for (const fn of ["record-usage-snapshot", "atlas-daily-digest", "mail-sync"]) {
       const res = await fetch(FN(fn), {
