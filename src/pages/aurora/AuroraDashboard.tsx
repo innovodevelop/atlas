@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Cpu, Mic, Sparkles, Settings, Shield, CornerUpLeft } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
@@ -10,6 +10,7 @@ import { useVoiceSession } from '@/hooks/useVoiceSession';
 import { useAtlasSettings } from '@/hooks/useAtlasSettings';
 import { AtlasSphereLazy as AtlasSphere } from '@/components/atlas/AtlasSphereLazy';
 import { timeOfDayGreeting, atlasStateLabel } from './auroraHelpers';
+import { useBandNarration, type BandContent } from './useBandNarration';
 import {
   AuroraWeatherCard, AuroraCalendarCard, AuroraTasksCard,
   AuroraStocksCard, AuroraInboxCard, AuroraBriefingCard,
@@ -97,10 +98,20 @@ const AuroraDashboard = ({ preview = false }: { preview?: boolean } = {}) => {
   const name = profile?.nickname || profile?.first_name || profile?.display_name || 'there';
   const greetingPrefix = `${timeOfDayGreeting()}, `;
   const eventCount = events.length;
-  const subline = [
-    eventCount > 0 ? `${eventCount} ${eventCount === 1 ? 'event' : 'events'} today` : 'Nothing on your calendar',
-    `${weather.location} · ${weather.condition}`,
-  ].join(' · ');
+
+  // Home-state band content; the narration hook swaps to per-widget copy when a
+  // widget is focused, animating the directional swap.
+  const home = useMemo<BandContent>(() => ({
+    lead: greetingPrefix,
+    accent: `${name}.`,
+    subline: [
+      eventCount > 0 ? `${eventCount} ${eventCount === 1 ? 'event' : 'events'} today` : 'Nothing on your calendar',
+      `${weather.location} · ${weather.condition}`,
+    ].join(' · '),
+    metaBig: `${Math.round(weather.temp)}°`,
+    metaSmall: `${weather.location} · ${weather.condition}`,
+  }), [greetingPrefix, name, eventCount, weather.location, weather.condition, weather.temp]);
+  const { content: band, swapping } = useBandNarration(expanded, home);
 
   const initials = (name[0] || 'A').toUpperCase();
 
@@ -127,7 +138,7 @@ const AuroraDashboard = ({ preview = false }: { preview?: boolean } = {}) => {
         </div>
       </header>
 
-      <section className="bandB">
+      <section className={`bandB${swapping ? ' swapping' : ''}`}>
         <div className="orbwrapB" onClick={() => setDrawerOpen(true)}>
           <div className="orbhalo" />
           <AtlasSphere state={effectiveAtlasState} audioLevel={audioLevel} context="dashboard" className="orbcvB" />
@@ -137,12 +148,12 @@ const AuroraDashboard = ({ preview = false }: { preview?: boolean } = {}) => {
             className={`greetB${expanded ? ' returnable' : ''}`}
             onClick={expanded ? closeWidget : undefined}
             title={expanded ? 'Return to dashboard' : undefined}
-          >{greetingPrefix}<span className="accw">{name}.</span></h2>
-          <p className="gsubB">{subline}</p>
+          >{band.lead}<span className="accw">{band.accent}</span></h2>
+          <p className="gsubB">{band.subline}</p>
         </div>
         <div className="bandmetaB">
-          <p className="bmvB tnum">{Math.round(weather.temp)}°</p>
-          <p className="bmlB">{weather.location} · {weather.condition}</p>
+          <p className="bmvB tnum">{band.metaBig}</p>
+          <p className="bmlB">{band.metaSmall}</p>
         </div>
       </section>
 

@@ -827,5 +827,15 @@ body{display:block;overflow-x:hidden;overflow-y:visible;max-width:none;flex:none
 .retbar:hover{color:var(--ink2)}
 
 /* Band title becomes the primary return control while focused. */
-.greetB.returnable{cursor:pointer;transition:opacity .2s}
+.greetB.returnable{cursor:pointer}
 .greetB.returnable:hover{opacity:.72}
+
+/* ===================================================================
+   Step 3 — band narrates the focused widget, with a directional swap.
+   Title + meta exit upward, subline exits downward; content is switched
+   while hidden, then eased back to rest (CSS transitions, no remounts).
+   =================================================================== */
+.greetB,.gsubB,.bandmetaB{transition:opacity .34s cubic-bezier(.22,1,.36,1),transform .34s cubic-bezier(.22,1,.36,1)}
+.bandB.swapping .greetB,
+.bandB.swapping .bandmetaB{opacity:0;transform:translateY(-18px);transition:opacity .19s ease,transform .19s ease}
+.bandB.swapping .gsubB{opacity:0;transform:translateY(16px);transition:opacity .19s ease,transform .19s ease}
