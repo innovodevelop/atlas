@@ -790,3 +790,42 @@ body{display:block;overflow-x:hidden;overflow-y:visible;max-width:none;flex:none
    to the design's .lbl0 / .mtx values (warm ink tiers). */
 .mlblB{font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--ink2);margin:0}
 .metaB{font-size:13px;color:var(--ink2)}
+
+/* ===================================================================
+   Step 2 — full-screen widget system (design Change 1)
+   The header + greeting band stay mounted; only the grid region swaps.
+   Opening folds the grid cards "up into Atlas"; the focused view slides
+   in below the band, in normal flow (no fixed overlay, dock stays).
+   =================================================================== */
+
+/* Grid fold-out: cards cascade upward toward the sphere, staggered. */
+@keyframes cardFoldOut{to{opacity:0;transform:translateY(-52px) scale(.86);filter:blur(7px)}}
+.gridB.folding{pointer-events:none}
+.gridB.folding .cardB{animation:cardFoldOut .34s cubic-bezier(.4,0,.2,1) both}
+.gridB.folding .cardB:nth-child(2){animation-delay:.02s}
+.gridB.folding .cardB:nth-child(3){animation-delay:.04s}
+.gridB.folding .cardB:nth-child(4){animation-delay:.06s}
+.gridB.folding .cardB:nth-child(5){animation-delay:.08s}
+.gridB.folding .cardB:nth-child(6){animation-delay:.10s}
+.gridB.folding .cardB:nth-child(7){animation-delay:.12s}
+.gridB.folding .cardB:nth-child(8){animation-delay:.14s}
+.gridB.folding .cardB:nth-child(9){animation-delay:.16s}
+.gridB.folding .cardB:nth-child(10){animation-delay:.18s}
+
+/* Focused view — in-flow, replaces the grid; header + band remain above. */
+@keyframes focusIn{from{opacity:0;transform:translateY(30px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes focusOut{to{opacity:0;transform:translateY(30px) scale(.985)}}
+.focusview{position:relative;z-index:5;max-width:1200px;margin:0 auto;padding:0 28px 128px;animation:focusIn .5s cubic-bezier(.22,1,.36,1) both}
+.focusview.exiting{animation:focusOut .3s cubic-bezier(.4,0,.2,1) both}
+
+/* Neutralise the old fixed-overlay .exp so each view sits in flow inside
+   .focusview (the editorial restyle of these panels lands in step 4). */
+.focusview .exp{position:relative;inset:auto;z-index:auto;min-height:0;background:none;animation:none;padding:0}
+
+/* Thin return-hint bar (no close button — return via band title or Esc). */
+.retbar{display:inline-flex;align-items:center;gap:8px;padding:10px 0 18px;border:none;background:none;font-family:inherit;font-size:12px;letter-spacing:.01em;color:var(--ink3);cursor:pointer;transition:color .2s}
+.retbar:hover{color:var(--ink2)}
+
+/* Band title becomes the primary return control while focused. */
+.greetB.returnable{cursor:pointer;transition:opacity .2s}
+.greetB.returnable:hover{opacity:.72}

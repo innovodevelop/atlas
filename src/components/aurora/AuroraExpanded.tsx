@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
-  Minimize2, MapPin, RefreshCw, Droplets, Wind, Eye, Sunrise, Sunset,
+  MapPin, RefreshCw, Droplets, Wind, Eye, Sunrise, Sunset,
   Calendar as CalIcon, Plus, TrendingUp, Gauge, Sun, Thermometer,
   Inbox, Star, Send, Archive, PenLine, TrendingDown, Mail,
 } from 'lucide-react';
@@ -24,24 +24,13 @@ interface Props {
   audioLevel: number;
 }
 
-const CloseBtn = ({ onClose }: { onClose: () => void }) => (
-  <button className="closeBtn" onClick={onClose}>
-    <Minimize2 className="i16" /><span>Close</span><span className="kbd">Esc</span>
-  </button>
-);
-const Head = ({ title, onClose }: { title: string; onClose: () => void }) => (
-  <header className="ehead">
-    <div className="fx ac gap16"><div className="accline" /><h1 className="etitle">{title}</h1></div>
-    <CloseBtn onClose={onClose} />
-  </header>
-);
+// The per-view eyebrow/title/close header was removed (design Change 2/3): the
+// greeting band now narrates the focused widget, and the focus view carries a
+// single return-hint bar (rendered by AuroraDashboard). Kept as a no-op so the
+// per-view call sites stay untouched.
+const Head = (_props: { title: string; onClose: () => void }) => null;
 
 export const AuroraExpanded = ({ which, onClose }: Props) => {
-  // Lock body scroll while an expanded view is open
-  useEffect(() => {
-    if (which) { document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = ''; }; }
-  }, [which]);
-
   if (!which) return null;
   return (
     <>

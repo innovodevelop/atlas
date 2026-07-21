@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Cpu, Mic, Sparkles, Settings, Shield } from 'lucide-react';
+import { Cpu, Mic, Sparkles, Settings, Shield, CornerUpLeft } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWeather } from '@/hooks/useWeather';
@@ -25,7 +25,7 @@ import { AuroraSettings } from './AuroraSettings';
 
 export type AuroraExpandedKey = 'weather' | 'calendar' | 'tasks' | 'stocks' | 'email' | 'news' | null;
 
-const AuroraDashboard = () => {
+const AuroraDashboard = ({ preview = false }: { preview?: boolean } = {}) => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { profile } = useUserProfile();
@@ -33,7 +33,12 @@ const AuroraDashboard = () => {
   const { events } = useCalendarEvents();
 
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Full-screen widget system: the header + band stay mounted; only the grid
+  // region swaps to the focused widget. `gridFolding` runs the staggered
+  // fold-out before the focused view mounts; `viewExiting` runs the reverse.
   const [expanded, setExpanded] = useState<AuroraExpandedKey>(null);
+  const [gridFolding, setGridFolding] = useState(false);
+  const [viewExiting, setViewExiting] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [input, setInput] = useState('');
 
@@ -55,16 +60,32 @@ const AuroraDashboard = () => {
 
   // Auth gate (same behavior as the current dashboard)
   useEffect(() => {
-    if (import.meta.env.VITE_PREVIEW_NOAUTH === '1') return; // preview-only bypass
+    if (preview || import.meta.env.VITE_PREVIEW_NOAUTH === '1') return; // preview-only bypass
     if (!authLoading && !user) navigate('/auth');
-  }, [user, authLoading, navigate]);
+  }, [preview, user, authLoading, navigate]);
 
-  // Esc closes drawer / expanded
+  // Open a widget: fold the grid up into Atlas, then mount the focused view.
+  const openWidget = useCallback((key: Exclude<AuroraExpandedKey, null>) => {
+    setGridFolding(true);
+    window.setTimeout(() => { setExpanded(key); setGridFolding(false); }, 340);
+  }, []);
+
+  // Close: slide the focused view out, then bring the grid back (folds in on remount).
+  const closeWidget = useCallback(() => {
+    setExpanded((cur) => {
+      if (!cur) return cur;
+      setViewExiting(true);
+      window.setTimeout(() => { setExpanded(null); setViewExiting(false); }, 300);
+      return cur;
+    });
+  }, []);
+
+  // Esc closes drawer / settings / focused widget
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setDrawerOpen(false); setExpanded(null); setSettingsOpen(false); } };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setDrawerOpen(false); setSettingsOpen(false); closeWidget(); } };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [closeWidget]);
 
   const send = useCallback(() => {
     const v = input.trim();
@@ -112,7 +133,11 @@ const AuroraDashboard = () => {
           <AtlasSphere state={effectiveAtlasState} audioLevel={audioLevel} context="dashboard" className="orbcvB" />
         </div>
         <div>
-          <h2 className="greetB">{greetingPrefix}<span className="accw">{name}.</span></h2>
+          <h2
+            className={`greetB${expanded ? ' returnable' : ''}`}
+            onClick={expanded ? closeWidget : undefined}
+            title={expanded ? 'Return to dashboard' : undefined}
+          >{greetingPrefix}<span className="accw">{name}.</span></h2>
           <p className="gsubB">{subline}</p>
         </div>
         <div className="bandmetaB">
@@ -141,18 +166,35 @@ const AuroraDashboard = () => {
         <button className="dockav" onClick={() => navigate('/atlas-core')} aria-label="Profile">{initials}</button>
       </div>
 
-      <main className="gridB">
-        <AuroraWeatherCard onOpen={() => setExpanded('weather')} />
-        <AuroraCalendarCard onOpen={() => setExpanded('calendar')} />
-        <AuroraTasksCard onOpen={() => setExpanded('tasks')} />
-        <AuroraStocksCard onOpen={() => setExpanded('stocks')} />
-        <AuroraInboxCard onOpen={() => setExpanded('email')} />
-        <AuroraBriefingCard onOpen={() => setExpanded('news')} />
-        <AuroraAirQualityCard />
-        <AuroraNowPlayingCard />
-        <AuroraActivityCard />
-        <AuroraWorldClockCard />
-      </main>
+      {/* Grid region: shows the widget grid, OR the focused widget — the header
+          and band above stay mounted either way (design Change 1). */}
+      {!expanded ? (
+        <main className={`gridB${gridFolding ? ' folding' : ''}`}>
+          <AuroraWeatherCard onOpen={() => openWidget('weather')} />
+          <AuroraCalendarCard onOpen={() => openWidget('calendar')} />
+          <AuroraTasksCard onOpen={() => openWidget('tasks')} />
+          <AuroraStocksCard onOpen={() => openWidget('stocks')} />
+          <AuroraInboxCard onOpen={() => openWidget('email')} />
+          <AuroraBriefingCard onOpen={() => openWidget('news')} />
+          <AuroraAirQualityCard />
+          <AuroraNowPlayingCard />
+          <AuroraActivityCard />
+          <AuroraWorldClockCard />
+        </main>
+      ) : (
+        <div className={`focusview${viewExiting ? ' exiting' : ''}`}>
+          <button className="retbar" onClick={closeWidget} aria-label="Return to dashboard">
+            <CornerUpLeft className="i16" />Tap the title or press Esc to return
+          </button>
+          <AuroraExpanded
+            which={expanded}
+            onClose={closeWidget}
+            onOpenDrawer={() => { closeWidget(); setDrawerOpen(true); }}
+            sphereState={effectiveAtlasState}
+            audioLevel={audioLevel}
+          />
+        </div>
+      )}
 
       <AuroraDrawer
         open={drawerOpen}
@@ -166,14 +208,6 @@ const AuroraDashboard = () => {
       />
 
       {settingsOpen && <AuroraSettings onClose={() => setSettingsOpen(false)} />}
-
-      <AuroraExpanded
-        which={expanded}
-        onClose={() => setExpanded(null)}
-        onOpenDrawer={() => { setExpanded(null); setDrawerOpen(true); }}
-        sphereState={effectiveAtlasState}
-        audioLevel={audioLevel}
-      />
     </div>
   );
 };
