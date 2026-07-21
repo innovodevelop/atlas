@@ -4,25 +4,43 @@ import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
 import { AuthSphere, type OrbState } from './AuthSphere';
 
-// Split conversational login (design "Atlas Login C1 - Split"): flat #ff6a00
-// scene, the Atlas Sphere on the right, a typed Atlas prompt on the left and
-// choices / big-text credential inputs on the right. Real Supabase auth
-// (useAuth signIn/signUp) is preserved — the conversational steps collect the
-// email + password (and a name on sign-up).
+// Split conversational login (design "Atlas Login C1 - Split"): flat #3461f2
+// scene, the Atlas Sphere on the right. Atlas talks on the left (typed word by
+// word); the right shows the choice, then collects each credential ONE at a
+// time — the conversational cadence of the design — before a final confirmation.
+// Real Supabase auth (useAuth signIn/signUp) is preserved.
 
-type Step = 'start' | 'form';
 type Mode = 'signin' | 'signup';
+type FieldKey = 'name' | 'email' | 'password';
+type StepKind = 'start' | 'field' | 'done';
+
+const SEQ: Record<Mode, FieldKey[]> = {
+  signin: ['email', 'password'],
+  signup: ['name', 'email', 'password'],
+};
+
+const firstName = (n: string) => n.trim().split(' ')[0] || 'friend';
+
+function promptFor(mode: Mode, key: FieldKey, name: string): string {
+  if (mode === 'signin') return key === 'email' ? 'Welcome back. What’s your email?' : 'And your password?';
+  if (key === 'name') return 'Lovely. What should I call you?';
+  if (key === 'email') return `Nice to meet you, ${firstName(name)}. What’s your email?`;
+  return 'Now pick a password to keep it safe.';
+}
+
+const placeholderFor: Record<FieldKey, string> = {
+  name: 'your name', email: 'your email', password: 'your password',
+};
 
 const Auth = () => {
   const navigate = useNavigate();
   const { signIn, signUp, isAuthenticated, loading } = useAuth();
 
   const [phase, setPhase] = useState<'intro' | 'chat'>('intro');
-  const [step, setStep] = useState<Step>('start');
+  const [kind, setKind] = useState<StepKind>('start');
   const [mode, setMode] = useState<Mode>('signin');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
+  const [idx, setIdx] = useState(0);
+  const [vals, setVals] = useState<Record<FieldKey, string>>({ name: '', email: '', password: '' });
 
   const [toks, setToks] = useState<string[]>([]);
   const [shown, setShown] = useState(0);
@@ -31,6 +49,7 @@ const Auth = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const typer = useRef<number | undefined>(undefined);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isAuthenticated && !loading) navigate('/');
@@ -44,41 +63,58 @@ const Auth = () => {
     typer.current = window.setInterval(() => {
       i++; setShown(i);
       if (i >= t.length) { window.clearInterval(typer.current); setReady(true); setOrbState('idle'); }
-    }, 120);
+    }, 115);
   }, []);
+
+  // focus the field once its prompt finishes typing
+  useEffect(() => {
+    if (ready && kind === 'field') inputRef.current?.focus();
+  }, [ready, kind, idx]);
 
   useEffect(() => {
     const to = window.setTimeout(() => {
       setPhase('chat');
-      typeMsg("Hey — I'm Atlas. Have we met before?");
+      typeMsg("Hey — I’m Atlas. Have we met before?");
     }, 900);
     return () => { window.clearTimeout(to); window.clearInterval(typer.current); };
   }, [typeMsg]);
 
+  const seq = SEQ[mode];
+  const fieldKey = seq[idx];
+
   const pick = (m: Mode) => {
-    setMode(m);
-    setStep('form');
-    typeMsg(m === 'signin' ? 'Welcome back. Let’s sign you in.' : 'Lovely. Let’s set you up.');
+    setMode(m); setIdx(0); setKind('field'); setError(null);
+    typeMsg(promptFor(m, SEQ[m][0], vals.name));
   };
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const advance = useCallback(async () => {
+    const key = seq[idx];
+    if (!vals[key].trim()) { setError('This one can’t be empty.'); return; }
     setError(null);
-    if (!email || !password || (mode === 'signup' && !name)) {
-      setError('Please fill in every field.');
+    if (idx < seq.length - 1) {
+      const ni = idx + 1;
+      setIdx(ni);
+      typeMsg(promptFor(mode, seq[ni], vals.name));
       return;
     }
-    setSubmitting(true);
-    setOrbState('thinking');
+    // last field → authenticate
+    setSubmitting(true); setOrbState('thinking');
     try {
-      if (mode === 'signin') await signIn(email, password);
-      else await signUp(email, password, name);
+      if (mode === 'signin') await signIn(vals.email, vals.password);
+      else await signUp(vals.email, vals.password, vals.name);
+      setKind('done');
+      typeMsg(`Good to see you, ${firstName(vals.name || vals.email)}.`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.');
+      setError(err instanceof Error ? err.message : 'That didn’t work — try again.');
+      setOrbState('idle');
     } finally {
       setSubmitting(false);
-      setOrbState('idle');
     }
+  }, [idx, mode, seq, vals, signIn, signUp, typeMsg]);
+
+  const back = () => {
+    setKind('start'); setIdx(0); setError(null);
+    typeMsg("Hey — I’m Atlas. Have we met before?");
   };
 
   if (loading) {
@@ -89,7 +125,10 @@ const Auth = () => {
     );
   }
 
-  const sub = step === 'start' ? 'Tell me where to begin.' : 'Speak to me, or just type.';
+  const sub = kind === 'start' ? 'Tell me where to begin.'
+    : kind === 'done' ? 'Everything is ready.'
+      : 'Speak to me, or just type.';
+  const hasVal = kind === 'field' && !!vals[fieldKey]?.trim();
 
   return (
     <div className="ascene" data-screen-label="Atlas — Login">
@@ -100,6 +139,11 @@ const Auth = () => {
 
       <div className="agrid">
         <div className="aleft">
+          {kind === 'field' && (
+            <div className="adots" aria-hidden="true">
+              {seq.map((k, i) => <span key={k} className={`adot${i <= idx ? ' on' : ''}`} />)}
+            </div>
+          )}
           <p className="amsg">
             {toks.slice(0, shown).map((w, i) => <span key={i} className="awd">{w} </span>)}
             {phase === 'chat' && !ready && <span className="acaret" />}
@@ -109,33 +153,47 @@ const Auth = () => {
 
         <div className="aright">
           <div className={`aans${ready ? ' on' : ''}`}>
-            {step === 'start' ? (
+            {kind === 'start' && (
               <div className="achoices">
-                <button className="achoice" onClick={() => pick('signin')}>Yes, we&rsquo;ve met before</button>
-                <button className="achoice" onClick={() => pick('signup')}>No, we&rsquo;re just meeting</button>
+                <button className="achoice" onClick={() => pick('signin')}
+                  onMouseEnter={() => setOrbState('listening')} onMouseLeave={() => setOrbState('idle')}>
+                  Yes, we&rsquo;ve met before
+                </button>
+                <button className="achoice" onClick={() => pick('signup')}
+                  onMouseEnter={() => setOrbState('listening')} onMouseLeave={() => setOrbState('idle')}>
+                  No, we&rsquo;re just meeting
+                </button>
               </div>
-            ) : (
-              <form className="aform" onSubmit={submit}>
-                {mode === 'signup' && (
-                  <input className="bigin" placeholder="your name" value={name}
-                    onChange={(e) => setName(e.target.value)} autoFocus autoComplete="name" />
-                )}
-                <input className="bigin" type="email" placeholder="your email" value={email}
-                  onChange={(e) => setEmail(e.target.value)} autoFocus={mode === 'signin'} autoComplete="email" />
-                <input className="bigin" type="password" placeholder="your password" value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} />
+            )}
+
+            {kind === 'field' && (
+              <div className="aform">
+                <input
+                  ref={inputRef}
+                  key={`${mode}-${fieldKey}`}
+                  className="bigin"
+                  type={fieldKey === 'password' ? 'password' : fieldKey === 'email' ? 'email' : 'text'}
+                  placeholder={placeholderFor[fieldKey]}
+                  value={vals[fieldKey]}
+                  onChange={(e) => setVals((v) => ({ ...v, [fieldKey]: e.target.value }))}
+                  onKeyDown={(e) => { if (e.key === 'Enter') advance(); }}
+                  autoComplete={fieldKey === 'password' ? (mode === 'signin' ? 'current-password' : 'new-password') : fieldKey}
+                />
                 {error && <p className="aerr">{error}</p>}
                 <div className="afoot">
-                  <button className="aenter" type="submit" disabled={submitting}>
-                    {submitting && <Loader2 className="i16 animate-spin" />}
-                    {submitting ? 'One moment…' : 'Enter Atlas →'}
-                  </button>
-                  <button type="button" className="aswap" onClick={() => pick(mode === 'signin' ? 'signup' : 'signin')}>
-                    {mode === 'signin' ? 'New here?' : 'Been here before?'}
-                  </button>
+                  {(hasVal || submitting) && (
+                    <button className="aenter" onClick={advance} disabled={submitting}>
+                      {submitting && <Loader2 className="i16 animate-spin" />}
+                      {submitting ? 'One moment…' : idx < seq.length - 1 ? 'Continue →' : 'Enter Atlas →'}
+                    </button>
+                  )}
+                  <button type="button" className="aswap" onClick={back}>Start over</button>
                 </div>
-              </form>
+              </div>
+            )}
+
+            {kind === 'done' && (
+              <a className="aenter" href="/">Enter Atlas →</a>
             )}
           </div>
         </div>

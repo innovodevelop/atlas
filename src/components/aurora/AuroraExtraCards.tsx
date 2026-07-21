@@ -106,7 +106,7 @@ AuroraNowPlayingCard.displayName = 'AuroraNowPlayingCard';
 // Activity rings — demo content until a Health data source exists.
 
 const RINGS = [
-  { r: 42, dash: 264, off: 58, color: 'var(--acc)', track: 'rgba(255,106,0,.16)' },
+  { r: 42, dash: 264, off: 58, color: 'var(--acc)', track: 'rgba(52,97,242,.16)' },
   { r: 30, dash: 188.5, off: 72, color: '#2f7d4f', track: 'rgba(47,125,79,.16)' },
   { r: 18, dash: 113, off: 62, color: '#3461f2', track: 'rgba(52,97,242,.16)' },
 ] as const;

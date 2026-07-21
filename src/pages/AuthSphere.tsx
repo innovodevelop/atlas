@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 // points) + a soft drifting backdrop, ported from the "Atlas Login C1 - Split"
 // design. Deliberately canvas, not the WebGL AtlasSphere: the login is the
 // first paint, pre-auth, and shouldn't drag in the ~1MB three.js chunk. White
-// ink over the flat #ff6a00 scene; tracks the pointer for a gentle parallax.
+// ink over the flat #3461f2 scene; tracks the pointer for a gentle parallax.
 
 export type OrbState = 'idle' | 'listening' | 'thinking' | 'speaking';
 
@@ -64,8 +64,8 @@ export function AuthSphere({ orbState }: { orbState: OrbState }) {
     };
     fit();
     const B = [
-      { c: '255,200,132', x: 0.2, y: 0.3, r: 0.8, a: 0.06 },
-      { c: '255,150,54', x: 0.8, y: 0.7, r: 0.9, a: 0.05 },
+      { c: '184,201,247', x: 0.2, y: 0.3, r: 0.8, a: 0.06 },
+      { c: '110,144,243', x: 0.8, y: 0.7, r: 0.9, a: 0.05 },
       { c: '128,102,255', x: 0.3, y: 0.85, r: 0.7, a: 0.03 },
     ];
     const tick = (t: number) => {
@@ -125,8 +125,8 @@ export function AuthSphere({ orbState }: { orbState: OrbState }) {
       const R = H * 0.44, breathe = 1 + Math.sin(t * 0.0009) * 0.03;
       const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.3);
       cg.addColorStop(0, 'rgba(255,252,248,' + (0.36 * cur.br) + ')');
-      cg.addColorStop(0.5, 'rgba(255,205,150,.11)');
-      cg.addColorStop(1, 'rgba(255,150,60,0)');
+      cg.addColorStop(0.5, 'rgba(190,206,248,.11)');
+      cg.addColorStop(1, 'rgba(110,144,243,0)');
       ctx.fillStyle = cg; ctx.fillRect(0, 0, S, H);
       ctx.globalCompositeOperation = 'lighter';
       for (const p of pts) {

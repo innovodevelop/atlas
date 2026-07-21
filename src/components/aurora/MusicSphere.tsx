@@ -46,7 +46,7 @@ function drawOrb(x: CanvasRenderingContext2D, w: number, h: number, amp: number,
   const ay = spin, ax = 0.42, ca = Math.cos(ay), sa = Math.sin(ay), cx2 = Math.cos(ax), sx2 = Math.sin(ax);
   const g = x.createRadialGradient(cx, cy, 0, cx, cy, R * 1.1);
   g.addColorStop(0, 'rgba(255,255,255,' + (0.5 + amp * 0.3) + ')');
-  g.addColorStop(0.4, 'rgba(255,241,220,.12)');
+  g.addColorStop(0.4, 'rgba(226,234,252,.12)');
   g.addColorStop(1, 'rgba(255,255,255,0)');
   x.fillStyle = g; x.beginPath(); x.arc(cx, cy, R * 1.1, 0, 7); x.fill();
   const rrad = R * (1 + amp * 0.06);
@@ -89,7 +89,7 @@ function drawBloom(x: CanvasRenderingContext2D, w: number, h: number, amp: numbe
   const cx = w / 2, cy = h / 2, M = Math.min(w, h);
   const aura = x.createRadialGradient(cx, cy, 0, cx, cy, M * 0.58);
   aura.addColorStop(0, 'rgba(255,255,255,' + (0.2 + amp * 0.32) + ')');
-  aura.addColorStop(0.5, 'rgba(255,236,210,' + (0.09 + amp * 0.16) + ')');
+  aura.addColorStop(0.5, 'rgba(220,230,252,' + (0.09 + amp * 0.16) + ')');
   aura.addColorStop(1, 'rgba(255,255,255,0)');
   x.fillStyle = aura; x.fillRect(0, 0, w, h);
   for (let r = 0; r < 3; r++) {
@@ -110,14 +110,14 @@ function drawBloom(x: CanvasRenderingContext2D, w: number, h: number, amp: numbe
   x.closePath();
   const g = x.createRadialGradient(cx, cy, 0, cx, cy, R * 1.4);
   g.addColorStop(0, 'rgba(255,255,255,.96)');
-  g.addColorStop(0.45, 'rgba(255,243,224,' + (0.55 + amp * 0.3) + ')');
+  g.addColorStop(0.45, 'rgba(228,235,252,' + (0.55 + amp * 0.3) + ')');
   g.addColorStop(1, 'rgba(255,255,255,.04)');
   x.fillStyle = g; x.fill();
   const dx = Math.cos(t * 0.9) * R * 0.14, dy = Math.sin(t * 1.15) * R * 0.14, ir = R * 0.42 * (1 + amp * 0.32);
   const ig = x.createRadialGradient(cx + dx, cy + dy, 0, cx + dx, cy + dy, ir);
   ig.addColorStop(0, 'rgba(255,255,255,.98)');
-  ig.addColorStop(0.6, 'rgba(255,240,218,' + (0.5 + amp * 0.4) + ')');
-  ig.addColorStop(1, 'rgba(255,236,208,0)');
+  ig.addColorStop(0.6, 'rgba(224,233,252,' + (0.5 + amp * 0.4) + ')');
+  ig.addColorStop(1, 'rgba(220,230,252,0)');
   x.fillStyle = ig; x.beginPath(); x.arc(cx + dx, cy + dy, ir, 0, 7); x.fill();
 }
 
@@ -141,10 +141,10 @@ function drawField(x: CanvasRenderingContext2D, w: number, h: number, amp: numbe
       const rad = (1 + crest * 2.9) * edge * (0.75 + amp * 1.15);
       if (crest > 0.4) {
         x.beginPath(); x.arc(px, py, rad * 2.8, 0, 7);
-        x.fillStyle = 'rgba(255,238,210,' + (crest * edge * (amp * 0.4 + p * 0.55)).toFixed(3) + ')'; x.fill();
+        x.fillStyle = 'rgba(222,232,252,' + (crest * edge * (amp * 0.4 + p * 0.55)).toFixed(3) + ')'; x.fill();
       }
       x.beginPath(); x.arc(px, py, Math.max(0.5, rad), 0, 7);
-      x.fillStyle = 'rgba(255,248,238,' + br.toFixed(3) + ')'; x.fill();
+      x.fillStyle = 'rgba(232,238,253,' + br.toFixed(3) + ')'; x.fill();
     }
   }
 }
