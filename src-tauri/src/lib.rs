@@ -10,6 +10,7 @@ mod snaptrade;
 mod portfolio_db;
 mod portfolio;
 mod oauth;
+mod music;
 
 const BUNDLE_ID: &str = "com.magnuspilegaard.atlas";
 
@@ -144,6 +145,7 @@ pub fn run() {
     // back into this process; we parse it and hand the code to the webview.
     .plugin(tauri_plugin_deep_link::init())
     .manage(gateway)
+    .manage(music::MusicState::new())
     .invoke_handler(tauri::generate_handler![
       voice_gateway_info,
       portfolio::portfolio_status,
@@ -154,6 +156,21 @@ pub fn run() {
       portfolio::portfolio_history,
       portfolio::portfolio_allocation,
       portfolio::portfolio_disconnect,
+      music::music_status,
+      music::music_connect,
+      music::music_disconnect,
+      music::music_search,
+      music::music_library_tracks,
+      music::music_playlists,
+      music::music_playlist_tracks,
+      music::music_now_playing,
+      music::music_play,
+      music::music_pause,
+      music::music_next,
+      music::music_prev,
+      music::music_seek,
+      music::music_load,
+      music::music_volume,
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {
@@ -178,10 +195,23 @@ pub fn run() {
         app.deep_link().on_open_url(move |event| {
           for u in event.urls() {
             if let Some(cb) = oauth::parse_callback(u.as_str()) {
-              // The webview's pending OAuth promise resolves off this event
-              // (see src/lib/deepLinkOauth.ts). Never log the code.
-              log::info!("[oauth] captured callback for provider '{}'", cb.provider);
-              let _ = handle.emit("oauth-callback", cb);
+              log::info!("[oauth] captured redirect (has_code={})", cb.code.is_some());
+              // Exchange the code in Rust so it never enters the webview; the
+              // provider owner (music.rs) validates CSRF state and emits its own
+              // status event. Dispatch to each provider that could be in flight.
+              if let Some(state) = handle.try_state::<music::MusicState>() {
+                music::complete_oauth(&handle, state.inner(), &cb);
+              }
+              // Sanitized signal for the generic seam (src/lib/deepLinkOauth.ts):
+              // no auth code crosses the boundary.
+              let _ = handle.emit(
+                "oauth-callback",
+                serde_json::json!({
+                  "provider": cb.provider,
+                  "state": cb.state,
+                  "error": cb.error,
+                }),
+              );
             }
           }
         });

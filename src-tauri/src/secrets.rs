@@ -43,3 +43,30 @@ pub fn clear_snaptrade_user() -> Result<(), String> {
     if let Ok(e) = entry("user_secret") { let _ = e.delete_password(); }
     Ok(())
 }
+
+// --- Music (Spotify) ----------------------------------------------------
+// The Spotify OAuth *refresh token* lives under its own Keychain service.
+// It's the only long-lived music secret; the Spotify Client ID is public and
+// hardcoded, and the PKCE flow uses no client secret. The refresh token never
+// touches the DB, git, or the JS layer.
+
+const MUSIC_SERVICE: &str = "atlas-music";
+
+fn music_entry(account: &str) -> keyring::Result<keyring::Entry> {
+    keyring::Entry::new(MUSIC_SERVICE, account)
+}
+
+pub fn music_refresh_token() -> Option<String> {
+    music_entry("spotify_refresh_token").ok()?.get_password().ok()
+}
+
+pub fn set_music_refresh_token(token: &str) -> Result<(), String> {
+    music_entry("spotify_refresh_token")
+        .and_then(|e| e.set_password(token))
+        .map_err(|e| e.to_string())
+}
+
+pub fn clear_music_refresh_token() -> Result<(), String> {
+    if let Ok(e) = music_entry("spotify_refresh_token") { let _ = e.delete_password(); }
+    Ok(())
+}
