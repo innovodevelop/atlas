@@ -133,12 +133,14 @@ export function useBandNarration(focusedKey: AuroraExpandedKey, home: BandConten
 
   useEffect(() => {
     if (focusedKey === shownKey) return;
+    // Swap is a self-completing keyframe animation (see workshop.css): switch
+    // content at the hidden midpoint, drop the flag when the animation ends. A
+    // keyframe (not a toggled transition) can't freeze mid-way if interrupted —
+    // it always resolves to the rest state.
     setSwapping(true);
-    const t = window.setTimeout(() => {
-      setShownKey(focusedKey);
-      requestAnimationFrame(() => setSwapping(false));
-    }, 190);
-    return () => window.clearTimeout(t);
+    const tMid = window.setTimeout(() => setShownKey(focusedKey), 210);
+    const tEnd = window.setTimeout(() => setSwapping(false), 440);
+    return () => { window.clearTimeout(tMid); window.clearTimeout(tEnd); };
   }, [focusedKey, shownKey]);
 
   const content: BandContent = shownKey ? byKey[shownKey] ?? home : home;
