@@ -26,7 +26,15 @@ export function getGoogleOAuthConfig() {
   if (!clientId || !clientSecret) {
     throw new Error("GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET secrets are not set (see docs/mail-setup.md)");
   }
-  const redirectUri = `${Deno.env.get("SUPABASE_URL")}/functions/v1/mail-oauth-callback`;
+  // Prefer the branded callback (atlas.innovo-studio.com/oauth/google/callback,
+  // an atlas-site Pages Function that proxies to mail-oauth-callback) when
+  // OAUTH_REDIRECT_BASE is set; otherwise fall back to the direct Supabase URL
+  // so the flow keeps working until the domain cutover. This exact string must
+  // also be registered as an Authorized redirect URI on the Atlas Mail client.
+  const base = Deno.env.get("OAUTH_REDIRECT_BASE");
+  const redirectUri = base
+    ? `${base.replace(/\/$/, "")}/oauth/google/callback`
+    : `${Deno.env.get("SUPABASE_URL")}/functions/v1/mail-oauth-callback`;
   return { clientId, clientSecret, redirectUri };
 }
 
