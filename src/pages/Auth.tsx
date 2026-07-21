@@ -1,124 +1,147 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
-import { Eye, EyeOff, Loader2, Chrome, Github } from "lucide-react";
-import { z } from "zod";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { Loader2 } from 'lucide-react';
+import { AuthSphere, type OrbState } from './AuthSphere';
 
-const authSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-  displayName: z.string().optional(),
-});
+// Split conversational login (design "Atlas Login C1 - Split"): flat #ff6a00
+// scene, the Atlas Sphere on the right, a typed Atlas prompt on the left and
+// choices / big-text credential inputs on the right. Real Supabase auth
+// (useAuth signIn/signUp) is preserved — the conversational steps collect the
+// email + password (and a name on sign-up).
 
-// Aurora auth screen (design: .overlay/.authwrap/.authcard). Real Supabase
-// wiring via useAuth is preserved.
+type Step = 'start' | 'form';
+type Mode = 'signin' | 'signup';
+
 const Auth = () => {
   const navigate = useNavigate();
   const { signIn, signUp, isAuthenticated, loading } = useAuth();
 
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [phase, setPhase] = useState<'intro' | 'chat'>('intro');
+  const [step, setStep] = useState<Step>('start');
+  const [mode, setMode] = useState<Mode>('signin');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+
+  const [toks, setToks] = useState<string[]>([]);
+  const [shown, setShown] = useState(0);
+  const [ready, setReady] = useState(false);
+  const [orbState, setOrbState] = useState<OrbState>('idle');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const typer = useRef<number | undefined>(undefined);
 
   useEffect(() => {
-    if (isAuthenticated && !loading) navigate("/");
+    if (isAuthenticated && !loading) navigate('/');
   }, [isAuthenticated, loading, navigate]);
 
-  const validate = () => {
-    try {
-      authSchema.parse({ email, password, displayName });
-      setErrors({});
-      return true;
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        const next: Record<string, string> = {};
-        err.errors.forEach((e) => { if (e.path[0]) next[e.path[0] as string] = e.message; });
-        setErrors(next);
-      }
-      return false;
-    }
+  const typeMsg = useCallback((text: string) => {
+    window.clearInterval(typer.current);
+    const t = text.split(' ');
+    setToks(t); setShown(0); setReady(false); setOrbState('speaking');
+    let i = 0;
+    typer.current = window.setInterval(() => {
+      i++; setShown(i);
+      if (i >= t.length) { window.clearInterval(typer.current); setReady(true); setOrbState('idle'); }
+    }, 120);
+  }, []);
+
+  useEffect(() => {
+    const to = window.setTimeout(() => {
+      setPhase('chat');
+      typeMsg("Hey — I'm Atlas. Have we met before?");
+    }, 900);
+    return () => { window.clearTimeout(to); window.clearInterval(typer.current); };
+  }, [typeMsg]);
+
+  const pick = (m: Mode) => {
+    setMode(m);
+    setStep('form');
+    typeMsg(m === 'signin' ? 'Welcome back. Let’s sign you in.' : 'Lovely. Let’s set you up.');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validate()) return;
-    setIsSubmitting(true);
+    setError(null);
+    if (!email || !password || (mode === 'signup' && !name)) {
+      setError('Please fill in every field.');
+      return;
+    }
+    setSubmitting(true);
+    setOrbState('thinking');
     try {
-      if (mode === "signin") await signIn(email, password);
-      else await signUp(email, password, displayName);
+      if (mode === 'signin') await signIn(email, password);
+      else await signUp(email, password, name);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong.');
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
+      setOrbState('idle');
     }
   };
 
   if (loading) {
     return (
-      <div className="page fx ac jc" style={{ minHeight: "100vh" }}>
-        <div className="auro" />
-        <Loader2 className="animate-spin" style={{ width: 28, height: 28, color: "hsl(243 82% 80%)" }} />
+      <div className="ascene fx ac jc">
+        <Loader2 className="animate-spin" style={{ width: 28, height: 28, color: '#fffdfa' }} />
       </div>
     );
   }
 
-  const isSignup = mode === "signup";
+  const sub = step === 'start' ? 'Tell me where to begin.' : 'Speak to me, or just type.';
+
   return (
-    <div className="overlay" data-screen-label="Aurora — Auth">
-      <div className="ovwash" />
-      <div className="authwrap"><div className="authcol">
-        <div className="authlogo">
-          <div className="authmk">A</div>
-          <div><h1 className="authname">Atlas</h1><p className="authtag">AI Assistant</p></div>
-        </div>
-        <div className="authcard">
-          <div className="authseg">
-            <button className={`segbtn ${!isSignup ? "on" : ""}`} onClick={() => setMode("signin")}>Sign In</button>
-            <button className={`segbtn ${isSignup ? "on" : ""}`} onClick={() => setMode("signup")}>Sign Up</button>
-          </div>
-          <h2 className="authh">{isSignup ? "Create your account" : "Welcome back"}</h2>
-          <p className="auths">{isSignup ? "Start your journey with Atlas" : "Sign in to access your assistant"}</p>
+    <div className="ascene" data-screen-label="Atlas — Login">
+      <AuthSphere orbState={orbState} />
+      <div className="avig" />
+      <div className="ascrim" />
+      <span className="alogo">atlas</span>
 
-          <form onSubmit={handleSubmit}>
-            {isSignup && (
-              <div className="fld">
-                <label className="lbl">Display Name</label>
-                <input className="field" placeholder="How should Atlas call you?" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
-              </div>
-            )}
-            <div className="fld">
-              <label className="lbl">Email</label>
-              <input className="field" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-              {errors.email && <p style={{ fontSize: 12, color: "hsl(350 75% 72%)", margin: "6px 0 0" }}>{errors.email}</p>}
-            </div>
-            <div className="fld">
-              <label className="lbl">Password</label>
-              <div className="pwwrap">
-                <input className="field" type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} style={{ paddingRight: 42 }} />
-                <button type="button" className="eye" onClick={() => setShowPassword((s) => !s)}>{showPassword ? <EyeOff className="i16" /> : <Eye className="i16" />}</button>
-              </div>
-              {errors.password && <p style={{ fontSize: 12, color: "hsl(350 75% 72%)", margin: "6px 0 0" }}>{errors.password}</p>}
-            </div>
-            <button className="authbtn" type="submit" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="i16 animate-spin" style={{ marginRight: 8, display: "inline", verticalAlign: -3 }} />}
-              {isSignup ? "Create Account" : "Sign In"}
-            </button>
-          </form>
-
-          <div className="ordiv">or</div>
-          <div className="oauth">
-            <button className="oauthbtn" type="button" disabled><Chrome className="i16" />Google</button>
-            <button className="oauthbtn" type="button" disabled><Github className="i16" />GitHub</button>
-          </div>
-          <p className="authswap">
-            {isSignup ? "Already have an account?" : "Don't have an account?"}{" "}
-            <button className="linkA" onClick={() => setMode(isSignup ? "signin" : "signup")}>{isSignup ? "Sign in" : "Sign up"}</button>
+      <div className="agrid">
+        <div className="aleft">
+          <p className="amsg">
+            {toks.slice(0, shown).map((w, i) => <span key={i} className="awd">{w} </span>)}
+            {phase === 'chat' && !ready && <span className="acaret" />}
           </p>
+          <p className="asub">{ready ? sub : ''}</p>
         </div>
-        <p className="authterms">By continuing, you agree to our Terms of Service and Privacy Policy.</p>
-      </div></div>
+
+        <div className="aright">
+          <div className={`aans${ready ? ' on' : ''}`}>
+            {step === 'start' ? (
+              <div className="achoices">
+                <button className="achoice" onClick={() => pick('signin')}>Yes, we&rsquo;ve met before</button>
+                <button className="achoice" onClick={() => pick('signup')}>No, we&rsquo;re just meeting</button>
+              </div>
+            ) : (
+              <form className="aform" onSubmit={submit}>
+                {mode === 'signup' && (
+                  <input className="bigin" placeholder="your name" value={name}
+                    onChange={(e) => setName(e.target.value)} autoFocus autoComplete="name" />
+                )}
+                <input className="bigin" type="email" placeholder="your email" value={email}
+                  onChange={(e) => setEmail(e.target.value)} autoFocus={mode === 'signin'} autoComplete="email" />
+                <input className="bigin" type="password" placeholder="your password" value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} />
+                {error && <p className="aerr">{error}</p>}
+                <div className="afoot">
+                  <button className="aenter" type="submit" disabled={submitting}>
+                    {submitting && <Loader2 className="i16 animate-spin" />}
+                    {submitting ? 'One moment…' : 'Enter Atlas →'}
+                  </button>
+                  <button type="button" className="aswap" onClick={() => pick(mode === 'signin' ? 'signup' : 'signin')}>
+                    {mode === 'signin' ? 'New here?' : 'Been here before?'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <p className="aterms">By continuing, you agree to our Terms &amp; Privacy Policy.</p>
     </div>
   );
 };

@@ -937,3 +937,44 @@ body{display:block;overflow-x:hidden;overflow-y:visible;max-width:none;flex:none
 .mpconnectbtn:disabled{opacity:.6;cursor:default}
 .mpconnectbtn:hover:not(:disabled){transform:scale(1.03)}
 .mpnote{position:relative;z-index:2;text-align:center;color:rgba(255,255,255,.85);font-size:14px;margin:16px auto;max-width:360px;line-height:1.5}
+
+/* ===================================================================
+   Step 6 — split conversational login (design "Atlas Login C1 - Split")
+   Flat #ff6a00 scene, Atlas Sphere on the right, typed prompt left,
+   choices / big-text credential inputs right. Low-alpha vignette + scrim
+   keep the split depth; the accent gradient background is gone (flat).
+   =================================================================== */
+.ascene{position:fixed;inset:0;overflow:hidden;background:#ff6a00;color:#fffdfa;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.authbgcv{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;display:block}
+.authorbcv{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;display:block;filter:saturate(1.05)}
+.avig{position:absolute;inset:0;z-index:2;pointer-events:none;background:radial-gradient(90% 120% at 6% 50%,rgba(150,44,0,.32),transparent 55%)}
+.ascrim{position:absolute;inset:0;z-index:3;pointer-events:none;background:linear-gradient(90deg,rgba(150,44,0,.16) 0%,transparent 30%,rgba(120,32,0,.22) 66%,rgba(110,28,0,.4) 100%)}
+.alogo{position:absolute;top:5.5%;left:6.5%;z-index:6;font-family:'Hanken Grotesk',sans-serif;font-size:20px;font-weight:600;letter-spacing:-.02em}
+.agrid{position:absolute;inset:0;z-index:4;display:grid;grid-template-columns:1.02fr .98fr;align-items:stretch}
+.aleft{display:flex;flex-direction:column;justify-content:center;padding:0 4% 0 6.5%}
+.aright{position:relative;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;padding:0 6.5% 0 3%}
+.amsg{font-family:'Hanken Grotesk',sans-serif;font-size:clamp(32px,5.2vw,60px);line-height:1.03;letter-spacing:-.04em;font-weight:600;margin:0;max-width:13ch}
+.awd{display:inline-block;margin-right:.26em;animation:wfade 1.05s cubic-bezier(.2,.65,.2,1) both}
+.acaret{display:inline-block;width:4px;height:.86em;margin-left:2px;background:#fffdfa;border-radius:2px;vertical-align:-4px;animation:acblink 1s steps(1) infinite}
+.asub{margin:22px 0 0;font-family:'Newsreader',Georgia,serif;font-style:italic;font-size:19px;color:rgba(255,253,250,.82);max-width:26ch;min-height:24px}
+.aans{opacity:0;transform:translateY(14px);transition:opacity .55s cubic-bezier(.22,1,.36,1),transform .55s cubic-bezier(.22,1,.36,1);width:100%;max-width:26rem}
+.aans.on{opacity:1;transform:none}
+.achoices{display:flex;flex-direction:column;gap:14px;align-items:flex-start}
+.achoice{border:0;background:none;padding:4px 2px;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(24px,2.8vw,32px);font-weight:600;letter-spacing:-.03em;color:rgba(247,239,226,.86);cursor:pointer;transition:color .3s,transform .38s cubic-bezier(.22,1,.36,1);text-align:left}
+.achoice:hover{color:#fff;transform:translateY(-3px)}
+.aform{display:flex;flex-direction:column;width:100%}
+/* Name-input fix: the downward text-shadow was clipped — bottom padding +
+   line-height give it room (design's .bigin values). */
+.bigin{width:100%;background:transparent;border:0;outline:0;color:#fffdfa;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(26px,3vw,38px);font-weight:600;letter-spacing:-.03em;padding:6px 0 26px;line-height:1.12;caret-color:#fffdfa;text-shadow:0 2px 20px rgba(120,30,0,.5)}
+.bigin::placeholder{color:rgba(255,253,250,.42)}
+.aerr{font-size:13px;color:#fff;background:rgba(120,30,0,.28);border-radius:8px;padding:6px 10px;margin:0 0 12px;align-self:flex-start}
+.afoot{display:flex;align-items:center;gap:22px;margin-top:8px}
+.aenter{display:inline-flex;align-items:center;gap:10px;background:none;border:0;color:#fffdfa;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(22px,2.6vw,30px);font-weight:600;letter-spacing:-.03em;cursor:pointer;transition:gap .2s,opacity .2s}
+.aenter:hover:not(:disabled){gap:16px}
+.aenter:disabled{opacity:.7;cursor:default}
+.aswap{background:none;border:0;color:rgba(255,253,250,.72);font-size:12px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer;transition:color .2s}
+.aswap:hover{color:#fffdfa}
+.aterms{position:absolute;bottom:24px;left:6.5%;z-index:5;font-size:11.5px;color:rgba(255,253,250,.6);margin:0}
+@keyframes wfade{from{opacity:0;transform:translateY(.16em);filter:blur(4px)}to{opacity:1;transform:none;filter:blur(0)}}
+@keyframes acblink{0%,50%{opacity:1}51%,100%{opacity:0}}
+@media (max-width:820px){.agrid{grid-template-columns:1fr;align-items:center}.aleft,.aright{padding:0 8%}.aright{margin-top:8px}}
