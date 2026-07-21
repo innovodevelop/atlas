@@ -9,6 +9,7 @@ mod secrets;
 mod snaptrade;
 mod portfolio_db;
 mod portfolio;
+mod oauth;
 
 const BUNDLE_ID: &str = "com.magnuspilegaard.atlas";
 
@@ -139,6 +140,9 @@ pub fn run() {
     // in the system browser (where the user's Google session lives).
     .plugin(tauri_plugin_notification::init())
     .plugin(tauri_plugin_opener::init())
+    // Native OAuth redirect capture (RFC 8252): the OS routes atlas://oauth/…
+    // back into this process; we parse it and hand the code to the webview.
+    .plugin(tauri_plugin_deep_link::init())
     .manage(gateway)
     .invoke_handler(tauri::generate_handler![
       voice_gateway_info,
@@ -159,6 +163,30 @@ pub fn run() {
             .build(),
         )?;
       }
+
+      // Deep-link OAuth capture. In dev the scheme isn't in the app bundle's
+      // Info.plist, so register it at runtime; packaged macOS builds get it
+      // from tauri.conf.json's plugins.deep-link config.
+      {
+        use tauri::Emitter;
+        use tauri_plugin_deep_link::DeepLinkExt;
+
+        #[cfg(debug_assertions)]
+        let _ = app.deep_link().register_all();
+
+        let handle = app.handle().clone();
+        app.deep_link().on_open_url(move |event| {
+          for u in event.urls() {
+            if let Some(cb) = oauth::parse_callback(u.as_str()) {
+              // The webview's pending OAuth promise resolves off this event
+              // (see src/lib/deepLinkOauth.ts). Never log the code.
+              log::info!("[oauth] captured callback for provider '{}'", cb.provider);
+              let _ = handle.emit("oauth-callback", cb);
+            }
+          }
+        });
+      }
+
       Ok(())
     })
     .build(tauri::generate_context!())
