@@ -653,7 +653,7 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 .minimic{width:40px;height:40px;border-radius:12px;background:var(--pg);border:1px solid var(--bd);color:var(--ink2);cursor:pointer;display:flex;align-items:center;justify-content:center}
 .aqbar{position:relative;height:6px;border-radius:9999px;margin-top:16px;background:linear-gradient(90deg,#2f7d4f,#d9b23a 55%,#c14a35)}
 .aqbar span{position:absolute;top:50%;width:12px;height:12px;border-radius:50%;background:#fff;border:2px solid var(--grn);transform:translate(-50%,-50%);box-shadow:0 1px 4px rgba(0,0,0,.22)}
-.npart{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--acc),#ffb277);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;animation:spin 9s linear infinite}
+.npart{width:48px;height:48px;border-radius:50%;background:var(--acc);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;animation:spin 9s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .npbar{height:4px;border-radius:9999px;background:var(--sk);overflow:hidden;margin-top:9px}
 .npbar span{display:block;height:100%;width:38%;background:var(--acc);border-radius:9999px}
@@ -744,7 +744,7 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 .wkbar{background:rgba(255,106,0,.32)}
 .on{background:var(--acc);box-shadow:0 0 10px rgba(255,106,0,.45)}
 .expwash{background:radial-gradient(58% 44% at 50% 2%,rgba(255,106,0,.10),transparent 62%),linear-gradient(180deg,var(--wt),var(--pg) 72%)}
-.featImg{background:linear-gradient(135deg,rgba(255,106,0,.16),var(--sk));border:1px solid rgba(255,106,0,.18)}
+.featImg{background:rgba(255,106,0,.12);border:1px solid rgba(255,106,0,.18)}
 
 /* 7-day outlook active row — orange tint (aurora used broken indigo hsl(var(--acc))) */
 .drow.today{background:rgba(255,106,0,.12)}
