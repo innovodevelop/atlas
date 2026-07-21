@@ -25,19 +25,16 @@ use tauri::{AppHandle, Emitter, State};
 use crate::oauth;
 use crate::secrets;
 
+use crate::music_engine::{self, EngineCmd, EngineHandle};
+
 const PROVIDER: &str = "spotify";
-const CLIENT_ID: &str = "29af1118819f4086a68dfc21b2359625"; // public-safe
+pub(crate) const CLIENT_ID: &str = "29af1118819f4086a68dfc21b2359625"; // public-safe
 const AUTH_URL: &str = "https://accounts.spotify.com/authorize";
 const TOKEN_URL: &str = "https://accounts.spotify.com/api/token";
 const API: &str = "https://api.spotify.com/v1";
 const SCOPES: &str = "streaming user-read-playback-state user-modify-playback-state \
 user-read-currently-playing user-library-read playlist-read-private \
 playlist-read-collaborative user-read-email user-read-private";
-
-/// Placeholder returned by transport commands until the librespot audio engine
-/// lands. The catalog/OAuth half is fully live; only sound output is pending.
-const AUDIO_PENDING: &str =
-    "Atlas audio playback is not wired yet — the librespot engine is the next step.";
 
 // ---------------------------------------------------------------------------
 // State
@@ -48,6 +45,8 @@ pub struct MusicState {
     pending: Mutex<Option<PendingAuth>>,
     /// Cached bearer token; refreshed from the Keychain refresh token on expiry.
     access: Mutex<Option<AccessToken>>,
+    /// The librespot audio engine, started lazily on first playback.
+    engine: Mutex<Option<EngineHandle>>,
 }
 
 struct PendingAuth {
@@ -67,6 +66,7 @@ impl MusicState {
         Self {
             pending: Mutex::new(None),
             access: Mutex::new(None),
+            engine: Mutex::new(None),
         }
     }
 }
@@ -231,14 +231,41 @@ pub fn music_status(state: State<'_, MusicState>) -> MusicStatus {
             .ok()
             .and_then(|v| v["product"].as_str().map(|p| p == "premium"))
             .unwrap_or(false);
+    let audio_ready = state.engine.lock().unwrap().is_some();
     MusicStatus {
         available: true,
         provider: PROVIDER,
         connected,
         premium,
-        audio_ready: false, // set true once librespot is connected
+        audio_ready,
         device_name: "Atlas",
     }
+}
+
+/// Lazily start the librespot audio engine (connects the Atlas playback device
+/// on first play), returning a command sender. Idempotent.
+fn ensure_engine(
+    app: &AppHandle,
+    state: &MusicState,
+) -> Result<tokio::sync::mpsc::UnboundedSender<EngineCmd>, String> {
+    if let Some(h) = state.engine.lock().unwrap().as_ref() {
+        return Ok(h.tx.clone());
+    }
+    let token = valid_token(state)?;
+    let handle = music_engine::spawn(app.clone(), token)?;
+    let tx = handle.tx.clone();
+    *state.engine.lock().unwrap() = Some(handle);
+    let _ = app.emit(
+        "music:status",
+        serde_json::json!({ "connected": true, "audio_ready": true }),
+    );
+    Ok(tx)
+}
+
+fn send_cmd(app: &AppHandle, state: &MusicState, cmd: EngineCmd) -> Result<(), String> {
+    ensure_engine(app, state)?
+        .send(cmd)
+        .map_err(|_| "audio engine is not running".to_string())
 }
 
 /// Begin the OAuth flow: stash a fresh PKCE pair + CSRF state and return the
@@ -258,6 +285,9 @@ pub fn music_connect(state: State<'_, MusicState>) -> Result<String, String> {
 
 #[tauri::command]
 pub fn music_disconnect(state: State<'_, MusicState>) -> Result<(), String> {
+    if let Some(engine) = state.engine.lock().unwrap().take() {
+        engine.shutdown();
+    }
     secrets::clear_music_refresh_token()?;
     *state.access.lock().unwrap() = None;
     *state.pending.lock().unwrap() = None;
@@ -369,44 +399,50 @@ pub fn music_now_playing(state: State<'_, MusicState>) -> Result<Value, String> 
 }
 
 // ---------------------------------------------------------------------------
-// Commands — transport (audio engine pending: librespot next increment)
-//
-// Signatures are final so the hook + UI can be built against them now; each
-// returns AUDIO_PENDING until the librespot device is wired in.
+// Commands — transport. Each ensures the librespot engine is running (connects
+// the Atlas playback device on first use) then forwards the command.
 
 #[tauri::command]
-pub fn music_play(_state: State<'_, MusicState>) -> Result<(), String> {
-    Err(AUDIO_PENDING.into())
+pub fn music_load(app: AppHandle, state: State<'_, MusicState>, uri: String) -> Result<(), String> {
+    send_cmd(&app, &state, EngineCmd::Load(uri))
 }
 
 #[tauri::command]
-pub fn music_pause(_state: State<'_, MusicState>) -> Result<(), String> {
-    Err(AUDIO_PENDING.into())
+pub fn music_play(app: AppHandle, state: State<'_, MusicState>) -> Result<(), String> {
+    send_cmd(&app, &state, EngineCmd::Play)
 }
 
 #[tauri::command]
-pub fn music_next(_state: State<'_, MusicState>) -> Result<(), String> {
-    Err(AUDIO_PENDING.into())
+pub fn music_pause(app: AppHandle, state: State<'_, MusicState>) -> Result<(), String> {
+    send_cmd(&app, &state, EngineCmd::Pause)
 }
 
 #[tauri::command]
-pub fn music_prev(_state: State<'_, MusicState>) -> Result<(), String> {
-    Err(AUDIO_PENDING.into())
+pub fn music_next(app: AppHandle, state: State<'_, MusicState>) -> Result<(), String> {
+    send_cmd(&app, &state, EngineCmd::Next)
 }
 
 #[tauri::command]
-pub fn music_seek(_state: State<'_, MusicState>, _position_ms: u32) -> Result<(), String> {
-    Err(AUDIO_PENDING.into())
+pub fn music_prev(app: AppHandle, state: State<'_, MusicState>) -> Result<(), String> {
+    send_cmd(&app, &state, EngineCmd::Prev)
 }
 
 #[tauri::command]
-pub fn music_load(_state: State<'_, MusicState>, _uri: String) -> Result<(), String> {
-    Err(AUDIO_PENDING.into())
+pub fn music_seek(
+    app: AppHandle,
+    state: State<'_, MusicState>,
+    position_ms: u32,
+) -> Result<(), String> {
+    send_cmd(&app, &state, EngineCmd::Seek(position_ms))
 }
 
 #[tauri::command]
-pub fn music_volume(_state: State<'_, MusicState>, _volume: f32) -> Result<(), String> {
-    Err(AUDIO_PENDING.into())
+pub fn music_volume(
+    app: AppHandle,
+    state: State<'_, MusicState>,
+    volume: f32,
+) -> Result<(), String> {
+    send_cmd(&app, &state, EngineCmd::Volume(volume))
 }
 
 #[cfg(test)]

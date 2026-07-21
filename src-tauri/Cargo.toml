@@ -27,6 +27,12 @@ tauri-plugin-notification = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-deep-link = "2"                            # native OAuth redirect capture (RFC 8252)
 url = "2"                                               # parse the captured deep-link callback
+# In-app Spotify audio (Premium): librespot decodes full tracks to CoreAudio.
+# NOTE: librespot-core 0.8's build script needs vergen pinned — the committed
+# Cargo.lock holds vergen=9.0.6 / vergen-gitcl=1.0.5 (see docs/decisions/006).
+librespot-core = "0.8"
+librespot-playback = { version = "0.8", default-features = false, features = ["rodio-backend"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
 # Local portfolio engine (SnapTrade brokerage sync + on-device analytics):
 duckdb = { version = "1.1", features = ["bundled"] }   # columnar OLAP over the full transaction history
 ureq = { version = "2.10", features = ["json"] }        # lean blocking HTTP (no async runtime needed)

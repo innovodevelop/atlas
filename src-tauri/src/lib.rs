@@ -11,6 +11,7 @@ mod portfolio_db;
 mod portfolio;
 mod oauth;
 mod music;
+mod music_engine;
 
 const BUNDLE_ID: &str = "com.magnuspilegaard.atlas";
 
