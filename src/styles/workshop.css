@@ -885,3 +885,55 @@ body{display:block;overflow-x:hidden;overflow-y:visible;max-width:none;flex:none
 /* Row separators to the warm border tone. */
 .focusview .rowB,
 .focusview .mailrow{border-bottom-color:var(--bd)}
+
+/* ===================================================================
+   Step 5 — Atlas Sphere music player (design Change 4)
+   Compact tile (flat orange, mini reactive sphere) → full-screen player
+   with the sphere hero, waveform seek and flat (shadowless) transport.
+   =================================================================== */
+
+/* --- Compact tile --- */
+.npcard{position:relative;flex-direction:row;align-items:center;gap:14px;background:var(--acc);color:#fff;overflow:hidden;padding:18px 20px}
+.npcard::after{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(130% 100% at 16% -12%,rgba(255,255,255,.22),transparent 58%)}
+.npsphereWrap{position:relative;width:56px;height:56px;flex-shrink:0;z-index:1}
+.npsphere{width:100%;height:100%;display:block}
+.nplbl{font-size:9.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.7);margin:0 0 3px;position:relative;z-index:1}
+.nptitle{font-family:'Hanken Grotesk','Geist',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em;margin:0;position:relative;z-index:1;color:#fff}
+.npsub{font-size:12px;color:rgba(255,255,255,.82);margin:2px 0 0;position:relative;z-index:1}
+.npeq{display:flex;align-items:flex-end;gap:2.5px;height:20px;flex-shrink:0;position:relative;z-index:1}
+.npeq span{width:3px;height:30%;background:rgba(255,255,255,.9);border-radius:2px}
+.npeq.on span{animation:npeqb .9s ease-in-out infinite}
+.npeq.on span:nth-child(2){animation-delay:.15s}
+.npeq.on span:nth-child(3){animation-delay:.30s}
+.npeq.on span:nth-child(4){animation-delay:.10s}
+.npeq.on span:nth-child(5){animation-delay:.25s}
+@keyframes npeqb{0%,100%{height:25%}50%{height:95%}}
+.npplay{width:42px;height:42px;flex-shrink:0;border:none;cursor:pointer;border-radius:50%;background:#fff;color:var(--acc);display:flex;align-items:center;justify-content:center;position:relative;z-index:1;transition:transform .18s}
+.npplay:hover{transform:scale(1.08)}
+.npprog{position:absolute;left:20px;right:20px;bottom:10px;height:3px;background:rgba(255,255,255,.24);border-radius:9999px;z-index:1;overflow:hidden}
+.npprog span{display:block;height:100%;background:#fff;border-radius:9999px;box-shadow:0 0 8px rgba(255,255,255,.7)}
+
+/* --- Full-screen player --- */
+.mpfull{position:relative;background:var(--acc);color:#fff;border-radius:28px;padding:26px 30px 30px;min-height:560px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 40px 90px -40px rgba(255,106,0,.5)}
+.mpfull::before{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 70% at 50% -10%,rgba(255,255,255,.2),transparent 55%)}
+.mptop{position:relative;text-align:center;z-index:2}
+.mpeyebrow{font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.68);margin:0}
+.mptitle{font-family:'Hanken Grotesk',sans-serif;font-size:24px;font-weight:600;letter-spacing:-.025em;margin:5px 0 0;color:#fff}
+.mpartist{font-size:14px;color:rgba(255,255,255,.82);margin:3px 0 0}
+.mpstage{position:relative;flex:1;min-height:280px;z-index:1}
+.mpsphere{position:absolute;inset:0;width:100%;height:100%;display:block}
+.mpseek{position:relative;z-index:2;margin-top:8px}
+.mpwave{width:100%;height:56px;cursor:pointer;display:block}
+.mptimes{display:flex;align-items:center;justify-content:space-between;font-size:11.5px;font-variant-numeric:tabular-nums;color:rgba(255,255,255,.8);font-family:ui-monospace,Menlo,monospace;margin-top:6px}
+.mptransport{position:relative;z-index:2;display:flex;align-items:center;justify-content:center;gap:22px;margin-top:22px}
+/* Flat (shadowless) translucent transport buttons. */
+.mpbtn{width:46px;height:46px;border:none;cursor:pointer;border-radius:50%;background:transparent;color:rgba(255,255,255,.85);display:flex;align-items:center;justify-content:center;transition:color .18s,background .18s,transform .18s}
+.mpbtn:hover{color:#fff;background:rgba(255,255,255,.14)}
+.mpbtn.liked{color:#fff}
+.mpplay{width:76px;height:76px;background:#fff;color:var(--acc)}
+.mpplay:hover{background:#fff;transform:scale(1.05)}
+.mpconnect{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 0}
+.mpconnectbtn{display:inline-flex;align-items:center;gap:8px;border:none;cursor:pointer;border-radius:9999px;background:#fff;color:var(--acc);font-family:inherit;font-size:14px;font-weight:600;padding:12px 22px;transition:transform .18s;opacity:1}
+.mpconnectbtn:disabled{opacity:.6;cursor:default}
+.mpconnectbtn:hover:not(:disabled){transform:scale(1.03)}
+.mpnote{position:relative;z-index:2;text-align:center;color:rgba(255,255,255,.85);font-size:14px;margin:16px auto;max-width:360px;line-height:1.5}

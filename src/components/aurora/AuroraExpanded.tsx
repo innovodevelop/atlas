@@ -5,6 +5,7 @@ import {
   Inbox, Star, Send, Archive, PenLine, TrendingDown, Mail,
 } from 'lucide-react';
 import { WeatherIcon } from './auroraIcons';
+import { MusicPlayerFull } from './MusicPlayerFull';
 import { sparklinePoints, fmtPct, fmtEventTime } from '@/pages/aurora/auroraHelpers';
 import { useWeather } from '@/hooks/useWeather';
 import { useStocks } from '@/hooks/useStocks';
@@ -40,6 +41,7 @@ export const AuroraExpanded = ({ which, onClose }: Props) => {
       {which === 'stocks' && <StocksView onClose={onClose} />}
       {which === 'email' && <EmailView onClose={onClose} />}
       {which === 'news' && <NewsView onClose={onClose} />}
+      {which === 'music' && <MusicPlayerFull />}
     </>
   );
 };

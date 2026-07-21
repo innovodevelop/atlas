@@ -91,8 +91,9 @@ export function useAudioReactivity(
       const lvl = levelRef.current ?? REST;
       const [low, mid, high] = lvl.bands ?? [0, 0, 0];
 
-      // Energy gate settles motion to rest shortly after pause.
-      energy = approach(energy, playingRef.current ? 1 : 0, dt, 3);
+      // Energy gate: full while playing, but keep a fraction at rest so the
+      // sphere stays gently alive (a dead visualizer reads as broken).
+      energy = approach(energy, playingRef.current ? 1 : 0.4, dt, 3);
 
       // Onset detection on the low band → beat timestamp. Bass transients are a
       // far better beat source than broadband RMS.
@@ -102,11 +103,12 @@ export function useAudioReactivity(
       if (on && onset > 0.06 && sinceBeat > 0.14) beatT = t;
       const kick = beatT < 0 ? 0 : Math.exp(-(t - beatT) * 8);
 
-      // Target amplitude blends the real swell with the beat kick, gated by
-      // energy. At rest it eases to a faint idle breathing.
+      // A constant idle floor (visible shimmer) plus the energy-gated reactive
+      // swell (beat kick + real level). Reduced-motion holds at the idle floor.
+      const IDLE = 0.12;
       const target = on
-        ? Math.min(1, (0.42 * kick + 0.4 * (lvl.amp ?? 0) + 0.12) * energy)
-        : 0.1 * energy;
+        ? Math.min(1, IDLE + (0.5 * kick + 0.45 * (lvl.amp ?? 0)) * energy)
+        : IDLE;
 
       ampS = approach(ampS, target, dt, 11);
       pulse = approach(pulse, kick * energy, dt, 16);

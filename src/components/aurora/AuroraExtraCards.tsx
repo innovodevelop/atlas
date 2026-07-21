@@ -6,8 +6,11 @@
  * the design file; CSS for all classes already ships in workshop.css.
  */
 import { memo, useEffect, useState } from 'react';
-import { Leaf, Music, Disc3, Flame, Globe } from 'lucide-react';
+import { Leaf, Flame, Globe, Play, Pause } from 'lucide-react';
 import { useWeather } from '@/hooks/useWeather';
+import { useMusicPlayer } from '@/hooks/useMusicPlayer';
+import { useAudioReactivity } from '@/hooks/useAudioReactivity';
+import { MusicSphere } from './MusicSphere';
 
 // ---------------------------------------------------------------------------
 // Air quality — real data. OpenWeather reports aqi 1–5; we display a US-style
@@ -58,21 +61,45 @@ export const AuroraAirQualityCard = memo(() => {
 AuroraAirQualityCard.displayName = 'AuroraAirQualityCard';
 
 // ---------------------------------------------------------------------------
-// Now playing — demo content until a music integration (Spotify) exists.
+// Now playing — the Atlas Sphere music player's compact tile (design Change 4).
+// Flat-orange card: a mini reactive sphere, live equalizer, animated progress
+// and play/pause. The whole tile opens the full-screen player; the play button
+// stops propagation so it doesn't also open it.
 
-export const AuroraNowPlayingCard = memo(() => (
-  <div className="cardB d2" style={{ cursor: 'default' }}>
-    <div className="chB"><p className="mlblB">Now playing</p><div className="icboxB fx ac jc"><Music className="i14" /></div></div>
-    <div className="cbB fx ac gap12">
-      <div className="npart"><Disc3 className="i20" /></div>
+const EqBars = ({ playing }: { playing: boolean }) => (
+  <span className={`npeq${playing ? ' on' : ''}`} aria-hidden="true">
+    <span /><span /><span /><span /><span />
+  </span>
+);
+
+export const AuroraNowPlayingCard = memo(({ onOpen }: { onOpen?: () => void }) => {
+  const m = useMusicPlayer();
+  const isPlaying = m.nowPlaying?.isPlaying ?? false;
+  const reactivity = useAudioReactivity(m.levelRef, isPlaying);
+  const track = m.nowPlaying?.track ?? null;
+  const title = track?.title ?? (m.connected ? 'Nothing playing' : 'Atlas Music');
+  const artist = track?.artist ?? (m.connected ? '' : 'Tap to open the player');
+  const ratio = track?.durationMs ? Math.min(1, (m.nowPlaying?.positionMs ?? 0) / track.durationMs) : 0;
+  return (
+    <div className="cardB npcard d2" onClick={onOpen} style={{ cursor: 'pointer' }}>
+      <div className="npsphereWrap"><MusicSphere form="field" reactivity={reactivity} className="npsphere" /></div>
       <div className="f1" style={{ minWidth: 0 }}>
-        <p className="evtB trunc">Weightless</p>
-        <p className="evsB trunc">Marconi Union · Focus</p>
-        <div className="npbar"><span /></div>
+        <p className="nplbl">Now playing</p>
+        <p className="nptitle trunc">{title}</p>
+        <p className="npsub trunc">{artist}</p>
       </div>
+      <EqBars playing={isPlaying} />
+      <button
+        className="npplay"
+        aria-label={isPlaying ? 'Pause' : 'Play'}
+        onClick={(e) => { e.stopPropagation(); isPlaying ? m.pause() : m.play(); }}
+      >
+        {isPlaying ? <Pause className="i16" /> : <Play className="i16" />}
+      </button>
+      <div className="npprog"><span style={{ width: `${ratio * 100}%` }} /></div>
     </div>
-  </div>
-));
+  );
+});
 AuroraNowPlayingCard.displayName = 'AuroraNowPlayingCard';
 
 // ---------------------------------------------------------------------------

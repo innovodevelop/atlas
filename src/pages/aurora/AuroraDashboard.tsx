@@ -24,7 +24,7 @@ import { AuroraDrawer } from '@/components/aurora/AuroraDrawer';
 import { AuroraExpanded } from '@/components/aurora/AuroraExpanded';
 import { AuroraSettings } from './AuroraSettings';
 
-export type AuroraExpandedKey = 'weather' | 'calendar' | 'tasks' | 'stocks' | 'email' | 'news' | null;
+export type AuroraExpandedKey = 'weather' | 'calendar' | 'tasks' | 'stocks' | 'email' | 'news' | 'music' | null;
 
 const AuroraDashboard = ({ preview = false }: { preview?: boolean } = {}) => {
   const navigate = useNavigate();
@@ -188,7 +188,7 @@ const AuroraDashboard = ({ preview = false }: { preview?: boolean } = {}) => {
           <AuroraInboxCard onOpen={() => openWidget('email')} />
           <AuroraBriefingCard onOpen={() => openWidget('news')} />
           <AuroraAirQualityCard />
-          <AuroraNowPlayingCard />
+          <AuroraNowPlayingCard onOpen={() => openWidget('music')} />
           <AuroraActivityCard />
           <AuroraWorldClockCard />
         </main>
