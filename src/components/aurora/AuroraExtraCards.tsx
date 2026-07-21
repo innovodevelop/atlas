@@ -82,20 +82,24 @@ export const AuroraNowPlayingCard = memo(({ onOpen }: { onOpen?: () => void }) =
   const ratio = track?.durationMs ? Math.min(1, (m.nowPlaying?.positionMs ?? 0) / track.durationMs) : 0;
   return (
     <div className="cardB npcard d2" onClick={onOpen} style={{ cursor: 'pointer' }}>
-      <div className="npsphereWrap"><MusicSphere form="field" reactivity={reactivity} className="npsphere" /></div>
-      <div className="f1" style={{ minWidth: 0 }}>
-        <p className="nplbl">Now playing</p>
-        <p className="nptitle trunc">{title}</p>
-        <p className="npsub trunc">{artist}</p>
+      {/* Field animation as the widget background — ~80% of the tile, 60%
+          opacity so the track info stays legible on top. */}
+      <div className="npfield"><MusicSphere form="field" reactivity={reactivity} className="npsphere" /></div>
+      <div className="npcontent">
+        <div className="f1" style={{ minWidth: 0 }}>
+          <p className="nplbl">Now playing</p>
+          <p className="nptitle trunc">{title}</p>
+          <p className="npsub trunc">{artist}</p>
+        </div>
+        <EqBars playing={isPlaying} />
+        <button
+          className="npplay"
+          aria-label={isPlaying ? 'Pause' : 'Play'}
+          onClick={(e) => { e.stopPropagation(); isPlaying ? m.pause() : m.play(); }}
+        >
+          {isPlaying ? <Pause className="i16" /> : <Play className="i16" />}
+        </button>
       </div>
-      <EqBars playing={isPlaying} />
-      <button
-        className="npplay"
-        aria-label={isPlaying ? 'Pause' : 'Play'}
-        onClick={(e) => { e.stopPropagation(); isPlaying ? m.pause() : m.play(); }}
-      >
-        {isPlaying ? <Pause className="i16" /> : <Play className="i16" />}
-      </button>
       <div className="npprog"><span style={{ width: `${ratio * 100}%` }} /></div>
     </div>
   );
