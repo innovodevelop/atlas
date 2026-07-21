@@ -41,7 +41,7 @@ export const AuroraExpanded = ({ which, onClose }: Props) => {
       {which === 'stocks' && <StocksView onClose={onClose} />}
       {which === 'email' && <EmailView onClose={onClose} />}
       {which === 'news' && <NewsView onClose={onClose} />}
-      {which === 'music' && <MusicPlayerFull />}
+      {which === 'music' && <MusicPlayerFull onClose={onClose} />}
     </>
   );
 };

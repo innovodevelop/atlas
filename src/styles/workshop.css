@@ -919,29 +919,39 @@ body{display:block;overflow-x:hidden;overflow-y:visible;max-width:none;flex:none
 .npprog span{display:block;height:100%;background:#fff;border-radius:9999px;box-shadow:0 0 8px rgba(255,255,255,.7)}
 
 /* --- Full-screen player --- */
-.mpfull{position:relative;background:var(--acc);color:#fff;border-radius:28px;padding:26px 30px 30px;min-height:560px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 40px 90px -40px rgba(52,97,242,.5)}
-.mpfull::before{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 70% at 50% -10%,rgba(255,255,255,.2),transparent 55%)}
-.mptop{position:relative;text-align:center;z-index:2}
-.mpeyebrow{font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.68);margin:0}
-.mptitle{font-family:'Hanken Grotesk',sans-serif;font-size:24px;font-weight:600;letter-spacing:-.025em;margin:5px 0 0;color:#fff}
-.mpartist{font-size:14px;color:rgba(255,255,255,.82);margin:3px 0 0}
-.mpstage{position:relative;flex:1;min-height:280px;z-index:1}
-.mpsphere{position:absolute;inset:0;width:100%;height:100%;display:block}
-.mpseek{position:relative;z-index:2;margin-top:8px}
-.mpwave{width:100%;height:56px;cursor:pointer;display:block}
+/* Full-screen takeover: the Field fills the background, title centred top,
+   transport flat at the bottom. */
+.mpfull{position:fixed;inset:0;z-index:80;background:var(--acc);color:#fff;overflow:hidden;animation:mpIn .4s cubic-bezier(.22,1,.36,1) both}
+@keyframes mpIn{from{opacity:0}to{opacity:1}}
+.mpbg{position:absolute;inset:0;z-index:0;pointer-events:none}
+.mpbgsphere{width:100%;height:100%;display:block}
+.mptopglow{position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(120% 70% at 50% -10%,rgba(255,255,255,.16),transparent 55%)}
+.mpbottomfade{position:absolute;left:0;right:0;bottom:0;height:42%;z-index:1;pointer-events:none;background:linear-gradient(to bottom,transparent,var(--acc) 84%)}
+.mpminiglow{position:absolute;top:8vh;left:5vw;width:170px;height:170px;z-index:1;pointer-events:none;border-radius:50%;background:radial-gradient(closest-side,rgba(255,255,255,.5),transparent 72%);filter:blur(26px);opacity:.3;animation:mpbreathe 5s ease-in-out infinite}
+@keyframes mpbreathe{0%,100%{transform:scale(1);opacity:.26}50%{transform:scale(1.12);opacity:.36}}
+.mpcollapse{position:absolute;top:24px;right:26px;z-index:5;width:44px;height:44px;border:none;cursor:pointer;border-radius:50%;background:rgba(255,255,255,.16);color:#fff;display:flex;align-items:center;justify-content:center;transition:background .18s}
+.mpcollapse:hover{background:rgba(255,255,255,.28)}
+.mphead{position:absolute;top:7vh;left:50%;transform:translateX(-50%);z-index:3;text-align:center;width:min(900px,82%)}
+.mpeyebrow{font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.72);margin:0}
+.mptitle{font-family:'Hanken Grotesk',sans-serif;font-size:clamp(28px,4vw,52px);font-weight:600;letter-spacing:-.03em;margin:12px 0 0;line-height:1.02;color:#fff}
+.mpartist{color:rgba(255,255,255,.72);font-weight:500}
+.mpalbum{font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.56);margin:8px 0 0}
+.mpdock{position:absolute;left:50%;bottom:5vh;transform:translateX(-50%);z-index:3;width:min(680px,88%);display:flex;flex-direction:column;align-items:center;gap:14px}
+.mpseek{width:100%}
+.mpwave{width:100%;height:60px;cursor:pointer;display:block}
 .mptimes{display:flex;align-items:center;justify-content:space-between;font-size:11.5px;font-variant-numeric:tabular-nums;color:rgba(255,255,255,.8);font-family:ui-monospace,Menlo,monospace;margin-top:6px}
-.mptransport{position:relative;z-index:2;display:flex;align-items:center;justify-content:center;gap:22px;margin-top:22px}
+.mptransport{display:flex;align-items:center;justify-content:center;gap:24px;margin-top:6px}
 /* Flat (shadowless) translucent transport buttons. */
-.mpbtn{width:46px;height:46px;border:none;cursor:pointer;border-radius:50%;background:transparent;color:rgba(255,255,255,.85);display:flex;align-items:center;justify-content:center;transition:color .18s,background .18s,transform .18s}
+.mpbtn{width:48px;height:48px;border:none;cursor:pointer;border-radius:50%;background:transparent;color:rgba(255,255,255,.85);display:flex;align-items:center;justify-content:center;transition:color .18s,background .18s,transform .18s}
 .mpbtn:hover{color:#fff;background:rgba(255,255,255,.14)}
 .mpbtn.liked{color:#fff}
-.mpplay{width:76px;height:76px;background:#fff;color:var(--acc)}
+.mpplay{width:78px;height:78px;background:#fff;color:var(--acc)}
 .mpplay:hover{background:#fff;transform:scale(1.05)}
-.mpconnect{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 0}
-.mpconnectbtn{display:inline-flex;align-items:center;gap:8px;border:none;cursor:pointer;border-radius:9999px;background:#fff;color:var(--acc);font-family:inherit;font-size:14px;font-weight:600;padding:12px 22px;transition:transform .18s;opacity:1}
+.mpconnect{display:flex;flex-direction:column;align-items:center;gap:10px}
+.mpconnectbtn{display:inline-flex;align-items:center;gap:8px;border:none;cursor:pointer;border-radius:9999px;background:#fff;color:var(--acc);font-family:inherit;font-size:14px;font-weight:600;padding:12px 22px;transition:transform .18s}
 .mpconnectbtn:disabled{opacity:.6;cursor:default}
 .mpconnectbtn:hover:not(:disabled){transform:scale(1.03)}
-.mpnote{position:relative;z-index:2;text-align:center;color:rgba(255,255,255,.85);font-size:14px;margin:16px auto;max-width:360px;line-height:1.5}
+.mpnote{text-align:center;color:rgba(255,255,255,.85);font-size:14px;margin:0;max-width:360px;line-height:1.5}
 
 /* ===================================================================
    Step 6 — split conversational login (design "Atlas Login C1 - Split")
