@@ -122,10 +122,10 @@ export function AuthSphere({ orbState }: { orbState: OrbState }) {
       rot += cur.spd; const cxr = Math.cos(rot), sxr = Math.sin(rot);
       const cx = S * 0.9 + m.tx * S * 0.05 + Math.sin(t * 0.00042) * S * 0.015;
       const cy = H * 0.55 + m.ty * H * 0.05 + Math.cos(t * 0.00051) * H * 0.018;
-      const R = H * 0.44, breathe = 1 + Math.sin(t * 0.0009) * 0.03;
+      const R = H * 0.66, breathe = 1 + Math.sin(t * 0.0009) * 0.03;
       const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.3);
       cg.addColorStop(0, 'rgba(255,252,248,' + (0.36 * cur.br) + ')');
-      cg.addColorStop(0.5, 'rgba(190,206,248,.11)');
+      cg.addColorStop(0.5, 'rgba(184,204,255,.12)');
       cg.addColorStop(1, 'rgba(110,144,243,0)');
       ctx.fillStyle = cg; ctx.fillRect(0, 0, S, H);
       ctx.globalCompositeOperation = 'lighter';

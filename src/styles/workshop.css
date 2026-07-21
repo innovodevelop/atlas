@@ -306,7 +306,7 @@ body{margin:0;background:hsl(240 28% 7%);color:hsl(240 30% 96%);font-family:'Man
 
 /* Accent = Atlas Blue #3461f2 (swapped from orange). The original orange is
    saved below as --acc-orange / --acch-orange for easy restore if needed. */
-:root{--pg:#f9f7f4;--rz:#f1eeea;--sk:#edebe7;--wt:#ffffff;--ink:#1e1e24;--ink2:#6d6a67;--ink3:#b6b1aa;--bd:#e2ded7;--acc:#3461f2;--acch:#5578f4;--acc-orange:#ff6a00;--acch-orange:#ff773c;--alt:#3950e6;--dkf:#f9f7f4;--rsm:10px;--rmd:20px;--rlg:28px;--grn:#2f7d4f;--red:#c14a35}
+:root{--pg:#f9f7f4;--rz:#f1eeea;--sk:#edebe7;--wt:#ffffff;--ink:#1e1e24;--ink2:#6d6a67;--ink3:#b6b1aa;--bd:#e2ded7;--acc:#3461f2;--acch:#5b7cff;--acc-text:#2a4fd0;--acc-orange:#ff6a00;--acch-orange:#ff773c;--alt:#3950e6;--dkf:#f9f7f4;--rsm:10px;--rmd:20px;--rlg:28px;--grn:#2f7d4f;--red:#c14a35}
 body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
 .disp{font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.03em}
 .tnum{font-variant-numeric:tabular-nums}
@@ -682,8 +682,8 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 .bandB{position:relative;z-index:10;display:flex;align-items:center;gap:30px;max-width:1680px;margin:0 auto;padding:44px 28px 14px;animation:rise .8s cubic-bezier(.22,1,.36,1) both}
 .bandmetaB{margin-left:auto;text-align:right}
 .bmlB{font-size:13px;color:var(--ink2);margin-top:6px}
-.cardB{background:rgba(255,253,250,.72);backdrop-filter:blur(12px) saturate(1.06);-webkit-backdrop-filter:blur(12px) saturate(1.06);border:none;border-radius:var(--rlg);display:flex;flex-direction:column;overflow:hidden;cursor:pointer;box-shadow:0 1px 2px rgba(30,30,36,.05),0 12px 32px -20px rgba(30,30,36,.24);transition:box-shadow .28s,transform .28s;animation:rise .8s cubic-bezier(.22,1,.36,1) both}
-.cardB:hover{transform:translateY(-3px);box-shadow:0 4px 10px rgba(30,30,36,.06),0 22px 48px -22px rgba(30,30,36,.32)}
+.cardB{background:rgba(255,253,250,.72);backdrop-filter:blur(12px) saturate(1.06);-webkit-backdrop-filter:blur(12px) saturate(1.06);border:none;border-radius:var(--rlg);display:flex;flex-direction:column;overflow:hidden;cursor:pointer;box-shadow:0 8px 22px -18px rgba(30,30,36,.2);transition:box-shadow .28s,transform .28s;animation:rise .8s cubic-bezier(.22,1,.36,1) both}
+.cardB:hover{transform:translateY(-3px);box-shadow:0 14px 32px -24px rgba(30,30,36,.24)}
 .cbB{flex:1;padding:16px 22px 22px;min-height:0}
 .wxcard .cbB{position:relative;z-index:2}
 .chB{display:flex;align-items:center;justify-content:space-between;padding:20px 22px 0}
@@ -704,8 +704,8 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 .nmB{font-size:12px;color:var(--ink3)}
 .ntB{font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:500;line-height:1.26;color:var(--ink);margin:6px 0 4px;letter-spacing:-.01em}
 .ntagB{font-size:12px;font-weight:600;color:var(--acc)}
-.orbcvB{width:150px;height:150px;display:block}
-.orbwrapB{width:150px;height:150px;flex-shrink:0;cursor:pointer}
+.orbcvB{width:224px;height:224px;display:block}
+.orbwrapB{width:224px;height:224px;flex-shrink:0;cursor:pointer}
 .prcB{font-size:14px;color:var(--ink);font-variant-numeric:tabular-nums}
 .sbjB{font-size:13px;color:var(--ink2)}
 .snB{font-size:12px;color:var(--ink2)}
@@ -860,7 +860,7 @@ body{display:block;overflow-x:hidden;overflow-y:visible;max-width:none;flex:none
 /* Subtle editorial surfaces — lighter than the dashboard cards. */
 .focusview .gpanel,
 .focusview .gpanel2,
-.focusview .feat{background:rgba(255,253,250,.58);border:1px solid rgba(226,222,215,.6);border-radius:20px;box-shadow:0 1px 2px rgba(30,30,36,.03);backdrop-filter:blur(8px) saturate(1.04)}
+.focusview .feat{background:rgba(255,253,250,.55);border:none;border-radius:20px;box-shadow:0 6px 18px -16px rgba(30,30,36,.14);backdrop-filter:blur(8px) saturate(1.04)}
 
 /* Section labels → eyebrows. */
 .focusview .ebody h3,
@@ -952,8 +952,8 @@ body{display:block;overflow-x:hidden;overflow-y:visible;max-width:none;flex:none
 .ascene{position:fixed;inset:0;overflow:hidden;background:#3461f2;color:#fffdfa;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
 .authbgcv{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;display:block}
 .authorbcv{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;display:block;filter:saturate(1.05)}
-.avig{position:absolute;inset:0;z-index:2;pointer-events:none;background:radial-gradient(90% 120% at 6% 50%,rgba(24,40,120,.32),transparent 55%)}
-.ascrim{position:absolute;inset:0;z-index:3;pointer-events:none;background:linear-gradient(90deg,rgba(24,40,120,.16) 0%,transparent 30%,rgba(20,34,110,.22) 66%,rgba(18,30,100,.4) 100%)}
+.avig{position:absolute;inset:0;z-index:2;pointer-events:none;background:radial-gradient(90% 120% at 6% 50%,rgba(14,24,78,.32),transparent 55%)}
+.ascrim{position:absolute;inset:0;z-index:3;pointer-events:none;background:linear-gradient(90deg,rgba(14,24,78,.16) 0%,transparent 30%,rgba(12,20,70,.22) 66%,rgba(10,18,64,.4) 100%)}
 .alogo{position:absolute;top:5.5%;left:6.5%;z-index:6;font-family:'Hanken Grotesk',sans-serif;font-size:20px;font-weight:600;letter-spacing:-.02em}
 .agrid{position:absolute;inset:0;z-index:4;display:grid;grid-template-columns:1.02fr .98fr;align-items:stretch}
 .aleft{display:flex;flex-direction:column;justify-content:center;padding:0 4% 0 6.5%}
