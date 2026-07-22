@@ -22,7 +22,7 @@ use base64::Engine;
 use rusqlite::types::{Value as SqlValue, ValueRef};
 use rusqlite::{params, params_from_iter, Connection, OptionalExtension};
 use serde_json::{Map, Value as Json};
-use tauri::State;
+use tauri::{Emitter, State};
 
 /// The full schema (44 tables + indexes + updated_at triggers), applied
 /// idempotently on every open via `CREATE TABLE IF NOT EXISTS`.
@@ -527,30 +527,51 @@ pub fn db_select(
 }
 
 #[tauri::command]
-pub fn db_insert(state: State<'_, DbState>, table: String, values: Json) -> Result<Json, String> {
-    let conn = state.conn.lock().map_err(|e| e.to_string())?;
-    insert(&conn, &table, &values)
+pub fn db_insert(
+    app: tauri::AppHandle,
+    state: State<'_, DbState>,
+    table: String,
+    values: Json,
+) -> Result<Json, String> {
+    let out = {
+        let conn = state.conn.lock().map_err(|e| e.to_string())?;
+        insert(&conn, &table, &values)?
+    };
+    // Local "realtime": tell listeners the table changed (replaces Supabase
+    // postgres_changes channels — the frontend shim re-queries on this).
+    let _ = app.emit("db:changed", serde_json::json!({ "table": table, "op": "insert" }));
+    Ok(out)
 }
 
 #[tauri::command]
 pub fn db_update(
+    app: tauri::AppHandle,
     state: State<'_, DbState>,
     table: String,
     filters: Map<String, Json>,
     patch: Map<String, Json>,
 ) -> Result<Json, String> {
-    let conn = state.conn.lock().map_err(|e| e.to_string())?;
-    update(&conn, &table, &filters, &patch)
+    let out = {
+        let conn = state.conn.lock().map_err(|e| e.to_string())?;
+        update(&conn, &table, &filters, &patch)?
+    };
+    let _ = app.emit("db:changed", serde_json::json!({ "table": table, "op": "update" }));
+    Ok(out)
 }
 
 #[tauri::command]
 pub fn db_delete(
+    app: tauri::AppHandle,
     state: State<'_, DbState>,
     table: String,
     filters: Map<String, Json>,
 ) -> Result<Json, String> {
-    let conn = state.conn.lock().map_err(|e| e.to_string())?;
-    delete(&conn, &table, &filters)
+    let out = {
+        let conn = state.conn.lock().map_err(|e| e.to_string())?;
+        delete(&conn, &table, &filters)?
+    };
+    let _ = app.emit("db:changed", serde_json::json!({ "table": table, "op": "delete" }));
+    Ok(out)
 }
 
 /// Hybrid semantic+lexical memory retrieval (local recall_memories).
