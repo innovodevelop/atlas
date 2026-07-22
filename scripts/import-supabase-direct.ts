@@ -97,6 +97,22 @@ function toSqlite(v: unknown): string | number | null {
   return JSON.stringify(v); // jsonb objects & arrays
 }
 
+// Retry a query a couple of times — the Supabase pooler's first handshake can
+// transiently fail (often surfaced as a misleading "password authentication
+// failed"); a short backoff clears it.
+async function retry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
+  let last: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      last = e;
+      await Bun.sleep(500 * (i + 1));
+    }
+  }
+  throw last;
+}
+
 mkdirSync(dirname(DB_PATH), { recursive: true }); // must exist before opening the DB
 const db = new Database(DB_PATH, { create: true });
 db.exec(readFileSync(SCHEMA_PATH, "utf8")); // idempotent
@@ -132,12 +148,19 @@ let grandTotal = 0;
 const errors: string[] = [];
 
 try {
+  // Warm up the pooled connection (with retries) so the cold-start handshake
+  // blip lands here, not on the first real table read.
+  await retry(() => sql`SELECT 1`);
+
   for (const table of localTables) {
     const localCols = new Set(
       db.query<{ name: string }, []>(`PRAGMA table_info("${table}")`).all().map((r) => r.name),
     );
     try {
-      const rows = (await sql.unsafe(`SELECT * FROM public."${table}"`)) as unknown as Record<string, unknown>[];
+      const rows = (await retry(() => sql.unsafe(`SELECT * FROM public."${table}"`))) as unknown as Record<
+        string,
+        unknown
+      >[];
 
       if (!DRY_RUN && rows.length) {
         const tx = db.transaction((batch: Record<string, unknown>[]) => {
