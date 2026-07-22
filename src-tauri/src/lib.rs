@@ -12,6 +12,7 @@ mod portfolio;
 mod oauth;
 mod music;
 mod music_engine;
+mod db;
 
 const BUNDLE_ID: &str = "com.magnuspilegaard.atlas";
 
@@ -172,8 +173,19 @@ pub fn run() {
       music::music_seek,
       music::music_load,
       music::music_volume,
+      db::db_info,
     ])
     .setup(|app| {
+      // Local app database (Supabase migration). Open once at startup under the
+      // app-data dir; register the WAL connection for all db commands.
+      {
+        let dir = app.path().app_data_dir()?;
+        std::fs::create_dir_all(&dir)?;
+        let db_path = dir.join("atlas.db");
+        app.manage(db::DbState::open(&db_path)?);
+        log::info!("[db] local SQLite opened at {}", db_path.display());
+      }
+
       if cfg!(debug_assertions) {
         app.handle().plugin(
           tauri_plugin_log::Builder::default()

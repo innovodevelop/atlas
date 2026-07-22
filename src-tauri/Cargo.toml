@@ -35,6 +35,11 @@ librespot-playback = { version = "0.8", default-features = false, features = ["r
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
 # Local portfolio engine (SnapTrade brokerage sync + on-device analytics):
 duckdb = { version = "1.1", features = ["bundled"] }   # columnar OLAP over the full transaction history
+# Local-first app database (Supabase migration): SQLite mirror of the Postgres
+# schema. `bundled` vendors SQLite (with FTS5) — no system dep. sqlite-vec for
+# semantic recall lands in a later phase. DO NOT `cargo update` (breaks the
+# librespot vergen pin above); adding this dep only appends to Cargo.lock.
+rusqlite = { version = "0.32", features = ["bundled"] }
 ureq = { version = "2.10", features = ["json"] }        # lean blocking HTTP (no async runtime needed)
 hmac = "0.12"                                           # SnapTrade request signing
 sha2 = "0.10"
