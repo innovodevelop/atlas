@@ -25,38 +25,11 @@
  */
 
 import "./denoShim.ts";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { createLocalDb } from "./localDb.ts";
 
 import { runChat } from "../../../supabase/functions/_shared/orchestrator.ts";
 import { aiChatCompletion, hasAIKey } from "../../../supabase/functions/_shared/aiGateway.ts";
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-
-function loadRepoDotenv(): Record<string, string> {
-  const out: Record<string, string> = {};
-  try {
-    const txt = readFileSync(join(HERE, "../../../.env"), "utf8");
-    for (const line of txt.split("\n")) {
-      const m = line.match(/^([A-Z0-9_]+)="?([^"\n]*)"?$/);
-      if (m) out[m[1]] = m[2];
-    }
-  } catch {
-    /* packaged build: env comes from Tauri */
-  }
-  return out;
-}
-
-const dotenv = loadRepoDotenv();
-const SUPABASE_URL =
-  process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? dotenv.VITE_SUPABASE_URL;
-const ANON_KEY =
-  process.env.SUPABASE_ANON_KEY ??
-  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
-  dotenv.VITE_SUPABASE_PUBLISHABLE_KEY;
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ANON_KEY;
 const PORT = Number(process.env.ATLAS_BRAIN_PORT ?? 4830);
 const SIDECAR_TOKEN = process.env.SIDECAR_TOKEN;
 
@@ -84,41 +57,46 @@ class AuthError extends Error {
   }
 }
 
+/** Decode a JWT payload (no signature check — see requireUser). */
+function decodeJwt(token: string): { sub?: string; email?: string; exp?: number } | null {
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  try {
+    const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(Buffer.from(b64, "base64").toString("utf8"));
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Identity from the verified JWT only — never from the body (mirrors the edge
- * functions' requireUser). Also enforces SIDECAR_TOKEN when one is configured.
+ * Identity from the Cloudflare account JWT. Single local trust boundary
+ * (local-first): the brain runs on the user's own machine, so it decodes the
+ * token for the userId rather than cryptographically verifying it — signature
+ * verification lives at Cloudflare (the account endpoints, the mail worker),
+ * where the secret stays. Still enforces SIDECAR_TOKEN when configured.
  */
-async function requireUser(req: Request): Promise<{ userId: string; token: string }> {
+function requireUser(req: Request): { userId: string; email: string; token: string } {
   if (SIDECAR_TOKEN) {
     const presented = req.headers.get("x-sidecar-token");
     if (presented !== SIDECAR_TOKEN) throw new AuthError("bad sidecar token", 403);
   }
-  if (!SUPABASE_URL || !ANON_KEY) throw new AuthError("brain not configured (no Supabase env)", 503);
   const auth = req.headers.get("authorization") ?? "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
   if (!token) throw new AuthError("missing bearer token");
-  const authClient = createClient(SUPABASE_URL, ANON_KEY);
-  const { data, error } = await authClient.auth.getUser(token);
-  if (error || !data.user) throw new AuthError("invalid jwt");
-  return { userId: data.user.id, token };
+  const claims = decodeJwt(token);
+  if (!claims?.sub) throw new AuthError("invalid token");
+  if (claims.exp && Date.now() / 1000 >= claims.exp) throw new AuthError("token expired");
+  return { userId: claims.sub, email: claims.email ?? "", token };
 }
 
-function userClient(token: string): SupabaseClient {
-  return createClient(SUPABASE_URL!, ANON_KEY!, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-}
-
-function systemClient(): SupabaseClient {
-  return createClient(SUPABASE_URL!, SERVICE_ROLE_KEY!, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-}
+// One local DB (bun:sqlite over atlas.db) serves as both the user client and the
+// service-role client for the orchestrator — there's no RLS locally.
+const localDb = createLocalDb();
 
 // POST /chat-with-memory — full orchestrator: memory recall, tools, streaming.
 async function handleChatWithMemory(req: Request): Promise<Response> {
-  const { userId, token } = await requireUser(req);
+  const { userId, token } = requireUser(req);
   const {
     messages,
     source = "text_chat",
@@ -130,11 +108,12 @@ async function handleChatWithMemory(req: Request): Promise<Response> {
 
   const result = await runChat(
     {
-      supabase: userClient(token),
-      systemDb: systemClient(),
+      // Local DB stands in for both the user + service-role Supabase clients.
+      supabase: localDb as any,
+      systemDb: localDb as any,
       userId,
       userToken: token,
-      supabaseUrl: SUPABASE_URL!,
+      supabaseUrl: "local",
       perplexityKey: process.env.PERPLEXITY_API_KEY,
       sessionId: req.headers.get("x-session-id") || undefined,
     },
@@ -158,7 +137,7 @@ async function handleChatWithMemory(req: Request): Promise<Response> {
 
 // POST /chat — memory-less fallback: a single streamed completion.
 async function handleChat(req: Request): Promise<Response> {
-  await requireUser(req);
+  requireUser(req);
   const { messages } = await req.json();
   if (!hasAIKey()) return json({ error: "No AI key configured (GEMINI_API_KEY)" }, 500);
 
@@ -190,7 +169,7 @@ const server = Bun.serve({
     const url = new URL(req.url);
     if (req.method === "OPTIONS") return new Response(null, { headers: cors });
     if (url.pathname === "/health") {
-      return json({ ok: true, service: "atlas-brain", aiKey: hasAIKey(), supabase: Boolean(SUPABASE_URL && ANON_KEY) });
+      return json({ ok: true, service: "atlas-brain", aiKey: hasAIKey(), db: "local" });
     }
     try {
       if (req.method === "POST" && url.pathname === "/chat-with-memory") return await handleChatWithMemory(req);
@@ -205,5 +184,4 @@ const server = Bun.serve({
 });
 
 if (!hasAIKey()) console.log("[brain] no GEMINI_API_KEY — completions will 500 until a key is set");
-if (!SUPABASE_URL || !ANON_KEY) console.log("[brain] no Supabase env — auth/memory disabled until injected");
-console.log(`[brain] Atlas brain on http://127.0.0.1:${server.port} (/chat, /chat-with-memory)`);
+console.log(`[brain] Atlas brain on http://127.0.0.1:${server.port} (/chat, /chat-with-memory) — local DB`);
