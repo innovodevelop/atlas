@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { getToken } from '@/lib/authClient';
 import { toast } from 'sonner';
 import type { Message, Citation, AIState } from '@/types';
 import { CARD_KEYWORDS } from '@/types';
@@ -219,10 +219,10 @@ export const useUnifiedChat = ({
       // Get URL based on memory mode
       const url = enableMemory ? CHAT_WITH_MEMORY_URL : CHAT_URL;
       
-      // WS-A: identity travels in the JWT, never in the body. Raw fetch is
-      // kept (functions.invoke can't stream SSE) with the session token.
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      // Identity travels in the JWT (now a Cloudflare account token), never in
+      // the body. Raw fetch is kept (functions.invoke can't stream SSE).
+      const token = getToken();
+      if (!token) {
         throw new Error('Not authenticated');
       }
 
@@ -239,8 +239,7 @@ export const useUnifiedChat = ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(body),
         signal: abortControllerRef.current.signal,

@@ -13,7 +13,7 @@
  * and the dashboard chrome stay untouched.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { getToken } from "@/lib/authClient";
 import { WakeWordDetector } from "@/lib/wakeWord";
 import type { AIState } from "@/types";
 
@@ -169,8 +169,8 @@ export function useVoiceSession(options?: {
   const connect = useCallback(async () => {
     if (wsRef.current && wsRef.current.readyState <= WebSocket.OPEN) return;
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return; // not logged in — voice stays dormant
+    const token = getToken();
+    if (!token) return; // not logged in — voice stays dormant
 
     const target = await gatewayTarget();
     const ws = new WebSocket(target.url);
@@ -180,7 +180,7 @@ export function useVoiceSession(options?: {
     ws.onopen = () => {
       ws.send(JSON.stringify({
         type: "hello",
-        jwt: session.access_token,
+        jwt: token,
         sessionToken: target.sessionToken,
         sampleRate: 16000,
         voiceId: optionsRef.current?.voiceId,

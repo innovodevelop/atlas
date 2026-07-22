@@ -1,113 +1,65 @@
-import { useState, useEffect, useCallback } from "react";
-import { User, Session } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { clearPersistedCache } from "@/App";
+import * as auth from "@/lib/authClient";
 
+// Auth is now backed by the Cloudflare account system (atlas-site), not Supabase.
+// The session lives in localStorage (authClient); every useAuth instance stays in
+// sync via useSyncExternalStore. Same external shape as before (user / session /
+// loading / signIn / signUp / signOut / isAuthenticated) plus entitlement +
+// hasFeature. `session.access_token` is kept so existing bearer-token callers
+// keep working.
 export const useAuth = () => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const session = useSyncExternalStore(auth.subscribe, auth.getSession, auth.getSession);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, currentSession) => {
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-        setLoading(false);
-      }
-    );
-
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
-      setSession(existingSession);
-      setUser(existingSession?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    setLoading(false);
+    // Re-validate entitlement in the background (offline-safe; clears the
+    // session on a 401 so an expired token forces re-login).
+    void auth.refreshEntitlement();
   }, []);
 
-  const signUp = useCallback(async (email: string, password: string, displayName?: string) => {
-    try {
-      const redirectUrl = `${window.location.origin}/`;
-
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            display_name: displayName,
-          },
-        },
-      });
-
-      if (error) {
-        if (error.message.includes("already registered")) {
-          toast.error("This email is already registered. Please sign in instead.");
-        } else {
-          toast.error(error.message);
-        }
-        return { error };
-      }
-
-      toast.success("Account created successfully!");
-      return { data };
-    } catch (err) {
-      console.error("Sign up error:", err);
-      toast.error("An unexpected error occurred. Please try again.");
-      return { error: err };
+  const signUp = useCallback(async (email: string, password: string, _displayName?: string) => {
+    const { error, session } = await auth.signUp(email, password);
+    if (error) {
+      toast.error(error);
+      return { error };
     }
+    toast.success("Account created successfully!");
+    return { data: session };
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        toast.error(error.message);
-        return { error };
-      }
-
-      toast.success("Welcome back!");
-      return { data };
-    } catch (err) {
-      console.error("Sign in error:", err);
-      toast.error("An unexpected error occurred. Please try again.");
-      return { error: err };
+    const { error, session } = await auth.signIn(email, password);
+    if (error) {
+      toast.error(error);
+      return { error };
     }
+    toast.success("Welcome back!");
+    return { data: session };
   }, []);
 
   const signOut = useCallback(async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        toast.error(error.message);
-        return { error };
-      }
-      // Persisted query cache holds auth-scoped data — drop it on sign-out
-      clearPersistedCache();
-      toast.success("Signed out successfully");
-      return {};
-    } catch (err) {
-      console.error("Sign out error:", err);
-      toast.error("An unexpected error occurred. Please try again.");
-      return { error: err };
-    }
+    auth.signOut();
+    // Persisted query cache holds account-scoped data — drop it on sign-out.
+    clearPersistedCache();
+    toast.success("Signed out successfully");
+    return {};
   }, []);
+
+  const user = session ? { id: session.userId, email: session.email } : null;
 
   return {
     user,
-    session,
+    // Back-compat shim: callers read session.access_token for bearer auth.
+    session: session ? { access_token: session.token, user } : null,
+    entitlement: session?.entitlement ?? null,
     loading,
     signUp,
     signIn,
     signOut,
-    isAuthenticated: !!user,
+    isAuthenticated: !!session,
+    hasFeature: auth.hasFeature,
   };
 };

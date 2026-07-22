@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { getToken } from "@/lib/authClient";
 
 interface UseStreamingTTSOptions {
   onPlaybackStart?: () => void;
@@ -69,9 +69,9 @@ export const useStreamingTTS = (options: UseStreamingTTSOptions = {}) => {
     signal: AbortSignal,
   ): Promise<Blob | null> => {
     try {
-      // WS-A: authenticate with the user's session JWT, not the publishable key.
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
+      // Authenticate with the user's Cloudflare account token.
+      const token = getToken();
+      if (!token) throw new Error("Not authenticated");
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts-stream`,
         {
@@ -79,7 +79,7 @@ export const useStreamingTTS = (options: UseStreamingTTSOptions = {}) => {
           headers: {
             "Content-Type": "application/json",
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${session.access_token}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ text, voiceId: speakOptions.voiceId, modelId: speakOptions.modelId }),
           signal,
