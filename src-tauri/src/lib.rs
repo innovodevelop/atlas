@@ -124,28 +124,43 @@ fn atlas_brain_info(state: tauri::State<AtlasBrain>) -> serde_json::Value {
     })
 }
 
-/// Store an AI provider key in the Keychain (atlas-core). Takes effect on the
-/// next app launch (the sidecar reads keys from env at spawn). Accepts
-/// "gemini" or "perplexity".
-#[tauri::command]
-fn brain_set_ai_key(provider: String, key: String) -> Result<(), String> {
-    let account = match provider.as_str() {
+/// Map a provider slug to its Keychain account (service `atlas-core`). Covers
+/// the AI keys (brain sidecar) and the external-provider keys the local
+/// data-fetch / voice paths need (Supabase-removal Phase 5).
+fn core_account(provider: &str) -> Option<&'static str> {
+    Some(match provider {
         "gemini" => "gemini_api_key",
         "perplexity" => "perplexity_api_key",
-        other => return Err(format!("unknown provider: {other}")),
-    };
+        "openweather" => "openweather_api_key",
+        "finnhub" => "finnhub_api_key",
+        "news" => "news_api_key",
+        "elevenlabs" => "elevenlabs_api_key",
+        _ => return None,
+    })
+}
+
+/// Store a provider key in the Keychain (atlas-core). Takes effect on the next
+/// app launch (sidecars/commands read keys at spawn/call). Empty value clears it.
+#[tauri::command]
+fn brain_set_ai_key(provider: String, key: String) -> Result<(), String> {
+    let account = core_account(&provider).ok_or_else(|| format!("unknown provider: {provider}"))?;
     if key.trim().is_empty() {
         return secrets::clear_core_key(account);
     }
     secrets::set_core_key(account, key.trim())
 }
 
-/// Which AI keys are present in the Keychain (never returns the values).
+/// Which provider keys are present in the Keychain (never returns the values).
 #[tauri::command]
 fn brain_ai_status() -> serde_json::Value {
+    let present = |a: &str| secrets::core_key(a).is_some();
     serde_json::json!({
-        "gemini": secrets::core_key("gemini_api_key").is_some(),
-        "perplexity": secrets::core_key("perplexity_api_key").is_some(),
+        "gemini": present("gemini_api_key"),
+        "perplexity": present("perplexity_api_key"),
+        "openweather": present("openweather_api_key"),
+        "finnhub": present("finnhub_api_key"),
+        "news": present("news_api_key"),
+        "elevenlabs": present("elevenlabs_api_key"),
     })
 }
 const CACHE_PURGE_THRESHOLD_BYTES: u64 = 200 * 1024 * 1024; // 200 MB
