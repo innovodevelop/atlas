@@ -2,7 +2,25 @@ import { useState, useMemo, useCallback } from 'react';
 import { useDebouncedValue } from './useDebouncedValue';
 import { useAtlasKnowledge } from './useAtlasKnowledge';
 import { useAtlasResearch } from './useAtlasResearch';
-import { supabase } from '@/integrations/supabase/client';
+import { getToken } from '@/lib/authClient';
+import { getBrainEndpoint } from '@/lib/brainClient';
+
+// Search runs on the local brain sidecar (embed + local recall).
+async function brainPost(path: string, body: unknown): Promise<{ data: any; error: any }> {
+  const brain = await getBrainEndpoint();
+  if (!brain) return { data: null, error: new Error('Search is only available in the desktop app.') };
+  try {
+    const res = await fetch(`${brain.baseUrl}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken() ?? ''}`, 'x-sidecar-token': brain.token },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    return res.ok ? { data, error: null } : { data: null, error: new Error(data.error || 'Search failed') };
+  } catch (e) {
+    return { data: null, error: e };
+  }
+}
 
 export type BrainResultType = 'knowledge' | 'research' | 'finding';
 export type SearchMode = 'keyword' | 'semantic' | 'hybrid';
@@ -223,9 +241,7 @@ export const useBrainSearch = (options: BrainSearchOptions = {}) => {
     
     setIsSemanticSearching(true);
     try {
-      const { data, error } = await supabase.functions.invoke('semantic-search', {
-        body: { query: searchQuery, threshold: 0.3, limit }
-      });
+      const { data, error } = await brainPost('/search', { query: searchQuery, threshold: 0.3, limit });
       
       if (error) {
         console.error('Semantic search error:', error);
@@ -324,10 +340,7 @@ export const useBrainSearch = (options: BrainSearchOptions = {}) => {
   // Generate embeddings for new content
   const generateEmbeddings = useCallback(async (batchSize = 10) => {
     try {
-      const { data, error } = await supabase.functions.invoke('generate-embeddings', {
-        body: { batchSize }
-      });
-      
+      const { data, error } = await brainPost('/embed-backfill', { batchSize });
       if (error) throw error;
       return data;
     } catch (e) {

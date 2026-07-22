@@ -28,7 +28,7 @@ import "./denoShim.ts";
 import { createLocalDb } from "./localDb.ts";
 
 import { runChat } from "../../../supabase/functions/_shared/orchestrator.ts";
-import { aiChatCompletion, hasAIKey } from "../../../supabase/functions/_shared/aiGateway.ts";
+import { aiChatCompletion, hasAIKey, generateEmbedding } from "../../../supabase/functions/_shared/aiGateway.ts";
 
 const PORT = Number(process.env.ATLAS_BRAIN_PORT ?? 4830);
 const SIDECAR_TOKEN = process.env.SIDECAR_TOKEN;
@@ -162,6 +162,79 @@ async function handleChat(req: Request): Promise<Response> {
   return new Response(response.body, { headers: { ...cors, "Content-Type": "text/event-stream" } });
 }
 
+// POST /search — semantic search over local memory + knowledge (replaces the
+// semantic-search edge fn): embed the query (Gemini), recall locally, enrich.
+async function handleSearch(req: Request): Promise<Response> {
+  const { userId } = requireUser(req);
+  const { query, threshold = 0.3, limit = 20 } = await req.json();
+  if (!query || typeof query !== "string") return json({ error: "Query is required" }, 400);
+  if (!hasAIKey()) return json({ results: [], query, message: "No AI key configured" });
+
+  const queryEmbedding = await generateEmbedding(query);
+  const { data: hits } = await localDb.rpc("recall_memories", {
+    p_user_id: userId,
+    query_embedding: queryEmbedding,
+    query_text: query,
+    match_count: limit,
+  });
+
+  const results: Array<Record<string, unknown>> = [];
+  for (const h of (hits as any[]) ?? []) {
+    if (h.knowledge_entry_id) {
+      const { data: k } = await localDb.from("atlas_knowledge_entries").select().eq("id", h.knowledge_entry_id).single();
+      if (k) results.push({
+        id: k.id, type: "knowledge", title: k.topic,
+        preview: (typeof k.content === "object" ? JSON.stringify(k.content) : String(k.content)).slice(0, 200),
+        category: k.category, confidence: k.confidence, similarity: h.similarity, createdAt: k.created_at,
+        source: "semantic", metadata: { source: k.source, accessCount: k.access_count, relevanceScore: k.relevance_score },
+      });
+    } else if (h.memory_item_id) {
+      const { data: m } = await localDb.from("ai_memory").select().eq("id", h.memory_item_id).single();
+      if (m) results.push({
+        id: m.id, type: "memory", title: m.key,
+        preview: (typeof m.value === "object" ? JSON.stringify(m.value) : String(m.value)).slice(0, 200),
+        category: m.category, confidence: m.validation_score || 0.5, similarity: h.similarity, createdAt: m.created_at,
+        source: "semantic", metadata: { memoryType: m.memory_type, importance: m.importance },
+      });
+    }
+  }
+  return json({ results: results.filter((r) => (r.similarity as number) >= threshold), query });
+}
+
+// POST /embed-backfill — embed + store vectors for the user's memories/knowledge
+// that don't have one yet (replaces the generate-embeddings edge fn).
+async function handleEmbedBackfill(req: Request): Promise<Response> {
+  const { userId } = requireUser(req);
+  const { batchSize = 10 } = await req.json();
+  if (!hasAIKey()) return json({ processed: 0, message: "No AI key configured" });
+
+  const raw: any = (localDb as any)._db;
+  const upsert = (localDb as any).upsertVector as (a: Record<string, unknown>) => void;
+  let processed = 0;
+
+  const mems = raw
+    .query("SELECT id, key, value FROM ai_memory WHERE user_id = ? AND id NOT IN (SELECT memory_item_id FROM memory_vectors WHERE memory_item_id IS NOT NULL) LIMIT ?")
+    .all(userId, batchSize) as any[];
+  for (const m of mems) {
+    const text = `${m.key}: ${m.value}`.slice(0, 2000);
+    upsert({ id: crypto.randomUUID(), userId, chunkText: text, embedding: await generateEmbedding(text), memoryItemId: m.id });
+    processed++;
+  }
+
+  const remaining = Math.max(0, batchSize - processed);
+  if (remaining > 0) {
+    const ks = raw
+      .query("SELECT id, topic, content FROM atlas_knowledge_entries WHERE user_id = ? AND id NOT IN (SELECT knowledge_entry_id FROM memory_vectors WHERE knowledge_entry_id IS NOT NULL) LIMIT ?")
+      .all(userId, remaining) as any[];
+    for (const k of ks) {
+      const text = `${k.topic}: ${k.content}`.slice(0, 2000);
+      upsert({ id: crypto.randomUUID(), userId, chunkText: text, embedding: await generateEmbedding(text), knowledgeEntryId: k.id });
+      processed++;
+    }
+  }
+  return json({ processed });
+}
+
 const server = Bun.serve({
   hostname: "127.0.0.1", // localhost only — never exposed to the network
   port: PORT,
@@ -174,6 +247,8 @@ const server = Bun.serve({
     try {
       if (req.method === "POST" && url.pathname === "/chat-with-memory") return await handleChatWithMemory(req);
       if (req.method === "POST" && url.pathname === "/chat") return await handleChat(req);
+      if (req.method === "POST" && url.pathname === "/search") return await handleSearch(req);
+      if (req.method === "POST" && url.pathname === "/embed-backfill") return await handleEmbedBackfill(req);
     } catch (e) {
       if (e instanceof AuthError) return json({ error: e.message }, e.status);
       console.error("[brain] error:", e);

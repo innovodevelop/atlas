@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { useRealtimeScribeStable as useRealtimeScribe } from '@/hooks/useRealtimeScribeStable';
 import { useStreamingTTS } from '@/hooks/useStreamingTTS';
 import { supabase } from '@/integrations/supabase/client';
+import { getToken } from '@/lib/authClient';
+import { getBrainEndpoint } from '@/lib/brainClient';
 import { useToast } from '@/hooks/use-toast';
 import { AtlasSphere } from '@/components/atlas';
 
@@ -114,19 +116,24 @@ const AtlasTeach = () => {
         throw new Error('Please sign in to use Atlas Teach.');
       }
 
-      const { data, error } = await supabase.functions.invoke('chat-with-memory', {
-        body: {
-          messages: [...messages, newUserMessage].map(m => ({
-            role: m.role,
-            content: m.content,
-          })),
-          userId: user.id,
+      // Teaching runs through the local brain (non-streaming JSON turn).
+      const brain = await getBrainEndpoint();
+      if (!brain) throw new Error('Atlas Teach is only available in the desktop app.');
+      const res = await fetch(`${brain.baseUrl}/chat-with-memory`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${getToken() ?? ''}`,
+          'x-sidecar-token': brain.token,
+        },
+        body: JSON.stringify({
+          messages: [...messages, newUserMessage].map(m => ({ role: m.role, content: m.content })),
           teachingMode: true,
           systemPromptOverride: TEACHING_SYSTEM_PROMPT,
-        },
+        }),
       });
-
-      if (error) throw error;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Teaching request failed');
 
       const responseText = data.response || data.message || 'I understand. Tell me more.';
       const assistantMessage: Message = {
