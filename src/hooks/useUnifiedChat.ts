@@ -1,11 +1,9 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { getToken } from '@/lib/authClient';
+import { getBrainEndpoint } from '@/lib/brainClient';
 import { toast } from 'sonner';
 import type { Message, Citation, AIState } from '@/types';
 import { CARD_KEYWORDS } from '@/types';
-
-const CHAT_WITH_MEMORY_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-with-memory`;
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
 // Response cache for repeated queries
 const responseCache = new Map<string, { response: string; timestamp: number }>();
@@ -216,15 +214,17 @@ export const useUnifiedChat = ({
     };
 
     try {
-      // Get URL based on memory mode
-      const url = enableMemory ? CHAT_WITH_MEMORY_URL : CHAT_URL;
-      
-      // Identity travels in the JWT (now a Cloudflare account token), never in
-      // the body. Raw fetch is kept (functions.invoke can't stream SSE).
+      // Chat streams from the LOCAL brain sidecar (not Supabase). Identity is
+      // the Cloudflare account token; the sidecar token gates the local port.
       const token = getToken();
       if (!token) {
         throw new Error('Not authenticated');
       }
+      const brain = await getBrainEndpoint();
+      if (!brain) {
+        throw new Error('Atlas brain is only available in the desktop app.');
+      }
+      const url = `${brain.baseUrl}${enableMemory ? '/chat-with-memory' : '/chat'}`;
 
       const chatMessages = [...messages, userMessage].map((m) => ({
         role: m.role,
@@ -240,6 +240,7 @@ export const useUnifiedChat = ({
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
+          'x-sidecar-token': brain.token,
         },
         body: JSON.stringify(body),
         signal: abortControllerRef.current.signal,
