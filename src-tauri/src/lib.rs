@@ -42,11 +42,16 @@ fn spawn_voice_gateway(token: &str) -> Option<Child> {
         );
         return None;
     }
-    match Command::new(&bin)
-        .env("SIDECAR_TOKEN", token)
-        .env("VOICE_GATEWAY_PORT", VOICE_GATEWAY_PORT.to_string())
-        .spawn()
-    {
+    let mut cmd = Command::new(&bin);
+    cmd.env("SIDECAR_TOKEN", token)
+        .env("VOICE_GATEWAY_PORT", VOICE_GATEWAY_PORT.to_string());
+    // ElevenLabs key from the Keychain (Phase 5): voice runs directly against
+    // ElevenLabs (TTS + scribe-token), no Supabase edge-fn hop. Never in env
+    // files or git.
+    if let Some(k) = secrets::core_key("elevenlabs_api_key") {
+        cmd.env("ELEVENLABS_API_KEY", k);
+    }
+    match cmd.spawn() {
         Ok(child) => {
             eprintln!("[atlas] voice gateway spawned (pid {})", child.id());
             Some(child)

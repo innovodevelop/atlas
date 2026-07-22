@@ -33,10 +33,20 @@ export class RealtimeStt {
     private userJwt: string,
     private events: SttEvents,
     private languageCode?: string, // e.g. "da" — Danish-first product
+    private apiKey?: string, // ElevenLabs key (direct mint); falls back to edge fn
   ) {}
 
-  /** Mint a single-use token and open the WS. Resolves when ready for audio. */
-  async start(): Promise<void> {
+  /** Mint a single-use scribe token — directly from ElevenLabs when the key is
+   *  injected (Phase 5), else via the edge function (transitional). */
+  private async mintToken(): Promise<string> {
+    if (this.apiKey) {
+      const r = await fetch("https://api.elevenlabs.io/v1/single-use-token/realtime_scribe", {
+        method: "POST",
+        headers: { "xi-api-key": this.apiKey },
+      });
+      if (!r.ok) throw new Error(`scribe token failed: ${r.status}`);
+      return (await r.json()).token;
+    }
     const tokenRes = await fetch(`${this.supabaseUrl}/functions/v1/elevenlabs-scribe-token`, {
       method: "POST",
       headers: {
@@ -47,7 +57,12 @@ export class RealtimeStt {
       body: JSON.stringify({}),
     });
     if (!tokenRes.ok) throw new Error(`scribe token failed: ${tokenRes.status}`);
-    const { token } = await tokenRes.json();
+    return (await tokenRes.json()).token;
+  }
+
+  /** Mint a single-use token and open the WS. Resolves when ready for audio. */
+  async start(): Promise<void> {
+    const token = await this.mintToken();
 
     const params = new URLSearchParams({
       model_id: "scribe_v2_realtime",

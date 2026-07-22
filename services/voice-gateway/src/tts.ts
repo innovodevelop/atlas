@@ -57,6 +57,44 @@ export class EdgeFnTtsProvider implements TtsProvider {
 }
 
 /**
+ * Direct ElevenLabs streaming TTS (Supabase-removal, Phase 5). Replaces the
+ * edge-fn hop; the API key is injected into the sidecar from the Keychain
+ * (never reaches the webview). Same request the elevenlabs-tts-stream edge fn
+ * made.
+ */
+export class DirectTtsProvider implements TtsProvider {
+  readonly name = "elevenlabs-direct";
+  private static ALLOWED = ["eleven_turbo_v2_5", "eleven_flash_v2_5", "eleven_multilingual_v2"];
+
+  constructor(private apiKey: string) {}
+
+  async synthesize(req: TtsRequest, sink: (bytes: Uint8Array) => void): Promise<void> {
+    const voiceId = req.voiceId || "EXAVITQu4vr4xnSDxMaL";
+    const model = DirectTtsProvider.ALLOWED.includes(req.modelId ?? "") ? req.modelId : "eleven_turbo_v2_5";
+    const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`, {
+      method: "POST",
+      headers: { "xi-api-key": this.apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: req.text,
+        model_id: model,
+        output_format: "mp3_44100_128",
+        voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true },
+      }),
+      signal: req.signal,
+    });
+    if (!res.ok || !res.body) {
+      throw new Error(`TTS failed: ${res.status} ${await res.text().catch(() => "")}`);
+    }
+    const reader = res.body.getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value && value.length > 0) sink(value);
+    }
+  }
+}
+
+/**
  * Pipelined synthesis queue: chunk N+1 synthesizes while chunk N's bytes are
  * still being delivered/played. `abort()` cancels everything in flight —
  * that's the barge-in path.

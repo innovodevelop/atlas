@@ -16,7 +16,12 @@ import "./denoShim.ts";
 import { runChat, type ChatMessage } from "../../../supabase/functions/_shared/orchestrator.ts";
 import { createVad, type VadEngine, type VadAssets } from "./vad.ts";
 import { RealtimeStt } from "./stt.ts";
-import { TtsPipeline, EdgeFnTtsProvider } from "./tts.ts";
+import { TtsPipeline, EdgeFnTtsProvider, DirectTtsProvider } from "./tts.ts";
+
+// ElevenLabs key injected into the sidecar from the Keychain (Phase 5). When
+// present, voice runs directly against ElevenLabs; otherwise it falls back to
+// the (transitional) Supabase edge functions.
+const ELEVEN_KEY = process.env.ELEVENLABS_API_KEY;
 import { SentenceChunker, stripForSpeech, type SentenceChunk } from "./sentence.ts";
 import type { ServerMsg, ClientMsg, AtlasState } from "./protocol.ts";
 
@@ -60,7 +65,9 @@ export class VoiceSession {
   onLatency: ((wakeToFirstAudioMs: number) => void) | null = null;
 
   private constructor(private cfg: SessionConfig) {
-    this.tts = new TtsPipeline(new EdgeFnTtsProvider(cfg.supabaseUrl, cfg.anonKey, cfg.userJwt));
+    this.tts = new TtsPipeline(
+      ELEVEN_KEY ? new DirectTtsProvider(ELEVEN_KEY) : new EdgeFnTtsProvider(cfg.supabaseUrl, cfg.anonKey, cfg.userJwt),
+    );
   }
 
   static async create(cfg: SessionConfig): Promise<VoiceSession> {
@@ -139,6 +146,7 @@ export class VoiceSession {
         onError: (e) => console.error("[session] STT error:", e.message),
       },
       this.cfg.languageCode,
+      ELEVEN_KEY,
     );
     this.setState("listening");
     try {
