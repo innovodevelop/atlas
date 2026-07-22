@@ -174,6 +174,10 @@ pub fn run() {
       music::music_load,
       music::music_volume,
       db::db_info,
+      db::db_select,
+      db::db_insert,
+      db::db_update,
+      db::db_delete,
     ])
     .setup(|app| {
       // Local app database (Supabase migration). Open once at startup under the
