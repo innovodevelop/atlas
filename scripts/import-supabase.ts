@@ -80,8 +80,8 @@ async function fetchPage(table: string, offset: number): Promise<Record<string, 
   return (await res.json()) as Record<string, unknown>[];
 }
 
+mkdirSync(dirname(DB_PATH), { recursive: true }); // must exist before opening the DB
 const db = new Database(DB_PATH, { create: true });
-mkdirSync(dirname(DB_PATH), { recursive: true });
 db.exec(readFileSync(SCHEMA_PATH, 'utf8')); // idempotent (CREATE ... IF NOT EXISTS)
 db.exec('PRAGMA foreign_keys = OFF;'); // bulk load; verify integrity at the end
 
