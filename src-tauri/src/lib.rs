@@ -269,6 +269,8 @@ pub fn run() {
       db::db_insert,
       db::db_update,
       db::db_delete,
+      db::memory_recall,
+      db::memory_upsert_vector,
     ])
     .setup(|app| {
       // Local app database (Supabase migration). Open once at startup under the

@@ -40,6 +40,10 @@ duckdb = { version = "1.1", features = ["bundled"] }   # columnar OLAP over the 
 # semantic recall lands in a later phase. DO NOT `cargo update` (breaks the
 # librespot vergen pin above); adding this dep only appends to Cargo.lock.
 rusqlite = { version = "0.32", features = ["bundled"] }
+# Semantic memory: sqlite-vec provides a vec0 virtual table for on-device
+# cosine KNN over the 768-dim embeddings (replaces pgvector). FTS5 (bundled with
+# rusqlite) is the keyword arm; together they reimplement recall_memories().
+sqlite-vec = "0.1"
 ureq = { version = "2.10", features = ["json"] }        # lean blocking HTTP (no async runtime needed)
 hmac = "0.12"                                           # SnapTrade request signing
 sha2 = "0.10"

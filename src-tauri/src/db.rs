@@ -14,19 +14,43 @@
 // validated against the live schema (sqlite_master / table_info) before they
 // touch SQL; all values are bound parameters — no string interpolation of data.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Mutex, Once};
 
 use base64::Engine;
 use rusqlite::types::{Value as SqlValue, ValueRef};
-use rusqlite::{params_from_iter, Connection, OptionalExtension};
+use rusqlite::{params, params_from_iter, Connection, OptionalExtension};
 use serde_json::{Map, Value as Json};
 use tauri::State;
 
 /// The full schema (44 tables + indexes + updated_at triggers), applied
 /// idempotently on every open via `CREATE TABLE IF NOT EXISTS`.
 const SCHEMA: &str = include_str!("db_schema.sql");
+
+/// Semantic-memory virtual tables (Phase 3): the sqlite-vec KNN index over the
+/// 768-dim embeddings + an FTS5 keyword mirror of chunk_text. Kept separate
+/// from db_schema.sql because virtual tables require the vec extension loaded
+/// first (registered in `ensure_vec_extension`). Embeddings from Gemini are
+/// unit-normalized, so default L2 distance ranks identically to cosine and
+/// cosine_similarity = 1 - L2^2/2.
+const VEC_SCHEMA: &str = "\
+CREATE VIRTUAL TABLE IF NOT EXISTS memory_vec USING vec0(\
+  id TEXT PRIMARY KEY, embedding float[768]);\
+CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(\
+  id UNINDEXED, chunk_text, tokenize='porter unicode61');";
+
+static VEC_INIT: Once = Once::new();
+
+/// Register sqlite-vec as an auto-extension so every connection opened afterward
+/// gets the vec0 virtual table. Process-global; safe to call repeatedly.
+fn ensure_vec_extension() {
+    VEC_INIT.call_once(|| unsafe {
+        rusqlite::ffi::sqlite3_auto_extension(Some(std::mem::transmute(
+            sqlite_vec::sqlite3_vec_init as *const (),
+        )));
+    });
+}
 
 /// Managed state: the single long-lived SQLite connection.
 pub struct DbState {
@@ -36,6 +60,7 @@ pub struct DbState {
 impl DbState {
     /// Open (creating if absent) the DB at `path`, set pragmas, ensure schema.
     pub fn open(path: &Path) -> Result<Self, String> {
+        ensure_vec_extension();
         let conn = Connection::open(path).map_err(|e| e.to_string())?;
         conn.execute_batch(
             "PRAGMA journal_mode = WAL;\
@@ -44,14 +69,17 @@ impl DbState {
         )
         .map_err(|e| e.to_string())?;
         conn.execute_batch(SCHEMA).map_err(|e| e.to_string())?;
+        conn.execute_batch(VEC_SCHEMA).map_err(|e| e.to_string())?;
         Ok(DbState { conn: Mutex::new(conn) })
     }
 
     #[cfg(test)]
     fn open_in_memory() -> Result<Self, String> {
+        ensure_vec_extension();
         let conn = Connection::open_in_memory().map_err(|e| e.to_string())?;
         conn.execute_batch("PRAGMA foreign_keys = ON;").map_err(|e| e.to_string())?;
         conn.execute_batch(SCHEMA).map_err(|e| e.to_string())?;
+        conn.execute_batch(VEC_SCHEMA).map_err(|e| e.to_string())?;
         Ok(DbState { conn: Mutex::new(conn) })
     }
 }
@@ -294,6 +322,187 @@ fn delete(conn: &Connection, table: &str, filters: &Map<String, Json>) -> Result
 }
 
 // --------------------------------------------------------------------------
+// Semantic memory (Phase 3): sqlite-vec + FTS5 port of recall_memories()
+// --------------------------------------------------------------------------
+
+/// Pack a float embedding as little-endian f32 bytes (what sqlite-vec expects).
+fn embedding_to_blob(v: &[f32]) -> Vec<u8> {
+    let mut b = Vec::with_capacity(v.len() * 4);
+    for f in v {
+        b.extend_from_slice(&f.to_le_bytes());
+    }
+    b
+}
+
+/// Build a safe FTS5 MATCH query from free text: alphanumeric tokens, quoted,
+/// OR-combined (mirrors plainto_tsquery's "any term" behavior loosely).
+fn fts_query(text: &str) -> Option<String> {
+    let toks: Vec<String> = text
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|t| t.chars().count() >= 2)
+        .map(|t| format!("\"{}\"", t.to_lowercase()))
+        .collect();
+    if toks.is_empty() {
+        None
+    } else {
+        Some(toks.join(" OR "))
+    }
+}
+
+const EMBED_DIM: usize = 768;
+
+/// Insert/replace a memory chunk + its embedding across the base table, the
+/// vec0 KNN index, and the FTS5 keyword index (kept in lockstep).
+fn upsert_vector(
+    conn: &Connection,
+    id: &str,
+    user_id: &str,
+    chunk_text: &str,
+    embedding: &[f32],
+    memory_item_id: Option<&str>,
+    knowledge_entry_id: Option<&str>,
+) -> Result<(), String> {
+    if embedding.len() != EMBED_DIM {
+        return Err(format!("embedding must be {EMBED_DIM}-dim, got {}", embedding.len()));
+    }
+    let blob = embedding_to_blob(embedding);
+    conn.execute(
+        "INSERT OR REPLACE INTO memory_vectors \
+         (id, user_id, memory_item_id, knowledge_entry_id, embedding, chunk_text) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![id, user_id, memory_item_id, knowledge_entry_id, &blob, chunk_text],
+    )
+    .map_err(|e| e.to_string())?;
+    // vec0 has no UPDATE; delete + insert to refresh.
+    conn.execute("DELETE FROM memory_vec WHERE id = ?1", [id]).map_err(|e| e.to_string())?;
+    conn.execute("INSERT INTO memory_vec (id, embedding) VALUES (?1, ?2)", params![id, &blob])
+        .map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM memory_fts WHERE id = ?1", [id]).map_err(|e| e.to_string())?;
+    conn.execute("INSERT INTO memory_fts (id, chunk_text) VALUES (?1, ?2)", params![id, chunk_text])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Hybrid retrieval — the local port of the Postgres recall_memories() RPC.
+/// Blends semantic (sqlite-vec cosine, from normalized embeddings) and lexical
+/// (FTS5 bm25) scores, shaped by recency and importance, with the exact weights
+/// of the original: 0.65*sim + 0.35*min(fts,1), *(0.5+0.5*recency),
+/// *(0.5+importance/20); keep sim>0.25 OR fts>0.05; recency uses created_at
+/// with a 65-day decay constant.
+fn recall(
+    conn: &Connection,
+    user_id: &str,
+    query_embedding: &[f32],
+    query_text: &str,
+    match_count: i64,
+) -> Result<Json, String> {
+    if query_embedding.len() != EMBED_DIM {
+        return Err(format!("query embedding must be {EMBED_DIM}-dim, got {}", query_embedding.len()));
+    }
+    let qblob = embedding_to_blob(query_embedding);
+    let k = (match_count.max(1) * 8).max(8);
+
+    // 1. Semantic KNN. Embeddings are unit-normalized, so cosine_sim = 1 - L2^2/2.
+    let mut sims: HashMap<String, f64> = HashMap::new();
+    {
+        let mut stmt = conn
+            .prepare("SELECT id, distance FROM memory_vec WHERE embedding MATCH ?1 AND k = ?2")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map(params![qblob, k], |r| Ok((r.get::<_, String>(0)?, r.get::<_, f64>(1)?)))
+            .map_err(|e| e.to_string())?;
+        for row in rows {
+            let (id, dist) = row.map_err(|e| e.to_string())?;
+            sims.insert(id, (1.0 - dist * dist / 2.0).clamp(0.0, 1.0));
+        }
+    }
+
+    // 2. Lexical (bm25 is more-negative-is-better; normalize to ~[0,1]).
+    let mut ftsm: HashMap<String, f64> = HashMap::new();
+    if let Some(q) = fts_query(query_text) {
+        let mut stmt = conn
+            .prepare("SELECT id, bm25(memory_fts) FROM memory_fts WHERE memory_fts MATCH ?1")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map(params![q], |r| Ok((r.get::<_, String>(0)?, r.get::<_, f64>(1)?)))
+            .map_err(|e| e.to_string())?;
+        for row in rows {
+            let (id, bm) = row.map_err(|e| e.to_string())?;
+            ftsm.insert(id, (-bm / 10.0).clamp(0.0, 1.0));
+        }
+    }
+
+    // Candidate union.
+    let mut ids: Vec<String> = sims.keys().cloned().collect();
+    for id in ftsm.keys() {
+        if !sims.contains_key(id) {
+            ids.push(id.clone());
+        }
+    }
+    if ids.is_empty() {
+        return Ok(Json::Array(vec![]));
+    }
+
+    // 3. Pull metadata for the candidates (user filter, recency, importance, fakes).
+    let placeholders = vec!["?"; ids.len()].join(",");
+    let sql = format!(
+        "SELECT mv.id, mv.chunk_text, mv.memory_item_id, mv.knowledge_entry_id, \
+                (strftime('%s','now') - strftime('%s', mv.created_at)) AS age, \
+                am.importance, am.is_fake, ake.relevance_score, ake.is_fake \
+         FROM memory_vectors mv \
+         LEFT JOIN ai_memory am ON am.id = mv.memory_item_id \
+         LEFT JOIN atlas_knowledge_entries ake ON ake.id = mv.knowledge_entry_id \
+         WHERE mv.user_id = ? AND mv.id IN ({placeholders})"
+    );
+    let mut binds: Vec<SqlValue> = Vec::with_capacity(ids.len() + 1);
+    binds.push(SqlValue::Text(user_id.to_string()));
+    for id in &ids {
+        binds.push(SqlValue::Text(id.clone()));
+    }
+
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let mut rows = stmt.query(params_from_iter(binds.iter())).map_err(|e| e.to_string())?;
+    let mut scored: Vec<(f64, Json)> = Vec::new();
+    while let Some(row) = rows.next().map_err(|e| e.to_string())? {
+        let id: String = row.get(0).map_err(|e| e.to_string())?;
+        let chunk: String = row.get(1).map_err(|e| e.to_string())?;
+        let mem_id: Option<String> = row.get(2).map_err(|e| e.to_string())?;
+        let kn_id: Option<String> = row.get(3).map_err(|e| e.to_string())?;
+        let age: Option<i64> = row.get(4).map_err(|e| e.to_string())?;
+        let am_imp: Option<i64> = row.get(5).map_err(|e| e.to_string())?;
+        let am_fake: Option<i64> = row.get(6).map_err(|e| e.to_string())?;
+        let ake_rel: Option<f64> = row.get(7).map_err(|e| e.to_string())?;
+        let ake_fake: Option<i64> = row.get(8).map_err(|e| e.to_string())?;
+
+        if am_fake.unwrap_or(0) == 1 || ake_fake.unwrap_or(0) == 1 {
+            continue;
+        }
+        let sim = *sims.get(&id).unwrap_or(&0.0);
+        let fts = *ftsm.get(&id).unwrap_or(&0.0);
+        if !(sim > 0.25 || fts > 0.05) {
+            continue;
+        }
+        let age_s = age.unwrap_or(0).max(0) as f64;
+        let recency = (-age_s / (86400.0 * 65.0)).exp();
+        let importance = am_imp
+            .map(|i| i as f64)
+            .or_else(|| ake_rel.map(|r| (r * 10.0).clamp(1.0, 10.0)))
+            .unwrap_or(5.0);
+        let score = (0.65 * sim + 0.35 * fts.min(1.0)) * (0.5 + 0.5 * recency) * (0.5 + importance / 20.0);
+        scored.push((
+            score,
+            serde_json::json!({
+                "id": id, "chunk_text": chunk, "memory_item_id": mem_id,
+                "knowledge_entry_id": kn_id, "score": score, "similarity": sim,
+            }),
+        ));
+    }
+    scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+    let out: Vec<Json> = scored.into_iter().take(match_count.max(0) as usize).map(|(_, j)| j).collect();
+    Ok(Json::Array(out))
+}
+
+// --------------------------------------------------------------------------
 // Tauri commands (thin wrappers over the core fns)
 // --------------------------------------------------------------------------
 
@@ -342,6 +551,42 @@ pub fn db_delete(
 ) -> Result<Json, String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
     delete(&conn, &table, &filters)
+}
+
+/// Hybrid semantic+lexical memory retrieval (local recall_memories).
+#[tauri::command]
+pub fn memory_recall(
+    state: State<'_, DbState>,
+    user_id: String,
+    query_embedding: Vec<f32>,
+    query_text: String,
+    match_count: Option<i64>,
+) -> Result<Json, String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    recall(&conn, &user_id, &query_embedding, &query_text, match_count.unwrap_or(12))
+}
+
+/// Insert/replace a memory chunk + embedding (base table + vec0 + FTS5).
+#[tauri::command]
+pub fn memory_upsert_vector(
+    state: State<'_, DbState>,
+    id: String,
+    user_id: String,
+    chunk_text: String,
+    embedding: Vec<f32>,
+    memory_item_id: Option<String>,
+    knowledge_entry_id: Option<String>,
+) -> Result<(), String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    upsert_vector(
+        &conn,
+        &id,
+        &user_id,
+        &chunk_text,
+        &embedding,
+        memory_item_id.as_deref(),
+        knowledge_entry_id.as_deref(),
+    )
 }
 
 /// One row of `db_info`: a table and its current row count.
@@ -430,6 +675,48 @@ mod tests {
         assert_eq!(deleted.as_array().unwrap().len(), 1);
         let remaining = select(&conn, "user_tasks", &Map::new(), None, true, None).unwrap();
         assert_eq!(remaining.as_array().unwrap().len(), 1);
+    }
+
+    // A unit basis vector in 768-space (already normalized) for deterministic
+    // cosine tests.
+    fn basis(i: usize) -> Vec<f32> {
+        let mut v = vec![0f32; super::EMBED_DIM];
+        v[i] = 1.0;
+        v
+    }
+
+    #[test]
+    fn hybrid_recall_ranks_and_filters() {
+        let db = DbState::open_in_memory().unwrap();
+        let conn = db.conn.lock().unwrap();
+
+        upsert_vector(&conn, "a", "u", "apple pie recipe", &basis(0), None, None).unwrap();
+        upsert_vector(&conn, "b", "u", "quantum physics lecture", &basis(1), None, None).unwrap();
+        upsert_vector(&conn, "c", "u", "apple orchard tour", &basis(2), None, None).unwrap();
+
+        // Query identical to a's vector, text mentions "apple".
+        let res = recall(&conn, "u", &basis(0), "apple", 5).unwrap();
+        let arr = res.as_array().unwrap();
+
+        // a is the nearest vector (sim ~1) AND matches the term -> ranked first.
+        assert_eq!(arr[0]["id"], json!("a"));
+        assert!(arr[0]["similarity"].as_f64().unwrap() > 0.9);
+        // b (orthogonal vector, no "apple") is filtered out by sim>0.25 OR fts>0.05.
+        assert!(arr.iter().all(|r| r["id"] != json!("b")));
+
+        // Wrong user sees nothing.
+        assert_eq!(recall(&conn, "other", &basis(0), "apple", 5).unwrap().as_array().unwrap().len(), 0);
+
+        // is_fake knowledge is excluded even on a strong vector hit.
+        insert(
+            &conn,
+            "atlas_knowledge_entries",
+            &json!({ "id": "k1", "user_id": "u", "topic": "t", "content": "{}", "is_fake": true }),
+        )
+        .unwrap();
+        upsert_vector(&conn, "d", "u", "apple cider", &basis(0), None, Some("k1")).unwrap();
+        let res2 = recall(&conn, "u", &basis(0), "apple", 5).unwrap();
+        assert!(res2.as_array().unwrap().iter().all(|r| r["id"] != json!("d")));
     }
 
     #[test]
