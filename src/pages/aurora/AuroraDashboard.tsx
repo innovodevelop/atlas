@@ -26,7 +26,7 @@ import { AuroraSettings } from './AuroraSettings';
 
 export type AuroraExpandedKey = 'weather' | 'calendar' | 'tasks' | 'stocks' | 'email' | 'news' | 'music' | null;
 
-const AuroraDashboard = ({ preview = false }: { preview?: boolean } = {}) => {
+const AuroraDashboard = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { profile } = useUserProfile();
@@ -61,9 +61,8 @@ const AuroraDashboard = ({ preview = false }: { preview?: boolean } = {}) => {
 
   // Auth gate (same behavior as the current dashboard)
   useEffect(() => {
-    if (preview || import.meta.env.VITE_PREVIEW_NOAUTH === '1') return; // preview-only bypass
     if (!authLoading && !user) navigate('/auth');
-  }, [preview, user, authLoading, navigate]);
+  }, [user, authLoading, navigate]);
 
   // Open a widget: fold the grid up into Atlas, then mount the focused view.
   const openWidget = useCallback((key: Exclude<AuroraExpandedKey, null>) => {

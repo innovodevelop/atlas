@@ -1,14 +1,22 @@
 {
-  "source": "designsync-project",
-  "projectId": "c3c44c02-3188-4835-8e6a-f50349d78608",
-  "name": "Atlas premium polish / Atlas Premium D - Workshop.dc.html",
-  "sha256": "c29a64875d86392da25f2065a2d614fdc69033c72e688802600a870c1481794b",
-  "syncedAt": "2026-07-15T00:45:00+02:00",
-  "note": "Workshop reskin: warm paper base, Atlas Orange, frosted glass, Hanken Grotesk/Geist",
+  "source": "downloads-zip",
+  "bundle": "Atlas premium polish (2).zip",
+  "name": "Atlas premium polish (2) / design_handoff_workshop_polish",
+  "sha256": "e714957dd2cc65108e04262f9aff40fb62dcdd166462b9d7297bc9dd78974153",
+  "syncedAt": "2026-07-22T02:00:00+02:00",
+  "note": "Design-sync v4.4: --acch #5b7cff / --acc-text #2a4fd0, login orb H*0.66 + cool scrim, band orb 224px, softer card shadows, borderless focus panels; music full-screen takeover (Field-only, portal to body); NEW Atlas Intro scroll-narrative landing (ported to atlas-site). Palette is Atlas Blue #3461f2 (orange saved as --acc-orange).",
+  "files": [
+    "Atlas Dashboard (Current).dc.html",
+    "Atlas Design System.dc.html",
+    "Atlas Intro.dc.html",
+    "Atlas Login C1 - Split.dc.html",
+    "Atlas Music Player.dc.html",
+    "README.md"
+  ],
   "lastFile": {
     "name": "Atlas Dashboard (Current).dc.html",
-    "source": "claude.ai DesignSync",
-    "sha256": "c29a64875d86392da25f2065a2d614fdc69033c72e688802600a870c1481794b",
-    "syncedAt": "2026-07-20T00:00:00Z"
+    "source": "downloads-zip: Atlas premium polish (2).zip",
+    "sha256": "ef1d48bb03e9133aa98415e5050150855fa11dd2ee4da50390c4f95d86c93176",
+    "syncedAt": "2026-07-22T02:00:00+02:00"
   }
 }

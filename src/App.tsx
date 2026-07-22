@@ -143,12 +143,6 @@ const App = () => (
             } 
           />
           
-          {/* Dev-only: render the dashboard without the auth gate for visual
-              verification during the design-polish work. Stripped in prod. */}
-          {import.meta.env.DEV && (
-            <Route path="/preview" element={<AuroraDashboard preview />} />
-          )}
-
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

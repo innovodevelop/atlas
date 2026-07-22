@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=Newsreader:ital,wght@1,500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@0.462.0/dist/umd/lucide.min.js"></script>
+<style>
+body{margin:0;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#2a4fd0;text-decoration:none}a:hover{color:#3461f2}
+.page{--pg:#f9f7f4;--rz:#f1eeea;--sk:#edebe7;--ink:#1e1e24;--ink2:#6d6a67;--ink3:#b6b1aa;--bd:#e2ded7;--acc:#3461f2;--acch:#5b7cff;--acc2:#ff6a00;--acc2h:#ff773c;--grn:#2f7d4f;--red:#c14a35;--blu:#3461f2;--sky:#7a8cff;min-height:100vh;position:relative;overflow-x:hidden}
+.disp{font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.03em}
+.mono{font-family:ui-monospace,'SF Mono',Menlo,monospace}
+.ital{font-family:'Newsreader',serif;font-style:italic}
+.tnum{font-variant-numeric:tabular-nums}
+.grain{position:fixed;inset:0;pointer-events:none;z-index:2;opacity:.4;mix-blend-mode:multiply;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.bg{position:fixed;inset:0;z-index:1;pointer-events:none;overflow:hidden}
+.blob{position:absolute;border-radius:50%;filter:blur(80px)}
+.b1{top:-30%;right:-15%;width:900px;height:800px;background:radial-gradient(closest-side,rgba(255,158,64,.28),transparent 72%);animation:drift1 26s ease-in-out infinite alternate}
+.b2{top:-15%;left:-12%;width:760px;height:700px;background:radial-gradient(closest-side,rgba(255,214,153,.36),transparent 70%);animation:drift2 32s ease-in-out infinite alternate}
+.b3{bottom:-30%;left:28%;width:1000px;height:600px;background:radial-gradient(closest-side,rgba(122,140,255,.13),transparent 72%);animation:drift1 38s ease-in-out infinite alternate-reverse}
+@keyframes drift1{from{transform:translate(0,0) scale(1)}to{transform:translate(50px,26px) scale(1.08)}}
+@keyframes drift2{from{transform:translate(0,0)}to{transform:translate(-44px,30px)}}
+@keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+@keyframes hdrflow{from{transform:translateX(-18px) scale(1)}to{transform:translateX(18px) scale(1.07)}}
+@keyframes pls{0%,100%{opacity:1}50%{opacity:.35}}
+.hz{position:relative;z-index:2}
+.i14{width:14px;height:14px;flex-shrink:0}.i16{width:16px;height:16px;flex-shrink:0}.i20{width:20px;height:20px;flex-shrink:0}.i24{width:24px;height:24px;flex-shrink:0}
+.hdr{position:sticky;top:14px;z-index:50;display:flex;align-items:center;justify-content:space-between;gap:16px;max-width:1200px;margin:14px auto 0;padding:9px 16px 9px 20px;border-radius:9999px;background:#fffdfa;border:1px solid var(--bd);overflow:hidden}
+.hdrbg{position:absolute;inset:-34px;pointer-events:none;filter:blur(34px) saturate(1.15);background:radial-gradient(420px 200px at 10% 130%,rgba(255,166,77,.42),transparent 70%),radial-gradient(520px 240px at 36% -50%,rgba(255,214,153,.55),transparent 70%),radial-gradient(460px 220px at 64% 140%,rgba(122,140,255,.22),transparent 70%),radial-gradient(560px 260px at 92% -40%,rgba(255,136,60,.34),transparent 70%);animation:hdrflow 14s ease-in-out infinite alternate}
+.wm{font-size:19px;font-weight:500;letter-spacing:-.035em;color:var(--ink)}
+.hdrpg{font-size:14px;font-weight:600;color:var(--ink2)}
+.hst{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink2)}
+.ldot{color:var(--acc)}
+.livedot{width:7px;height:7px;border-radius:50%;background:var(--acc);animation:pls 2s ease-in-out infinite}
+.backpill{display:flex;align-items:center;gap:7px;padding:7px 14px;border-radius:9999px;background:var(--ink);color:#fffdfa;font-size:12.5px;font-weight:600;text-decoration:none;transition:background .2s}
+.backpill:hover{background:#000;color:#fffdfa}
+.main{position:relative;z-index:10;max-width:1200px;margin:0 auto;padding:52px 28px 120px}
+.hero{margin-bottom:8px;animation:rise .8s cubic-bezier(.22,1,.36,1) both}
+.kick{font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--acc);margin:0 0 14px}
+.bh1{font-size:clamp(46px,7vw,86px);font-weight:500;letter-spacing:-.045em;line-height:.95;margin:0 0 18px}
+.hsub{font-size:16px;line-height:1.6;color:var(--ink2);max-width:640px;margin:0}
+.shead{display:flex;align-items:baseline;gap:14px;border-top:1px solid var(--bd);padding-top:26px;margin:60px 0 6px}
+.snum{font-size:12px;color:var(--ink3);font-family:ui-monospace,Menlo,monospace}
+.sh2{font-size:24px;font-weight:500;margin:0}
+.secd{font-size:13.5px;color:var(--ink2);margin:5px 0 24px;max-width:620px;line-height:1.6}
+.card2{background:#fffdfa;border:1px solid var(--bd);border-radius:18px;padding:22px}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(min(230px,100%),1fr))}
+.g4{grid-template-columns:repeat(auto-fill,minmax(min(168px,100%),1fr))}
+/* color */
+.sw{border-radius:16px;border:1px solid var(--bd);overflow:hidden;background:#fffdfa}
+.swc{height:82px;position:relative}
+.swm{padding:11px 13px}
+.swn{font-size:13px;font-weight:600;margin:0}
+.swx{font-size:11px;color:var(--ink3);margin:2px 0 0;text-transform:uppercase;letter-spacing:.04em}
+.swr{font-size:11px;color:var(--ink2);margin:5px 0 0;line-height:1.4}
+.onlight{color:#1e1e24}.ondark{color:#f9f7f4}
+.swtag{position:absolute;bottom:9px;left:11px;font-size:11px;font-weight:600}
+/* type */
+.tspec{border-top:1px solid var(--bd);padding:18px 0;display:flex;align-items:baseline;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.tspec:first-child{border-top:none}
+.tmeta{font-size:11px;color:var(--ink3);font-family:ui-monospace,Menlo,monospace;text-align:right;white-space:nowrap;line-height:1.6}
+.famcard{background:#fffdfa;border:1px solid var(--bd);border-radius:16px;padding:20px}
+.famname{font-size:13px;font-weight:600;margin:0 0 3px}
+.famrole{font-size:12px;color:var(--ink2);margin:0 0 14px}
+.fambig{font-size:52px;line-height:1;letter-spacing:-.03em;margin:0}
+.famset{font-size:13px;color:var(--ink2);margin:14px 0 0;letter-spacing:.01em}
+/* tokens */
+.tok{display:flex;align-items:center;gap:14px;padding:11px 0;border-top:1px solid var(--bd);font-size:13px}
+.tok:first-child{border-top:none}
+.tokn{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--ink);width:150px;flex-shrink:0}
+.tokv{color:var(--ink2);width:70px;flex-shrink:0;font-variant-numeric:tabular-nums}
+.spacebar{height:16px;border-radius:4px;background:var(--acc);opacity:.85}
+.radbox{width:64px;height:52px;background:var(--sk);border:1px solid var(--bd)}
+.elev{height:60px;border-radius:14px;background:#fffdfa;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--ink3);font-family:ui-monospace,Menlo,monospace}
+.e0{box-shadow:none;border:1px solid var(--bd)}
+.e1{box-shadow:0 1px 2px rgba(30,30,36,.05),0 12px 32px -20px rgba(30,30,36,.24)}
+.e2{box-shadow:0 4px 10px rgba(30,30,36,.06),0 22px 48px -22px rgba(30,30,36,.32)}
+.e3{box-shadow:0 18px 44px -12px rgba(30,30,36,.5)}
+/* light language */
+.lightwrap{position:relative;height:280px;border-radius:20px;overflow:hidden;background:#12141f;display:flex;align-items:center;justify-content:center}
+.lightcv{position:absolute;inset:0;width:100%;height:100%}
+.orb{position:relative;width:120px;height:120px;border-radius:50%;z-index:2;background:radial-gradient(circle at 50% 42%,#fffdf6,#ffe3ac 46%,rgba(255,170,80,.2) 74%,transparent 100%);box-shadow:0 0 60px 16px rgba(255,170,80,.4);animation:breath 5s ease-in-out infinite}
+@keyframes breath{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+.lightlbl{position:absolute;bottom:14px;left:16px;z-index:3;color:rgba(249,247,244,.75);font-size:12px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:6px 12px;border-radius:9999px;background:var(--sk);color:var(--ink2)}
+.chip.acc{background:rgba(255,106,0,.1);color:var(--acc)}
+.chip.gr{background:rgba(47,125,79,.1);color:var(--grn)}
+.chip.bl{background:rgba(52,97,242,.1);color:var(--blu)}
+/* components */
+.btn{height:40px;padding:0 20px;border-radius:9999px;border:none;font:inherit;font-weight:500;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:background .2s,transform .15s,border-color .2s}
+.btnp{background:var(--acc);color:#fff}.btnp:hover{background:var(--acch);transform:scale(1.02)}
+.btns{background:var(--ink);color:#fffdfa}.btns:hover{background:#000}
+.btng{background:transparent;color:var(--ink2);border:1px solid var(--bd)}.btng:hover{color:var(--ink);border-color:var(--ink3)}
+.btnt{background:transparent;color:var(--acc);padding:0 8px}.btnt:hover{color:var(--acch)}
+.icobtn{width:40px;height:40px;border-radius:9999px;background:transparent;border:1px solid var(--bd);color:var(--ink2);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.icobtn:hover{color:var(--ink);border-color:var(--ink3)}
+.inp{height:42px;padding:0 16px;border-radius:9999px;background:#fffdfa;border:1px solid var(--bd);font:inherit;font-size:14px;color:var(--ink);outline:none;min-width:200px}
+.inp:focus{border-color:var(--ink)}
+.pilltab{display:inline-flex;gap:3px;padding:5px;border-radius:9999px;background:var(--rz);border:1px solid var(--bd)}
+.pt{padding:7px 15px;border-radius:9999px;border:none;background:transparent;color:var(--ink2);font:inherit;font-size:13px;font-weight:500;cursor:pointer}
+.pt.on{background:var(--ink);color:#fff}
+.frostcard{background:rgba(255,253,250,.72);backdrop-filter:blur(12px);border-radius:18px;box-shadow:0 1px 2px rgba(30,30,36,.05),0 12px 32px -20px rgba(30,30,36,.24);padding:18px 20px}
+.dot0{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.don{background:var(--acc)}.dgr{background:var(--grn)}.dof{background:var(--ink3)}
+.statusline{display:flex;align-items:center;gap:9px;font-size:13px;padding:7px 0}
+.compcap{font-size:11px;color:var(--ink3);font-family:ui-monospace,Menlo,monospace;margin:16px 0 8px;text-transform:uppercase;letter-spacing:.06em}
+.demo{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+/* icons */
+.icocell{display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 8px;border-radius:14px;background:#fffdfa;border:1px solid var(--bd);color:var(--ink)}
+.icocap{font-size:11px;color:var(--ink3)}
+/* motion */
+.motion{display:flex;align-items:center;gap:16px;padding:14px 0;border-top:1px solid var(--bd)}
+.motion:first-child{border-top:none}
+.mtrack{flex:1;height:8px;border-radius:9999px;background:var(--sk);position:relative;overflow:hidden}
+.mfill{position:absolute;top:0;left:0;height:100%;width:38%;border-radius:9999px;background:var(--acc);animation:mslide 2.6s cubic-bezier(.22,1,.36,1) infinite}
+@keyframes mslide{0%{left:-38%}60%,100%{left:100%}}
+.mname{width:130px;flex-shrink:0;font-size:13px;font-weight:600}
+.mval{width:150px;flex-shrink:0;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:var(--ink2);text-align:right}
+/* voice + do/dont */
+.voice{border-left:3px solid var(--acc);padding:4px 0 4px 18px;margin:0 0 18px}
+.vq{font-family:'Hanken Grotesk',sans-serif;font-size:20px;font-weight:500;letter-spacing:-.02em;color:var(--ink);margin:0 0 4px;line-height:1.3}
+.vc{font-size:13px;color:var(--ink2);margin:0}
+.ddcard{border-radius:16px;padding:18px 20px}
+.doc{background:rgba(47,125,79,.06);border:1px solid rgba(47,125,79,.22)}
+.dontc{background:rgba(193,74,53,.06);border:1px solid rgba(193,74,53,.22)}
+.ddh{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;margin:0 0 12px}
+.ddg{color:var(--grn)}.ddr{color:var(--red)}
+.ddli{font-size:13px;color:var(--ink2);line-height:1.5;padding:5px 0 5px 20px;position:relative}
+.ddli::before{content:'';position:absolute;left:2px;top:11px;width:6px;height:6px;border-radius:50%}
+.doc .ddli::before{background:var(--grn)}
+.dontc .ddli::before{background:var(--red)}
+.prin{display:flex;gap:14px;align-items:flex-start;padding:16px 0;border-top:1px solid var(--bd)}
+.prin:first-child{border-top:none}
+.prinum{font-family:'Hanken Grotesk',sans-serif;font-size:22px;font-weight:600;color:var(--acc);width:34px;flex-shrink:0;line-height:1}
+.prit{font-size:15px;font-weight:600;margin:0 0 3px}
+.prid{font-size:13px;color:var(--ink2);margin:0;line-height:1.55}
+.ftr{position:relative;z-index:10;text-align:center;padding:26px;color:var(--ink3);font-size:12px;border-top:1px solid var(--bd);max-width:1200px;margin:0 auto}
+
+/* code blocks */
+.code{background:#181a26;border-radius:14px;padding:18px 20px;overflow-x:auto;margin:0}
+.code pre{margin:0;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.7;color:#d7d3ee;white-space:pre}
+.code .c1{color:#8a86ad}.code .c2{color:#ffb277}.code .c3{color:#7fd0a0}.code .c4{color:#8fb6ff}
+.codecap{font-size:11px;color:var(--ink3);font-family:ui-monospace,Menlo,monospace;margin:0 0 8px;text-transform:uppercase;letter-spacing:.06em}
+/* spec tables */
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-size:11px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;padding:0 14px 10px 0;border-bottom:1px solid var(--bd)}
+.tbl td{padding:11px 14px 11px 0;border-bottom:1px solid var(--bd);color:var(--ink2);vertical-align:top}
+.tbl td:first-child{color:var(--ink);font-weight:600}
+.tbl .mn{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--ink2)}
+.tbl tr:last-child td{border-bottom:none}
+/* layout grid demo */
+.gridemo{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.gcell{height:46px;border-radius:10px;background:rgba(255,106,0,.1);border:1px dashed rgba(255,106,0,.4);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--acc);font-family:ui-monospace,Menlo,monospace}
+.gcell.s2{grid-column:span 2}.gcell.s4{grid-column:span 4}
+.bprow{display:flex;align-items:center;gap:14px;padding:11px 0;border-top:1px solid var(--bd);font-size:13px}
+.bprow:first-child{border-top:none}
+.bpn{width:90px;font-weight:600;flex-shrink:0}
+.bpv{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--ink2);width:130px;flex-shrink:0}
+.bpd{color:var(--ink2)}
+/* component states */
+.stateg{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px}
+.statecell{display:flex;flex-direction:column;align-items:center;gap:9px;padding:16px 8px;border-radius:14px;background:#fffdfa;border:1px solid var(--bd)}
+.statelbl{font-size:11px;color:var(--ink3);font-family:ui-monospace,Menlo,monospace}
+.btnf{box-shadow:0 0 0 3px rgba(255,106,0,.28)}
+.spin{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* toggle */
+.tgl{width:44px;height:26px;border-radius:9999px;background:var(--sk);border:1px solid var(--bd);position:relative;cursor:pointer;transition:background .2s}
+.tgl.on{background:var(--acc);border-color:var(--acc)}
+.tgl i{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:left .22s var(--ease,cubic-bezier(.22,1,.36,1))}
+.tgl.on i{left:20px}
+/* badge / counter */
+.badge{min-width:18px;height:18px;padding:0 5px;border-radius:9999px;background:var(--acc);color:#fff;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+.badge.ink{background:var(--ink)}
+/* avatar */
+.av{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:#fff;background:linear-gradient(135deg,#ff9440,#ff5f00)}
+.avs{width:28px;height:28px;font-size:12px}
+.avstack{display:flex}.avstack .av{border:2px solid var(--pg);margin-left:-10px}.avstack .av:first-child{margin-left:0}
+/* progress ring */
+.ring{width:64px;height:64px}
+/* slider */
+.sld{position:relative;height:6px;border-radius:9999px;background:linear-gradient(90deg,#2f7d4f,#d9b23a 55%,#c14a35)}
+.sld i{position:absolute;top:50%;width:16px;height:16px;border-radius:50%;background:#fff;border:2px solid var(--grn);transform:translate(-50%,-50%);box-shadow:0 1px 4px rgba(0,0,0,.22)}
+/* alert */
+.alert{display:flex;gap:11px;padding:13px 15px;border-radius:14px;font-size:13px;line-height:1.5}
+.alert i{flex-shrink:0;margin-top:1px}
+.alert b{font-weight:600}
+.ai{background:rgba(52,97,242,.07);color:var(--ink)}.ai i{color:var(--blu)}
+.ap{background:rgba(47,125,79,.07);color:var(--ink)}.ap i{color:var(--grn)}
+.aw{background:rgba(255,106,0,.07);color:var(--ink)}.aw i{color:var(--acc)}
+/* tooltip */
+.tipwrap{position:relative;display:inline-flex;padding-top:34px}
+.tip{position:absolute;top:0;left:50%;transform:translateX(-50%);background:var(--ink);color:#fffdfa;font-size:12px;padding:6px 10px;border-radius:9px;white-space:nowrap}
+.tip::after{content:'';position:absolute;bottom:-4px;left:50%;transform:translateX(-50%) rotate(45deg);width:8px;height:8px;background:var(--ink)}
+/* modal preview */
+.sheetprev{position:relative;height:200px;border-radius:16px;overflow:hidden;background:linear-gradient(120deg,#f0 e8de,#e8ecff);background:linear-gradient(120deg,#efe8de,#e8ecff)}
+.scrim{position:absolute;inset:0;background:rgba(20,20,28,.28);backdrop-filter:blur(2px)}
+.sheet{position:absolute;left:14px;right:14px;bottom:14px;background:var(--surface-raised,#fffdfa);border-radius:16px;box-shadow:0 18px 44px -12px rgba(30,30,36,.5);padding:16px 18px}
+.grab{width:34px;height:4px;border-radius:9999px;background:var(--ink3);margin:0 auto 12px}
+/* nav dock demo */
+.dockd{display:inline-flex;gap:4px;padding:6px;border-radius:9999px;background:var(--ink);box-shadow:0 18px 44px -12px rgba(30,30,36,.5)}
+.dbtn{display:flex;align-items:center;gap:7px;height:34px;padding:0 14px;border-radius:9999px;color:rgba(249,247,244,.82);font-size:13px;font-weight:500;cursor:pointer}
+.dbtn.on{background:rgba(249,247,244,.14);color:#fff}.dbtn.cta{background:var(--acc);color:#fff}
+/* list rows */
+.lrow{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--bd);font-size:13px}
+.lrow:last-child{border-bottom:none}
+.lrow .sym{font-weight:600;width:52px}.lrow .f1{flex:1;color:var(--ink2);min-width:0}
+.lrow .up{color:var(--grn);font-weight:600}.lrow .dn{color:var(--red);font-weight:600}
+.anat{display:flex;gap:10px;align-items:flex-start;font-size:12.5px;color:var(--ink2);line-height:1.5;padding:7px 0}
+.anat b{color:var(--ink);font-weight:600}
+.anat .n{width:22px;height:22px;border-radius:50%;background:var(--acc);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+/* brand + assets */
+.assetcard{border-radius:18px;border:1px solid var(--bd);overflow:hidden;background:#fffdfa}
+.assetimg{display:block;width:100%;height:auto}
+.assetmeta{padding:13px 16px}
+.assetn{font-size:13px;font-weight:600;margin:0}
+.assetd{font-size:12px;color:var(--ink2);margin:4px 0 0;line-height:1.5}
+.assetp{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--ink3);margin:7px 0 0}
+.markbox{display:flex;align-items:center;justify-content:center;height:118px;border-radius:16px;background:var(--sk);border:1px solid var(--bd)}
+.markbox.dark{background:#12141f;border-color:transparent}
+.wordmark{font-size:42px;font-weight:500;letter-spacing:-.035em;color:var(--ink)}
+.orbmark{width:62px;height:62px;border-radius:50%;background:radial-gradient(circle at 50% 42%,#fffdf6,#ffe3ac 46%,rgba(255,170,80,.2) 74%,transparent 100%);box-shadow:0 0 40px 10px rgba(255,170,80,.4)}
+</style>
+</helmet>
+<div class="page" data-screen-label="Atlas Design System" ref="{{ rootRef }}">
+<div class="grain"></div><div class="bg"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+<header class="hdr"><div class="hdrbg"></div><div class="fx ac gap10 hz"><span class="wm">atlas</span><span class="hdrpg">· Design System</span></div><div class="fx ac gap16 hz"><span class="hst"><span class="livedot"></span>v4.3 · internal</span><a class="backpill" href="Atlas Premium D - Workshop.dc.html">← Dashboard</a></div></header>
+<main class="main">
+<div class="hero"><p class="kick">Internal reference</p><h1 class="bh1 disp">The Atlas<br>design system</h1><p class="hsub">One language for every Atlas surface — the tokens, type, components, motion and light that make the product feel calm, warm and alive. Build from these; don't reinvent them.</p></div>
+
+<div class="shead"><span class="snum">01</span><h2 class="sh2 disp">Color</h2></div>
+<p class="secd">A warm paper base with a single confident accent. Blue is Atlas's voice — used sparingly for the live, active and interactive. Orange is a secondary accent for warmth and highlights; green and red are reserved for status and markets; signal blue belongs to the atmosphere and network visualisations.</p>
+<div class="grid g3">
+<div class="sw"><div class="swc" style="background:#f9f7f4"><span class="swtag onlight">Base</span></div><div class="swm"><p class="swn">Paper</p><p class="swx">#F9F7F4</p><p class="swr">Page background. The calm ground everything sits on.</p></div></div>
+<div class="sw"><div class="swc" style="background:#f1eeea"><span class="swtag onlight">Surface</span></div><div class="swm"><p class="swn">Rise</p><p class="swx">#F1EEEA</p><p class="swr">Card and panel fills, dividers-in-negative.</p></div></div>
+<div class="sw"><div class="swc" style="background:#edebe7"><span class="swtag onlight">Sunken</span></div><div class="swm"><p class="swn">Sky</p><p class="swx">#EDEBE7</p><p class="swr">Insets, tracks, chip fills, icon wells.</p></div></div>
+<div class="sw"><div class="swc" style="background:#1e1e24"><span class="swtag ondark">Ink</span></div><div class="swm"><p class="swn">Ink</p><p class="swx">#1E1E24</p><p class="swr">Primary text, the dock, dark surfaces.</p></div></div>
+<div class="sw"><div class="swc" style="background:#6d6a67"><span class="swtag ondark">Text 2</span></div><div class="swm"><p class="swn">Ink 2</p><p class="swx">#6D6A67</p><p class="swr">Secondary text, labels, metadata.</p></div></div>
+<div class="sw"><div class="swc" style="background:#b6b1aa"><span class="swtag onlight">Text 3</span></div><div class="swm"><p class="swn">Ink 3</p><p class="swx">#B6B1AA</p><p class="swr">Muted text, placeholders, timestamps.</p></div></div>
+<div class="sw"><div class="swc" style="background:#3461f2"><span class="swtag ondark">Accent</span></div><div class="swm"><p class="swn">Atlas Blue</p><p class="swx">#3461F2</p><p class="swr">Live, active, interactive. The one voice. Hover #FF773C.</p></div></div>
+<div class="sw"><div class="swc" style="background:#2f7d4f"><span class="swtag ondark">Positive</span></div><div class="swm"><p class="swn">Green</p><p class="swx">#2F7D4F</p><p class="swr">Gains, healthy status, completion.</p></div></div>
+<div class="sw"><div class="swc" style="background:#c14a35"><span class="swtag ondark">Negative</span></div><div class="swm"><p class="swn">Red</p><p class="swx">#C14A35</p><p class="swr">Losses, threats, destructive actions.</p></div></div>
+<div class="sw"><div class="swc" style="background:#ff6a00"><span class="swtag ondark">2nd accent</span></div><div class="swm"><p class="swn">Atlas Orange</p><p class="swx">#FF6A00</p><p class="swr">Secondary accent — warmth, highlights, energy</p></div></div>here skies, network pulses, edge traffic.</p></div></div>
+<div class="sw"><div class="swc" style="background:#e2ded7"><span class="swtag onlight">Border</span></div><div class="swm"><p class="swn">Border</p><p class="swx">#E2DED7</p><p class="swr">Hairlines and dividers. Never for emphasis.</p></div></div>
+<div class="sw"><div class="swc" style="background:linear-gradient(120deg,#ff9440,#ff5f00)"><span class="swtag ondark">Gradient</span></div><div class="swm"><p class="swn">Warm glow</p><p class="swx">#FF9440 → #FF5F00</p><p class="swr">Logo mark, hero light, the orb core.</p></div></div>
+</div>
+
+<div class="shead"><span class="snum">02</span><h2 class="sh2 disp">Typography</h2></div>
+<p class="secd">Two families do all the work. Hanken Grotesk for display and numerals with personality; Geist for interface text and body. Newsreader italic is a rare editorial accent. Monospace for data, tokens and code.</p>
+<div class="grid g3" style="margin-bottom:26px">
+<div class="famcard"><p class="famname">Hanken Grotesk</p><p class="famrole">Display · headings · big numerals</p><p class="fambig disp">Ag 68°</p><p class="famset">Medium 500 · SemiBold 600 · Bold 700</p></div>
+<div class="famcard"><p class="famname">Geist</p><p class="famrole">Interface · body · labels</p><p class="fambig" style="font-family:'Geist'">Ag 24</p><p class="famset">Regular 400 · Medium 500 · SemiBold 600</p></div>
+<div class="famcard"><p class="famname">Newsreader Italic</p><p class="famrole">Editorial accent only</p><p class="fambig ital">Ag good</p><p class="famset">Italic 500 — use rarely, for warmth</p></div>
+</div>
+<div class="card2">
+<div class="tspec"><span class="disp" style="font-size:56px;font-weight:500;letter-spacing:-.045em">Display</span><span class="tmeta">Hanken 500 · clamp 46–86px<br>tracking −.045em · leading .95</span></div>
+<div class="tspec"><span class="disp" style="font-size:32px;font-weight:500">Greeting / H1</span><span class="tmeta">Hanken/Geist 500 · 32–58px<br>tracking −.03em</span></div>
+<div class="tspec"><span style="font-size:24px;font-weight:500">Section title</span><span class="tmeta">Geist 500 · 24px</span></div>
+<div class="tspec"><span style="font-size:16px">Body — the calm middle voice of the product.</span><span class="tmeta">Geist 400 · 16px · leading 1.6</span></div>
+<div class="tspec"><span style="font-size:13px;font-weight:600;color:var(--ink2)">LABEL · CARD HEADER</span><span class="tmeta">Geist 600 · 13px · ink2</span></div>
+<div class="tspec"><span class="mono" style="font-size:12px;color:var(--ink2)">240ms · #FF6A00 · tabular</span><span class="tmeta">Mono · 11–12px · data + tokens</span></div>
+</div>
+
+<div class="shead"><span class="snum">03</span><h2 class="sh2 disp">Space · radius · elevation</h2></div>
+<p class="secd">A 4px base rhythm. Radii step from tight controls to soft cards to full pills. Elevation is warm and diffuse — never a hard grey drop shadow.</p>
+<div class="grid g2">
+<div class="card2"><p class="compcap" style="margin-top:0">Spacing scale · base 4</p>
+<div class="tok"><span class="tokn">space-1</span><span class="tokv">4px</span><span class="spacebar" style="width:4px"></span></div>
+<div class="tok"><span class="tokn">space-2</span><span class="tokv">8px</span><span class="spacebar" style="width:8px"></span></div>
+<div class="tok"><span class="tokn">space-3</span><span class="tokv">12px</span><span class="spacebar" style="width:12px"></span></div>
+<div class="tok"><span class="tokn">space-4</span><span class="tokv">16px</span><span class="spacebar" style="width:16px"></span></div>
+<div class="tok"><span class="tokn">space-6</span><span class="tokv">24px</span><span class="spacebar" style="width:24px"></span></div>
+<div class="tok"><span class="tokn">space-8</span><span class="tokv">32px</span><span class="spacebar" style="width:32px"></span></div>
+</div>
+<div class="card2"><p class="compcap" style="margin-top:0">Radius</p>
+<div class="demo" style="gap:18px;align-items:flex-end">
+<div class="fx col ac gap8"><div class="radbox" style="border-radius:9px"></div><span class="icocap">9 · control</span></div>
+<div class="fx col ac gap8"><div class="radbox" style="border-radius:12px"></div><span class="icocap">12 · icon</span></div>
+<div class="fx col ac gap8"><div class="radbox" style="border-radius:18px"></div><span class="icocap">18 · card</span></div>
+<div class="fx col ac gap8"><div class="radbox" style="border-radius:9999px;width:64px"></div><span class="icocap">full · pill</span></div>
+</div>
+<p class="compcap">Elevation</p>
+<div class="grid g2" style="gap:10px"><div class="elev e0">flat · e0</div><div class="elev e1">card · e1</div><div class="elev e2">hover · e2</div><div class="elev e3" style="background:#1e1e24;color:rgba(249,247,244,.6)">dock · e3</div></div>
+</div>
+</div>
+
+<div class="shead"><span class="snum">04</span><h2 class="sh2 disp">Design tokens</h2></div>
+<p class="secd">Every value above ships as a CSS custom property under <span class="mono">:root</span>. Consuming apps import <span class="mono">styles.css</span> (or the equivalent JSON/Tailwind theme) and reference tokens by name — never hard-coded hex or px. Copy the block below to bootstrap a new surface.</p>
+<div class="grid g2">
+<div class="code" data-om-raster><p class="codecap" style="color:#8a86ad">tokens/colors.css · tokens/radius.css</p><pre><span class="c1">/* color */</span>
+<span class="c2">--pg</span>:        #f9f7f4;  <span class="c1">/* paper base */</span>
+<span class="c2">--rz</span>:        #f1eeea;  <span class="c1">/* raised surface */</span>
+<span class="c2">--sk</span>:        #edebe7;  <span class="c1">/* sunken / wells */</span>
+<span class="c2">--ink</span>:       #1e1e24;  <span class="c1">/* text primary */</span>
+<span class="c2">--ink-2</span>:     #6d6a67;  <span class="c1">/* text secondary */</span>
+<span class="c2">--ink-3</span>:     #b6b1aa;  <span class="c1">/* text muted */</span>
+<span class="c2">--border</span>:    #e2ded7;
+<span class="c2">--accent</span>:    #3461f2;  <span class="c1">/* the one voice */</span>
+<span class="c2">--accent-2</span>:  #ff6a00;  <span class="c1">/* secondary warm */</span>
+<span class="c2">--positive</span>:  #2f7d4f;
+<span class="c2">--negative</span>:  #c14a35;
+<span class="c2">--signal</span>:    #3461f2;  <span class="c1">/* atmosphere */</span>
+
+<span class="c1">/* radius */</span>
+<span class="c2">--radius-control</span>: 9px;
+<span class="c2">--radius-card</span>:    18px;
+<span class="c2">--radius-pill</span>:    9999px;</pre></div>
+<div class="code" data-om-raster><p class="codecap" style="color:#8a86ad">tokens/elevation.css · tokens/motion.css</p><pre><span class="c1">/* elevation — warm, diffuse */</span>
+<span class="c2">--elevation-card</span>:
+  0 1px 2px rgba(30,30,36,.05),
+  0 12px 32px -20px rgba(30,30,36,.24);
+<span class="c2">--elevation-hover</span>:
+  0 4px 10px rgba(30,30,36,.06),
+  0 22px 48px -22px rgba(30,30,36,.32);
+<span class="c2">--blur-frost</span>: blur(12px) saturate(1.06);
+
+<span class="c1">/* motion */</span>
+<span class="c2">--ease-spring</span>:
+  cubic-bezier(.22,1,.36,1);
+<span class="c2">--dur-micro</span>:      160ms;
+<span class="c2">--dur-transition</span>: 300ms;
+<span class="c2">--dur-entrance</span>:   800ms;
+
+<span class="c1">/* usage */</span>
+<span class="c4">.card</span> {
+  background: <span class="c2">var(--surface-card)</span>;
+  box-shadow: <span class="c2">var(--elevation-card)</span>;
+  border-radius: <span class="c2">var(--radius-card)</span>;
+}</pre></div>
+</div>
+<div class="card2" style="margin-top:16px"><p class="codecap" style="margin-top:0">Naming convention</p>
+<table class="tbl"><thead><tr><th>Pattern</th><th>Example</th><th>Meaning</th></tr></thead><tbody>
+<tr><td>Base</td><td class="mn">--accent · --ink · --pg</td><td>Raw palette / primitive value.</td></tr>
+<tr><td>Scale step</td><td class="mn">--space-4 · --ink-2</td><td>Numbered rung on a scale (4px base; ink darkness).</td></tr>
+<tr><td>Semantic alias</td><td class="mn">--text-secondary · --surface-card</td><td>Role that maps to a base — reference these in components.</td></tr>
+<tr><td>Component</td><td class="mn">--radius-card · --elevation-dock</td><td>Named for where it's used.</td></tr>
+</tbody></table></div>
+
+<div class="shead"><span class="snum">05</span><h2 class="sh2 disp">Grid & layout</h2></div>
+<p class="secd">A 12-column fluid grid on a 1120–1200px max canvas, gutter 16px. Widget cards are placed on a 3-column dashboard grid that collapses to 2 then 1. Cards size to content (auto-rows) — never stretch a short widget to match a tall neighbour.</p>
+<div class="grid g2">
+<div class="card2"><p class="compcap" style="margin-top:0">Dashboard card grid (3-col)</p>
+<div class="gridemo"><div class="gcell s2">span 2</div><div class="gcell">1</div><div class="gcell">1</div><div class="gcell">1</div><div class="gcell">1</div><div class="gcell s4">full-bleed hero</div></div>
+<p style="font-size:12.5px;color:var(--ink3);margin:14px 0 0;line-height:1.5">Small widgets span 1, feature widgets span 2, section heroes span the row. Gap is <span class="mono">--space-4</span>.</p></div>
+<div class="card2"><p class="compcap" style="margin-top:0">Breakpoints & containers</p>
+<div class="bprow"><span class="bpn">Mobile</span><span class="bpv">&lt; 640px</span><span class="bpd">1 column, dock docks to bottom edge</span></div>
+<div class="bprow"><span class="bpn">Tablet</span><span class="bpv">640–1024px</span><span class="bpd">2 columns</span></div>
+<div class="bprow"><span class="bpn">Desktop</span><span class="bpv">&gt; 1024px</span><span class="bpd">3 columns · max 1200px</span></div>
+<div class="bprow"><span class="bpn">Page pad</span><span class="bpv">24–32px</span><span class="bpd">Content inset from viewport edge</span></div>
+</div>
+</div>
+
+<div class="shead"><span class="snum">06</span><h2 class="sh2 disp">The light language</h2></div>
+<p class="secd">Atlas's signature. State is expressed as light, not chrome. The orb breathes when idle, sharpens when listening, blooms when speaking. Weather and system health render as atmosphere — warm glow for good, cool blue for calm, cloud and rain for degraded. Surfaces are frosted so this light shows faintly through the whole product.</p>
+<div class="grid g2">
+<div class="lightwrap"><canvas class="lightcv" ref="{{ lightRef }}"></canvas><div class="orb"></div><span class="lightlbl">Orb · listening → speaking</span></div>
+<div class="card2 fx col" style="justify-content:center;gap:14px">
+<p style="font-size:14px;color:var(--ink2);margin:0;line-height:1.6">Rules of the light:</p>
+<div class="fx col gap10">
+<span class="chip acc"><span class="dot0 don"></span>Atlas blue — live, active, interactive</span>
+<span class="chip bl" style="background:rgba(255,106,0,.1);color:#b95511"><span class="dot0" style="background:var(--acc2)"></span>Warm orange — secondary accent, highlights, energy</span>
+<span class="chip gr"><span class="dot0 dgr"></span>Green — healthy, resolved, gains</span>
+<span class="chip"><span class="dot0 dof"></span>Grey haze / rain — degraded, overcast, idle</span>
+</div>
+<p style="font-size:12.5px;color:var(--ink3);margin:6px 0 0;line-height:1.55">Motion is slow and organic — drift, breathe, bloom. Never blink, jitter or strobe. Light additive-blends; it never uses hard edges.</p>
+</div>
+</div>
+
+<div class="shead"><span class="snum">07</span><h2 class="sh2 disp">Components</h2></div>
+<p class="secd">The working parts, built from the tokens above. Everything is pill-first, borderless where it can be, and frosted over the atmosphere.</p>
+<div class="grid g2">
+<div class="card2"><p class="compcap" style="margin-top:0">Buttons</p><div class="demo"><button class="btn btnp">Ask Atlas</button><button class="btn btns">Confirm</button><button class="btn btng"><i data-lucide="plus" class="i16"></i>New</button><button class="btn btnt">Skip</button><button class="icobtn"><i data-lucide="mic" class="i16"></i></button></div>
+<p class="compcap">Inputs</p><div class="demo"><input class="inp" placeholder="Message Atlas…"><span class="pilltab"><button class="pt on">Day</button><button class="pt">Week</button><button class="pt">Month</button></span></div></div>
+<div class="card2"><p class="compcap" style="margin-top:0">Chips & status</p><div class="demo" style="margin-bottom:6px"><span class="chip acc">Live</span><span class="chip gr">Healthy</span><span class="chip bl">Streaming</span><span class="chip">Idle</span></div>
+<div class="statusline"><span class="dot0 don"></span>Listening for "Hey Atlas" — ambient</div>
+<div class="statusline"><span class="dot0 dgr"></span>All systems nominal · v4.2.1</div>
+<div class="statusline"><span class="dot0 dof"></span>Weather station sync — 40s ago</div>
+<div class="statusline"><span class="dot0" style="background:var(--red)"></span>Portfolio down −1.2% · after hours</div>
+<p style="font-size:12px;color:var(--ink3);margin:12px 0 0;line-height:1.5">Dots: accent = live, green = healthy, red = alert, grey = idle or stale. The label always pairs with the dot — never colour alone.</p></div>
+</div>
+<p class="compcap">Cards — frosted surface over the atmosphere, borderless, warm elevation</p>
+<div class="grid g3">
+<div class="frostcard"><div class="fx ac jb" style="margin-bottom:10px"><span style="font-size:13px;font-weight:600;color:var(--ink2)">Weather</span><i data-lucide="cloud-sun" class="i16" style="color:var(--acc)"></i></div><p class="disp" style="font-size:34px;font-weight:500;margin:0">68°</p><p style="font-size:13px;color:var(--ink2);margin:6px 0 0">Partly cloudy · SF</p></div>
+<div class="frostcard"><div class="fx ac jb" style="margin-bottom:10px"><span style="font-size:13px;font-weight:600;color:var(--ink2)">Watchlist</span><i data-lucide="activity" class="i16" style="color:var(--acc)"></i></div><p class="disp tnum" style="font-size:30px;font-weight:500;margin:0">$248,910</p><p style="font-size:13px;margin:6px 0 0"><span style="color:var(--grn);font-weight:600">+0.75%</span> today</p></div>
+<div class="frostcard"><div class="fx ac jb" style="margin-bottom:10px"><span style="font-size:13px;font-weight:600;color:var(--ink2)">Tasks</span><i data-lucide="check" class="i16" style="color:var(--acc)"></i></div><div style="height:6px;border-radius:9999px;background:var(--sk);overflow:hidden;margin:14px 0 8px"><div style="width:40%;height:100%;background:var(--acc);border-radius:9999px"></div></div><p style="font-size:13px;color:var(--ink2);margin:0">2 of 5 done</p></div>
+</div>
+
+<p class="compcap">Button states</p>
+<div class="stateg">
+<div class="statecell"><button class="btn btnp">Ask Atlas</button><span class="statelbl">default</span></div>
+<div class="statecell"><button class="btn btnp" style="background:var(--acch);transform:scale(1.02)">Ask Atlas</button><span class="statelbl">hover</span></div>
+<div class="statecell"><button class="btn btnp btnf">Ask Atlas</button><span class="statelbl">focus</span></div>
+<div class="statecell"><button class="btn btnp" style="opacity:.5;cursor:not-allowed">Ask Atlas</button><span class="statelbl">disabled</span></div>
+<div class="statecell"><button class="btn btnp"><span class="spin"></span>Working</button><span class="statelbl">loading</span></div>
+</div>
+
+<div class="grid g3">
+<div class="card2"><p class="compcap" style="margin-top:0">Toggle</p><div class="demo" style="gap:18px"><span class="tgl on"><i></i></span><span class="tgl"><i></i></span></div><p style="font-size:12px;color:var(--ink3);margin:12px 0 0">On = accent. Springs 220ms.</p></div>
+<div class="card2"><p class="compcap" style="margin-top:0">Badge & counter</p><div class="demo" style="gap:16px"><span class="fx ac gap8" style="font-size:13px"><i data-lucide="mail" class="i16"></i>Inbox<span class="badge">2</span></span><span class="badge ink">12</span><span class="chip acc">New</span></div><p style="font-size:12px;color:var(--ink3);margin:12px 0 0;line-height:1.5">Accent for unread and new; ink for neutral counts.</p></div>
+<div class="card2"><p class="compcap" style="margin-top:0">Avatar</p><div class="demo"><span class="av">M</span><span class="av avs">SC</span><span class="avstack"><span class="av avs">M</span><span class="av avs" style="background:linear-gradient(135deg,#7a8cff,#3461f2)">A</span><span class="av avs" style="background:var(--ink)">+3</span></span></div><p style="font-size:12px;color:var(--ink3);margin:12px 0 0;line-height:1.5">Initials on a warm gradient; stacks overflow to +N in ink.</p></div>
+</div>
+
+<div class="grid g3">
+<div class="card2"><p class="compcap" style="margin-top:0">Progress</p><div style="height:6px;border-radius:9999px;background:var(--sk);overflow:hidden;margin-bottom:14px"><div style="width:64%;height:100%;background:var(--acc);border-radius:9999px"></div></div>
+<div class="fx ac gap12"><svg class="ring" viewBox="0 0 64 64"><circle cx="32" cy="32" r="27" fill="none" stroke="var(--sk)" stroke-width="7"></circle><circle cx="32" cy="32" r="27" fill="none" stroke="var(--acc)" stroke-width="7" stroke-linecap="round" stroke-dasharray="169.6" stroke-dashoffset="55" transform="rotate(-90 32 32)"></circle></svg><span style="font-size:13px;color:var(--ink2)">Ring · determinate</span></div></div>
+<div class="card2"><p class="compcap" style="margin-top:0">Slider</p><div class="sld" style="margin-top:22px"><i style="left:24%"></i></div><p style="font-size:12px;color:var(--ink3);margin:16px 0 0">Track carries the scale's meaning (AQI good→hazardous).</p></div>
+<div class="card2"><p class="compcap" style="margin-top:0">Tooltip</p><div class="demo" style="justify-content:center"><span class="tipwrap"><span class="tip">Speak to Atlas</span><button class="icobtn"><i data-lucide="mic" class="i16"></i></button></span></div><p style="font-size:12px;color:var(--ink3);margin:16px 0 0;text-align:center">Ink bubble, appears on hover or focus.</p></div>
+</div>
+
+<p class="compcap">Alerts & banners</p>
+<div class="grid g3">
+<div class="alert ai"><i data-lucide="info" class="i16"></i><span><b>Ambient listening.</b> Atlas is standing by for "Hey Atlas".</span></div>
+<div class="alert ap"><i data-lucide="check-circle" class="i16"></i><span><b>Deployed.</b> pollen-index v0.1.0 is live in the module graph.</span></div>
+<div class="alert aw"><i data-lucide="alert-triangle" class="i16"></i><span><b>Elevated posture.</b> Firewall is blocking more aggressively.</span></div>
+</div>
+
+<div class="grid g2">
+<div class="card2"><p class="compcap" style="margin-top:0">List rows — data</p>
+<div class="lrow"><span class="sym">AAPL</span><span class="f1">Apple Inc.</span><span class="tnum">247.31</span><span class="up" style="width:60px;text-align:right">+1.24%</span></div>
+<div class="lrow"><span class="sym">NVDA</span><span class="f1">NVIDIA Corp.</span><span class="tnum">138.07</span><span class="up" style="width:60px;text-align:right">+2.31%</span></div>
+<div class="lrow"><span class="sym">TSLA</span><span class="f1">Tesla Inc.</span><span class="tnum">402.18</span><span class="dn" style="width:60px;text-align:right">−1.12%</span></div>
+</div>
+<div class="card2"><p class="compcap" style="margin-top:0">Navigation dock</p><div class="demo" style="justify-content:center;padding:10px 0"><nav class="dockd"><span class="dbtn"><i data-lucide="mic" class="i16"></i>Home</span><span class="dbtn on"><i data-lucide="layout-grid" class="i16"></i>Dashboard</span><span class="dbtn"><i data-lucide="cpu" class="i16"></i>Core</span><span class="dbtn cta">Ask Atlas</span></nav></div>
+<p style="font-size:12px;color:var(--ink3);margin:6px 0 0;text-align:center">Ink pill, floating. Active = frosted highlight; CTA = accent.</p></div>
+</div>
+
+<p class="compcap">Modal / bottom sheet</p>
+<div class="grid g2">
+<div class="sheetprev"><div class="scrim"></div><div class="sheet"><div class="grab"></div><p style="font-size:15px;font-weight:600;margin:0 0 4px">Confirm booking</p><p style="font-size:13px;color:var(--ink2);margin:0 0 14px">Friday 9:40 AM — SFO → CDG, economy.</p><div class="demo"><button class="btn btnp">Book it</button><button class="btn btng">Not now</button></div></div></div>
+<div class="card2"><p class="compcap" style="margin-top:0">Anatomy — card</p>
+<div class="anat"><span class="n">1</span><span><b>Header row</b> — label (Geist 600, ink-2) + icon well (34px, radius 12, Sky fill).</span></div>
+<div class="anat"><span class="n">2</span><span><b>Hero value</b> — Hanken 500, tabular numerals, tracking −.02em.</span></div>
+<div class="anat"><span class="n">3</span><span><b>Support line</b> — 13px ink-2; a signed metric + short qualifier.</span></div>
+<div class="anat"><span class="n">4</span><span><b>Surface</b> — frosted (blur 12 / sat 1.06), radius 18, elevation-card, no border.</span></div>
+<div class="anat"><span class="n">5</span><span><b>Padding</b> — 18px 20px. Lift 3px + elevation-hover on hover.</span></div>
+</div>
+</div>
+
+<div class="shead"><span class="snum">08</span><h2 class="sh2 disp">Iconography</h2></div>
+<p class="secd">Lucide, 1.75–2px stroke, drawn in ink or accent — never filled. Sizes step 14 / 16 / 20 / 24. Icons sit in soft square wells (radius 10–12, Sky fill) when they anchor a card header.</p>
+<div class="grid g4">
+<div class="icocell"><i data-lucide="cloud-sun" class="i24"></i><span class="icocap">weather</span></div>
+<div class="icocell"><i data-lucide="calendar" class="i24"></i><span class="icocap">calendar</span></div>
+<div class="icocell"><i data-lucide="activity" class="i24"></i><span class="icocap">markets</span></div>
+<div class="icocell"><i data-lucide="mail" class="i24"></i><span class="icocap">inbox</span></div>
+<div class="icocell"><i data-lucide="shield" class="i24"></i><span class="icocap">control</span></div>
+<div class="icocell"><i data-lucide="cpu" class="i24"></i><span class="icocap">core</span></div>
+<div class="icocell"><i data-lucide="mic" class="i24"></i><span class="icocap">voice</span></div>
+<div class="icocell"><i data-lucide="sparkles" class="i24" style="color:var(--acc)"></i><span class="icocap">atlas</span></div>
+</div>
+
+<div class="shead"><span class="snum">09</span><h2 class="sh2 disp">Motion</h2></div>
+<p class="secd">Calm, spring-eased, purposeful. Content rises in; the orb breathes; light drifts. Standard easing is <span class="mono">cubic-bezier(.22,1,.36,1)</span>. Nothing snaps or bounces hard.</p>
+<div class="card2">
+<div class="motion"><span class="mname">Micro</span><div class="mtrack"><div class="mfill" style="animation-duration:1.6s"></div></div><span class="mval">120–200ms · ease</span></div>
+<div class="motion"><span class="mname">Transition</span><div class="mtrack"><div class="mfill" style="animation-duration:2.2s"></div></div><span class="mval">250–420ms · spring</span></div>
+<div class="motion"><span class="mname">Entrance</span><div class="mtrack"><div class="mfill" style="animation-duration:3s"></div></div><span class="mval">.8s rise · stagger 70ms</span></div>
+<div class="motion"><span class="mname">Ambient</span><div class="mtrack"><div class="mfill" style="animation-duration:4.5s"></div></div><span class="mval">5–30s loops · breathe/drift</span></div>
+</div>
+
+<div class="shead"><span class="snum">10</span><h2 class="sh2 disp">Voice & tone</h2></div>
+<p class="secd">Atlas speaks like a capable, unhurried chief of staff. Warm, brief, and always a step ahead — never chirpy, never robotic.</p>
+<div class="voice"><p class="vq">"Friday's 9:40 to Paris is the strongest option — fares dip midweek and rain clears by the weekend."</p><p class="vc">Leads with the answer. Shows the reasoning briefly. No filler, no hedging.</p></div>
+<div class="grid g3">
+<div class="prin" style="border:none;padding-top:0"><span class="prinum">1</span><div><p class="prit">Answer first</p><p class="prid">The recommendation up front; supporting detail after.</p></div></div>
+<div class="prin" style="border:none;padding-top:0"><span class="prinum">2</span><div><p class="prit">Warm, not cute</p><p class="prid">Human and calm. No exclamation marks or emoji.</p></div></div>
+<div class="prin" style="border:none;padding-top:0"><span class="prinum">3</span><div><p class="prit">Show the work</p><p class="prid">Name the sources it checked so trust is earned.</p></div></div>
+</div>
+
+<div class="shead"><span class="snum">11</span><h2 class="sh2 disp">Accessibility</h2></div>
+<p class="secd">Calm should never mean unclear. Atlas targets WCAG 2.1 AA across every surface.</p>
+<div class="grid g2">
+<div class="card2"><p class="compcap" style="margin-top:0">Contrast & targets</p>
+<table class="tbl"><tbody>
+<tr><td>Body text</td><td>Ink on Paper — 13.6:1 (AAA)</td></tr>
+<tr><td>Secondary</td><td>Ink-2 on Paper — 4.9:1 (AA)</td></tr>
+<tr><td>Accent text</td><td>Use #2A4FD0 on Paper for blue text (5.6:1); reserve #3461F2 for fills/icons.</td></tr>
+<tr><td>Hit target</td><td>≥ 44×44px, even when the glyph is smaller.</td></tr>
+</tbody></table></div>
+<div class="card2"><p class="compcap" style="margin-top:0">Interaction & motion</p>
+<div class="anat"><span class="n" style="background:var(--grn)">✓</span><span>Visible focus ring on every control — 3px accent glow (never remove outline without a replacement).</span></div>
+<div class="anat"><span class="n" style="background:var(--grn)">✓</span><span>Never signal by color alone — pair gain/loss and status with a sign, icon or label.</span></div>
+<div class="anat"><span class="n" style="background:var(--grn)">✓</span><span>Honour <span class="mono">prefers-reduced-motion</span> — freeze drift, breathe and stream; keep instant state.</span></div>
+<div class="anat"><span class="n" style="background:var(--grn)">✓</span><span>Icon-only buttons carry an <span class="mono">aria-label</span>; live regions announce Atlas replies.</span></div>
+</div>
+</div>
+
+<div class="shead"><span class="snum">12</span><h2 class="sh2 disp">Do & don't</h2></div>
+<div class="grid g2">
+<div class="ddcard doc"><p class="ddh ddg"><i data-lucide="check-circle" class="i16"></i>Do</p>
+<div class="ddli">Use orange only for what is live, active or interactive.</div>
+<div class="ddli">Let surfaces be frosted so the atmosphere reads through.</div>
+<div class="ddli">Express state as light — glow, bloom, drift.</div>
+<div class="ddli">Keep motion slow and organic; stagger entrances.</div>
+<div class="ddli">Lead copy with the answer.</div>
+</div>
+<div class="ddcard dontc"><p class="ddh ddr"><i data-lucide="x-circle" class="i16"></i>Don't</p>
+<div class="ddli">Flood the UI with blue — one confident accent; orange only as a rare secondary.</div>
+<div class="ddli">Use hard grey drop shadows or heavy borders.</div>
+<div class="ddli">Blink, strobe or jitter — light never flickers.</div>
+<div class="ddli">Reach for emoji or exclamation marks in Atlas's voice.</div>
+<div class="ddli">Introduce new fonts, radii or one-off colors.</div>
+</div>
+</div>
+<div class="shead"><span class="snum">13</span><h2 class="sh2 disp">Brand &amp; assets</h2></div>
+<p class="secd">The brand shows as the lowercase <span class="mono">atlas</span> wordmark set in Geist Medium at −.035em tracking — never capitalised, never a drawn logotype. The informal mark is the light orb; Lucide <span class="mono">sparkles</span> stands in at small sizes. Two production images ship with the kit; reference them from <span class="mono">assets/</span>.</p>
+<div class="grid g3" style="margin-bottom:16px">
+<div class="card2 fx col gap12"><p class="compcap" style="margin-top:0">Wordmark · on paper</p><div class="markbox"><span class="wordmark">atlas</span></div></div>
+<div class="card2 fx col gap12"><p class="compcap" style="margin-top:0">Wordmark · on ink</p><div class="markbox dark"><span class="wordmark" style="color:#f9f7f4">atlas</span></div></div>
+<div class="card2 fx col gap12"><p class="compcap" style="margin-top:0">Orb mark</p><div class="markbox dark"><span class="orbmark"></span></div></div>
+</div>
+<div class="grid g2">
+<div class="assetcard"><img class="assetimg" src="assets/orb-hero.png" alt="Meet Atlas intro hero"><div class="assetmeta"><p class="assetn">Intro hero — “Meet Atlas.”</p><p class="assetd">Full-bleed Atlas Orange field with the particle orb and a Newsreader-italic headline. Landing and intro surfaces only.</p><p class="assetp">assets/orb-hero.png · 924×540 · JPEG</p></div></div>
+<div class="assetcard"><img class="assetimg" src="assets/workshop.png" alt="Atlas Workshop dashboard"><div class="assetmeta"><p class="assetn">Workshop dashboard</p><p class="assetd">The canonical home surface — greeting, weather and agenda in frosted cards over drifting warm atmosphere.</p><p class="assetp">assets/workshop.png · 924×540 · JPEG</p></div></div>
+</div>
+
+<div class="shead"><span class="snum">14</span><h2 class="sh2 disp">Fonts &amp; delivery</h2></div>
+<p class="secd">Three families, loaded from Google Fonts. Vendor them as local <span class="mono">@font-face</span> to ship offline. Every value in this system is also published as a CSS custom property across seven token files, gathered by <span class="mono">styles.css</span> — import that one file and reference tokens by name.</p>
+<div class="grid g2">
+<div class="card2"><p class="compcap" style="margin-top:0">Font stacks</p>
+<table class="tbl"><thead><tr><th>Token</th><th>Stack</th></tr></thead><tbody>
+<tr><td>--font-display</td><td class="mn">'Hanken Grotesk','Geist',system-ui,sans-serif</td></tr>
+<tr><td>--font-ui</td><td class="mn">'Geist',system-ui,sans-serif</td></tr>
+<tr><td>--font-editorial</td><td class="mn">'Newsreader',Georgia,serif</td></tr>
+<tr><td>--font-mono</td><td class="mn">ui-monospace,'SF Mono',Menlo,monospace</td></tr>
+</tbody></table>
+<p class="compcap">Weights shipped</p>
+<table class="tbl"><tbody>
+<tr><td>Hanken Grotesk</td><td>400 · 500 · 600 · 700 — display &amp; numerals</td></tr>
+<tr><td>Geist</td><td>400 · 500 · 600 · 700 — UI &amp; body</td></tr>
+<tr><td>Newsreader</td><td>italic 500 only — editorial accent</td></tr>
+</tbody></table></div>
+<div class="code" data-om-raster><p class="codecap" style="color:#8a86ad">tokens/fonts.css — CDN load</p><pre><span class="c1">/* Loaded from Google Fonts.</span>
+<span class="c1">   Swap for local @font-face to ship offline. */</span>
+<span class="c4">@import</span> <span class="c3">url('https://fonts.googleapis.com/css2?
+  family=Geist:wght@400;500;600;700&amp;
+  family=Hanken+Grotesk:wght@400;500;600;700&amp;
+  family=Newsreader:ital,wght@1,500&amp;
+  display=swap')</span>;</pre></div>
+</div>
+<div class="card2" style="margin-top:16px"><p class="codecap" style="margin-top:0">Token files · linked by styles.css</p>
+<table class="tbl"><thead><tr><th>File</th><th>Holds</th><th>Sample tokens</th></tr></thead><tbody>
+<tr><td>colors.css</td><td>Palette + semantic aliases</td><td class="mn">--accent · --surface-card · --text-secondary</td></tr>
+<tr><td>typography.css</td><td>Font stacks, scale, weights, tracking</td><td class="mn">--text-display · --tracking-display · --weight-medium</td></tr>
+<tr><td>spacing.css</td><td>4px base scale · 1→16</td><td class="mn">--space-1 … --space-16</td></tr>
+<tr><td>radius.css</td><td>Corner radii</td><td class="mn">--radius-control · --radius-card · --radius-pill</td></tr>
+<tr><td>elevation.css</td><td>Warm shadows + frost blur</td><td class="mn">--elevation-card · --elevation-dock · --blur-frost</td></tr>
+<tr><td>motion.css</td><td>Easing + durations</td><td class="mn">--ease-spring · --dur-entrance · --stagger</td></tr>
+<tr><td>fonts.css</td><td>Webfont load (CDN)</td><td class="mn">@import Google Fonts</td></tr>
+</tbody></table></div>
+
+<div class="shead"><span class="snum">15</span><h2 class="sh2 disp">App icons &amp; favicon</h2></div>
+<p class="secd">Six directions for the Atlas mark, all on the blue accent. The superellipse tile is the master shape; each renders down to a 16px favicon. Prefer the dot-sphere (01) as the primary; the inverted mark (06) is for light contexts and monochrome.</p>
+<div class="grid g3" style="gap:20px">
+<div class="card2 fx col ac gap12"><svg width="88" height="88" viewBox="0 0 88 88" data-om-raster><defs><clipPath id="sq"><rect width="88" height="88" rx="22"/></clipPath></defs><g clip-path="url(#sq)"><rect width="88" height="88" fill="#3461f2"/><g fill="#ffffff"><circle cx="44" cy="20" r="2"/><circle cx="58" cy="24" r="2"/><circle cx="66" cy="36" r="2.2"/><circle cx="68" cy="50" r="2"/><circle cx="60" cy="62" r="2.2"/><circle cx="48" cy="68" r="2"/><circle cx="34" cy="66" r="2.2"/><circle cx="24" cy="56" r="2"/><circle cx="20" cy="44" r="2.4"/><circle cx="24" cy="30" r="2"/><circle cx="34" cy="22" r="2.2"/><circle cx="44" cy="44" r="3" opacity=".95"/><circle cx="52" cy="38" r="2"/><circle cx="38" cy="50" r="2"/><circle cx="54" cy="52" r="1.8"/><circle cx="36" cy="36" r="1.8"/></g></g></svg><p class="assetn">01 · Dot-sphere</p></div>
+<div class="card2 fx col ac gap12"><svg width="88" height="88" viewBox="0 0 88 88" data-om-raster><rect width="88" height="88" rx="22" fill="#3461f2"/><text x="45" y="62" text-anchor="middle" font-family="Geist,ui-sans-serif,sans-serif" font-size="56" font-weight="500" letter-spacing="-3" fill="#fffdfa">a</text></svg><p class="assetn">02 · Wordmark (Geist)</p></div>
+<div class="card2 fx col ac gap12"><svg width="88" height="88" viewBox="0 0 88 88" data-om-raster><rect width="88" height="88" rx="22" fill="#3461f2"/><g fill="none" stroke="#fffdfa" stroke-width="2.4"><ellipse cx="44" cy="44" rx="26" ry="10"/><ellipse cx="44" cy="44" rx="10" ry="26"/><ellipse cx="44" cy="44" rx="22" ry="22" opacity=".5"/></g><circle cx="44" cy="44" r="5" fill="#fffdfa"/></svg><p class="assetn">03 · Orbit rings</p></div>
+<div class="card2 fx col ac gap12"><svg width="88" height="88" viewBox="0 0 88 88" data-om-raster><rect width="88" height="88" rx="22" fill="#3461f2"/><g fill="#fffdfa"><circle cx="18" cy="30" r="1.6" opacity=".4"/><circle cx="31" cy="34" r="1.6" opacity=".4"/><circle cx="44" cy="35" r="1.6" opacity=".4"/><circle cx="57" cy="31" r="1.6" opacity=".4"/><circle cx="70" cy="26" r="1.6" opacity=".4"/><circle cx="18" cy="42" r="1.8" opacity=".6"/><circle cx="31" cy="46" r="1.8" opacity=".6"/><circle cx="44" cy="47" r="1.8" opacity=".6"/><circle cx="57" cy="43" r="1.8" opacity=".6"/><circle cx="70" cy="38" r="1.8" opacity=".6"/><circle cx="18" cy="54" r="2" opacity=".85"/><circle cx="31" cy="58" r="2" opacity=".85"/><circle cx="44" cy="59" r="2" opacity=".85"/><circle cx="57" cy="55" r="2" opacity=".85"/><circle cx="70" cy="50" r="2" opacity=".85"/><circle cx="18" cy="66" r="2.2"/><circle cx="31" cy="70" r="2.2"/><circle cx="44" cy="71" r="2.2"/><circle cx="57" cy="67" r="2.2"/><circle cx="70" cy="62" r="2.2"/></g></svg><p class="assetn">04 · Sound field</p></div>
+<div class="card2 fx col ac gap12"><svg width="88" height="88" viewBox="0 0 88 88" data-om-raster><defs><radialGradient id="gl" cx="38%" cy="34%" r="72%"><stop offset="0%" stop-color="#8fb0ff"/><stop offset="60%" stop-color="#3461f2"/><stop offset="100%" stop-color="#2340c8"/></radialGradient></defs><rect width="88" height="88" rx="22" fill="#1b2a6b"/><circle cx="44" cy="44" r="26" fill="url(#gl)"/><g fill="none" stroke="#dbe6ff" stroke-width="1.4" opacity=".6"><ellipse cx="44" cy="44" rx="26" ry="9"/><path d="M44 18 A26 26 0 0 1 44 70"/></g></svg><p class="assetn">05 · Sphere globe</p></div>
+<div class="card2 fx col ac gap12"><svg width="88" height="88" viewBox="0 0 88 88" data-om-raster><rect width="88" height="88" rx="22" fill="#f2f5ff" stroke="#dfe6fb" stroke-width="1"/><g fill="#3461f2"><circle cx="44" cy="22" r="2"/><circle cx="60" cy="30" r="2"/><circle cx="66" cy="46" r="2.2"/><circle cx="58" cy="60" r="2"/><circle cx="44" cy="66" r="2.2"/><circle cx="28" cy="58" r="2"/><circle cx="22" cy="44" r="2.4"/><circle cx="28" cy="30" r="2"/><circle cx="44" cy="44" r="3.4"/><circle cx="52" cy="40" r="1.8"/><circle cx="38" cy="48" r="1.8"/></g></svg><p class="assetn">06 · Inverted / mono</p></div>
+</div>
+</main>
+<footer class="ftr">Atlas Design System · v4.4 · internal reference — tokens, foundations, grid, components, motion, voice, accessibility, brand, assets &amp; app icons</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  componentDidMount() { this._icons(); }
+  componentDidUpdate() { this._icons(); }
+  _icons() { if (window.lucide) requestAnimationFrame(() => { try { lucide.createIcons(); } catch (e) {} }); }
+  rgba(c, a) { return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')'; }
+  blob(x, cx, cy, r, col, a) {
+    const g = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+    g.addColorStop(0, this.rgba(col, a)); g.addColorStop(.55, this.rgba(col, a * .4)); g.addColorStop(1, this.rgba(col, 0));
+    x.fillStyle = g; x.fillRect(cx - r, cy - r, r * 2, r * 2);
+  }
+  lightCanvas(el) {
+    if (!el || el.__run) return; el.__run = 1;
+    const x = el.getContext('2d');
+    const cols = [[255, 166, 77], [255, 217, 160], [122, 140, 255], [255, 136, 60]];
+    const tick = (ts) => {
+      if (!el.isConnected) { el.__run = 0; return; }
+      const d = Math.min(2, window.devicePixelRatio || 1);
+      const w = el.clientWidth, h = el.clientHeight;
+      if (!w || !h) { requestAnimationFrame(tick); return; }
+      if (el.width !== w * d || el.height !== h * d) { el.width = w * d; el.height = h * d; }
+      x.setTransform(d, 0, 0, d, 0, 0);
+      const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#1a1c2b'); g.addColorStop(1, '#101220');
+      x.fillStyle = g; x.fillRect(0, 0, w, h);
+      const t = ts / 1000;
+      for (let i = 0; i < 5; i++) {
+        const c = cols[i % cols.length];
+        const cx = w * (.5 + .4 * Math.sin(t * .18 + i * 1.7));
+        const cy = h * (.5 + .38 * Math.cos(t * .13 * (1 + i * .2) + i));
+        const r = Math.max(w, h) * (.34 + .1 * Math.sin(t * .2 + i));
+        this.blob(x, cx, cy, r, c, (i === 2 ? .12 : .16) * (.7 + .3 * Math.sin(t * .3 + i)));
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+  renderVals() {
+    return {
+      rootRef: (el) => { if (el) this._icons(); },
+      lightRef: (el) => this.lightCanvas(el)
+    };
+  }
+}
+</script>
+</body>
+</html>
