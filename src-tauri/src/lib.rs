@@ -66,6 +66,88 @@ fn voice_gateway_info(state: tauri::State<VoiceGateway>) -> serde_json::Value {
         "running": running,
     })
 }
+
+// ---------------------------------------------------------------------------
+// Brain sidecar (Supabase migration, Phase 2): a compiled Bun HTTP server that
+// runs the chat/AI orchestrator locally (replacing the chat + chat-with-memory
+// edge functions). Same trust model as the voice gateway — 127.0.0.1 only,
+// guarded by the shared SIDECAR_TOKEN. AI keys come from the Keychain.
+
+const ATLAS_BRAIN_PORT: u16 = 4830;
+
+struct AtlasBrain {
+    child: Mutex<Option<Child>>,
+    token: String,
+}
+
+fn spawn_atlas_brain(token: &str) -> Option<Child> {
+    let exe = std::env::current_exe().ok()?;
+    let dir = exe.parent()?;
+    let bin = dir.join("atlas-brain");
+    if !bin.exists() {
+        eprintln!(
+            "[atlas] brain sidecar binary not found ({}) — dev mode? run `bun run dev` in services/atlas-brain",
+            bin.display()
+        );
+        return None;
+    }
+    let mut cmd = Command::new(&bin);
+    cmd.env("SIDECAR_TOKEN", token)
+        .env("ATLAS_BRAIN_PORT", ATLAS_BRAIN_PORT.to_string());
+    // AI keys from the Keychain (never in env files / git).
+    if let Some(k) = secrets::core_key("gemini_api_key") { cmd.env("GEMINI_API_KEY", k); }
+    if let Some(k) = secrets::core_key("perplexity_api_key") { cmd.env("PERPLEXITY_API_KEY", k); }
+    // Transitional: the brain still verifies JWTs + reads memory via Supabase
+    // until later phases go fully local. Pass through any Supabase env present.
+    for var in ["SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"] {
+        if let Ok(v) = std::env::var(var) { cmd.env(var, v); }
+    }
+    match cmd.spawn() {
+        Ok(child) => {
+            eprintln!("[atlas] brain sidecar spawned (pid {})", child.id());
+            Some(child)
+        }
+        Err(e) => {
+            eprintln!("[atlas] brain sidecar spawn failed: {e}");
+            None
+        }
+    }
+}
+
+#[tauri::command]
+fn atlas_brain_info(state: tauri::State<AtlasBrain>) -> serde_json::Value {
+    let running = state.child.lock().ok().map(|g| g.is_some()).unwrap_or(false);
+    serde_json::json!({
+        "port": ATLAS_BRAIN_PORT,
+        "token": state.token,
+        "running": running,
+    })
+}
+
+/// Store an AI provider key in the Keychain (atlas-core). Takes effect on the
+/// next app launch (the sidecar reads keys from env at spawn). Accepts
+/// "gemini" or "perplexity".
+#[tauri::command]
+fn brain_set_ai_key(provider: String, key: String) -> Result<(), String> {
+    let account = match provider.as_str() {
+        "gemini" => "gemini_api_key",
+        "perplexity" => "perplexity_api_key",
+        other => return Err(format!("unknown provider: {other}")),
+    };
+    if key.trim().is_empty() {
+        return secrets::clear_core_key(account);
+    }
+    secrets::set_core_key(account, key.trim())
+}
+
+/// Which AI keys are present in the Keychain (never returns the values).
+#[tauri::command]
+fn brain_ai_status() -> serde_json::Value {
+    serde_json::json!({
+        "gemini": secrets::core_key("gemini_api_key").is_some(),
+        "perplexity": secrets::core_key("perplexity_api_key").is_some(),
+    })
+}
 const CACHE_PURGE_THRESHOLD_BYTES: u64 = 200 * 1024 * 1024; // 200 MB
 
 fn dir_size(path: &Path) -> u64 {
@@ -133,6 +215,11 @@ pub fn run() {
   purge_webview_cache_on_update();
 
   let gateway_token = uuid::Uuid::new_v4().to_string();
+  // Both sidecars share one per-launch token (127.0.0.1-only, token-gated).
+  let brain = AtlasBrain {
+    child: Mutex::new(spawn_atlas_brain(&gateway_token)),
+    token: gateway_token.clone(),
+  };
   let gateway = VoiceGateway {
     child: Mutex::new(spawn_voice_gateway(&gateway_token)),
     token: gateway_token,
@@ -147,9 +234,13 @@ pub fn run() {
     // back into this process; we parse it and hand the code to the webview.
     .plugin(tauri_plugin_deep_link::init())
     .manage(gateway)
+    .manage(brain)
     .manage(music::MusicState::new())
     .invoke_handler(tauri::generate_handler![
       voice_gateway_info,
+      atlas_brain_info,
+      brain_set_ai_key,
+      brain_ai_status,
       portfolio::portfolio_status,
       portfolio::portfolio_connect_url,
       portfolio::portfolio_sync,
@@ -239,7 +330,7 @@ pub fn run() {
     .build(tauri::generate_context!())
     .expect("error while building tauri application")
     .run(|app_handle, event| {
-      // Kill the sidecar when the app exits — never leave an orphan gateway.
+      // Kill the sidecars when the app exits — never leave orphans.
       if let tauri::RunEvent::Exit = event {
         if let Some(gw) = app_handle.try_state::<VoiceGateway>() {
           if let Ok(mut guard) = gw.child.lock() {
@@ -247,6 +338,15 @@ pub fn run() {
               let _ = child.kill();
               let _ = child.wait();
               eprintln!("[atlas] voice gateway stopped");
+            }
+          }
+        }
+        if let Some(br) = app_handle.try_state::<AtlasBrain>() {
+          if let Ok(mut guard) = br.child.lock() {
+            if let Some(mut child) = guard.take() {
+              let _ = child.kill();
+              let _ = child.wait();
+              eprintln!("[atlas] brain sidecar stopped");
             }
           }
         }

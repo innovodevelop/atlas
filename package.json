@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "build:sidecar": "cd services/voice-gateway && bun install --frozen-lockfile && bun run fetch-models && bun build --compile --minify src/index.ts --outfile ../../src-tauri/binaries/atlas-voice-gateway-aarch64-apple-darwin",
+    "build:brain": "cd services/atlas-brain && bun install --frozen-lockfile && bun build --compile --minify src/index.ts --outfile ../../src-tauri/binaries/atlas-brain-aarch64-apple-darwin",
     "tauri": "tauri"
   },
   "dependencies": {

@@ -1,0 +1,19 @@
+{
+  "name": "atlas-brain",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Atlas brain sidecar — the chat/AI orchestrator (memory recall, tool loop, streaming) served over local HTTP, replacing the chat + chat-with-memory edge functions. Re-imports the runtime-neutral _shared/orchestrator.ts. Tauri sidecar in packaged builds; standalone in dev.",
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "typecheck": "bunx tsc --noEmit",
+    "compile": "bun build --compile --minify src/index.ts --outfile dist/atlas-brain"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.14",
+    "typescript": "^5.6.0"
+  }
+}

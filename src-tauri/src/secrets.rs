@@ -70,3 +70,31 @@ pub fn clear_music_refresh_token() -> Result<(), String> {
     if let Ok(e) = music_entry("spotify_refresh_token") { let _ = e.delete_password(); }
     Ok(())
 }
+
+// --- Brain sidecar / AI provider keys -----------------------------------
+// The brain sidecar's AI keys (Gemini required for completions + embeddings;
+// Perplexity optional for web-search tools) live under the "atlas-core"
+// service and are injected into the sidecar's env at spawn — never in the DB,
+// git, or the JS layer (Supabase-migration local-first model).
+
+const CORE_SERVICE: &str = "atlas-core";
+
+fn core_entry(account: &str) -> keyring::Result<keyring::Entry> {
+    keyring::Entry::new(CORE_SERVICE, account)
+}
+
+/// Read an atlas-core secret (e.g. "gemini_api_key", "perplexity_api_key").
+pub fn core_key(account: &str) -> Option<String> {
+    core_entry(account).ok()?.get_password().ok()
+}
+
+pub fn set_core_key(account: &str, value: &str) -> Result<(), String> {
+    core_entry(account)
+        .and_then(|e| e.set_password(value))
+        .map_err(|e| e.to_string())
+}
+
+pub fn clear_core_key(account: &str) -> Result<(), String> {
+    if let Ok(e) = core_entry(account) { let _ = e.delete_password(); }
+    Ok(())
+}
