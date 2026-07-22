@@ -13,6 +13,7 @@ mod oauth;
 mod music;
 mod music_engine;
 mod db;
+mod datafetch;
 
 const BUNDLE_ID: &str = "com.magnuspilegaard.atlas";
 
@@ -286,6 +287,9 @@ pub fn run() {
       db::db_delete,
       db::memory_recall,
       db::memory_upsert_vector,
+      datafetch::fetch_weather,
+      datafetch::fetch_stocks,
+      datafetch::fetch_news,
     ])
     .setup(|app| {
       // Local app database (Supabase migration). Open once at startup under the

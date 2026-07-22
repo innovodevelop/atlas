@@ -369,8 +369,25 @@ const realtime = {
 // Transitional: edge functions not yet migrated (research / learning / mail /
 // elevenlabs) are still called on Supabase. These get replaced in Phases 5/7;
 // until then this forwards to the Supabase function with the CF token.
+// Edge functions now served by local Tauri commands (Phase 5). Others still
+// forward to Supabase until their phase migrates them.
+const LOCAL_FN: Record<string, string> = {
+  "get-weather": "fetch_weather",
+  "get-stocks": "fetch_stocks",
+  "get-news": "fetch_news",
+};
+
 const functions = {
   async invoke(name: string, opts?: { body?: unknown; headers?: Record<string, string> }): Promise<Result<any>> {
+    const localCmd = LOCAL_FN[name];
+    if (localCmd && isTauri()) {
+      try {
+        const data = await invoke(localCmd, (opts?.body ?? {}) as Record<string, unknown>);
+        return { data, error: null };
+      } catch (e) {
+        return { data: null, error: { message: e instanceof Error ? e.message : String(e) } };
+      }
+    }
     const base = import.meta.env.VITE_SUPABASE_URL;
     if (!base) return { data: null, error: { message: `Edge function ${name} unavailable (no backend).` } };
     const token = authClient.getToken();
