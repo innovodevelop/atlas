@@ -36,7 +36,7 @@ function usAqiFromPm25(pm25: number): number {
   return 500;
 }
 
-export const AuroraAirQualityCard = memo(() => {
+export const AtlasAirQualityCard = memo(() => {
   const { weather } = useWeather();
   const pm25 = weather.air?.pm25 ?? 8;
   const band = AQI_BANDS.find((b) => pm25 <= b.max) ?? AQI_BANDS[0];
@@ -58,7 +58,7 @@ export const AuroraAirQualityCard = memo(() => {
     </div>
   );
 });
-AuroraAirQualityCard.displayName = 'AuroraAirQualityCard';
+AtlasAirQualityCard.displayName = 'AtlasAirQualityCard';
 
 // ---------------------------------------------------------------------------
 // Now playing — the Atlas Sphere music player's compact tile (design Change 4).
@@ -72,7 +72,7 @@ const EqBars = ({ playing }: { playing: boolean }) => (
   </span>
 );
 
-export const AuroraNowPlayingCard = memo(({ onOpen }: { onOpen?: () => void }) => {
+export const AtlasNowPlayingCard = memo(({ onOpen }: { onOpen?: () => void }) => {
   const m = useMusicPlayer();
   const isPlaying = m.nowPlaying?.isPlaying ?? false;
   const reactivity = useAudioReactivity(m.levelRef, isPlaying);
@@ -104,7 +104,7 @@ export const AuroraNowPlayingCard = memo(({ onOpen }: { onOpen?: () => void }) =
     </div>
   );
 });
-AuroraNowPlayingCard.displayName = 'AuroraNowPlayingCard';
+AtlasNowPlayingCard.displayName = 'AtlasNowPlayingCard';
 
 // ---------------------------------------------------------------------------
 // Activity rings — demo content until a Health data source exists.
@@ -115,7 +115,7 @@ const RINGS = [
   { r: 18, dash: 113, off: 62, color: '#3461f2', track: 'rgba(52,97,242,.16)' },
 ] as const;
 
-export const AuroraActivityCard = memo(() => (
+export const AtlasActivityCard = memo(() => (
   <div className="cardB sp2 d3" style={{ cursor: 'default' }}>
     <div className="chB"><p className="mlblB">Activity</p><div className="icboxB fx ac jc"><Flame className="i14" /></div></div>
     <div className="cbB fx ac gap20">
@@ -136,7 +136,7 @@ export const AuroraActivityCard = memo(() => (
     </div>
   </div>
 ));
-AuroraActivityCard.displayName = 'AuroraActivityCard';
+AtlasActivityCard.displayName = 'AtlasActivityCard';
 
 // ---------------------------------------------------------------------------
 // World clock — real times, minute tick.
@@ -158,7 +158,7 @@ function cityTimes() {
   });
 }
 
-export const AuroraWorldClockCard = memo(() => {
+export const AtlasWorldClockCard = memo(() => {
   const [rows, setRows] = useState(cityTimes);
   useEffect(() => {
     const id = window.setInterval(() => setRows(cityTimes()), 30_000);
@@ -178,4 +178,4 @@ export const AuroraWorldClockCard = memo(() => {
     </div>
   );
 });
-AuroraWorldClockCard.displayName = 'AuroraWorldClockCard';
+AtlasWorldClockCard.displayName = 'AtlasWorldClockCard';

@@ -4,9 +4,9 @@ import {
   Calendar as CalIcon, Plus, TrendingUp, Gauge, Sun, Thermometer,
   Inbox, Star, Send, Archive, PenLine, TrendingDown, Mail,
 } from 'lucide-react';
-import { WeatherIcon } from './auroraIcons';
+import { WeatherIcon } from './atlasIcons';
 import { MusicPlayerFull } from './MusicPlayerFull';
-import { sparklinePoints, fmtPct, fmtEventTime } from '@/pages/aurora/auroraHelpers';
+import { sparklinePoints, fmtPct, fmtEventTime } from '@/pages/atlas/atlasHelpers';
 import { useWeather } from '@/hooks/useWeather';
 import { useStocks } from '@/hooks/useStocks';
 import { useNews } from '@/hooks/useNews';
@@ -15,10 +15,10 @@ import { useCalendarEvents } from '@/hooks/useCalendarEvents';
 import { useMailIntelligence } from '@/hooks/useMailIntelligence';
 import { usePortfolio, type HistoryPoint } from '@/hooks/usePortfolio';
 import type { WakeWordState, AIState } from '@/types';
-import type { AuroraExpandedKey } from '@/pages/aurora/AuroraDashboard';
+import type { AtlasExpandedKey } from '@/pages/atlas/AtlasDashboard';
 
 interface Props {
-  which: AuroraExpandedKey;
+  which: AtlasExpandedKey;
   onClose: () => void;
   onOpenDrawer: () => void;
   sphereState: WakeWordState | AIState;
@@ -27,11 +27,11 @@ interface Props {
 
 // The per-view eyebrow/title/close header was removed (design Change 2/3): the
 // greeting band now narrates the focused widget, and the focus view carries a
-// single return-hint bar (rendered by AuroraDashboard). Kept as a no-op so the
+// single return-hint bar (rendered by AtlasDashboard). Kept as a no-op so the
 // per-view call sites stay untouched.
 const Head = (_props: { title: string; onClose: () => void }) => null;
 
-export const AuroraExpanded = ({ which, onClose }: Props) => {
+export const AtlasExpanded = ({ which, onClose }: Props) => {
   if (!which) return null;
   return (
     <>
@@ -50,7 +50,7 @@ function WeatherView({ onClose }: { onClose: () => void }) {
   const { weather } = useWeather();
   const hours = weather.hourly.slice(0, 8);
   return (
-    <div className="exp th-weather" data-screen-label="Aurora — Weather">
+    <div className="exp th-weather" data-screen-label="Atlas — Weather">
       <div className="skyB" /><div className="skyfadeB" />
       <Head title="Weather" onClose={onClose} />
       <div className="ebody">
@@ -148,7 +148,7 @@ function CalendarView({ onClose }: { onClose: () => void }) {
   const tomorrowStr = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
   const tomorrowEvents = events.filter((e) => isSameDay(e.start_time, tomorrowStr));
   return (
-    <div className="exp th-cal" data-screen-label="Aurora — Calendar">
+    <div className="exp th-cal" data-screen-label="Atlas — Calendar">
       <div className="expwash" />
       <Head title="Calendar" onClose={onClose} />
       <div className="ebody">
@@ -217,7 +217,7 @@ function TasksView({ onClose }: { onClose: () => void }) {
   const dueTodayCount = active.filter((t) => t.due_date && t.due_date.slice(0, 10) === todayStr).length;
   const overdueCount = active.filter((t) => t.due_date && t.due_date.slice(0, 10) < todayStr).length;
   return (
-    <div className="exp th-task" data-screen-label="Aurora — Tasks">
+    <div className="exp th-task" data-screen-label="Atlas — Tasks">
       <div className="expwash" />
       <Head title="Tasks" onClose={onClose} />
       <div className="ebody">
@@ -367,7 +367,7 @@ function StocksView({ onClose }: { onClose: () => void }) {
     { label: 'Day range', value: lead.high != null && lead.low != null ? (lead.high - lead.low).toFixed(2) : '—' },
   ] : [];
   return (
-    <div className="exp th-stock" data-screen-label="Aurora — Watchlist">
+    <div className="exp th-stock" data-screen-label="Atlas — Watchlist">
       <div className="expwash" />
       <Head title="Watchlist" onClose={onClose} />
       <div className="ebody">
@@ -453,7 +453,7 @@ function EmailView({ onClose }: { onClose: () => void }) {
   const receivedToday = messages.filter((m) => m.received_at && m.received_at.slice(0, 10) === todayStr).length;
 
   return (
-    <div className="exp th-mail" data-screen-label="Aurora — Mail">
+    <div className="exp th-mail" data-screen-label="Atlas — Mail">
       <div className="expwash" />
       <Head title="Mail" onClose={onClose} />
       <div className="ebody">
@@ -575,7 +575,7 @@ function NewsView({ onClose }: { onClose: () => void }) {
   const { news } = useNews();
   const [lead, ...rest] = news;
   return (
-    <div className="exp th-news" data-screen-label="Aurora — Briefing">
+    <div className="exp th-news" data-screen-label="Atlas — Briefing">
       <div className="expwash" />
       <Head title="Briefing" onClose={onClose} />
       <div className="ebody">

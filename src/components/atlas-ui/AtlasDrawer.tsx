@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { X, ArrowUp } from 'lucide-react';
 import type { Message } from '@/types';
 
-interface AuroraDrawerProps {
+interface AtlasDrawerProps {
   open: boolean;
   onClose: () => void;
   messages: Message[];
@@ -14,7 +14,7 @@ interface AuroraDrawerProps {
 }
 
 // Right-side conversation drawer (design: .backdrop + .drawer).
-export const AuroraDrawer = ({ open, onClose, messages, thinking, stateLabel, input, onInput, onSend }: AuroraDrawerProps) => {
+export const AtlasDrawer = ({ open, onClose, messages, thinking, stateLabel, input, onInput, onSend }: AtlasDrawerProps) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (open && scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;

@@ -9,24 +9,24 @@ import { useUnifiedChat } from '@/hooks/useUnifiedChat';
 import { useVoiceSession } from '@/hooks/useVoiceSession';
 import { useAtlasSettings } from '@/hooks/useAtlasSettings';
 import { AtlasSphereLazy as AtlasSphere } from '@/components/atlas/AtlasSphereLazy';
-import { timeOfDayGreeting, atlasStateLabel } from './auroraHelpers';
+import { timeOfDayGreeting, atlasStateLabel } from './atlasHelpers';
 import { useBandNarration, type BandContent } from './useBandNarration';
 import {
-  AuroraWeatherCard, AuroraCalendarCard, AuroraTasksCard,
-  AuroraStocksCard, AuroraInboxCard, AuroraBriefingCard,
-} from '@/components/aurora/AuroraCards';
+  AtlasWeatherCard, AtlasCalendarCard, AtlasTasksCard,
+  AtlasStocksCard, AtlasInboxCard, AtlasBriefingCard,
+} from '@/components/atlas-ui/AtlasCards';
 import {
-  AuroraAirQualityCard, AuroraNowPlayingCard, AuroraActivityCard, AuroraWorldClockCard,
-} from '@/components/aurora/AuroraExtraCards';
-import { HeaderWave } from '@/components/aurora/HeaderWave';
-import { AtmosphereCanvas } from '@/components/aurora/AtmosphereCanvas';
-import { AuroraDrawer } from '@/components/aurora/AuroraDrawer';
-import { AuroraExpanded } from '@/components/aurora/AuroraExpanded';
-import { AuroraSettings } from './AuroraSettings';
+  AtlasAirQualityCard, AtlasNowPlayingCard, AtlasActivityCard, AtlasWorldClockCard,
+} from '@/components/atlas-ui/AtlasExtraCards';
+import { HeaderWave } from '@/components/atlas-ui/HeaderWave';
+import { AtmosphereCanvas } from '@/components/atlas-ui/AtmosphereCanvas';
+import { AtlasDrawer } from '@/components/atlas-ui/AtlasDrawer';
+import { AtlasExpanded } from '@/components/atlas-ui/AtlasExpanded';
+import { AtlasSettings } from './AtlasSettings';
 
-export type AuroraExpandedKey = 'weather' | 'calendar' | 'tasks' | 'stocks' | 'email' | 'news' | 'music' | null;
+export type AtlasExpandedKey = 'weather' | 'calendar' | 'tasks' | 'stocks' | 'email' | 'news' | 'music' | null;
 
-const AuroraDashboard = () => {
+const AtlasDashboard = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { profile } = useUserProfile();
@@ -37,7 +37,7 @@ const AuroraDashboard = () => {
   // Full-screen widget system: the header + band stay mounted; only the grid
   // region swaps to the focused widget. `gridFolding` runs the staggered
   // fold-out before the focused view mounts; `viewExiting` runs the reverse.
-  const [expanded, setExpanded] = useState<AuroraExpandedKey>(null);
+  const [expanded, setExpanded] = useState<AtlasExpandedKey>(null);
   const [gridFolding, setGridFolding] = useState(false);
   const [viewExiting, setViewExiting] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -65,7 +65,7 @@ const AuroraDashboard = () => {
   }, [user, authLoading, navigate]);
 
   // Open a widget: fold the grid up into Atlas, then mount the focused view.
-  const openWidget = useCallback((key: Exclude<AuroraExpandedKey, null>) => {
+  const openWidget = useCallback((key: Exclude<AtlasExpandedKey, null>) => {
     setGridFolding(true);
     window.setTimeout(() => { setExpanded(key); setGridFolding(false); }, 340);
   }, []);
@@ -180,23 +180,23 @@ const AuroraDashboard = () => {
           and band above stay mounted either way (design Change 1). */}
       {!expanded ? (
         <main className={`gridB${gridFolding ? ' folding' : ''}`}>
-          <AuroraWeatherCard onOpen={() => openWidget('weather')} />
-          <AuroraCalendarCard onOpen={() => openWidget('calendar')} />
-          <AuroraTasksCard onOpen={() => openWidget('tasks')} />
-          <AuroraStocksCard onOpen={() => openWidget('stocks')} />
-          <AuroraInboxCard onOpen={() => openWidget('email')} />
-          <AuroraBriefingCard onOpen={() => openWidget('news')} />
-          <AuroraAirQualityCard />
-          <AuroraNowPlayingCard onOpen={() => openWidget('music')} />
-          <AuroraActivityCard />
-          <AuroraWorldClockCard />
+          <AtlasWeatherCard onOpen={() => openWidget('weather')} />
+          <AtlasCalendarCard onOpen={() => openWidget('calendar')} />
+          <AtlasTasksCard onOpen={() => openWidget('tasks')} />
+          <AtlasStocksCard onOpen={() => openWidget('stocks')} />
+          <AtlasInboxCard onOpen={() => openWidget('email')} />
+          <AtlasBriefingCard onOpen={() => openWidget('news')} />
+          <AtlasAirQualityCard />
+          <AtlasNowPlayingCard onOpen={() => openWidget('music')} />
+          <AtlasActivityCard />
+          <AtlasWorldClockCard />
         </main>
       ) : (
         <div className={`focusview${viewExiting ? ' exiting' : ''}`}>
           <button className="retbar" onClick={closeWidget} aria-label="Return to dashboard">
             <CornerUpLeft className="i16" />Tap the title or press Esc to return
           </button>
-          <AuroraExpanded
+          <AtlasExpanded
             which={expanded}
             onClose={closeWidget}
             onOpenDrawer={() => { closeWidget(); setDrawerOpen(true); }}
@@ -206,7 +206,7 @@ const AuroraDashboard = () => {
         </div>
       )}
 
-      <AuroraDrawer
+      <AtlasDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         messages={messages}
@@ -217,9 +217,9 @@ const AuroraDashboard = () => {
         onSend={send}
       />
 
-      {settingsOpen && <AuroraSettings onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && <AtlasSettings onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 };
 
-export default AuroraDashboard;
+export default AtlasDashboard;

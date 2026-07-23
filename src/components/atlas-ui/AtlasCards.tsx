@@ -3,8 +3,8 @@ import {
   CloudSun, Calendar, Check, Activity, Mail, Newspaper,
   Droplets, Wind, Sun, Sunrise, Sunset,
 } from 'lucide-react';
-import { WeatherIcon } from './auroraIcons';
-import { sparklinePoints, fmtPct, fmtEventTime } from '@/pages/aurora/auroraHelpers';
+import { WeatherIcon } from './atlasIcons';
+import { sparklinePoints, fmtPct, fmtEventTime } from '@/pages/atlas/atlasHelpers';
 import { startWxCanvas, presetFor } from '@/lib/wxAtmosphere';
 import { useWindowActivity } from '@/hooks/useWindowActivity';
 import { useWeather } from '@/hooks/useWeather';
@@ -15,8 +15,8 @@ import { useTasks } from '@/hooks/useTasks';
 import { useCalendarEvents } from '@/hooks/useCalendarEvents';
 import { useMailIntelligence } from '@/hooks/useMailIntelligence';
 
-// Each card faithfully reproduces the Aurora design's card face, wired to the
-// real data hooks. Card chrome (cardB / chB / icboxB / cbB) comes from aurora.css.
+// Each card faithfully reproduces the Atlas design's card face, wired to the
+// real data hooks. Card chrome (cardB / chB / icboxB / cbB) comes from atlas.css.
 
 /** Masked weather-atmosphere canvas behind the weather card's content
     (design .wxbg — the card content sits at z-index:2 via .wxcard rules). */
@@ -46,7 +46,7 @@ const WeatherCardCanvas = memo(({ condition }: { condition: string }) => {
 });
 WeatherCardCanvas.displayName = 'WeatherCardCanvas';
 
-export const AuroraWeatherCard = memo(({ onOpen }: { onOpen: () => void }) => {
+export const AtlasWeatherCard = memo(({ onOpen }: { onOpen: () => void }) => {
   const { weather } = useWeather();
   const hourly = weather.hourly.slice(0, 6);
   return (
@@ -85,9 +85,9 @@ export const AuroraWeatherCard = memo(({ onOpen }: { onOpen: () => void }) => {
     </div>
   );
 });
-AuroraWeatherCard.displayName = 'AuroraWeatherCard';
+AtlasWeatherCard.displayName = 'AtlasWeatherCard';
 
-export const AuroraCalendarCard = memo(({ onOpen }: { onOpen: () => void }) => {
+export const AtlasCalendarCard = memo(({ onOpen }: { onOpen: () => void }) => {
   const { events } = useCalendarEvents();
   const now = Date.now();
   const rows = events.slice(0, 4);
@@ -113,9 +113,9 @@ export const AuroraCalendarCard = memo(({ onOpen }: { onOpen: () => void }) => {
     </div>
   );
 });
-AuroraCalendarCard.displayName = 'AuroraCalendarCard';
+AtlasCalendarCard.displayName = 'AtlasCalendarCard';
 
-export const AuroraTasksCard = memo(({ onOpen }: { onOpen: () => void }) => {
+export const AtlasTasksCard = memo(({ onOpen }: { onOpen: () => void }) => {
   const { tasks, completedCount, progress } = useTasks();
   const rows = tasks.slice(0, 5);
   const pct = Math.round(progress || 0);
@@ -140,7 +140,7 @@ export const AuroraTasksCard = memo(({ onOpen }: { onOpen: () => void }) => {
     </div>
   );
 });
-AuroraTasksCard.displayName = 'AuroraTasksCard';
+AtlasTasksCard.displayName = 'AtlasTasksCard';
 
 const WATCHLIST = ['AAPL', 'GOOGL', 'MSFT', 'NVDA'];
 
@@ -156,7 +156,7 @@ const areaPath = (series: number[]) => {
   return { area: `M${pts.join(' L')} L600,82 L0,82 Z`, line: pts.join(' ') };
 };
 
-export const AuroraStocksCard = memo(({ onOpen }: { onOpen: () => void }) => {
+export const AtlasStocksCard = memo(({ onOpen }: { onOpen: () => void }) => {
   const { stocks, indices } = useStocks(WATCHLIST);
   const { available, connected, summary, history } = usePortfolio();
   const rows = stocks.slice(0, 4);
@@ -232,7 +232,7 @@ export const AuroraStocksCard = memo(({ onOpen }: { onOpen: () => void }) => {
     </div>
   );
 });
-AuroraStocksCard.displayName = 'AuroraStocksCard';
+AtlasStocksCard.displayName = 'AtlasStocksCard';
 
 const senderName = (from: string | null) => (from || '').replace(/<.*>/, '').replace(/"/g, '').trim() || 'Unknown';
 const senderInitials = (from: string | null) => {
@@ -247,7 +247,7 @@ const mailTime = (iso: string | null) => {
     : d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 };
 
-export const AuroraInboxCard = memo(({ onOpen }: { onOpen: () => void }) => {
+export const AtlasInboxCard = memo(({ onOpen }: { onOpen: () => void }) => {
   const { messages, alerts, isConnected, isLoading } = useMailIntelligence();
   const rows = messages.slice(0, 4);
   return (
@@ -284,9 +284,9 @@ export const AuroraInboxCard = memo(({ onOpen }: { onOpen: () => void }) => {
     </div>
   );
 });
-AuroraInboxCard.displayName = 'AuroraInboxCard';
+AtlasInboxCard.displayName = 'AtlasInboxCard';
 
-export const AuroraBriefingCard = memo(({ onOpen }: { onOpen: () => void }) => {
+export const AtlasBriefingCard = memo(({ onOpen }: { onOpen: () => void }) => {
   const { news } = useNews();
   const rows = news.slice(0, 3);
   return (
@@ -304,4 +304,4 @@ export const AuroraBriefingCard = memo(({ onOpen }: { onOpen: () => void }) => {
     </div>
   );
 });
-AuroraBriefingCard.displayName = 'AuroraBriefingCard';
+AtlasBriefingCard.displayName = 'AtlasBriefingCard';

@@ -1,4 +1,4 @@
-// Small shared helpers for the Aurora screens.
+// Small shared helpers for the Atlas screens.
 
 /** Header status label — mirrors the Workshop design's Atlas state readout. */
 export function atlasStateLabel(state: string): string {

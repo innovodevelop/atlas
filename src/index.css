@@ -97,7 +97,7 @@
   }
 
   .dark {
-    /* Same as root - Aurora is a dark-first design */
+    /* Same as root - Atlas is a dark-first design */
     --background: 240 28% 7%;
     --foreground: 240 30% 96%;
     --card: 240 33% 12%;

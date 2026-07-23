@@ -33,8 +33,9 @@ the Mac).
 
 ## Layout
 
-- `src/` — React webview. Aurora UI in `src/pages/aurora/` + `src/styles/`;
-  particle sphere in `src/components/atlas/`.
+- `src/` — React webview. App screens in `src/pages/atlas/`, dashboard UI in
+  `src/components/atlas-ui/`, styles in `src/styles/`; particle-sphere engine in
+  `src/components/atlas/`.
 - `src-tauri/src/` — Rust core: `db.rs` (SQLite app DB + sqlite-vec/FTS5 recall),
   `datafetch.rs`, `secrets.rs` (Keychain), `lib.rs` (commands + sidecar spawns).
 - `services/atlas-brain/` — Bun HTTP sidecar (chat orchestrator + local memory).
@@ -74,7 +75,7 @@ Ship flow (macOS): `bun run build` → confirm no `VITE_PREVIEW_NOAUTH` in `dist
 - Converse in Danish; write code, UI copy, comments, and commit messages in
   English.
 - Keep the WebGL / particle sphere unless told otherwise.
-- Design CSS lands in `src/styles/aurora.css` verbatim-with-attribution; replace
-  the design's mock data with real hooks.
+- Design CSS lands in `src/styles/workshop.css` verbatim-with-attribution;
+  replace the design's mock data with real hooks.
 - Machine-local Claude Code skills/settings (e.g. the `atlas-ship` skill) live
   outside this repo and are NOT available in Web — they're a local-CLI convenience.

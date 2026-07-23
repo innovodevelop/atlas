@@ -6,7 +6,7 @@ import { useUnifiedChat } from '@/hooks/useUnifiedChat';
 import { useVoiceSession } from '@/hooks/useVoiceSession';
 import { useAtlasSettings } from '@/hooks/useAtlasSettings';
 import { AtlasSphereLazy as AtlasSphere } from '@/components/atlas/AtlasSphereLazy';
-import { timeOfDayGreeting } from './auroraHelpers';
+import { timeOfDayGreeting } from './atlasHelpers';
 
 const CHIPS = [
   { label: 'Check emails', q: 'Check my emails' },
@@ -15,8 +15,8 @@ const CHIPS = [
   { label: 'Create document', q: 'Create a document' },
 ];
 
-// Voice-first landing (design: Aurora — Home / Voice).
-const AuroraHome = () => {
+// Voice-first landing (design: Atlas — Home / Voice).
+const AtlasHome = () => {
   const navigate = useNavigate();
   const { profile } = useUserProfile();
   const [input, setInput] = useState('');
@@ -42,7 +42,7 @@ const AuroraHome = () => {
   const recent = messages.slice(-4);
 
   return (
-    <div className="overlay" data-screen-label="Aurora — Home / Voice">
+    <div className="overlay" data-screen-label="Atlas — Home / Voice">
       <div className="ovwash" />
       <div className="homeorbwrap"><div className="homeorb"><div className="homeorbglow" />
         <AtlasSphere state={effectiveAtlasState} audioLevel={audioLevel} context="core" className="orbcvB w100" onClick={handleManualActivate} />
@@ -89,4 +89,4 @@ const AuroraHome = () => {
   );
 };
 
-export default AuroraHome;
+export default AtlasHome;

@@ -6,17 +6,17 @@ import { QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import AuroraDashboard from "./pages/aurora/AuroraDashboard";
+import AtlasDashboard from "./pages/atlas/AtlasDashboard";
 import NotFound from "./pages/NotFound";
 import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
 import { useRealtimePauseOnInactivity } from "./hooks/useRealtimePauseOnInactivity";
 
-// Only the default route (AuroraDashboard) is eager — everything else is
+// Only the default route (AtlasDashboard) is eager — everything else is
 // code-split so the entry chunk stays small and the startup paint is instant.
 // The legacy Dashboard especially must stay lazy: it drags 9 realtime hooks
 // and the whole legacy card stack into whatever chunk it lands in.
-const AuroraHome = lazy(() => import("./pages/aurora/AuroraHome"));
-const AuroraCore = lazy(() => import("./pages/aurora/AuroraCore"));
+const AtlasHome = lazy(() => import("./pages/atlas/AtlasHome"));
+const AtlasCoreScreen = lazy(() => import("./pages/atlas/AtlasCoreScreen"));
 const Auth = lazy(() => import("./pages/Auth"));
 const AtlasDemo = lazy(() => import("./pages/AtlasDemo"));
 const AtlasCore = lazy(() => import("./pages/AtlasCore"));
@@ -100,11 +100,11 @@ const App = () => (
         {/* One suspense boundary for every lazy route */}
         <Suspense fallback={<PageLoader />}>
         <Routes>
-          {/* Aurora screens */}
-          <Route path="/" element={<AuroraDashboard />} />
-          <Route path="/dashboard" element={<AuroraDashboard />} />
-          <Route path="/home" element={<AuroraHome />} />
-          <Route path="/atlas-core" element={<AuroraCore />} />
+          {/* Atlas screens */}
+          <Route path="/" element={<AtlasDashboard />} />
+          <Route path="/dashboard" element={<AtlasDashboard />} />
+          <Route path="/home" element={<AtlasHome />} />
+          <Route path="/atlas-core" element={<AtlasCoreScreen />} />
           <Route path="/auth" element={<Auth />} />
 
           {/* Legacy Atlas Core health dashboard (settings still live here until

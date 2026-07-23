@@ -21,7 +21,7 @@ const TABS: { key: SettingsTab; label: string; icon: typeof Mic }[] = [
   { key: 'budget', label: 'Budget & AI', icon: Wallet },
 ];
 
-export const AuroraSettings = ({ onClose }: { onClose: () => void }) => {
+export const AtlasSettings = ({ onClose }: { onClose: () => void }) => {
   const [tab, setTab] = useState<SettingsTab>('voice');
 
   useEffect(() => {
@@ -32,7 +32,7 @@ export const AuroraSettings = ({ onClose }: { onClose: () => void }) => {
   }, [onClose]);
 
   return (
-    <div className="exp th-cal" data-screen-label="Aurora — Settings">
+    <div className="exp th-cal" data-screen-label="Atlas — Settings">
       <div className="expwash" />
       <header className="ehead">
         <div className="fx ac gap16"><div className="accline" /><h1 className="etitle">Settings</h1></div>
@@ -181,4 +181,4 @@ function PortfolioSettings() {
   );
 }
 
-export default AuroraSettings;
+export default AtlasSettings;

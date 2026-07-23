@@ -48,7 +48,7 @@ function blob(x: Ctx, cx: number, cy: number, r: number, col: number[], a: numbe
   x.fillStyle = g; x.fillRect(cx - r, cy - r, r * 2, r * 2);
 }
 
-function aurora(x: Ctx, w: number, h: number, t: number, P: WxPreset) {
+function atlas(x: Ctx, w: number, h: number, t: number, P: WxPreset) {
   const R = Math.max(w, h);
   for (let L = 0; L < 2; L++) {
     const n = L ? 3 : 4;
@@ -197,7 +197,7 @@ export function renderAtmo(x: Ctx, w: number, h: number, t: number, P: WxPreset)
     blob(x, w * (1 - wxSunPos[0]), h * .04, Math.max(w, h) * .62, [78, 134, 228], .34 * s);
     blob(x, wxSunPos[0] * w, wxSunPos[1] * h, Math.max(w, h) * .5, [255, 240, 205], .1 * s);
   }
-  aurora(x, w, h, t, P);
+  atlas(x, w, h, t, P);
   sun(x, w, h, t, P);
   rays(x, w, h, t, P);
   clouds(x, w, h, t, P);

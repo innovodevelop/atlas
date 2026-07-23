@@ -6,8 +6,8 @@ import { useStocks } from '@/hooks/useStocks';
 import { useMailIntelligence } from '@/hooks/useMailIntelligence';
 import { useNews } from '@/hooks/useNews';
 import { useMusicPlayer } from '@/hooks/useMusicPlayer';
-import { fmtPct, fmtEventTime } from './auroraHelpers';
-import type { AuroraExpandedKey } from './AuroraDashboard';
+import { fmtPct, fmtEventTime } from './atlasHelpers';
+import type { AtlasExpandedKey } from './AtlasDashboard';
 
 // The greeting band narrates the focused widget (design Change 2). The title's
 // last word is the accent; the subline and meta are data-driven from the real
@@ -30,7 +30,7 @@ const senderName = (from: string | null | undefined) =>
  * @param home        home-state content (greeting + weather), owned by the page
  * @returns the content to render + a `swapping` flag driving the exit/enter swap
  */
-export function useBandNarration(focusedKey: AuroraExpandedKey, home: BandContent) {
+export function useBandNarration(focusedKey: AtlasExpandedKey, home: BandContent) {
   const { weather } = useWeather();
   const { events } = useCalendarEvents();
   const { tasks, completedCount, progress } = useTasks();
@@ -128,7 +128,7 @@ export function useBandNarration(focusedKey: AuroraExpandedKey, home: BandConten
   // in. We render live content for `shownKey` (so data stays fresh) and only
   // key the swap on `focusedKey` — putting the content object in the deps would
   // let live-data re-renders keep resetting the timer, lagging the swap.
-  const [shownKey, setShownKey] = useState<AuroraExpandedKey>(focusedKey);
+  const [shownKey, setShownKey] = useState<AtlasExpandedKey>(focusedKey);
   const [swapping, setSwapping] = useState(false);
 
   useEffect(() => {

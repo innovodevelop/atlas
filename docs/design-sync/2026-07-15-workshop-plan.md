@@ -6,7 +6,7 @@ project "Atlas premium polish" → `Atlas Premium D - Workshop.dc.html` +
 inline (subagent quota exhausted mid-run).*
 
 ## What this design IS
-A full reskin **away from dark-indigo Aurora to a warm light "Workshop"
+A full reskin **away from dark-indigo Atlas to a warm light "Workshop"
 language**: paper base `#f9f7f4`, ink text `#1e1e24`, single accent **Atlas
 Orange `#ff6a00`**, Signal Blue `#3461f2` for visualizations only, frosted
 glass `rgba(255,253,250,.72)` + `blur(12px) saturate(1.06)`, warm diffuse
@@ -17,7 +17,7 @@ expressed as glow/atmosphere, not chrome.
 
 ## Part 1 — Token reskin (42 of 46 tokens drift or are missing)
 Foundation for everything else. Files: `src/index.css` (role tokens),
-`src/styles/aurora.css` (component CSS — becomes `workshop` values),
+`src/styles/atlas.css` (component CSS — becomes `workshop` values),
 `index.html` (font loading Geist + Hanken Grotesk + Newsreader replaces
 Sora/Manrope).
 - Surfaces: page/raised/sunken/card-frosted → warm paper set; **add saturate(1.06)** to all backdrop-filters (missing everywhere).
@@ -28,7 +28,7 @@ Sora/Manrope).
 - Verification: every route in preview — no dark-theme remnants, fonts loaded, contrast sane.
 
 ## Part 2 — Shared chrome
-- **Header → floating pill** (max-width 1680, radius 9999, raised surface, hairline) with ambient gradient layer + **state waveform canvas** (idle/listening/thinking/speaking presets — wire to useDashboardVoice state; the label must switch too, today hardcoded "Listening for 'Hey Atlas'" at AuroraDashboard.tsx:86).
+- **Header → floating pill** (max-width 1680, radius 9999, raised surface, hairline) with ambient gradient layer + **state waveform canvas** (idle/listening/thinking/speaking presets — wire to useDashboardVoice state; the label must switch too, today hardcoded "Listening for 'Hey Atlas'" at AtlasDashboard.tsx:86).
 - **Bottom dock** (fixed centered dark pill, hover-expanding labels): Core / Voice (wired) / **New chat CTA (missing entirely)** / avatar. Header buttons relocate here.
 - **Grain overlay** (fractal-noise, multiply, .4) on all screens; warm 4-radial hero aura replaces the indigo `.auro` wash.
 - Brand: lowercase `atlas` wordmark (drop the gradient glyph + uppercase).

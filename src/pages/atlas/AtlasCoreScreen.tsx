@@ -5,7 +5,7 @@ import {
   Database, DownloadCloud, Cpu, CheckCircle2, FileText, BookOpen, Loader, Clock, Radio, Bot, Zap,
 } from 'lucide-react';
 import { AtlasSphereLazy as AtlasSphere } from '@/components/atlas/AtlasSphereLazy';
-import { AuroraCoreTabs } from '@/components/aurora/AuroraCoreTabs';
+import { AtlasCoreTabs } from '@/components/atlas-ui/AtlasCoreTabs';
 import { useAtlasHealth } from '@/hooks/useAtlasHealth';
 
 const TABS = [
@@ -18,16 +18,16 @@ const TABS = [
   { key: 'learning', label: 'Learning', icon: Zap },
 ];
 
-// Aurora Atlas Core — Intelligence Center (design: Aurora — Atlas Core).
+// Atlas Atlas Core — Intelligence Center (design: Atlas — Atlas Core).
 // Top stats are wired to useAtlasHealth; the overview panels use the design's
 // curated content.
-const AuroraCore = () => {
+const AtlasCoreScreen = () => {
   const navigate = useNavigate();
   const [tab, setTab] = useState('overview');
   const { stats } = useAtlasHealth();
 
   return (
-    <div className="overlay" data-screen-label="Aurora — Atlas Core">
+    <div className="overlay" data-screen-label="Atlas — Atlas Core">
       <div className="ovwash" />
       <header className="corehead">
         <button className="backbtn" onClick={() => navigate('/')}><ArrowLeft className="i16" />Back to Dashboard</button>
@@ -63,7 +63,7 @@ const AuroraCore = () => {
           })}
         </div>
 
-        {tab !== 'overview' && <AuroraCoreTabs tab={tab} />}
+        {tab !== 'overview' && <AtlasCoreTabs tab={tab} />}
 
         {tab === 'overview' && (
         <div className="coregrid">
@@ -143,4 +143,4 @@ function ErrRow({ sev, msg, meta, last }: { sev: 'e' | 'w' | 'i'; msg: string; m
   );
 }
 
-export default AuroraCore;
+export default AtlasCoreScreen;

@@ -1,15 +1,15 @@
 /* ==========================================================================
    Workshop — the single Atlas stylesheet.
-   Consolidated from the former aurora.css + workshop.css (July 2026
+   Consolidated from the former atlas.css + workshop.css (July 2026
    deep-clean). Order preserved from their original load sequence:
    the base layer first, then the Workshop design + overrides, so the
-   cascade is identical to before. Delete aurora.css.
+   cascade is identical to before. Delete atlas.css.
    ========================================================================== */
 
-/* ---- base layer (was aurora.css) ---- */
+/* ---- base layer (was atlas.css) ---- */
 /* ==========================================================================
-   Aurora theme — ported verbatim from the Claude Design handoff
-   "Atlas Premium B - Aurora.dc.html". Component classes (cardB, hdrB, band,
+   Atlas theme — ported verbatim from the Claude Design handoff
+   "Atlas Premium B - Atlas.dc.html". Component classes (cardB, hdrB, band,
    expanded panels, auth, home, core…) are the design's own CSS, unchanged so
    the React port renders pixel-identically.
    ========================================================================== */
@@ -300,7 +300,7 @@ body{margin:0;background:hsl(240 28% 7%);color:hsl(240 30% 96%);font-family:'Man
    Workshop theme — ported verbatim from the Claude Design handoff
    "Atlas Premium D - Workshop.dc.html" (claude.ai project c3c44c02).
    Design CSS unchanged so the port renders faithfully; the generated
-   compat section at the bottom maps the Aurora port's B-suffixed class
+   compat section at the bottom maps the Atlas port's B-suffixed class
    names onto the Workshop originals.
    ========================================================================== */
 
@@ -677,7 +677,7 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 .gap20{gap:20px}
 
 
-/* GENERATED compat aliases: the Aurora port suffixed class names with "B"; Workshop uses the unsuffixed originals. Each alias duplicates its base rule. */
+/* GENERATED compat aliases: the Atlas port suffixed class names with "B"; Workshop uses the unsuffixed originals. Each alias duplicates its base rule. */
 .avB{width:38px;height:38px;border-radius:50%;background:var(--ink);color:var(--dkf);font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .bandB{position:relative;z-index:10;display:flex;align-items:center;gap:30px;max-width:1680px;margin:0 auto;padding:44px 28px 14px;animation:rise .8s cubic-bezier(.22,1,.36,1) both}
 .bandmetaB{margin-left:auto;text-align:right}
@@ -715,13 +715,13 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 .tmB{font-size:12px;color:var(--ink3);flex-shrink:0;font-variant-numeric:tabular-nums}
 .upB{color:var(--grn)}
 
-/* Hand-authored Workshop equivalents for aurora-only classes that had no
+/* Hand-authored Workshop equivalents for atlas-only classes that had no
    name-match in the design (values from the design's own .mk and .bgwash). */
 .authmk{width:44px;height:44px;border-radius:13px;background:var(--ink);color:var(--dkf);font-family:'Hanken Grotesk','Geist',sans-serif;font-size:20px;font-weight:600;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 32px -20px rgba(30,30,36,.24)}
 .mk{width:30px;height:30px;border-radius:9px;background:var(--ink);box-shadow:none;flex-shrink:0}
 .auro{position:fixed;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(216,227,251,.85),rgba(249,247,244,0) 48%)}
 
-/* Kill the last Aurora-indigo utility tints — icon wells, icon colors, small
+/* Kill the last Atlas-indigo utility tints — icon wells, icon colors, small
    chrome — remapped to the Workshop design's own values (sunken-paper wells,
    ink icons, orange = active). These utilities are used verbatim across the
    port's TSX so overriding here reskins every screen at once. */
@@ -736,9 +736,9 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 .statico{background:var(--sk);border:1px solid var(--bd);color:var(--ink)}
 .kbico,.flowdot{background:var(--sk);border:1px solid var(--bd);color:var(--ink)}
 
-/* --acc collision fix: aurora.css treats --acc as an HSL triplet, the Workshop
+/* --acc collision fix: atlas.css treats --acc as an HSL triplet, the Workshop
    design defines it as hex #3461f2 (which wins, loading last). These are the
-   aurora rules that used hsl(var(--acc) / a) — rewritten with the orange hex +
+   atlas rules that used hsl(var(--acc) / a) — rewritten with the orange hex +
    rgba alpha, and dark expwash/featImg backdrops swapped to warm paper. */
 .accline{background:var(--acc)}
 .pillAcc{color:var(--acc);background:rgba(52,97,242,.12);border:1px solid rgba(52,97,242,.28)}
@@ -748,12 +748,12 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 .expwash{background:radial-gradient(58% 44% at 50% 2%,rgba(52,97,242,.10),transparent 62%),linear-gradient(180deg,var(--wt),var(--pg) 72%)}
 .featImg{background:rgba(52,97,242,.12);border:1px solid rgba(52,97,242,.18)}
 
-/* 7-day outlook active row — orange tint (aurora used broken indigo hsl(var(--acc))) */
+/* 7-day outlook active row — orange tint (atlas used broken indigo hsl(var(--acc))) */
 .drow.today{background:rgba(52,97,242,.12)}
 
 /* ---- Workshop retint of the expanded-view + settings chrome ----
    These classes (.exp/.ehead/.gpanel/.gpanel2/.closeBtn/.esval/.xbtn) were
-   left dark-indigo from the original Aurora theme, so every expanded card view
+   left dark-indigo from the original Atlas theme, so every expanded card view
    and the Settings overlay rendered dark on the warm page. Warm-paper values. */
 .exp{background:var(--pg)}
 .ehead{border-bottom:1px solid var(--bd);background:hsl(36 100% 99% / .6)}
@@ -788,7 +788,7 @@ body{display:block;overflow-x:hidden;overflow-y:visible;max-width:none;flex:none
 .wavelbl{color:inherit;background:none;-webkit-background-clip:initial;background-clip:initial;animation:none}
 .wavelbl .stshimmer{font-size:12px}
 
-/* Design-parity: card kicker + meta text were still Aurora lavender — remap
+/* Design-parity: card kicker + meta text were still Atlas lavender — remap
    to the design's .lbl0 / .mtx values (warm ink tiers). */
 .mlblB{font-size:13px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--ink2);margin:0}
 .metaB{font-size:13px;color:var(--ink2)}

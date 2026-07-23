@@ -190,7 +190,7 @@ function LearningTab() {
   );
 }
 
-export const AuroraCoreTabs = memo(({ tab }: { tab: string }) => {
+export const AtlasCoreTabs = memo(({ tab }: { tab: string }) => {
   switch (tab) {
     case 'search': return <SearchTab />;
     case 'live': return <LiveTab />;
@@ -201,4 +201,4 @@ export const AuroraCoreTabs = memo(({ tab }: { tab: string }) => {
     default: return null;
   }
 });
-AuroraCoreTabs.displayName = 'AuroraCoreTabs';
+AtlasCoreTabs.displayName = 'AtlasCoreTabs';
