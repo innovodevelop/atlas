@@ -960,6 +960,10 @@ body{display:block;overflow-x:hidden;overflow-y:visible;max-width:none;flex:none
    keep the split depth; the accent gradient background is gone (flat).
    =================================================================== */
 .ascene{position:fixed;inset:0;overflow:hidden;background:#3461f2;color:#fffdfa;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+/* WKWebView (the desktop app engine) draws native button/field chrome unless
+   appearance is reset — that's the stray blue box behind the login choices.
+   Blink hides it with background:none; WebKit needs this explicitly. */
+.ascene button,.ascene input{-webkit-appearance:none;appearance:none}
 .authbgcv{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;display:block}
 .authorbcv{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;display:block;filter:saturate(1.05)}
 .avig{position:absolute;inset:0;z-index:2;pointer-events:none;background:radial-gradient(90% 120% at 6% 50%,rgba(14,24,78,.32),transparent 55%)}
@@ -969,7 +973,9 @@ body{display:block;overflow-x:hidden;overflow-y:visible;max-width:none;flex:none
 .aleft{display:flex;flex-direction:column;justify-content:center;padding:0 4% 0 6.5%}
 .aright{position:relative;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;padding:0 6.5% 0 3%}
 .amsg{font-family:'Hanken Grotesk',sans-serif;font-size:clamp(32px,5.2vw,60px);line-height:1.03;letter-spacing:-.04em;font-weight:600;margin:0;max-width:13ch}
-.awd{display:inline-block;margin-right:.26em;animation:wfade 1.05s cubic-bezier(.2,.65,.2,1) both}
+/* opacity:1 base + forwards (not both): the words are visible even if WKWebView
+   doesn't run the wfade entrance — it was leaving the heading stuck invisible. */
+.awd{display:inline-block;margin-right:.26em;opacity:1;animation:wfade 1.05s cubic-bezier(.2,.65,.2,1) forwards}
 .acaret{display:inline-block;width:4px;height:.86em;margin-left:2px;background:#fffdfa;border-radius:2px;vertical-align:-4px;animation:acblink 1s steps(1) infinite}
 .asub{margin:22px 0 0;font-family:'Newsreader',Georgia,serif;font-style:italic;font-size:19px;color:rgba(255,253,250,.82);max-width:26ch;min-height:24px}
 .adots{display:flex;gap:8px;margin-bottom:30px}
