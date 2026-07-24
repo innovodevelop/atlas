@@ -1,0 +1,142 @@
+{
+  "audit": {
+    "date": "2026-07-24",
+    "commit": "3e54e86",
+    "branch": "atlas-redesign",
+    "method": "read-only multi-agent evidence sweep + adversarial verification pass",
+    "repos": ["helloatlas", "atlas-site"]
+  },
+  "scorecard": {
+    "M1_abstraction": { "score": 2, "max": 5, "justification": "One real gateway (Gemini, aiGateway.ts) + clean escalation choke point (mapModel), but 10 raw provider call sites, 4 drifting config copies, non-uniform streaming, 361-line dead router (providerRouting.ts, zero importers)." },
+    "M2_retrieval": { "score": 1, "max": 5, "justification": "Solid memory recall (sqlite-vec+FTS5 hybrid, 3 consistent ports, unit-tested); zero reranker anywhere; web retrieval is wholesale Perplexity delegation with no owned pipeline." },
+    "M3_memory_personality": { "score": 2, "max": 5, "justification": "Memory core live and composed-at-runtime (3/5) but 'deletable' is false, hygiene loops severed, upsert duplicates facts; personality is a hardcoded prose constant (1/5) with one clean injection seam." },
+    "M4_atlas1": { "score": 0, "max": 5, "justification": "No local inference, no LLM weights, no SFT logging (messages table has zero writers), no success signal, no consent — the dataset is not accumulating." },
+    "M5_admin_selfdev": { "score": 1, "max": 5, "justification": "Minimal capability manifest + fixed no-code-exec tool set; signing, updater, sandbox, enforced approval, rollback, kill switch all missing; CI doesn't trigger on the working branch." },
+    "M6_global_brain": { "score": 0, "max": 5, "justification": "Nothing cross-user exists — no sharing, distillation, opt-in, or poisoning defense. Zero current legal exposure from it; the live legal surface is elsewhere." }
+  },
+  "claims": [
+    { "id": 1, "title": "Providers are assemblies behind a kept abstraction layer", "verdict": "partially_reflected", "readiness": 2,
+      "evidence_highlights": [
+        "aiGateway.ts:17-21,103,143 — only Gemini URLs in repo; 15+ importers incl. brain sidecar",
+        "8 raw Perplexity fetch sites (orchestrator.ts:402,430; atlas-research; news-pulse; topic-discovery; validation-engine; tool-gateway x2); 2 raw Anthropic sites",
+        "providerRouting.ts (361 lines) implements the claimed escalation and has zero importers",
+        "orchestrator.ts:110-111 pins live path to google/gemini-2.5-flash; no escalation path exists",
+        "Seam for escalation exists: aiGateway.ts:58-91 mapModel/aiChatCompletion choke point"
+      ] },
+    { "id": 2, "title": "The reranker decides answer quality", "verdict": "silent_component_absent", "readiness": 1,
+      "evidence_highlights": [
+        "No reranker/cross-encoder anywhere (grep-empty); ONNX assets are wake-word, not rerank",
+        "Web retrieval = wholesale Perplexity (orchestrator.ts:400-425): no owned search/crawler/chunking/web-embeddings",
+        "Memory recall real: db.rs:386-440 hybrid 0.65*sim+0.35*bm25 x recency x importance; 8x over-fetch slot ready for a reranker",
+        "Web reranking has no candidate set to act on until an owned pipeline exists"
+      ] },
+    { "id": 3, "title": "Atlas-1 is a fine-tune, not from-scratch", "verdict": "reflected_negative_half_only", "readiness": 0,
+      "evidence_highlights": [
+        "No local LLM runtime; onnxruntime-web serves wake-word (wakeWord.ts:17) + Silero VAD only",
+        "conversations/messages tables have zero writers (db_schema.sql:53-68); chat dies in React state",
+        "System prompt composed at orchestrator.ts:829 is never persisted; messages schema lacks system/tool roles",
+        "No feedback/reward signal anywhere; no Terms/Privacy documents exist (Auth.tsx:202 links nothing)",
+        "From-scratch pretraining confirmed absent — but so is all fine-tuning work; 'Atlas-1'/'LoRA'/'SFT' appear nowhere"
+      ] },
+    { "id": 4, "title": "Learning is memory, not weights", "verdict": "reflected_with_defects", "readiness": 3,
+      "evidence_highlights": [
+        "System prompt COMPOSED at runtime: buildPersonalizedPrompt orchestrator.ts:246-383, selected :829; per-message recall injected :833-836",
+        "ai_memory written live via memory_store tool (orchestrator.ts:469-487); hybrid semantic recall live each turn",
+        "'Deletable' false: no forget UI; deletion machinery targets abandoned Supabase (localClient.ts:374-411)",
+        "Duplicate-fact defect: localDb.ts:70,130 INSERT OR REPLACE on fresh UUID; no UNIQUE(user_id,key)",
+        "New memories not auto-embedded (manual /embed-backfill only); user_life_events has no writer; consolidation loop nonexistent locally",
+        "Per-speaker identification missing; one flat user_id"
+      ] },
+    { "id": 5, "title": "Personality is bounded state", "verdict": "contradicted_seam_clean", "readiness": 1,
+      "evidence_highlights": [
+        "Persona is hardcoded prose constant orchestrator.ts:318-327; humour mandated unconditionally",
+        "Style-notes injection slot live (orchestrator.ts:271-274,787) but only producer runs Supabase-side against wrong DB",
+        "Seam: buildPersonalizedPrompt + systemPromptOverride (orchestrator.ts:829) shared by text/voice/edge — new module, no restructure",
+        "No approval-shaped feedback exists; non-approval signals in schema feed nothing (user_tasks.completed, mention_count, access_count, last_accessed)",
+        "No humour context gating anywhere; emotion keywords only surface as ignorable prompt hint"
+      ] },
+    { "id": 6, "title": "Never modify the running binary", "verdict": "aspirational_not_enforced", "readiness": 1,
+      "evidence_highlights": [
+        "No signingIdentity/notarization in tauri.conf.json; oauth.rs:9-11 designs around unsigned builds",
+        "No updater (tauri-plugin-updater absent, Cargo.toml:25-28); lib.rs:195-232 accommodates unverified in-place replacement",
+        "Sidecars exec'd every launch with zero integrity check (lib.rs:35-54,90-111) — most direct violation path",
+        "No OS sandbox (Entitlements.plist lacks app-sandbox); CSP allows 'unsafe-inline' (tauri.conf.json:28)",
+        "Entitlements decorative: hasFeature() zero call sites; brain decodes JWT without signature (atlas-brain/src/index.ts:60-91)",
+        "CI push trigger names pre-rename branch (ci.yml:5) — no CI on working-branch pushes; no rollback; no kill switch",
+        "Positives: minimal capability manifest (capabilities/default.json), fixed AI tool set with no code-exec tool, no eval/dynamic-code paths"
+      ] },
+    { "id": 7, "title": "Global brain is the largest legal surface", "verdict": "contradicted_surface_is_elsewhere", "readiness": 2,
+      "evidence_highlights": [
+        "No telemetry/analytics/crash SDKs — confirmed clean",
+        "Live egress: memories in prompts to Gemini (orchestrator.ts:256-338); raw mic PCM to ElevenLabs (session.ts:117-118); memories to Anthropic; mail metadata via Supabase; brokerage data to SnapTrade; lat/lon to OpenWeather; IP to Google Fonts both surfaces (index.html:14-19)",
+        "No erasure endpoint for D1 accounts/waitlist; no Supabase account-wipe; no data export",
+        "Auth.tsx:202 references Terms & Privacy that do not exist in either repo",
+        "Voice ephemeral (no PCM persistence; diarize=false) — no Art.9 processing today; transcripts retained plaintext",
+        "global_discovery_enabled is single-user news discovery, not cross-user; global brain 0% built"
+      ] }
+  ],
+  "gaps": [
+    { "rank": 1, "area": "migration", "gap": "Voice gateway still authenticates via supabase.auth.getUser and persists voice-turn memory through supabase-js; fails (close 4003) against placeholder env", "evidence": "services/voice-gateway/src/index.ts:124-137; session.ts:16,197; useVoiceSession.ts:183-191", "blocks": ["M3"] },
+    { "rank": 2, "area": "data_capture", "gap": "No SFT tuple persisted: messages/conversations have zero writers; system prompt never stored; no model id/tool-call logging", "evidence": "db_schema.sql:53-68; orchestrator.ts:829; grep zero writers", "blocks": ["M4"] },
+    { "rank": 3, "area": "feedback", "gap": "No success/reward signal of any kind captured; preference tuning and humour loop impossible", "evidence": "no feedback UI in src/; no reward columns in schema", "blocks": ["M4", "M3_personality"] },
+    { "rank": 4, "area": "legal", "gap": "No erasure path for cloud stores; Terms/Privacy referenced at signup do not exist; Google Fonts IP egress on EU-facing surfaces; no DPA records for four US processors", "evidence": "atlas-site/functions/api/ (no delete); Auth.tsx:202; index.html:14-19 both repos", "blocks": ["shipping_EU"] },
+    { "rank": 5, "area": "memory_integrity", "gap": "Restating a fact duplicates it (no UNIQUE(user_id,key); upsert=insert); new memories invisible to semantic recall until manual backfill; no forget UI; hygiene loops execute against abandoned Supabase", "evidence": "localDb.ts:70,130; db_schema.sql:73-89; BrainSearchPanel.tsx:85; localClient.ts:374-411", "blocks": ["M3"] },
+    { "rank": 6, "area": "selfdev_substrate", "gap": "No signature verification anywhere: unsigned app, unverified sidecar exec each launch, no updater, no rollback, no kill switch, CI dead on working branch", "evidence": "tauri.conf.json; lib.rs:35-54,90-111; Cargo.toml:25-28; ci.yml:5", "blocks": ["M5", "distribution"] },
+    { "rank": 7, "area": "personality", "gap": "Persona is a hardcoded prose constant; no trait state, lexicon, humour tracking, gating, or per-speaker profiles; style-note producer severed from local DB", "evidence": "orchestrator.ts:318-327; memory-synthesize (Supabase-side)", "blocks": ["M3_personality"] },
+    { "rank": 8, "area": "retrieval", "gap": "No reranker; memory recall ranked by hand-tuned linear formula despite existing 8x over-fetch slot; no owned web retrieval pipeline", "evidence": "db.rs:386-440; orchestrator.ts:400-425", "blocks": ["M2"] },
+    { "rank": 9, "area": "abstraction", "gap": "10 raw provider call sites bypass the gateway; PROVIDERS config copy-pasted 4x; escalation router is dead code; single pinned model on live path", "evidence": "providerRouting.ts (0 importers); orchestrator.ts:110-111", "blocks": ["M1"] },
+    { "rank": 10, "area": "consent", "gap": "No consent framework for training use, voice of non-account household members, or third-party processing; single unlinked sentence at signup", "evidence": "Auth.tsx:202; no privacy/terms docs in either repo", "blocks": ["M4", "M6", "shipping_EU"] },
+    { "rank": 11, "area": "concurrency", "gap": "Two concurrent writers on atlas.db: rusqlite (WAL+busy_timeout) and bun:sqlite (no busy_timeout found) — SQLITE_BUSY plausible under contention", "evidence": "db.rs:66-67; localDb.ts:11", "blocks": ["M3"] },
+    { "rank": 12, "area": "supply_chain", "gap": "deno.lock exists locally but is untracked — 36 edge functions run with unpinned Deno dependencies in CI", "evidence": "git status (?? deno.lock); git ls-files empty for deno", "blocks": ["M5"] }
+  ],
+  "offline_viability": {
+    "works_offline": ["app boot with cached session (authClient.ts:32-48, offline grace :130-131)", "all local CRUD/realtime via SQLite shim", "wake word (on-device ONNX)", "dashboard mocks when no API keys set"],
+    "breaks_offline": ["chat — LLM is cloud Gemini, no local inference", "semantic recall during chat — query embedding is cloud, silently degrades with no FTS-only fallback (orchestrator.ts:804-807)", "voice — ElevenLabs (intentional per brief)", "weather WITH key set errors instead of falling back to mock (datafetch.rs:70-78) — inconsistent with news/stocks", "first-ever sign-in (Cloudflare)", "music, portfolio sync, research/mail (Supabase remnants)"]
+  },
+  "tests": {
+    "bun_local": { "passed": 10, "failed": 0, "note": "localClient 4, atlas-brain localDb+localMemory 6" },
+    "auth_spec": { "passed": 1, "skipped": 2, "failed": 9, "note": "targets placeholder Supabase URL; dead weight locally" },
+    "cargo": { "count": 11, "executed": false, "note": "skipped: duckdb+librespot compile cost" },
+    "ci": { "note": "3 jobs (frontend tsc/lint/build/test, voice-gateway typecheck+VAD smoke, deno check); push trigger names renamed branch aurora-redesign — does not fire on atlas-redesign pushes" }
+  },
+  "secrets": { "committed_leaks": "none found; historical .env commits contained only public anon keys; Spotify CLIENT_ID hardcoded is PKCE-public-safe (music.rs:31); real keys in Keychain" },
+  "egress_inventory": [
+    { "host": "generativelanguage.googleapis.com", "caller": "aiGateway.ts:19,21 (runs inside local brain + voice gateway)", "data": "full chat turns + system prompt embedding name, birthday flag, style, ai_memory contents; embedding texts" },
+    { "host": "api.perplexity.ai", "caller": "orchestrator.ts:402,430 + 5 edge fns", "data": "search queries derived from conversation/learning topics" },
+    { "host": "api.anthropic.com", "caller": "agent-run/index.ts; memory-synthesize/index.ts", "data": "stored personal memories (synthesis input); agent content" },
+    { "host": "api.elevenlabs.io (+wss)", "caller": "voice-gateway stt.ts:21,43; tts.ts:74; 4 edge fns", "data": "raw microphone PCM post-wake of any speaker; assistant reply text" },
+    { "host": "*.supabase.co", "caller": "localClient.ts:374-411 fallback; index.html:13 preconnect", "data": "CF JWT + research/learning payloads; entire Gmail metadata pipeline (transitional)" },
+    { "host": "accounts.google.com / gmail.googleapis.com", "caller": "mail-oauth-start/callback; mail-sync", "data": "OAuth tokens; gmail.readonly from/subject/snippet" },
+    { "host": "atlas.innovo-studio.com", "caller": "authClient.ts:23,79,129; oauth.rs:29", "data": "email+password at signup/login; bearer JWT; OAuth relay" },
+    { "host": "api.openweathermap.org", "caller": "datafetch.rs:67-93", "data": "city or lat/lon (location)" },
+    { "host": "finnhub.io", "caller": "datafetch.rs:193-217", "data": "watchlist tickers" },
+    { "host": "newsapi.org", "caller": "datafetch.rs:270", "data": "category only" },
+    { "host": "api.snaptrade.com", "caller": "snaptrade.rs:19,89-121", "data": "brokerage registration, holdings, balances, activities (financial personal data)" },
+    { "host": "accounts.spotify.com / api.spotify.com", "caller": "music.rs:32-34,455", "data": "OAuth tokens, playback control" },
+    { "host": "r.jina.ai / api.firecrawl.dev", "caller": "orchestrator.ts:457; validation-engine; news-pulse", "data": "URLs user asks to scrape / queries" },
+    { "host": "fonts.googleapis.com / fonts.gstatic.com", "caller": "index.html:14-19 (app) + atlas-site index.html:12-14", "data": "user IP on every launch / page view" },
+    { "host": "www.google.com/s2/favicons", "caller": "ConversationPanel.tsx:23; CitationsList.tsx:33", "data": "domains of user's researched sources" },
+    { "host": "telemetry/analytics/crash", "caller": "none", "data": "NONE — verified absent" }
+  ],
+  "next_prs": [
+    { "n": 1, "title": "Fix CI trigger branch + commit deno.lock", "files": [".github/workflows/ci.yml", "deno.lock"] },
+    { "n": 2, "title": "Persist chat transcripts as SFT tuples (roles, model id, system-prompt snapshot)", "files": ["src-tauri/src/db_schema.sql", "supabase/functions/_shared/orchestrator.ts", "services/atlas-brain/src/localDb.ts"] },
+    { "n": 3, "title": "UNIQUE(user_id,key) + real upsert for ai_memory", "files": ["src-tauri/src/db_schema.sql", "services/atlas-brain/src/localDb.ts", "src-tauri/src/db.rs"] },
+    { "n": 4, "title": "Auto-embed memories on write", "files": ["supabase/functions/_shared/orchestrator.ts", "services/atlas-brain/src/index.ts"] },
+    { "n": 5, "title": "Forget UI + local erasure", "files": ["src/components/atlas-health/BrainSearchPanel.tsx", "src/hooks/", "src-tauri/src/db.rs"] },
+    { "n": 6, "title": "Voice gateway → CF-token identity + local DB", "files": ["services/voice-gateway/src/index.ts", "services/voice-gateway/src/session.ts", "src/hooks/useVoiceSession.ts"] },
+    { "n": 7, "title": "Terms + Privacy pages + D1 account deletion endpoint", "files": ["../atlas-site/", "src/pages/Auth.tsx"] },
+    { "n": 8, "title": "Self-host fonts; drop Google favicon service", "files": ["index.html", "../atlas-site/index.html", "src/components/atlas-health/CitationsList.tsx", "src/components/aria/ConversationPanel.tsx"] },
+    { "n": 9, "title": "composePersonality(state) module + humour gating", "files": ["supabase/functions/_shared/personality.ts", "supabase/functions/_shared/orchestrator.ts"] },
+    { "n": 10, "title": "Difficulty escalation at aiGateway choke point", "files": ["supabase/functions/_shared/aiGateway.ts", "supabase/functions/_shared/orchestrator.ts", "supabase/functions/_shared/providerRouting.ts"] }
+  ],
+  "uncertainties": [
+    "Supabase project region + whether 36 edge fns remain deployed",
+    "PERPLEXITY_API_KEY presence in Keychain (without it, no web retrieval at all)",
+    "Gemini paid-tier (no-training) terms; ElevenLabs audio retention DPA",
+    "Out-of-repo signing tooling; GitHub branch-protection settings",
+    "Cargo tests unexecuted; SnapTrade/portfolio + music.rs credential handling not deep-audited",
+    "Historical Supabase conversation data recoverability",
+    "supabase/migrations vs db_schema.sql drift undiffed; committed sidecar binaries of unknown provenance"
+  ]
+}
