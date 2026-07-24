@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
+    "types": ["bun"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "esModuleInterop": true,
+    // moduleResolution "bundler" turns this on by default; the tokenizer .json
+    // files are imported as file PATHS (assets.d.ts), not as parsed JSON.
+    "resolveJsonModule": false
+  },
+  "include": ["src/**/*.ts", "scripts/**/*.ts"]
+}

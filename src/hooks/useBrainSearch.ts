@@ -241,7 +241,10 @@ export const useBrainSearch = (options: BrainSearchOptions = {}) => {
     
     setIsSemanticSearching(true);
     try {
-      const { data, error } = await brainPost('/search', { query: searchQuery, threshold: 0.3, limit });
+      // Threshold intentionally omitted: the brain owns the model-appropriate
+      // default (multilingual-e5 cosines sit far higher than the old Gemini
+      // ones, so a hardcoded 0.3 here admitted everything).
+      const { data, error } = await brainPost('/search', { query: searchQuery, limit });
       
       if (error) {
         console.error('Semantic search error:', error);

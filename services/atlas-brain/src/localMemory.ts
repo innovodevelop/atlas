@@ -29,7 +29,8 @@ export const DEFAULT_DB_PATH = join(
   "atlas.db",
 );
 
-export function openMemoryDb(path: string = DEFAULT_DB_PATH): Database {
+/** ATLAS_DB_PATH points the sidecar at another DB (tests, smoke runs). */
+export function openMemoryDb(path: string = process.env.ATLAS_DB_PATH || DEFAULT_DB_PATH): Database {
   const db = new Database(path, { create: true, readwrite: true });
   db.exec("PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON;");
   return db;
@@ -78,15 +79,25 @@ export interface UpsertArgs {
   embedding: Float32Array | number[];
   memoryItemId?: string | null;
   knowledgeEntryId?: string | null;
+  /** Provenance, e.g. { model: "multilingual-e5-base" } — see autoEmbed.ts. */
+  sourceRef?: Record<string, unknown> | null;
 }
 
 /** Insert/replace a memory chunk + its embedding in the base table. */
 export function upsertVector(db: Database, a: UpsertArgs): void {
   db.query(
     `INSERT OR REPLACE INTO memory_vectors
-       (id, user_id, memory_item_id, knowledge_entry_id, embedding, chunk_text)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-  ).run(a.id, a.userId, a.memoryItemId ?? null, a.knowledgeEntryId ?? null, floatToBlob(a.embedding), a.chunkText);
+       (id, user_id, memory_item_id, knowledge_entry_id, embedding, chunk_text, source_ref_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    a.id,
+    a.userId,
+    a.memoryItemId ?? null,
+    a.knowledgeEntryId ?? null,
+    floatToBlob(a.embedding),
+    a.chunkText,
+    JSON.stringify(a.sourceRef ?? {}),
+  );
 }
 
 export interface RecallHit {

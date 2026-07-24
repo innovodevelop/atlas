@@ -10,8 +10,7 @@
  * 127.0.0.1, optional SIDECAR_TOKEN) or standalone in dev: `bun run dev`.
  *
  * Env (sidecar: injected by Tauri; dev: shell env):
- *   GEMINI_API_KEY                                (required for real completions; from Keychain)
- *   PERPLEXITY_API_KEY                            (optional; web-search tools)
+ *   ANTHROPIC_API_KEY                             (required: completions + native web search; from Keychain)
  *   ATLAS_BRAIN_PORT (default 4830)
  *   SIDECAR_TOKEN (optional — checked when set)
  *
@@ -23,9 +22,12 @@
 import "./denoShim.ts";
 import { createLocalDb } from "./localDb.ts";
 import { createLearningHandlers } from "./learningRoutes.ts";
+import { embedText } from "./localEmbed.ts";
+import { AUTO_EMBED_BATCH, embedPending, scheduleAutoEmbed } from "./autoEmbed.ts";
 
 import { runChat } from "../../../supabase/functions/_shared/orchestrator.ts";
-import { aiChatCompletion, hasAIKey, generateEmbedding } from "../../../supabase/functions/_shared/aiGateway.ts";
+import { aiChatCompletion, hasAIKey } from "../../../supabase/functions/_shared/aiGateway.ts";
+import { selectModel } from "../../../supabase/functions/_shared/providerRouting.ts";
 
 const PORT = Number(process.env.ATLAS_BRAIN_PORT ?? 4830);
 const SIDECAR_TOKEN = process.env.SIDECAR_TOKEN;
@@ -114,11 +116,20 @@ async function handleChatWithMemory(req: Request): Promise<Response> {
       userId,
       userToken: token,
       supabaseUrl: "local",
-      perplexityKey: process.env.PERPLEXITY_API_KEY,
       sessionId: req.headers.get("x-session-id") || undefined,
+      // Same local e5 embedder that writes memory_vectors — querying with any
+      // other model would compare vectors across embedding spaces. The "query"
+      // prefix is e5's asymmetric-retrieval convention (stored text uses
+      // "passage"); it widens the hit/miss margin measurably.
+      embed: (text: string) => embedText(text, "query"),
     },
     { messages, source, enableTools, teachingMode, systemPromptOverride, conversationId },
   );
+
+  // The turn's memory_store writes have landed by now — embed them so they are
+  // recallable on the next turn, not whenever someone runs a backfill. Bounded
+  // and off the response path (see autoEmbed.ts).
+  scheduleAutoEmbed(localDb, userId);
 
   switch (result.kind) {
     case "stream":
@@ -139,10 +150,11 @@ async function handleChatWithMemory(req: Request): Promise<Response> {
 async function handleChat(req: Request): Promise<Response> {
   requireUser(req);
   const { messages } = await req.json();
-  if (!hasAIKey()) return json({ error: "No AI key configured (GEMINI_API_KEY)" }, 500);
+  if (!hasAIKey()) return json({ error: "No AI key configured (ANTHROPIC_API_KEY)" }, 500);
 
   const response = await aiChatCompletion({
-    model: "google/gemini-2.5-flash",
+    // Logical id — mapModel() resolves it per provider (Claude: Sonnet 5).
+    model: selectModel("chat"),
     messages: [
       {
         role: "system",
@@ -163,14 +175,17 @@ async function handleChat(req: Request): Promise<Response> {
 }
 
 // POST /search — semantic search over local memory + knowledge (replaces the
-// semantic-search edge fn): embed the query (Gemini), recall locally, enrich.
+// semantic-search edge fn): embed the query on-device, recall locally, enrich.
 async function handleSearch(req: Request): Promise<Response> {
   const { userId } = requireUser(req);
-  const { query, threshold = 0.3, limit = 20 } = await req.json();
+  // multilingual-e5 cosines sit on a compressed scale — measured on Danish
+  // memory-style text: true hits 0.78-0.85, unrelated 0.65-0.79. The old 0.3
+  // default was calibrated for Gemini vectors and now admits everything.
+  // Callers omit `threshold` and inherit this model-appropriate default.
+  const { query, threshold = 0.78, limit = 20 } = await req.json();
   if (!query || typeof query !== "string") return json({ error: "Query is required" }, 400);
-  if (!hasAIKey()) return json({ results: [], query, message: "No AI key configured" });
 
-  const queryEmbedding = await generateEmbedding(query);
+  const queryEmbedding = await embedText(query, "query");
   const { data: hits } = await localDb.rpc("recall_memories", {
     p_user_id: userId,
     query_embedding: queryEmbedding,
@@ -202,36 +217,12 @@ async function handleSearch(req: Request): Promise<Response> {
 }
 
 // POST /embed-backfill — embed + store vectors for the user's memories/knowledge
-// that don't have one yet (replaces the generate-embeddings edge fn).
+// that don't have one yet (replaces the generate-embeddings edge fn). Mostly a
+// catch-up lever now: chat turns embed their own writes (see autoEmbed.ts).
 async function handleEmbedBackfill(req: Request): Promise<Response> {
   const { userId } = requireUser(req);
-  const { batchSize = 10 } = await req.json();
-  if (!hasAIKey()) return json({ processed: 0, message: "No AI key configured" });
-
-  const raw: any = (localDb as any)._db;
-  const upsert = (localDb as any).upsertVector as (a: Record<string, unknown>) => void;
-  let processed = 0;
-
-  const mems = raw
-    .query("SELECT id, key, value FROM ai_memory WHERE user_id = ? AND id NOT IN (SELECT memory_item_id FROM memory_vectors WHERE memory_item_id IS NOT NULL) LIMIT ?")
-    .all(userId, batchSize) as any[];
-  for (const m of mems) {
-    const text = `${m.key}: ${m.value}`.slice(0, 2000);
-    upsert({ id: crypto.randomUUID(), userId, chunkText: text, embedding: await generateEmbedding(text), memoryItemId: m.id });
-    processed++;
-  }
-
-  const remaining = Math.max(0, batchSize - processed);
-  if (remaining > 0) {
-    const ks = raw
-      .query("SELECT id, topic, content FROM atlas_knowledge_entries WHERE user_id = ? AND id NOT IN (SELECT knowledge_entry_id FROM memory_vectors WHERE knowledge_entry_id IS NOT NULL) LIMIT ?")
-      .all(userId, remaining) as any[];
-    for (const k of ks) {
-      const text = `${k.topic}: ${k.content}`.slice(0, 2000);
-      upsert({ id: crypto.randomUUID(), userId, chunkText: text, embedding: await generateEmbedding(text), knowledgeEntryId: k.id });
-      processed++;
-    }
-  }
+  const { batchSize = AUTO_EMBED_BATCH } = await req.json();
+  const processed = await embedPending(localDb, userId, batchSize);
   return json({ processed });
 }
 
@@ -263,5 +254,5 @@ const server = Bun.serve({
   },
 });
 
-if (!hasAIKey()) console.log("[brain] no GEMINI_API_KEY — completions will 500 until a key is set");
+if (!hasAIKey()) console.log("[brain] no AI key (ANTHROPIC_API_KEY) — completions will 500 until a key is set");
 console.log(`[brain] Atlas brain on http://127.0.0.1:${server.port} (/chat, /chat-with-memory) — local DB`);

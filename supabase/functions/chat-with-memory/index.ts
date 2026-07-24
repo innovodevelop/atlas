@@ -27,8 +27,7 @@ serve(async (req) => {
         userId,
         userToken: token,
         supabaseUrl: getSupabaseUrl(),
-        perplexityKey: Deno.env.get("PERPLEXITY_API_KEY"),
-        sessionId: req.headers.get("x-session-id") || undefined,
+          sessionId: req.headers.get("x-session-id") || undefined,
       },
       { messages, source, enableTools, teachingMode, systemPromptOverride, conversationId },
     );

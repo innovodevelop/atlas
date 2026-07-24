@@ -19,6 +19,7 @@ import {
   isLovableAIEnabled,
 } from "./providerStatus.ts";
 import { aiChatCompletion, hasAIKey, generateEmbedding } from "./aiGateway.ts";
+import { selectModel } from "./providerRouting.ts";
 import { findOrCreateSession } from "./learningGuards.ts";
 
 // ---------------------------------------------------------------------------
@@ -76,9 +77,15 @@ export interface ChatDeps {
   /** The caller's verified JWT — forwarded to internal function calls. */
   userToken: string;
   supabaseUrl: string;
-  perplexityKey?: string | null;
   /** Working-memory session id (edge fn: x-session-id header). */
   sessionId?: string;
+  /**
+   * Query embedder. MUST be the same model that produced the stored vectors —
+   * cosine across two embedding models is meaningless. The brain sidecar
+   * injects its local multilingual-e5 embedder; callers that omit it fall back
+   * to the gateway's (Gemini) embedder, which only matches legacy vectors.
+   */
+  embed?: (text: string) => Promise<number[]>;
 }
 
 export interface ChatOptions {
@@ -98,29 +105,40 @@ export type ChatResult =
 // ---------------------------------------------------------------------------
 // Provider configuration
 
+// Chat providers are not addressed here — aiGateway owns the endpoint and
+// selectModel() owns the model id. Only the scrape backend still needs a URL.
 export const PROVIDERS = {
-  perplexity: {
-    url: "https://api.perplexity.ai/chat/completions",
-    models: {
-      fast: "sonar",
-      deep: "sonar-pro",
-    },
-  },
-  lovable: {
-    url: "https://ai.gateway.lovable.dev/v1/chat/completions",
-    model: "google/gemini-2.5-flash",
-  },
-  anthropic: {
-    url: "https://api.anthropic.com/v1/messages",
-    models: {
-      memory: "claude-sonnet-4-5",
-      creative: "claude-sonnet-4-5",
-    },
-  },
   jina: {
     url: "https://r.jina.ai",
   },
 };
+
+/**
+ * Claude's server-side web search. Declared through the `anthropicTools`
+ * passthrough on the chat body; the adapter forwards it to the Messages API and
+ * Claude runs the searches itself — there is no client execution step.
+ */
+export const ANTHROPIC_WEB_SEARCH_TOOL = {
+  type: "web_search_20260209",
+  name: "web_search",
+} as const;
+
+/** Tool names Claude serves natively — never client-executed when available. */
+const NATIVE_SEARCH_TOOLS = new Set(["web_search", "deep_research"]);
+
+/**
+ * Native search only exists on the Anthropic adapter, so it is gated on that
+ * key. Read directly (not via aiGateway) so the adapter's contract with this
+ * file stays the single `anthropicTools` body field.
+ */
+export function hasNativeWebSearch(): boolean {
+  try {
+    const env = (globalThis as { Deno?: { env?: { get(k: string): string | undefined } } }).Deno?.env;
+    return !!env?.get("ANTHROPIC_API_KEY");
+  } catch {
+    return false;
+  }
+}
 
 // Available tools that Atlas can use
 export const ATLAS_TOOLS = [
@@ -388,7 +406,6 @@ Be genuine, warm, and emotionally attentive. You're not just storing data - you'
 export async function executeTool(
   toolCall: ToolCall,
   userId: string | null,
-  perplexityKey: string | null,
   supabase: any
 ): Promise<{ name: string; result: unknown }> {
   const { name, arguments: argsStr } = toolCall.function;
@@ -397,58 +414,20 @@ export async function executeTool(
   console.log(`[orchestrator] Executing tool: ${name}`, args);
 
   switch (name) {
+    // Search runs inside the model (web_search_20260209), so these are declared
+    // via `anthropicTools` and stripped from the client tool list. A call can
+    // still arrive from replayed history — answer with a marker rather than
+    // standing up a second search backend.
     case "web_search": {
-      if (perplexityKey) {
-        const response = await fetch(PROVIDERS.perplexity.url, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${perplexityKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: PROVIDERS.perplexity.models.fast,
-            messages: [
-              { role: "system", content: "Be precise and concise. Provide well-sourced information." },
-              { role: "user", content: args.query },
-            ],
-          }),
-        });
-        const data = await response.json();
-        return {
-          name,
-          result: {
-            content: data.choices?.[0]?.message?.content || "No results",
-            citations: data.citations || [],
-          },
-        };
+      if (hasNativeWebSearch()) {
+        return { name, result: { handled_natively: true, note: "Web search already ran server-side; use those results." } };
       }
       return { name, result: { error: "Web search not available", suggestion: "I'll answer based on my training data" } };
     }
 
     case "deep_research": {
-      if (perplexityKey) {
-        const response = await fetch(PROVIDERS.perplexity.url, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${perplexityKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: PROVIDERS.perplexity.models.deep,
-            messages: [
-              { role: "system", content: "Provide comprehensive, well-sourced research with detailed analysis." },
-              { role: "user", content: `Research thoroughly: ${args.topic}` },
-            ],
-          }),
-        });
-        const data = await response.json();
-        return {
-          name,
-          result: {
-            content: data.choices?.[0]?.message?.content || "Research failed",
-            citations: data.citations || [],
-          },
-        };
+      if (hasNativeWebSearch()) {
+        return { name, result: { handled_natively: true, note: "Research already ran server-side via web search; use those results." } };
       }
       return { name, result: { error: "Deep research not available", suggestion: "I'll provide what I know from my training" } };
     }
@@ -583,7 +562,7 @@ async function summarizeConversation(
       .join("\n");
 
     const response = await aiChatCompletion({
-      model: "google/gemini-2.5-flash-lite",
+      model: selectModel("summary"),
       messages: [
         {
           role: "system",
@@ -744,10 +723,8 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
   } = opts;
 
   if (!hasAIKey()) {
-    return { kind: "error", status: 500, message: "No AI key configured (GEMINI_API_KEY)" };
+    return { kind: "error", status: 500, message: "No AI key configured (ANTHROPIC_API_KEY)" };
   }
-
-  const perplexityKey = deps.perplexityKey ?? null;
 
   // Check if Lovable AI is enabled (master kill switch)
   const lovableAIStatus = await isLovableAIEnabled(systemDb);
@@ -792,7 +769,7 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
     recallQueryText.length > 2
       ? (async () => {
           try {
-            const queryEmbedding = await generateEmbedding(recallQueryText);
+            const queryEmbedding = await (deps.embed ?? generateEmbedding)(recallQueryText);
             const { data, error } = await supabase.rpc("recall_memories", {
               query_embedding: queryEmbedding,
               query_text: recallQueryText,
@@ -821,7 +798,7 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
   console.log("[orchestrator] Memories count:", memories.length);
   console.log("[orchestrator] Tools enabled:", enableTools, "teaching:", teachingMode);
 
-  const hasTools = enableTools && !teachingMode && (!!perplexityKey || true);
+  const hasTools = enableTools && !teachingMode;
 
   // Build personalized prompt and append session context (working memory)
   const styleNotes = ((styleResult as { data?: Array<{ key: string; value: unknown }> }).data || []);
@@ -852,12 +829,38 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
   let maxToolIterations = teachingMode ? 0 : 3;
   const currentMessages = [...conversationMessages];
 
+  // Detect learning intent once — it drives both the model tier below and the
+  // fire-and-forget knowledge extraction after the stream starts.
+  const latestUserMessage = messages.filter((m) => m.role === "user").pop();
+  const learningIntent = latestUserMessage
+    ? detectLearningIntent(latestUserMessage.content)
+    : { hasIntent: false } as ReturnType<typeof detectLearningIntent>;
+
+  // Difficulty tiering: only an explicit research ask pays for the hard tier.
+  const chatModel = selectModel(
+    learningIntent.hasIntent && learningIntent.intentType === "research" ? "deep_research" : "chat",
+  );
+
+  // Search runs inside Claude (web_search_20260209). Declare it through the
+  // adapter passthrough and drop the client-side twins from the function list —
+  // a duplicate "web_search" name would be rejected by the Messages API. Without
+  // an Anthropic key the function tools stay, and executeTool degrades.
+  const nativeSearch = hasNativeWebSearch();
+  const chatTools = hasTools
+    ? nativeSearch
+      ? ATLAS_TOOLS.filter((t) => !NATIVE_SEARCH_TOOLS.has(t.function.name))
+      : ATLAS_TOOLS
+    : undefined;
+  const anthropicTools = hasTools && nativeSearch ? [ANTHROPIC_WEB_SEARCH_TOOL] : undefined;
+  console.log("[orchestrator] Model:", chatModel, "native web_search:", nativeSearch);
+
   // TEACHING MODE: Fast path - skip tool checking, single non-streaming call
   if (teachingMode) {
     console.log("[orchestrator] Teaching mode: fast path (no tool loop)");
 
     const teachResponse = await aiChatCompletion({
-      model: PROVIDERS.lovable.model,
+      // Teaching mode only captures memories and acknowledges — cheap tier.
+      model: selectModel("memory"),
       messages: currentMessages,
       tools: [{
         type: "function",
@@ -921,10 +924,14 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
     console.log("[orchestrator] Making AI request, iteration:", 4 - maxToolIterations);
 
     const checkResponse = await aiChatCompletion({
-      model: PROVIDERS.lovable.model,
+      model: chatModel,
       messages: currentMessages,
-      tools: hasTools ? ATLAS_TOOLS : undefined,
-      tool_choice: hasTools ? "auto" : undefined,
+      tools: chatTools,
+      tool_choice: chatTools ? "auto" : undefined,
+      // Deliberately no `anthropicTools` here: this pass exists only to harvest
+      // client tool calls and its prose is discarded, so letting Claude search
+      // here would pay for results nothing reads. The streaming call below owns
+      // web search.
       stream: false,
     });
 
@@ -946,6 +953,15 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
       return { kind: "error", status: 500, message: "No response from AI" };
     }
 
+    // Native web_search citations live in Claude's web_search_tool_result blocks.
+    // If the adapter surfaces them on the OpenAI-shaped body (top-level
+    // `citations`), collect them; otherwise the list stays empty — never assume
+    // the shape exists.
+    const bridgedCitations = Array.isArray(checkData.citations) ? checkData.citations : [];
+    if (bridgedCitations.length > 0) {
+      allToolResults.push({ name: "web_search", result: null, citations: bridgedCitations });
+    }
+
     const toolCalls = choice.message?.tool_calls;
 
     if (!toolCalls || toolCalls.length === 0 || choice.finish_reason === "stop") {
@@ -959,7 +975,7 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
 
     for (const toolCall of toolCalls) {
       console.log("[orchestrator] Executing tool:", toolCall.function.name);
-      const result = await executeTool(toolCall, userId, perplexityKey, supabase);
+      const result = await executeTool(toolCall, userId, supabase);
 
       if (result.result && typeof result.result === "object" && "citations" in result.result) {
         const citations = (result.result as any).citations;
@@ -985,13 +1001,18 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
     maxToolIterations--;
   }
 
+  // Citations emitted up-front as an SSE event. Claude's own web_search
+  // citations arrive inside the streamed content blocks, which this function
+  // passes through untouched — so with native search this list is normally
+  // empty and the UI relies on the inline links Claude writes.
   const allCitations = allToolResults.flatMap(r => r.citations || []);
   console.log("[orchestrator] Total citations collected:", allCitations.length);
 
-  // Now stream the final response
+  // Now stream the final response — the pass that may run native web search.
   const streamResponse = await aiChatCompletion({
-    model: PROVIDERS.lovable.model,
+    model: chatModel,
     messages: currentMessages,
+    anthropicTools,
     stream: true,
   });
 
@@ -1003,12 +1024,6 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
   }
 
   await recordSuccess(systemDb, "lovable_ai");
-
-  // Detect learning intent from the latest user message
-  const latestUserMessage = messages.filter((m) => m.role === "user").pop();
-  const learningIntent = latestUserMessage
-    ? detectLearningIntent(latestUserMessage.content)
-    : { hasIntent: false } as ReturnType<typeof detectLearningIntent>;
 
   console.log("[orchestrator] Learning intent:", learningIntent.hasIntent ? learningIntent.intentType : "none");
 

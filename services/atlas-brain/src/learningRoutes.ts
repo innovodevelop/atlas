@@ -8,6 +8,8 @@
  */
 
 import { aiChatCompletion, hasAIKey } from "../../../supabase/functions/_shared/aiGateway.ts";
+import { selectModel } from "../../../supabase/functions/_shared/providerRouting.ts";
+import { scheduleAutoEmbed } from "./autoEmbed.ts";
 import type { LocalDb } from "./localDb.ts";
 
 interface Deps {
@@ -33,11 +35,14 @@ const SETTINGS_UPDATABLE = new Set([
   "global_discovery_enabled",
 ]);
 
-/** One non-streaming completion; returns the raw text content or null. */
+/**
+ * One non-streaming completion; returns the raw text content or null. Every
+ * caller here summarises, classifies or condenses — the cheap tier covers it.
+ */
 async function completeText(system: string, user: string): Promise<string | null> {
   try {
     const res = await aiChatCompletion({
-      model: "google/gemini-2.5-flash",
+      model: selectModel("summary"),
       messages: [
         { role: "system", content: system },
         { role: "user", content: user },
@@ -139,6 +144,9 @@ async function runResearchPass(
   });
 
   await db.from("atlas_learning_sessions").update({ status: "completed", ended_at: nowIso() }).eq("id", sessionId);
+  // Make the new knowledge entry semantically recallable without waiting for a
+  // chat turn or a manual backfill.
+  scheduleAutoEmbed(db, userId);
   return "completed";
 }
 

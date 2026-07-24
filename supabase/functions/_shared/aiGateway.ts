@@ -4,15 +4,25 @@
 // (https://ai.gateway.lovable.dev) with LOVABLE_API_KEY. After ejecting from
 // Lovable Cloud that gateway is unavailable, so this module routes chat
 // completions to whichever provider is configured:
-//   1. LOVABLE_API_KEY  -> Lovable gateway (unchanged behavior, works pre-eject)
-//   2. GEMINI_API_KEY   -> Google AI Studio's OpenAI-compatible endpoint
-// Model ids are translated automatically (the Lovable gateway uses
-// "google/gemini-2.5-flash" style ids; Google uses bare "gemini-2.5-flash").
+//   1. ANTHROPIC_API_KEY -> Claude, via claudeAdapter.ts (current target)
+//   2. LOVABLE_API_KEY   -> Lovable gateway (unchanged behavior, works pre-eject)
+//   3. GEMINI_API_KEY    -> Google AI Studio's OpenAI-compatible endpoint
+// The Lovable/Gemini branches stay live so the migration can land in pieces.
+// Model ids are translated automatically (callers use "google/gemini-2.5-flash"
+// style logical ids; Google uses bare "gemini-2.5-flash", Claude uses tiers).
 //
 // Embeddings: the legacy functions faked embeddings (LLM-hallucinated arrays
 // or SHA-256 hashes). generateEmbedding() replaces those with real semantic
 // vectors from gemini-embedding-001, truncated + re-normalized to 768 dims to
-// match match_brain_vectors(vector(768)).
+// match match_brain_vectors(vector(768)). Anthropic has no embeddings endpoint,
+// so embeddings stay on GEMINI_API_KEY regardless of the chat provider.
+
+import {
+  ANTHROPIC_MESSAGES_URL,
+  claudeChatCompletion,
+  claudeDocumentExtract,
+  mapModelToClaude,
+} from "./claudeAdapter.ts";
 
 const LOVABLE_CHAT_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const GEMINI_CHAT_URL =
@@ -25,10 +35,14 @@ export const EMBEDDING_DIMENSIONS = 768;
 export interface AIGatewayConfig {
   chatUrl: string;
   apiKey: string;
-  provider: "lovable_ai" | "gemini";
+  provider: "anthropic" | "lovable_ai" | "gemini";
 }
 
 export function getAIConfig(): AIGatewayConfig | null {
+  const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+  if (anthropicKey) {
+    return { chatUrl: ANTHROPIC_MESSAGES_URL, apiKey: anthropicKey, provider: "anthropic" };
+  }
   const lovableKey = Deno.env.get("LOVABLE_API_KEY");
   if (lovableKey) {
     return { chatUrl: LOVABLE_CHAT_URL, apiKey: lovableKey, provider: "lovable_ai" };
@@ -58,6 +72,7 @@ const GEMINI_MODEL_MAP: Record<string, string> = {
 export function mapModel(model: string): string {
   const config = getAIConfig();
   if (!config || config.provider === "lovable_ai") return model;
+  if (config.provider === "anthropic") return mapModelToClaude(model);
   return (
     GEMINI_MODEL_MAP[model] ??
     (model.startsWith("google/") ? model.slice("google/".length) : model)
@@ -73,8 +88,13 @@ export function aiChatCompletion(body: Record<string, unknown>): Promise<Respons
   const config = getAIConfig();
   if (!config) {
     return Promise.reject(
-      new Error("No AI key configured: set GEMINI_API_KEY (or LOVABLE_API_KEY)"),
+      new Error("No AI key configured: set ANTHROPIC_API_KEY (or GEMINI_API_KEY / LOVABLE_API_KEY)"),
     );
+  }
+  // Claude is not OpenAI-compatible; the adapter translates both directions and
+  // still hands back a raw Response, so no call site changes.
+  if (config.provider === "anthropic") {
+    return claudeChatCompletion(body, config.apiKey);
   }
   const payload = {
     ...body,
@@ -128,16 +148,26 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 }
 
 /**
- * Document understanding (PDF/image → text answer). The OpenAI-compatible
- * endpoint does not accept PDFs, so this calls the native Gemini
- * generateContent API with inline data. Used by mail-sync to extract invoice
- * fields from attachments. Requires GEMINI_API_KEY.
+ * Document understanding (PDF/image → text answer). Used by mail-sync to
+ * extract invoice fields from attachments. Prefers Claude document/image
+ * content blocks; falls back to the native Gemini generateContent API (the
+ * OpenAI-compatible endpoint does not accept PDFs) when ANTHROPIC_API_KEY is
+ * absent, or when Claude cannot handle the media type.
  */
 export async function aiDocumentExtract(
   prompt: string,
   mimeType: string,
   base64Data: string,
 ): Promise<string> {
+  const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+  if (anthropicKey) {
+    try {
+      return await claudeDocumentExtract(prompt, mimeType, base64Data, anthropicKey);
+    } catch (e) {
+      if (!Deno.env.get("GEMINI_API_KEY")) throw e;
+      console.log("[aiGateway] Claude document extraction failed, falling back to Gemini:", e);
+    }
+  }
   const geminiKey = Deno.env.get("GEMINI_API_KEY");
   if (!geminiKey) throw new Error("GEMINI_API_KEY is required for document extraction");
   const response = await fetch(

@@ -101,9 +101,11 @@ fn spawn_atlas_brain(token: &str) -> Option<Child> {
     let mut cmd = Command::new(&bin);
     cmd.env("SIDECAR_TOKEN", token)
         .env("ATLAS_BRAIN_PORT", ATLAS_BRAIN_PORT.to_string());
-    // AI keys from the Keychain (never in env files / git).
+    // AI keys from the Keychain (never in env files / git). Anthropic is the
+    // reasoning provider; the Gemini key is only a transitional fallback for
+    // installs that predate the Claude swap.
+    if let Some(k) = secrets::core_key("anthropic_api_key") { cmd.env("ANTHROPIC_API_KEY", k); }
     if let Some(k) = secrets::core_key("gemini_api_key") { cmd.env("GEMINI_API_KEY", k); }
-    if let Some(k) = secrets::core_key("perplexity_api_key") { cmd.env("PERPLEXITY_API_KEY", k); }
     match cmd.spawn() {
         Ok(child) => {
             eprintln!("[atlas] brain sidecar spawned (pid {})", child.id());
@@ -131,6 +133,7 @@ fn atlas_brain_info(state: tauri::State<AtlasBrain>) -> serde_json::Value {
 /// data-fetch / voice paths need (Supabase-removal Phase 5).
 fn core_account(provider: &str) -> Option<&'static str> {
     Some(match provider {
+        "anthropic" => "anthropic_api_key",
         "gemini" => "gemini_api_key",
         "perplexity" => "perplexity_api_key",
         "openweather" => "openweather_api_key",
@@ -157,6 +160,7 @@ fn brain_set_ai_key(provider: String, key: String) -> Result<(), String> {
 fn brain_ai_status() -> serde_json::Value {
     let present = |a: &str| secrets::core_key(a).is_some();
     serde_json::json!({
+        "anthropic": present("anthropic_api_key"),
         "gemini": present("gemini_api_key"),
         "perplexity": present("perplexity_api_key"),
         "openweather": present("openweather_api_key"),
