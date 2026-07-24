@@ -5,49 +5,41 @@
  * 127.0.0.1, guarded by a SIDECAR_TOKEN handshake so only the app connects)
  * or standalone in dev: `bun run dev` from services/voice-gateway.
  *
- * Env (sidecar: injected by Tauri; dev: .env fallback from the repo root):
- *   SUPABASE_URL / VITE_SUPABASE_URL
- *   SUPABASE_ANON_KEY / VITE_SUPABASE_PUBLISHABLE_KEY
+ * Env (injected by Tauri; dev: shell env):
  *   VOICE_GATEWAY_PORT (default 4820)
- *   SIDECAR_TOKEN (optional — required when set)
+ *   ATLAS_BRAIN_PORT (default 4830 — the brain sidecar; voice delegates chat there)
+ *   ELEVENLABS_API_KEY (from Keychain — direct TTS/STT, no Supabase hop)
+ *   SIDECAR_TOKEN (optional — required when set; shared with the brain)
  *   VAD_MODEL_PATH (default models/silero_vad.onnx)
  */
 
 import "./denoShim.ts";
-import { createClient } from "@supabase/supabase-js";
 import { VoiceSession } from "./session.ts";
 import type { ClientMsg } from "./protocol.ts";
-import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-function loadRepoDotenv(): Record<string, string> {
-  const out: Record<string, string> = {};
-  try {
-    const txt = readFileSync(join(HERE, "../../../.env"), "utf8");
-    for (const line of txt.split("\n")) {
-      const m = line.match(/^([A-Z0-9_]+)="?([^"\n]*)"?$/);
-      if (m) out[m[1]] = m[2];
-    }
-  } catch { /* packaged build: env comes from Tauri */ }
-  return out;
-}
-
-const dotenv = loadRepoDotenv();
-const SUPABASE_URL =
-  process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? dotenv.VITE_SUPABASE_URL;
-const ANON_KEY =
-  process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? dotenv.VITE_SUPABASE_PUBLISHABLE_KEY;
 const PORT = Number(process.env.VOICE_GATEWAY_PORT ?? 4820);
 const SIDECAR_TOKEN = process.env.SIDECAR_TOKEN;
 const VAD_MODEL_PATH = process.env.VAD_MODEL_PATH ?? join(HERE, "../models/silero_vad.onnx");
 
-// Compiled sidecar: env carries no Supabase config — the app supplies the
-// public URL + anon key in the hello message instead. Env wins in dev.
-if (!SUPABASE_URL || !ANON_KEY) {
-  console.log("[gateway] No Supabase env — expecting connection config in hello");
+/**
+ * Identity from the Cloudflare account JWT (decode only — the signature is
+ * verified at Cloudflare; the brain sidecar re-checks the token on every chat
+ * call). Same single-local-trust-boundary model as the brain: the gateway runs
+ * on 127.0.0.1 behind the SIDECAR_TOKEN handshake, so decoding is sufficient.
+ */
+function decodeJwt(token: string): { sub?: string; email?: string; exp?: number } | null {
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  try {
+    const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(Buffer.from(b64, "base64").toString("utf8"));
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -120,35 +112,18 @@ const server = Bun.serve<SocketData>({
           ws.close(4001);
           return;
         }
-        // Connection config: env (dev) wins; else the app-supplied values.
-        const supabaseUrl = SUPABASE_URL ?? msg.supabaseUrl;
-        const anonKey = ANON_KEY ?? msg.anonKey;
-        if (!supabaseUrl || !anonKey) {
-          ws.send(JSON.stringify({ type: "error", message: "missing supabase config" }));
-          ws.close(4002);
-          return;
-        }
-        // Validate the user JWT — same trust model as the edge functions.
-        const authClient = createClient(supabaseUrl, anonKey);
-        const { data, error } = await authClient.auth.getUser(msg.jwt);
-        if (error || !data.user) {
+        // Identity from the Cloudflare JWT (decode only — see decodeJwt). The
+        // brain re-checks the token cryptographically on each /chat call.
+        const claims = decodeJwt(msg.jwt);
+        if (!claims?.sub || (claims.exp && Date.now() / 1000 >= claims.exp)) {
           ws.send(JSON.stringify({ type: "error", message: "invalid jwt" }));
           ws.close(4003);
           return;
         }
 
-        // User-scoped client: RLS applies to everything the session touches.
-        const supabase = createClient(supabaseUrl, anonKey, {
-          global: { headers: { Authorization: `Bearer ${msg.jwt}` } },
-          auth: { persistSession: false, autoRefreshToken: false },
-        });
-
         const session = await VoiceSession.create({
-          supabaseUrl,
-          anonKey,
           userJwt: msg.jwt,
-          userId: data.user.id,
-          supabase,
+          userId: claims.sub,
           vadAssets: VAD_ASSETS,
           voiceId: msg.voiceId,
           ttsModelId: msg.ttsModelId,
@@ -159,7 +134,7 @@ const server = Bun.serve<SocketData>({
         ws.data.session = session;
         ws.data.authed = true;
         ws.send(JSON.stringify({ type: "ready", sessionId: crypto.randomUUID() }));
-        console.log(`[gateway] session ready (user ${data.user.id.slice(0, 8)}…, vad=${session.vadEngine})`);
+        console.log(`[gateway] session ready (user ${claims.sub.slice(0, 8)}…, vad=${session.vadEngine})`);
         return;
       }
 

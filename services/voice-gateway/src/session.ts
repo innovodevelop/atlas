@@ -13,25 +13,30 @@
  */
 
 import "./denoShim.ts";
-import { runChat, type ChatMessage } from "../../../supabase/functions/_shared/orchestrator.ts";
 import { createVad, type VadEngine, type VadAssets } from "./vad.ts";
 import { RealtimeStt } from "./stt.ts";
-import { TtsPipeline, EdgeFnTtsProvider, DirectTtsProvider } from "./tts.ts";
+import { TtsPipeline, DirectTtsProvider } from "./tts.ts";
 
-// ElevenLabs key injected into the sidecar from the Keychain (Phase 5). When
-// present, voice runs directly against ElevenLabs; otherwise it falls back to
-// the (transitional) Supabase edge functions.
+// ElevenLabs key injected into the sidecar from the Keychain. Voice runs
+// directly against ElevenLabs for TTS + scribe tokens — no Supabase hop.
 const ELEVEN_KEY = process.env.ELEVENLABS_API_KEY;
+
+// Voice delegates "thinking" to the brain sidecar (one brain, not two): the
+// brain runs the orchestrator with memory + tools against the local atlas.db
+// and streams the reply back over 127.0.0.1, guarded by the shared sidecar
+// token. Phase 2's Claude swap in the brain then covers voice for free.
+const SIDECAR_TOKEN = process.env.SIDECAR_TOKEN;
+const BRAIN_URL = `http://127.0.0.1:${process.env.ATLAS_BRAIN_PORT ?? "4830"}/chat-with-memory`;
+
 import { SentenceChunker, stripForSpeech, type SentenceChunk } from "./sentence.ts";
 import type { ServerMsg, ClientMsg, AtlasState } from "./protocol.ts";
 
+type ChatMessage = { role: "user" | "assistant" | "system"; content: string };
+
 export interface SessionConfig {
-  supabaseUrl: string;
-  anonKey: string;
+  /** Cloudflare account JWT — forwarded to the brain, which re-checks it. */
   userJwt: string;
   userId: string;
-  /** User-scoped supabase client (RLS). Also passed as systemDb — see note. */
-  supabase: any;
   /** VAD model + ORT wasm assets (paths in dev, embedded in the sidecar). */
   vadAssets: VadAssets;
   voiceId?: string;
@@ -65,9 +70,8 @@ export class VoiceSession {
   onLatency: ((wakeToFirstAudioMs: number) => void) | null = null;
 
   private constructor(private cfg: SessionConfig) {
-    this.tts = new TtsPipeline(
-      ELEVEN_KEY ? new DirectTtsProvider(ELEVEN_KEY) : new EdgeFnTtsProvider(cfg.supabaseUrl, cfg.anonKey, cfg.userJwt),
-    );
+    // Direct ElevenLabs TTS (key from the Keychain). No Supabase fallback.
+    this.tts = new TtsPipeline(new DirectTtsProvider(ELEVEN_KEY ?? ""));
   }
 
   static async create(cfg: SessionConfig): Promise<VoiceSession> {
@@ -137,9 +141,6 @@ export class VoiceSession {
 
     this.vad.reset();
     this.stt = new RealtimeStt(
-      this.cfg.supabaseUrl,
-      this.cfg.anonKey,
-      this.cfg.userJwt,
       {
         onPartial: (text) => this.cfg.send({ type: "partial_transcript", text }),
         onFinal: () => { /* resolved in finish() */ },
@@ -192,30 +193,28 @@ export class VoiceSession {
     this.llmAbort = new AbortController();
     const llmSignal = this.llmAbort.signal;
 
-    let result;
+    // Delegate the turn to the brain sidecar: it runs the orchestrator (memory
+    // recall + tools) against the local atlas.db and streams the reply back.
+    // Aborting llmSignal (barge-in) cancels the fetch, killing the stream.
+    let res: Response;
     try {
-      result = await runChat(
-        {
-          supabase: this.cfg.supabase,
-          // Local gateway holds no service-role key. The user client can READ
-          // the system tables (SELECT is granted TO authenticated); system
-          // WRITES (provider status, learning sessions) silently no-op under
-          // RLS — acceptable local-first degradation, see ADR 001.
-          systemDb: this.cfg.supabase,
-          userId: this.cfg.userId,
-          userToken: this.cfg.userJwt,
-          supabaseUrl: this.cfg.supabaseUrl,
-          perplexityKey: null, // web_search runs via edge deploys, not locally
-          sessionId: this.conversationId,
+      res = await fetch(BRAIN_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.cfg.userJwt}`,
+          ...(SIDECAR_TOKEN ? { "x-sidecar-token": SIDECAR_TOKEN } : {}),
         },
-        {
+        body: JSON.stringify({
           messages: this.history,
           source: "voice_chat",
           enableTools: true,
           conversationId: this.conversationId,
-        },
-      );
+        }),
+        signal: llmSignal,
+      });
     } catch (e) {
+      if (llmSignal.aborted) return; // barged in while thinking
       this.cfg.send({ type: "error", message: (e as Error).message });
       this.setState("idle");
       return;
@@ -223,21 +222,31 @@ export class VoiceSession {
 
     if (llmSignal.aborted) return; // barged in while thinking
 
-    if (result.kind === "error") {
-      this.cfg.send({ type: "error", message: result.message });
+    if (!res.ok || !res.body) {
+      let message = `brain error ${res.status}`;
+      try { message = (await res.json())?.error ?? message; } catch { /* non-json body */ }
+      this.cfg.send({ type: "error", message });
       this.setState("idle");
       return;
     }
-    if (result.kind === "json") {
-      // Teaching-mode style single response — speak it whole.
-      const text = stripForSpeech(String((result.body as any)?.response ?? ""));
-      if (text) this.speakChunks([{ text, charStart: 0, charEnd: text.length }]);
+
+    // Memory-less / teaching path returns a single JSON body — speak it whole.
+    if ((res.headers.get("content-type") ?? "").includes("application/json")) {
+      const body = await res.json().catch(() => ({}));
+      const text = stripForSpeech(String((body as { response?: unknown })?.response ?? ""));
+      if (text) {
+        this.turnFullText = text;
+        this.speakChunks([{ text, charStart: 0, charEnd: text.length }]);
+        void this.finishTurnWhenSpoken();
+      } else {
+        this.setState("idle");
+      }
       return;
     }
 
     // Parse the SSE stream → deltas → sentence chunks → TTS.
     const chunker = new SentenceChunker();
-    const reader = result.stream.getReader();
+    const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let sseBuf = "";
 

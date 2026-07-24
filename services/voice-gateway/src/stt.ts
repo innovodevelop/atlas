@@ -2,9 +2,8 @@
  * Realtime STT: ElevenLabs Scribe v2 Realtime over WebSocket.
  *
  * The gateway speaks the raw WS protocol (the @elevenlabs/react SDK wraps the
- * same endpoint in the browser). Auth: a single-use token minted by the
- * `elevenlabs-scribe-token` edge function with the user's JWT — the API key
- * never reaches this process.
+ * same endpoint in the browser). Auth: a single-use token minted directly from
+ * ElevenLabs with the Keychain-injected API key — no Supabase hop.
  *
  * Post-wake PCM frames are forwarded as base64 audio messages; partial and
  * final transcripts stream back. Endpointing is the VAD's job, not the STT's
@@ -28,36 +27,20 @@ export class RealtimeStt {
   private pendingFrames: Uint8Array[] = [];
 
   constructor(
-    private supabaseUrl: string,
-    private anonKey: string,
-    private userJwt: string,
     private events: SttEvents,
     private languageCode?: string, // e.g. "da" — Danish-first product
-    private apiKey?: string, // ElevenLabs key (direct mint); falls back to edge fn
+    private apiKey?: string, // ElevenLabs key from the Keychain (required)
   ) {}
 
-  /** Mint a single-use scribe token — directly from ElevenLabs when the key is
-   *  injected (Phase 5), else via the edge function (transitional). */
+  /** Mint a single-use scribe token directly from ElevenLabs. */
   private async mintToken(): Promise<string> {
-    if (this.apiKey) {
-      const r = await fetch("https://api.elevenlabs.io/v1/single-use-token/realtime_scribe", {
-        method: "POST",
-        headers: { "xi-api-key": this.apiKey },
-      });
-      if (!r.ok) throw new Error(`scribe token failed: ${r.status}`);
-      return (await r.json()).token;
-    }
-    const tokenRes = await fetch(`${this.supabaseUrl}/functions/v1/elevenlabs-scribe-token`, {
+    if (!this.apiKey) throw new Error("ELEVENLABS_API_KEY not configured");
+    const r = await fetch("https://api.elevenlabs.io/v1/single-use-token/realtime_scribe", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: this.anonKey,
-        Authorization: `Bearer ${this.userJwt}`,
-      },
-      body: JSON.stringify({}),
+      headers: { "xi-api-key": this.apiKey },
     });
-    if (!tokenRes.ok) throw new Error(`scribe token failed: ${tokenRes.status}`);
-    return (await tokenRes.json()).token;
+    if (!r.ok) throw new Error(`scribe token failed: ${r.status}`);
+    return (await r.json()).token;
   }
 
   /** Mint a single-use token and open the WS. Resolves when ready for audio. */

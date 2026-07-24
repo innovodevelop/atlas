@@ -16,7 +16,7 @@ export type AtlasState = "idle" | "listening" | "thinking" | "speaking";
 
 export interface HelloMsg {
   type: "hello";
-  /** Supabase user JWT — validated before the session starts. */
+  /** Cloudflare account JWT — identity decoded here, re-verified by the brain. */
   jwt: string;
   /** Tauri-spawn handshake token (SIDECAR_TOKEN); absent in dev. */
   sessionToken?: string;
@@ -24,12 +24,6 @@ export interface HelloMsg {
   /** Voice/model settings mirrored from useAtlasSettings. */
   voiceId?: string;
   ttsModelId?: string;
-  /**
-   * Supabase connection (public values). The compiled sidecar is spawned
-   * with zero Supabase env — the app provides these; env wins in dev.
-   */
-  supabaseUrl?: string;
-  anonKey?: string;
 }
 
 /** Wake word fired client-side — start a listening turn. */

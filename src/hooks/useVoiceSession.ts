@@ -185,10 +185,6 @@ export function useVoiceSession(options?: {
         sampleRate: 16000,
         voiceId: optionsRef.current?.voiceId,
         ttsModelId: optionsRef.current?.ttsModelId,
-        // The sidecar is spawned with zero Supabase env — supply the public
-        // connection values (env wins in dev).
-        supabaseUrl: import.meta.env.VITE_SUPABASE_URL,
-        anonKey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
       }));
     };
 

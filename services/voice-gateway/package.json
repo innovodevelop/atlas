@@ -12,7 +12,6 @@
     "compile": "bun build --compile --minify src/index.ts --outfile dist/atlas-voice-gateway"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.39.0",
     "onnxruntime-node": "^1.20.1",
     "onnxruntime-web": "^1.27.0"
   },
