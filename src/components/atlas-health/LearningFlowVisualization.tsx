@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
+import { getToken } from '@/lib/authClient';
+import { getBrainEndpoint } from '@/lib/brainClient';
 import { useToast } from '@/hooks/use-toast';
 
 interface LearningSession {
@@ -119,42 +121,19 @@ export const LearningFlowVisualization = ({ compact = false }: LearningFlowVisua
     setIsStarting(true);
     
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      // Create the learning session
-      const { data: sessionData, error: sessionError } = await supabase
-        .from('atlas_learning_sessions')
-        .insert({
-          user_id: user?.id,
-          topic: learningTopic,
-          mode: 'explore',
-          status: 'active',
-        })
-        .select()
-        .single();
-
-      if (sessionError) {
-        throw sessionError;
-      }
-
-      // Trigger research with the learning session ID
-      const { data: researchResult, error: researchError } = await supabase.functions.invoke('atlas-research', {
-        body: {
-          action: 'create',
-          topic: learningTopic,
-          description: `Learning session exploration: ${learningTopic}`,
-          userId: user?.id,
-          learningSessionId: sessionData.id,
-          autoDeepen: true,
-          maxDepth: 3,
-        },
+      // The /research route creates the learning session itself (its id comes
+      // back as sessionId) — inserting one here too would leave a duplicate,
+      // permanently-'active' session inflating the get_status count.
+      const brain = await getBrainEndpoint();
+      if (!brain) throw new Error('Learning is only available in the desktop app.');
+      const res = await fetch(`${brain.baseUrl}/research`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken() ?? ''}`, 'x-sidecar-token': brain.token },
+        body: JSON.stringify({ action: 'create', topic: learningTopic }),
       });
-
-      if (researchError) {
-        console.error('Research trigger error:', researchError);
-        // Session is still created, research will just be manual
-      } else {
-        console.log('Research started:', researchResult);
+      const researchResult = await res.json();
+      if (!res.ok) {
+        throw new Error(researchResult?.error || 'Failed to start research');
       }
 
       setIsLearning(true);

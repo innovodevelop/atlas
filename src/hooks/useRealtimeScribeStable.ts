@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useScribe, CommitStrategy } from "@elevenlabs/react";
 import { supabase } from "@/integrations/supabase/client";
+import { getVoiceEndpoint } from "@/lib/voiceClient";
 
 interface UseRealtimeScribeOptions {
   onPartialTranscript?: (text: string) => void;
@@ -153,13 +154,21 @@ export const useRealtimeScribeStable = (options: UseRealtimeScribeOptions = {}) 
       }
 
       console.log("[Scribe] Getting token...");
-      const { data, error } = await supabase.functions.invoke("elevenlabs-scribe-token");
-
-      if (error) {
-        const details =
-          (error as any)?.context || (error as any)?.details || (error as any)?.hint || "";
-        console.error("[Scribe] Token request error:", error, details);
-        throw new Error(details ? `${error.message}: ${details}` : error.message);
+      // Single-use scribe tokens are minted by the local voice gateway sidecar.
+      const voice = await getVoiceEndpoint();
+      if (!voice) {
+        throw new Error("Voice is only available in the desktop app.");
+      }
+      const res = await fetch(`${voice.baseUrl}/scribe-token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-sidecar-token": voice.token },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        const details = data?.error || "";
+        console.error("[Scribe] Token request error:", res.status, details);
+        throw new Error(details || `Token request failed (${res.status})`);
       }
 
       if (!data?.token) {

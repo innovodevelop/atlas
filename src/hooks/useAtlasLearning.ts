@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { getToken } from '@/lib/authClient';
+import { getBrainEndpoint } from '@/lib/brainClient';
 import { isWindowActive } from '@/hooks/useWindowActivity';
 
 interface BrainRun {
@@ -243,16 +245,23 @@ export function useAtlasLearning() {
   const activeRun = mergedRuns.find(run => run.status === 'running');
   const lastRun = mergedRuns[0];
 
-  // Trigger brain cycle manually
+  // Trigger brain cycle manually (runs on the local brain sidecar)
   const triggerBrainCycle = useCallback(async () => {
     setIsTriggering(true);
     try {
-      const { data, error } = await supabase.functions.invoke('atlas-brain', {
-        body: { manual: true }
+      const brain = await getBrainEndpoint();
+      if (!brain) throw new Error('Learning is only available in the desktop app.');
+      const res = await fetch(`${brain.baseUrl}/learning/cycle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken() ?? ''}`, 'x-sidecar-token': brain.token },
+        body: JSON.stringify({}),
       });
-      
-      if (error) throw error;
-      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Brain cycle failed');
+      // The route returns 200 {ok:false, error} when no AI key is configured —
+      // surface that instead of toasting success over a no-op.
+      if (data && data.ok === false) throw new Error(data.error || 'Brain cycle failed');
+
       // Refresh data
       queryClient.invalidateQueries({ queryKey: ['atlas-brain-runs'] });
       queryClient.invalidateQueries({ queryKey: ['atlas-research-queue'] });

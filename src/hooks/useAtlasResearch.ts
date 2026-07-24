@@ -1,6 +1,25 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { getToken } from '@/lib/authClient';
+import { getBrainEndpoint } from '@/lib/brainClient';
 import { useToast } from '@/hooks/use-toast';
+
+// Research runs on the local brain sidecar.
+async function brainPost(path: string, body: unknown): Promise<{ data: any; error: any }> {
+  const brain = await getBrainEndpoint();
+  if (!brain) return { data: null, error: new Error('Research is only available in the desktop app.') };
+  try {
+    const res = await fetch(`${brain.baseUrl}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken() ?? ''}`, 'x-sidecar-token': brain.token },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    return res.ok ? { data, error: null } : { data: null, error: new Error(data.error || 'Request failed') };
+  } catch (e) {
+    return { data: null, error: e };
+  }
+}
 
 interface ResearchTopic {
   id: string;
@@ -67,26 +86,15 @@ export const useAtlasResearch = () => {
     };
   }, [fetchTopics]);
 
-  const startResearch = useCallback(async (topic: string, description?: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
-
+  const startResearch = useCallback(async (topic: string, _description?: string) => {
     toast({
       title: 'Starting Research',
       description: `Initiating deep research on: ${topic}`,
     });
 
-    // Use the edge function to create and start research
+    // Create and start research on the local brain sidecar
     try {
-      const { data, error } = await supabase.functions.invoke('atlas-research', {
-        body: {
-          action: 'create',
-          topic,
-          description,
-          userId: user?.id,
-          autoDeepen: true,
-          // depth is decided server-side from atlas_system_settings
-        },
-      });
+      const { data, error } = await brainPost('/research', { action: 'create', topic });
 
       if (error) throw error;
 
@@ -130,14 +138,9 @@ export const useAtlasResearch = () => {
       .eq('id', id);
 
     if (!error) {
-      // Trigger the research edge function
-      try {
-        await supabase.functions.invoke('atlas-research', {
-          body: { topicId: id, action: 'resume' },
-        });
-      } catch (e) {
-        console.log('Research function not available yet');
-      }
+      // Trigger the research pass on the local brain sidecar
+      const { error: resumeError } = await brainPost('/research', { action: 'resume', topicId: id });
+      if (resumeError) console.log('Research resume failed:', resumeError);
     }
   }, []);
 

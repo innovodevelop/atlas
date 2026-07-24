@@ -21,6 +21,8 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
+import { getToken } from '@/lib/authClient';
+import { getBrainEndpoint } from '@/lib/brainClient';
 import { useToast } from '@/hooks/use-toast';
 
 interface ValidationLog {
@@ -116,15 +118,20 @@ export function MemoryDashboardPanel() {
   const runMemorySynthesis = async (operation: string) => {
     setIsRunningSync(true);
     try {
-      const { data, error } = await supabase.functions.invoke('memory-scheduler', {
-        body: { operation },
+      // Maintenance runs on the local brain sidecar
+      const brain = await getBrainEndpoint();
+      if (!brain) throw new Error('Memory maintenance is only available in the desktop app.');
+      const res = await fetch(`${brain.baseUrl}/memory/maintenance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken() ?? ''}`, 'x-sidecar-token': brain.token },
+        body: JSON.stringify({ operation }),
       });
-
-      if (error) throw error;
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Maintenance failed');
 
       toast({
         title: 'Memory Synthesis Complete',
-        description: `${operation}: ${data.duplicatesRemoved || 0} duplicates removed, ${data.insightsExtracted || 0} insights extracted`,
+        description: `${operation}: ${data.consolidated || 0} duplicates removed, ${data.insights || 0} insights extracted`,
       });
 
       fetchStats();

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import type { RealtimeChannel } from "@supabase/supabase-js";
+
+// The shimmed local client's channel handle — enough for stash + removeChannel.
+type ChannelHandle = ReturnType<typeof supabase.channel>;
 
 interface AIInsight {
   id: string;
@@ -23,7 +25,7 @@ export const useProactiveAI = () => {
     // mount (it accumulates on the single Supabase realtime socket → the
     // WKWebView Networking process balloons over a long session).
     let cancelled = false;
-    const channelRef: { current: RealtimeChannel | null } = { current: null };
+    const channelRef: { current: ChannelHandle | null } = { current: null };
 
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();

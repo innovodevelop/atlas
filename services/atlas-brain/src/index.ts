@@ -9,23 +9,20 @@
  * Runs as a Tauri sidecar in the packaged app (spawned by src-tauri, bound to
  * 127.0.0.1, optional SIDECAR_TOKEN) or standalone in dev: `bun run dev`.
  *
- * Env (sidecar: injected by Tauri; dev: .env fallback from the repo root):
- *   SUPABASE_URL / VITE_SUPABASE_URL              (JWT verification + user client)
- *   SUPABASE_ANON_KEY / VITE_SUPABASE_PUBLISHABLE_KEY
- *   SUPABASE_SERVICE_ROLE_KEY                     (optional; provider/learning tables)
+ * Env (sidecar: injected by Tauri; dev: shell env):
  *   GEMINI_API_KEY                                (required for real completions; from Keychain)
  *   PERPLEXITY_API_KEY                            (optional; web-search tools)
  *   ATLAS_BRAIN_PORT (default 4830)
  *   SIDECAR_TOKEN (optional — checked when set)
  *
- * NOTE (migration state): this phase still uses Supabase for JWT auth + memory/
- * data reads (via the injected clients). Phase 3 swaps memory to local SQLite +
- * sqlite-vec, Phase 6 swaps auth to a local profile — at which point the
- * Supabase env here goes away.
+ * Fully local: identity comes from the Cloudflare account JWT (decode-only —
+ * signature verification lives at Cloudflare), all data lives in the on-device
+ * atlas.db via bun:sqlite. No Supabase.
  */
 
 import "./denoShim.ts";
 import { createLocalDb } from "./localDb.ts";
+import { createLearningHandlers } from "./learningRoutes.ts";
 
 import { runChat } from "../../../supabase/functions/_shared/orchestrator.ts";
 import { aiChatCompletion, hasAIKey, generateEmbedding } from "../../../supabase/functions/_shared/aiGateway.ts";
@@ -93,6 +90,9 @@ function requireUser(req: Request): { userId: string; email: string; token: stri
 // One local DB (bun:sqlite over atlas.db) serves as both the user client and the
 // service-role client for the orchestrator — there's no RLS locally.
 const localDb = createLocalDb();
+
+// Learning / research / maintenance routes (see learningRoutes.ts).
+const learning = createLearningHandlers({ db: localDb, requireUser, json });
 
 // POST /chat-with-memory — full orchestrator: memory recall, tools, streaming.
 async function handleChatWithMemory(req: Request): Promise<Response> {
@@ -249,6 +249,11 @@ const server = Bun.serve({
       if (req.method === "POST" && url.pathname === "/chat") return await handleChat(req);
       if (req.method === "POST" && url.pathname === "/search") return await handleSearch(req);
       if (req.method === "POST" && url.pathname === "/embed-backfill") return await handleEmbedBackfill(req);
+      if (req.method === "POST" && url.pathname === "/learning/control") return await learning.control(req);
+      if (req.method === "POST" && url.pathname === "/learning/cycle") return await learning.cycle(req);
+      if (req.method === "POST" && url.pathname === "/learning/intent") return await learning.intent(req);
+      if (req.method === "POST" && url.pathname === "/research") return await learning.research(req);
+      if (req.method === "POST" && url.pathname === "/memory/maintenance") return await learning.memoryMaintenance(req);
     } catch (e) {
       if (e instanceof AuthError) return json({ error: e.message }, e.status);
       console.error("[brain] error:", e);

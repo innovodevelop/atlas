@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { getToken } from "@/lib/authClient";
+import { getVoiceEndpoint } from "@/lib/voiceClient";
 
 interface UseStreamingTTSOptions {
   onPlaybackStart?: () => void;
@@ -69,17 +69,16 @@ export const useStreamingTTS = (options: UseStreamingTTSOptions = {}) => {
     signal: AbortSignal,
   ): Promise<Blob | null> => {
     try {
-      // Authenticate with the user's Cloudflare account token.
-      const token = getToken();
-      if (!token) throw new Error("Not authenticated");
+      // TTS streams from the local voice gateway sidecar.
+      const voice = await getVoiceEndpoint();
+      if (!voice) throw new Error("Voice is only available in the desktop app.");
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts-stream`,
+        `${voice.baseUrl}/tts`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${token}`,
+            "x-sidecar-token": voice.token,
           },
           body: JSON.stringify({ text, voiceId: speakOptions.voiceId, modelId: speakOptions.modelId }),
           signal,

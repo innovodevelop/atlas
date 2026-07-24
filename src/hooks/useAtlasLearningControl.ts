@@ -1,7 +1,25 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { getToken } from '@/lib/authClient';
+import { getBrainEndpoint } from '@/lib/brainClient';
 import { useAtlasProviderStatus } from './useAtlasProviderStatus';
 import { useToast } from './use-toast';
+
+// Learning control runs on the local brain sidecar.
+async function brainPost(path: string, body: unknown): Promise<{ data: any; error: any }> {
+  const brain = await getBrainEndpoint();
+  if (!brain) return { data: null, error: new Error('Learning is only available in the desktop app.') };
+  try {
+    const res = await fetch(`${brain.baseUrl}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken() ?? ''}`, 'x-sidecar-token': brain.token },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    return res.ok ? { data, error: null } : { data: null, error: new Error(data.error || 'Request failed') };
+  } catch (e) {
+    return { data: null, error: e };
+  }
+}
 
 export interface StartLearningParams {
   topic: string;
@@ -40,18 +58,8 @@ export function useAtlasLearningControl() {
         throw new Error('AI credits are exhausted. Please add more credits.');
       }
 
-      // Call atlas-control edge function
-      const { data, error } = await supabase.functions.invoke('atlas-control', {
-        body: { 
-          topic: params.topic,
-          userId: params.userId,
-          sessionId: params.sessionId,
-          triggerType: params.triggerType || 'manual',
-        },
-        headers: {
-          'x-action': 'start_learning',
-        },
-      });
+      // Enable learning on the local brain sidecar
+      const { data, error } = await brainPost('/learning/control', { action: 'start_learning' });
 
       if (error) throw error;
       return data;
@@ -81,12 +89,7 @@ export function useAtlasLearningControl() {
     reason?: string;
   }> => {
     try {
-      const { data, error } = await supabase.functions.invoke('atlas-control', {
-        body: { message },
-        headers: {
-          'x-action': 'check_learning_intent',
-        },
-      });
+      const { data, error } = await brainPost('/learning/intent', { message });
 
       if (error) {
         console.error('Failed to check learning intent:', error);
@@ -94,10 +97,8 @@ export function useAtlasLearningControl() {
       }
 
       return {
-        shouldLearn: data.shouldLearn,
-        topic: data.intent?.topic,
-        intentType: data.intent?.type,
-        reason: data.reason,
+        shouldLearn: !!data.isLearningRequest,
+        topic: data.topic ?? undefined,
       };
     } catch (e) {
       console.error('Learning intent check error:', e);

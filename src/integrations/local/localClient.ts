@@ -366,16 +366,15 @@ const realtime = {
   disconnect: () => {},
 };
 
-// Transitional: edge functions not yet migrated (research / learning / mail /
-// elevenlabs) are still called on Supabase. These get replaced in Phases 5/7;
-// until then this forwards to the Supabase function with the CF token.
-// Edge functions now served by local Tauri commands (Phase 5). Others still
-// forward to Supabase until their phase migrates them.
+// Edge functions now served by local Tauri commands. Anything not in this map
+// has no backend anymore — mail waits on the Phase-7 CF mail worker.
 const LOCAL_FN: Record<string, string> = {
   "get-weather": "fetch_weather",
   "get-stocks": "fetch_stocks",
   "get-news": "fetch_news",
 };
+
+const MAIL_FNS = new Set(["mail-oauth-start", "mail-sync", "mail-disconnect"]);
 
 const functions = {
   async invoke(name: string, opts?: { body?: unknown; headers?: Record<string, string> }): Promise<Result<any>> {
@@ -388,26 +387,10 @@ const functions = {
         return { data: null, error: { message: e instanceof Error ? e.message : String(e) } };
       }
     }
-    const base = import.meta.env.VITE_SUPABASE_URL;
-    if (!base) return { data: null, error: { message: `Edge function ${name} unavailable (no backend).` } };
-    const token = authClient.getToken();
-    try {
-      const res = await fetch(`${base}/functions/v1/${name}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          ...(opts?.headers ?? {}),
-        },
-        body: JSON.stringify(opts?.body ?? {}),
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) return { data: null, error: { message: data?.error ?? res.statusText, status: res.status } };
-      return { data, error: null };
-    } catch (e) {
-      return { data: null, error: { message: e instanceof Error ? e.message : String(e) } };
+    if (MAIL_FNS.has(name)) {
+      return { data: null, error: new Error("Mail sync is temporarily unavailable — migrating to the new mail service") };
     }
+    return { data: null, error: new Error(`${name} is not available locally`) };
   },
 };
 

@@ -15,6 +15,7 @@
 
 import "./denoShim.ts";
 import { VoiceSession } from "./session.ts";
+import { DirectTtsProvider } from "./tts.ts";
 import type { ClientMsg } from "./protocol.ts";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -70,6 +71,75 @@ interface SocketData {
   authed: boolean;
 }
 
+// The webview calls the HTTP routes cross-origin from tauri://localhost.
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "content-type,x-sidecar-token",
+};
+
+function jsonRes(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json", ...CORS },
+  });
+}
+
+async function handleTts(req: Request): Promise<Response> {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) return jsonRes({ error: "ELEVENLABS_API_KEY not configured" }, 500);
+
+  let body: { text?: string; voiceId?: string; modelId?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return jsonRes({ error: "bad json" }, 400);
+  }
+  if (!body.text || typeof body.text !== "string") {
+    return jsonRes({ error: "text required" }, 400);
+  }
+
+  const provider = new DirectTtsProvider(apiKey);
+  const controller = new AbortController();
+  // Abort the upstream ElevenLabs fetch if the webview disconnects mid-stream.
+  req.signal?.addEventListener("abort", () => controller.abort(), { once: true });
+
+  const stream = new ReadableStream<Uint8Array>({
+    start(sink) {
+      provider
+        .synthesize(
+          { text: body.text!, voiceId: body.voiceId, modelId: body.modelId, signal: controller.signal },
+          (bytes) => sink.enqueue(bytes),
+        )
+        .then(() => sink.close())
+        .catch((e) => {
+          if (!controller.signal.aborted) console.error("[gateway] /tts failed:", e);
+          try {
+            sink.error(e);
+          } catch {}
+        });
+    },
+    cancel() {
+      controller.abort();
+    },
+  });
+
+  return new Response(stream, { headers: { "Content-Type": "audio/mpeg", ...CORS } });
+}
+
+async function handleScribeToken(): Promise<Response> {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) return jsonRes({ error: "ELEVENLABS_API_KEY not configured" }, 500);
+  // Same single-use-token mint RealtimeStt performs for the in-gateway WS path.
+  const r = await fetch("https://api.elevenlabs.io/v1/single-use-token/realtime_scribe", {
+    method: "POST",
+    headers: { "xi-api-key": apiKey },
+  });
+  if (!r.ok) return jsonRes({ error: `scribe token failed: ${r.status}` }, 500);
+  const { token } = (await r.json()) as { token: string };
+  return jsonRes({ token });
+}
+
 const server = Bun.serve<SocketData>({
   hostname: "127.0.0.1", // localhost only — never exposed to the network
   port: PORT,
@@ -81,6 +151,20 @@ const server = Bun.serve<SocketData>({
     if (url.pathname === "/ws") {
       if (srv.upgrade(req, { data: { session: null, authed: false } })) return;
       return new Response("upgrade failed", { status: 400 });
+    }
+    if (url.pathname === "/tts" || url.pathname === "/scribe-token") {
+      if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+      if (req.method !== "POST") return jsonRes({ error: "method not allowed" }, 405);
+      if (SIDECAR_TOKEN && req.headers.get("x-sidecar-token") !== SIDECAR_TOKEN) {
+        return jsonRes({ error: "unauthorized" }, 401);
+      }
+      // Bun.serve's default 500 carries no CORS headers, so an uncaught
+      // upstream failure would surface as an opaque "Failed to fetch" in the
+      // webview — keep errors as readable JSON.
+      const handler = url.pathname === "/tts" ? handleTts(req) : handleScribeToken();
+      return handler.catch((e) =>
+        jsonRes({ error: e instanceof Error ? e.message : String(e) }, 500),
+      );
     }
     return new Response("not found", { status: 404 });
   },
