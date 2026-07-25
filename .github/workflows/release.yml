@@ -1,0 +1,180 @@
+name: Release
+
+# Builds and publishes the Atlas macOS app.
+#
+# - Tag push `v*`  -> full release: build, sign updater artifacts (minisign),
+#   create a DRAFT GitHub Release with .dmg + updater artifacts + latest.json.
+#   Publishing the draft (manual, in the GitHub UI) is what makes the update
+#   live for existing installs. See docs/RELEASE.md.
+# - workflow_dispatch -> dry-run build only (no release is created); bundle is
+#   uploaded as a workflow artifact for inspection.
+#
+# Apple code signing + notarization are OPTIONAL: when the APPLE_* secrets are
+# absent (the Apple Developer Program is not purchased yet) the job still
+# produces an unsigned build. Once the secrets exist, signing + notarization
+# activate automatically — no workflow change needed.
+#
+# Updater (minisign) signing is REQUIRED: TAURI_SIGNING_PRIVATE_KEY must be set
+# or the build fails fast with instructions. This is the key that enforces
+# "verify before install" in the app's updater — never commit it, never print it.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-macos:
+    name: Build & release macOS app
+    # macos-latest is Apple silicon (arm64) — matches the aarch64-apple-darwin
+    # sidecar binaries produced by build:sidecar / build:brain.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same Bun setup as ci.yml — keep the two workflows consistent.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Cache restores exactly what Cargo.lock pins. NEVER run `cargo update`
+      # here or anywhere: vergen is pinned to 9.0.6 transitively via
+      # librespot-core 0.8 and a blanket update breaks the build.
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Require updater signing key
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY is not set. The updater artifacts cannot be signed, so this release would be uninstallable by the in-app updater. Generate a keypair locally with 'bunx tauri signer generate -w ~/.tauri/atlas-updater.key' (NEVER commit the private key), then add TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD as GitHub Actions secrets. See docs/RELEASE.md."
+            exit 1
+          fi
+          echo "Updater signing key is configured."
+
+      - name: Verify tag matches app version
+        if: github.ref_type == 'tag'
+        run: |
+          APP_VERSION="$(jq -r .version src-tauri/tauri.conf.json)"
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$APP_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match src-tauri/tauri.conf.json version ${APP_VERSION}. Bump the version first (see docs/RELEASE.md), commit, then re-tag."
+            exit 1
+          fi
+          echo "Version check OK: ${APP_VERSION}"
+
+      # Apple signing/notarization is strictly optional. Secrets are exported to
+      # the environment ONLY when present, because the Tauri CLI keys off the
+      # mere existence of these variables — an empty APPLE_SIGNING_IDENTITY
+      # would make it try (and fail) to sign. Values written to GITHUB_ENV are
+      # GitHub-masked in logs; nothing here echoes a secret value.
+      - name: Configure Apple signing & notarization (optional)
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "$APPLE_CERTIFICATE" ] && [ -n "$APPLE_SIGNING_IDENTITY" ]; then
+            {
+              echo "APPLE_CERTIFICATE<<__EOF_APPLE_CERT__"
+              echo "$APPLE_CERTIFICATE"
+              echo "__EOF_APPLE_CERT__"
+              echo "APPLE_CERTIFICATE_PASSWORD=$APPLE_CERTIFICATE_PASSWORD"
+              echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY"
+            } >> "$GITHUB_ENV"
+            echo "Code signing: ENABLED (Developer ID certificate found in secrets)."
+          else
+            echo "::notice::Code signing: DISABLED — APPLE_CERTIFICATE / APPLE_SIGNING_IDENTITY secrets are not set. Producing an UNSIGNED build (expected until the Apple Developer Program is purchased). See docs/RELEASE.md for what users must do to open an unsigned build."
+          fi
+          if [ -n "$APPLE_ID" ] && [ -n "$APPLE_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            {
+              echo "APPLE_ID=$APPLE_ID"
+              echo "APPLE_PASSWORD=$APPLE_PASSWORD"
+              echo "APPLE_TEAM_ID=$APPLE_TEAM_ID"
+            } >> "$GITHUB_ENV"
+            echo "Notarization: ENABLED."
+          else
+            echo "::notice::Notarization: DISABLED — APPLE_ID / APPLE_PASSWORD / APPLE_TEAM_ID secrets are not set."
+          fi
+
+      # tauri-action runs `tauri build`, which (via beforeBuildCommand in
+      # src-tauri/tauri.conf.json) builds the frontend (`bun run build`) and
+      # compiles BOTH Bun sidecars (`bun run build:sidecar` + `bun run
+      # build:brain`) before the Rust build. On a tag it then creates a DRAFT
+      # GitHub Release and uploads the .dmg, the updater archive + .sig, and
+      # latest.json. On workflow_dispatch (no tagName) it only builds.
+      - name: Build app (and create draft release on tags)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+          releaseName: ${{ github.ref_type == 'tag' && 'Atlas __VERSION__' || '' }}
+          releaseBody: |
+            Atlas __VERSION__ — macOS (Apple silicon).
+
+            Download the `.dmg` below to install. Existing installs receive this
+            version automatically through the in-app updater once this release
+            is published (updates are minisign-verified before install).
+
+            Note: while builds are not yet notarized, first launch of a fresh
+            install requires right-click -> Open. Auto-updates of an already
+            running Atlas are unaffected.
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: true
+
+      # Dry-run builds (workflow_dispatch) don't create a release — surface the
+      # bundle as a workflow artifact instead so it can be inspected/tested.
+      - name: Upload bundle as workflow artifact (dry-run only)
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-macos-dry-run
+          path: |
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/macos/*.app.tar.gz
+            src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
+          if-no-files-found: warn
+
+      - name: Summary
+        run: |
+          {
+            echo "## Atlas release build"
+            echo ""
+            if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+              echo "- Draft release created for **${GITHUB_REF_NAME}** — verify the assets, then **publish the draft** to go live (docs/RELEASE.md)."
+            else
+              echo "- Dry-run build (no release created). Bundle uploaded as workflow artifact."
+            fi
+            if [ -n "${APPLE_SIGNING_IDENTITY:-}" ]; then
+              echo "- Apple code signing: enabled"
+            else
+              echo "- Apple code signing: **disabled** (no Developer ID secrets — unsigned build)"
+            fi
+            if [ -n "${APPLE_ID:-}" ]; then
+              echo "- Notarization: enabled"
+            else
+              echo "- Notarization: **disabled**"
+            fi
+            echo "- Updater artifacts: minisign-signed (TAURI_SIGNING_PRIVATE_KEY)"
+          } >> "$GITHUB_STEP_SUMMARY"

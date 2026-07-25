@@ -15,6 +15,16 @@ mod music_engine;
 mod db;
 mod datafetch;
 mod scheduler;
+mod integrity;
+
+/// Outcome of a sidecar spawn attempt. `integrity_error` is set when the
+/// binary failed integrity verification (and was therefore NOT spawned) — it
+/// is surfaced to the webview via the `*_info` commands so the UI can tell the
+/// user why voice/chat is unavailable instead of failing silently.
+struct SidecarSpawn {
+    child: Option<Child>,
+    integrity_error: Option<String>,
+}
 
 const BUNDLE_ID: &str = "com.magnuspilegaard.atlas";
 
@@ -29,19 +39,34 @@ const VOICE_GATEWAY_PORT: u16 = 4820;
 struct VoiceGateway {
     child: Mutex<Option<Child>>,
     token: String,
+    /// Set when the bundled binary failed integrity verification (not spawned).
+    integrity_error: Option<String>,
 }
 
-fn spawn_voice_gateway(token: &str) -> Option<Child> {
+fn spawn_voice_gateway(token: &str) -> SidecarSpawn {
+    let none = SidecarSpawn { child: None, integrity_error: None };
     // externalBin lands next to the app executable (Contents/MacOS/).
-    let exe = std::env::current_exe().ok()?;
-    let dir = exe.parent()?;
+    let Some(exe) = std::env::current_exe().ok() else { return none };
+    let Some(dir) = exe.parent() else { return none };
     let bin = dir.join("atlas-voice-gateway");
     if !bin.exists() {
         eprintln!(
             "[atlas] voice gateway binary not found ({}) — dev mode? run `bun run dev` in services/voice-gateway",
             bin.display()
         );
-        return None;
+        return none;
+    }
+    // NEVER exec an unverified sidecar: check it against the SHA-256 manifest
+    // baked into this binary at compile time (see integrity.rs for the policy).
+    match integrity::gate("atlas-voice-gateway", &bin) {
+        integrity::SpawnDecision::Allow => {}
+        integrity::SpawnDecision::AllowUnverifiedDev(warn) => {
+            eprintln!("[atlas] WARNING: {warn}");
+        }
+        integrity::SpawnDecision::Refuse(reason) => {
+            eprintln!("[atlas] SECURITY: {reason}");
+            return SidecarSpawn { child: None, integrity_error: Some(reason) };
+        }
     }
     let mut cmd = Command::new(&bin);
     cmd.env("SIDECAR_TOKEN", token)
@@ -56,11 +81,11 @@ fn spawn_voice_gateway(token: &str) -> Option<Child> {
     match cmd.spawn() {
         Ok(child) => {
             eprintln!("[atlas] voice gateway spawned (pid {})", child.id());
-            Some(child)
+            SidecarSpawn { child: Some(child), integrity_error: None }
         }
         Err(e) => {
             eprintln!("[atlas] voice gateway spawn failed: {e}");
-            None
+            SidecarSpawn { child: None, integrity_error: None }
         }
     }
 }
@@ -72,6 +97,7 @@ fn voice_gateway_info(state: tauri::State<VoiceGateway>) -> serde_json::Value {
         "port": VOICE_GATEWAY_PORT,
         "token": state.token,
         "running": running,
+        "integrity_error": state.integrity_error,
     })
 }
 
@@ -86,18 +112,34 @@ const ATLAS_BRAIN_PORT: u16 = 4830;
 struct AtlasBrain {
     child: Mutex<Option<Child>>,
     token: String,
+    /// Set when the bundled binary failed integrity verification (not spawned).
+    integrity_error: Option<String>,
 }
 
-fn spawn_atlas_brain(token: &str) -> Option<Child> {
-    let exe = std::env::current_exe().ok()?;
-    let dir = exe.parent()?;
+fn spawn_atlas_brain(token: &str) -> SidecarSpawn {
+    let none = SidecarSpawn { child: None, integrity_error: None };
+    let Some(exe) = std::env::current_exe().ok() else { return none };
+    let Some(dir) = exe.parent() else { return none };
     let bin = dir.join("atlas-brain");
     if !bin.exists() {
         eprintln!(
             "[atlas] brain sidecar binary not found ({}) — dev mode? run `bun run dev` in services/atlas-brain",
             bin.display()
         );
-        return None;
+        return none;
+    }
+    // NEVER exec an unverified sidecar (see integrity.rs). The brain gets the
+    // Keychain-injected Anthropic key — running a swapped binary here would
+    // hand that key to the attacker.
+    match integrity::gate("atlas-brain", &bin) {
+        integrity::SpawnDecision::Allow => {}
+        integrity::SpawnDecision::AllowUnverifiedDev(warn) => {
+            eprintln!("[atlas] WARNING: {warn}");
+        }
+        integrity::SpawnDecision::Refuse(reason) => {
+            eprintln!("[atlas] SECURITY: {reason}");
+            return SidecarSpawn { child: None, integrity_error: Some(reason) };
+        }
     }
     let mut cmd = Command::new(&bin);
     cmd.env("SIDECAR_TOKEN", token)
@@ -110,11 +152,11 @@ fn spawn_atlas_brain(token: &str) -> Option<Child> {
     match cmd.spawn() {
         Ok(child) => {
             eprintln!("[atlas] brain sidecar spawned (pid {})", child.id());
-            Some(child)
+            SidecarSpawn { child: Some(child), integrity_error: None }
         }
         Err(e) => {
             eprintln!("[atlas] brain sidecar spawn failed: {e}");
-            None
+            SidecarSpawn { child: None, integrity_error: None }
         }
     }
 }
@@ -126,6 +168,7 @@ fn atlas_brain_info(state: tauri::State<AtlasBrain>) -> serde_json::Value {
         "port": ATLAS_BRAIN_PORT,
         "token": state.token,
         "running": running,
+        "integrity_error": state.integrity_error,
     })
 }
 
@@ -238,13 +281,28 @@ pub fn run() {
 
   let gateway_token = uuid::Uuid::new_v4().to_string();
   // Both sidecars share one per-launch token (127.0.0.1-only, token-gated).
+  // Each spawn is integrity-gated (SHA-256 vs the compile-time manifest); a
+  // refused binary is NOT spawned and the reason is surfaced via *_info.
+  // Hashing costs ~0.6s for the 372MB brain + ~0.2s for the voice gateway, so
+  // verify/spawn them in parallel — launch pays max(~0.6s), not the sum.
+  let brain_handle = {
+    let token = gateway_token.clone();
+    std::thread::spawn(move || spawn_atlas_brain(&token))
+  };
+  let gateway_spawn = spawn_voice_gateway(&gateway_token);
+  let brain_spawn = brain_handle.join().unwrap_or_else(|_| SidecarSpawn {
+    child: None,
+    integrity_error: Some("brain sidecar spawn thread panicked".to_string()),
+  });
   let brain = AtlasBrain {
-    child: Mutex::new(spawn_atlas_brain(&gateway_token)),
+    child: Mutex::new(brain_spawn.child),
     token: gateway_token.clone(),
+    integrity_error: brain_spawn.integrity_error,
   };
   let gateway = VoiceGateway {
-    child: Mutex::new(spawn_voice_gateway(&gateway_token)),
+    child: Mutex::new(gateway_spawn.child),
     token: gateway_token.clone(),
+    integrity_error: gateway_spawn.integrity_error,
   };
   // Local proactive scheduler (Phase 4): periodically kicks the brain's
   // /proactive/cycle. All judgement lives brain-side; this only ticks.
@@ -255,6 +313,10 @@ pub fn run() {
     // in the system browser (where the user's Google session lives).
     .plugin(tauri_plugin_notification::init())
     .plugin(tauri_plugin_opener::init())
+    // Signed-update channel (minisign): the updater verifies every artifact
+    // against the pubkey in tauri.conf.json before install — the app itself
+    // never modifies its own binary. (Registration per agent-A contract.)
+    .plugin(tauri_plugin_updater::Builder::new().build())
     // Native OAuth redirect capture (RFC 8252): the OS routes atlas://oauth/…
     // back into this process; we parse it and hand the code to the webview.
     .plugin(tauri_plugin_deep_link::init())

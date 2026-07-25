@@ -10,8 +10,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "preview": "vite preview",
-    "build:sidecar": "cd services/voice-gateway && bun install --frozen-lockfile && bun run fetch-models && bun build --compile --minify src/index.ts --outfile ../../src-tauri/binaries/atlas-voice-gateway-aarch64-apple-darwin",
-    "build:brain": "cd services/atlas-brain && bun install --frozen-lockfile && bun run fetch-models && bun build --compile --minify src/index.ts --outfile ../../src-tauri/binaries/atlas-brain-aarch64-apple-darwin",
+    "build:sidecar": "cd services/voice-gateway && bun install --frozen-lockfile && bun run fetch-models && bun build --compile --minify src/index.ts --outfile ../../src-tauri/binaries/atlas-voice-gateway-aarch64-apple-darwin && cd ../.. && bun run gen:sidecar-manifest",
+    "build:brain": "cd services/atlas-brain && bun install --frozen-lockfile && bun run fetch-models && bun build --compile --minify src/index.ts --outfile ../../src-tauri/binaries/atlas-brain-aarch64-apple-darwin && cd ../.. && bun run gen:sidecar-manifest",
+    "gen:sidecar-manifest": "bun scripts/gen-sidecar-manifest.ts",
     "tauri": "tauri"
   },
   "dependencies": {
@@ -55,6 +56,7 @@
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-notification": "^2.3.3",
     "@tauri-apps/plugin-opener": "^2.5.4",
+    "@tauri-apps/plugin-updater": "^2.10.1",
     "@types/three": "^0.166.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

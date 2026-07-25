@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Atlas",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "identifier": "com.magnuspilegaard.atlas",
   "build": {
     "frontendDist": "../dist",
@@ -33,10 +33,20 @@
       "desktop": {
         "schemes": ["atlas"]
       }
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJEQkZFMzlDNDJFREE0Q0UKUldUT3BPMUNuT08vTGN2dUtUSGp3N2J4K2wrWTVSL0R3Q2NzYkJCMTFBT1MwUTFyU0E2dG9SbUgK",
+      "endpoints": [
+        "https://github.com/HelloAtlasAI/helloatlas/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
     }
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": ["app", "dmg"],
     "externalBin": ["binaries/atlas-voice-gateway", "binaries/atlas-brain"],
     "icon": [
@@ -48,7 +58,9 @@
     ],
     "macOS": {
       "minimumSystemVersion": "13.0",
-      "entitlements": "Entitlements.plist"
+      "entitlements": "Entitlements.plist",
+      "signingIdentity": null,
+      "hardenedRuntime": true
     }
   }
 }

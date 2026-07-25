@@ -1,6 +1,9 @@
 [package]
 name = "app"
-version = "0.1.0"
+# Release version scheme (pre-1.0 SemVer): MINOR bumps per shipped release
+# train (MVP phase), PATCH for hotfixes. Keep in sync with tauri.conf.json
+# "version" — that value is what the updater compares against latest.json.
+version = "0.2.0"
 description = "A Tauri App"
 authors = ["you"]
 license = ""
@@ -51,3 +54,7 @@ base64 = "0.22"
 keyring = "2"                                           # macOS Keychain for app creds + user secret
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }
+# Verifying updater (ship substrate): downloads the release feed, checks the
+# minisign signature against plugins.updater.pubkey in tauri.conf.json BEFORE
+# installing anything. The private key lives in CI secrets / Keychain only.
+tauri-plugin-updater = "2.10.1"

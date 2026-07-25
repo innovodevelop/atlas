@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Minimize2, Mic, Mail, Wallet, LineChart, Plus, Check, RefreshCw, Trash2, Link2, Brain, Sparkles } from 'lucide-react';
+import { Minimize2, Mic, Mail, Wallet, LineChart, Plus, Check, RefreshCw, Trash2, Link2, Brain, Sparkles, Download } from 'lucide-react';
 import { VoiceSettingsPanel } from '@/components/atlas-health/VoiceSettingsPanel';
 import { BudgetSettingsPanel } from '@/components/atlas-health/BudgetSettingsPanel';
 import { MemoryPrivacyPanel } from '@/components/atlas-health/MemoryPrivacyPanel';
 import { PersonalityPanel } from '@/components/atlas-health/PersonalityPanel';
+import { SoftwareUpdatePanel } from '@/components/atlas-health/SoftwareUpdatePanel';
 import { useMailIntelligence } from '@/hooks/useMailIntelligence';
 import { usePortfolio } from '@/hooks/usePortfolio';
 
@@ -14,7 +15,7 @@ import { usePortfolio } from '@/hooks/usePortfolio';
 // Workshop palette without bespoke restyling. This is also the home for the
 // brokerage/portfolio Connections panel (Phase C).
 
-type SettingsTab = 'voice' | 'mail' | 'portfolio' | 'budget' | 'personality' | 'memory';
+type SettingsTab = 'voice' | 'mail' | 'portfolio' | 'budget' | 'personality' | 'memory' | 'updates';
 
 const TABS: { key: SettingsTab; label: string; icon: typeof Mic }[] = [
   { key: 'voice', label: 'Voice', icon: Mic },
@@ -23,6 +24,7 @@ const TABS: { key: SettingsTab; label: string; icon: typeof Mic }[] = [
   { key: 'budget', label: 'Budget & AI', icon: Wallet },
   { key: 'personality', label: 'Personality', icon: Sparkles },
   { key: 'memory', label: 'Memory & Privacy', icon: Brain },
+  { key: 'updates', label: 'Software Update', icon: Download },
 ];
 
 export const AtlasSettings = ({ onClose }: { onClose: () => void }) => {
@@ -76,6 +78,7 @@ export const AtlasSettings = ({ onClose }: { onClose: () => void }) => {
             {tab === 'budget' && <BudgetSettingsPanel />}
             {tab === 'personality' && <PersonalityPanel />}
             {tab === 'memory' && <MemoryPrivacyPanel />}
+            {tab === 'updates' && <SoftwareUpdatePanel />}
           </div>
         </div>
       </div>

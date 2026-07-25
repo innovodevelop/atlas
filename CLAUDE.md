@@ -64,11 +64,19 @@ Migrating off Supabase to local-first.
 bun install
 bun run dev            # webview dev server (Vite)
 bun run build          # typecheck + vite build — must be clean before shipping
-bun run tauri build    # native .app + dmg — macOS only
+bun run tauri build --no-sign   # native .app + dmg — macOS only
 ```
 
 Ship flow (macOS): `bun run build` → confirm no `VITE_PREVIEW_NOAUTH` in `dist/`
-→ `bun run tauri build` → install `.app` to `/Applications`.
+→ `bun run tauri build --no-sign` → install `.app` to `/Applications`.
+
+**`--no-sign` is required for local builds.** The updater is configured with a
+public key + `createUpdaterArtifacts`, which makes minisign signing mandatory at
+bundle time; without the private key in the environment the build hard-fails
+~15 minutes in, *after* the Rust compile. To build a genuinely updatable bundle
+locally, `export TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/atlas-updater.key)"`
+and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""` first. Releases come from CI —
+see `docs/RELEASE.md`.
 
 ## Conventions
 
