@@ -81,3 +81,32 @@ internal 5–10-person tool.
   (in addition to any future universal link).
 - Deep links on macOS rely on the app being the registered scheme handler; the
   first-launch (cold-start) URL is delivered after `setup` wires the handler.
+
+## Amendment — 2026-07-25: branded host moves to `helloatlas.dk`
+
+The decision above stands unchanged; only the **branded host** does. Atlas moved
+from `atlas.innovo-studio.com` to the purpose-bought **`helloatlas.dk`**, whose
+**apex is canonical** (`www.helloatlas.dk` redirects to it; the apex must serve
+directly because it also hosts the desktop app's auth API, and a 301 on
+`POST /api/auth/login` does not reliably survive a cross-origin hop).
+
+What changed:
+
+- `oauth::REDIRECT_URI_UNIVERSAL` is now
+  **`https://helloatlas.dk/oauth/callback`** — this is the URL we *generate*, so
+  it is the one to register in provider consoles from here on.
+- `parse_callback` *accepts* **both** hosts (`oauth::UNIVERSAL_HOSTS`). The old
+  host is still an active custom domain on the same Pages project and is still
+  compiled into every already-installed build, so rejecting it would drop an
+  in-flight callback for those users. Acceptance lists keep the old host;
+  generation uses the new one.
+- The AASA hosting step (§"Activating the universal link", step 2) now means
+  `https://helloatlas.dk/.well-known/apple-app-site-association`, and the
+  `associated-domains` entitlement becomes `applinks:helloatlas.dk`. Serving the
+  file from the old host as well costs nothing and keeps older signed builds
+  working, should any exist by then.
+- Same for the CSP `connect-src` in `tauri.conf.json`: `helloatlas.dk` added,
+  `atlas.innovo-studio.com` kept.
+
+Custom-scheme `atlas://oauth/callback` is untouched and remains the redirect in
+use today, so nothing about the shipping flow changes with this amendment.

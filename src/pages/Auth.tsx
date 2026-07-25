@@ -215,16 +215,16 @@ const Auth = () => {
       <p className="aterms">
         By continuing, you agree to our{' '}
         <a
-          href="https://atlas.innovo-studio.com/terms"
-          onClick={(e) => openLegal(e, 'https://atlas.innovo-studio.com/terms')}
+          href="https://helloatlas.dk/terms"
+          onClick={(e) => openLegal(e, 'https://helloatlas.dk/terms')}
           style={{ color: 'inherit', textDecoration: 'underline' }}
         >
           Terms
         </a>
         {' '}&amp;{' '}
         <a
-          href="https://atlas.innovo-studio.com/privacy"
-          onClick={(e) => openLegal(e, 'https://atlas.innovo-studio.com/privacy')}
+          href="https://helloatlas.dk/privacy"
+          onClick={(e) => openLegal(e, 'https://helloatlas.dk/privacy')}
           style={{ color: 'inherit', textDecoration: 'underline' }}
         >
           Privacy Policy

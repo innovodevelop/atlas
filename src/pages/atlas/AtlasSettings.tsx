@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Minimize2, Mic, Mail, Wallet, LineChart, Plus, Check, RefreshCw, Trash2, Link2, Brain, Sparkles, Download } from 'lucide-react';
+import { Minimize2, Mic, Mail, Wallet, LineChart, Plus, Check, RefreshCw, Trash2, Link2, Brain, Sparkles, Download, Music } from 'lucide-react';
 import { VoiceSettingsPanel } from '@/components/atlas-health/VoiceSettingsPanel';
 import { BudgetSettingsPanel } from '@/components/atlas-health/BudgetSettingsPanel';
 import { MemoryPrivacyPanel } from '@/components/atlas-health/MemoryPrivacyPanel';
@@ -7,20 +7,25 @@ import { PersonalityPanel } from '@/components/atlas-health/PersonalityPanel';
 import { SoftwareUpdatePanel } from '@/components/atlas-health/SoftwareUpdatePanel';
 import { useMailIntelligence } from '@/hooks/useMailIntelligence';
 import { usePortfolio } from '@/hooks/usePortfolio';
+import { useMusicPlayer } from '@/hooks/useMusicPlayer';
 
 // Workshop-native Settings overlay. Hosts the app's real settings (voice, mail,
 // budget) behind one entry point — before this, AtlasSettingsPanel was only
 // reachable via the removed legacy route. The embedded panels use shadcn
 // components that read the (now warm) CSS variables, so they render in the
 // Workshop palette without bespoke restyling. This is also the home for the
-// brokerage/portfolio Connections panel (Phase C).
+// brokerage/portfolio Connections panel (Phase C) and the Spotify connection —
+// the latter is the consent-withdrawal control the Privacy Policy (§4.6/§5) and
+// Terms (§4) point at, so it has to be as easy to reach as connecting was
+// (GDPR Art. 7(3)).
 
-type SettingsTab = 'voice' | 'mail' | 'portfolio' | 'budget' | 'personality' | 'memory' | 'updates';
+type SettingsTab = 'voice' | 'mail' | 'portfolio' | 'music' | 'budget' | 'personality' | 'memory' | 'updates';
 
 const TABS: { key: SettingsTab; label: string; icon: typeof Mic }[] = [
   { key: 'voice', label: 'Voice', icon: Mic },
   { key: 'mail', label: 'Mail', icon: Mail },
   { key: 'portfolio', label: 'Portfolio', icon: LineChart },
+  { key: 'music', label: 'Music', icon: Music },
   { key: 'budget', label: 'Budget & AI', icon: Wallet },
   { key: 'personality', label: 'Personality', icon: Sparkles },
   { key: 'memory', label: 'Memory & Privacy', icon: Brain },
@@ -75,6 +80,7 @@ export const AtlasSettings = ({ onClose }: { onClose: () => void }) => {
             {tab === 'voice' && <VoiceSettingsPanel />}
             {tab === 'mail' && <MailSettings />}
             {tab === 'portfolio' && <PortfolioSettings />}
+            {tab === 'music' && <MusicSettings />}
             {tab === 'budget' && <BudgetSettingsPanel />}
             {tab === 'personality' && <PersonalityPanel />}
             {tab === 'memory' && <MemoryPrivacyPanel />}
@@ -181,6 +187,118 @@ function PortfolioSettings() {
               }}
             >
               <Link2 className="i16" />{isConnecting ? 'Opening your broker…' : 'Connect a brokerage'}
+            </button>
+          )}
+          {error && <p className="fs12" style={{ color: 'var(--negative)' }}>{error}</p>}
+        </>
+      )}
+    </div>
+  );
+}
+
+// Spotify connection for the music player. Playback runs on consent, so this is
+// also the withdrawal control the legal docs promise: disconnecting deletes the
+// Spotify refresh token from the macOS Keychain (service "atlas-music") and
+// stops the playback engine. It cannot un-authorise Atlas inside Spotify — that
+// lives in the Spotify account settings — so the copy says so rather than
+// over-promising. Confirmation is a second click (not a typed phrase like the
+// memory erase): reconnecting is a single OAuth round trip, nothing is lost.
+function MusicSettings() {
+  const { available, connected, premium, isConnecting, error, connect, disconnect } = useMusicPlayer();
+  const [confirming, setConfirming] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+
+  const onDisconnect = async () => {
+    setIsDisconnecting(true);
+    try {
+      await disconnect();
+    } finally {
+      setIsDisconnecting(false);
+      setConfirming(false);
+    }
+  };
+
+  return (
+    <div className="col gap16">
+      <div>
+        <h3 className="t14 fw6" style={{ color: 'hsl(240 30% 20%)', marginBottom: 6 }}>Spotify connection</h3>
+        <p className="fs12" style={{ color: 'hsl(240 20% 50%)', lineHeight: 1.5 }}>
+          Connect Spotify to play your own library through Atlas. You sign in on Spotify's own page and Atlas never sees your Spotify password — only an access token, kept in this Mac's Keychain. Playback happens on your consent, and you can withdraw it here at any time.
+        </p>
+      </div>
+
+      {!available && (
+        <div className="gpanel fs12" style={{ padding: 14, color: 'hsl(240 20% 50%)' }}>
+          Music runs in the Atlas desktop app. Open Atlas on your Mac to connect or disconnect Spotify.
+        </div>
+      )}
+
+      {available && (
+        <>
+          {connected ? (
+            <>
+              <div className="fx ac jb gpanel" style={{ padding: 14 }}>
+                <div>
+                  <p className="t14 fw6 m0" style={{ color: 'hsl(240 30% 20%)' }}>Spotify connected</p>
+                  <p className="fs12 m0 fx ac gap6" style={{ color: 'var(--positive)' }}>
+                    <Check className="i12" />{premium ? 'Premium account · plays inside Atlas' : 'Connected · Spotify Premium is required for playback'}
+                  </p>
+                </div>
+                <button
+                  className="xbtn fx ac jc"
+                  title="Disconnect Spotify"
+                  onClick={() => setConfirming(true)}
+                  disabled={confirming || isDisconnecting}
+                >
+                  <Trash2 className="i14" />
+                </button>
+              </div>
+
+              {confirming && (
+                <div className="gpanel col gap10" style={{ padding: 14 }}>
+                  <p className="fs12 m0" style={{ color: 'hsl(240 20% 50%)', lineHeight: 1.5 }}>
+                    Disconnecting stops playback and deletes your Spotify token from this Mac's Keychain, so Atlas loses all access to your Spotify account. Your Spotify account, library and playlists are untouched — to also remove Atlas from the apps listed in your Spotify account settings, do that on Spotify's website. You can reconnect at any time.
+                  </p>
+                  <div className="fx ac gap8">
+                    <button
+                      className="fx ac jc gap8 fw6"
+                      onClick={onDisconnect}
+                      disabled={isDisconnecting}
+                      style={{
+                        padding: '10px 14px', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13,
+                        background: 'hsl(0 70% 50% / .12)', border: '1px solid hsl(0 70% 50% / .3)', color: 'var(--negative)',
+                        opacity: isDisconnecting ? 0.6 : 1,
+                      }}
+                    >
+                      <Trash2 className="i14" />{isDisconnecting ? 'Disconnecting…' : 'Disconnect Spotify'}
+                    </button>
+                    <button
+                      className="fw6"
+                      onClick={() => setConfirming(false)}
+                      disabled={isDisconnecting}
+                      style={{
+                        padding: '10px 14px', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13,
+                        background: 'transparent', border: '1px solid hsl(240 20% 80%)', color: 'hsl(240 20% 40%)',
+                      }}
+                    >
+                      Keep connected
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <button
+              className="fx ac jc gap8 fw6"
+              onClick={() => connect().catch(() => {})}
+              disabled={isConnecting}
+              style={{
+                width: '100%', padding: 12, borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit', fontSize: 14,
+                background: 'hsl(var(--acc) / .12)', border: '1px solid hsl(var(--acc) / .3)', color: 'hsl(var(--acc))',
+                opacity: isConnecting ? 0.6 : 1,
+              }}
+            >
+              <Music className="i16" />{isConnecting ? 'Waiting for Spotify…' : 'Connect Spotify'}
             </button>
           )}
           {error && <p className="fs12" style={{ color: 'var(--negative)' }}>{error}</p>}

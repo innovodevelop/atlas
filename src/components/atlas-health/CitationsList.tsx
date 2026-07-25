@@ -26,22 +26,59 @@ function extractDomain(url: string): string {
   }
 }
 
-// Get favicon URL for a domain
-function getFaviconUrl(url: string): string {
-  try {
-    const domain = new URL(url).hostname;
-    return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
-  } catch {
-    return '';
-  }
-}
-
 // Get credibility badge color
 function getCredibilityColor(score: number): string {
   if (score >= 0.8) return 'text-green-400';
   if (score >= 0.6) return 'text-yellow-400';
   return 'text-orange-400';
 }
+
+// Source chips are rendered locally instead of loading a favicon: fetching one
+// would hand a third party the user's IP plus the domain of every source Atlas
+// consulted. Colour is deterministic per domain so a source always looks the same.
+const MONOGRAM_COLORS = [
+  'bg-blue-400/15 text-blue-400',
+  'bg-violet-400/15 text-violet-400',
+  'bg-emerald-400/15 text-emerald-400',
+  'bg-amber-400/15 text-amber-400',
+  'bg-rose-400/15 text-rose-400',
+  'bg-cyan-400/15 text-cyan-400',
+];
+
+function hashDomain(domain: string): number {
+  let hash = 0;
+  for (let i = 0; i < domain.length; i++) {
+    hash = (hash * 31 + domain.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+// Initials from the domain's own label: "nature.com" → "NA", "bbc.co.uk" → "BB"
+function getMonogram(domain: string, letters: number): string {
+  const label = domain.replace(/^www\./, '').split('.')[0];
+  return (label.slice(0, letters) || '?').toUpperCase();
+}
+
+const SourceMonogram = ({
+  domain,
+  letters = 2,
+  className,
+}: {
+  domain: string;
+  letters?: number;
+  className?: string;
+}) => (
+  <span
+    aria-hidden="true"
+    className={cn(
+      'inline-flex items-center justify-center font-semibold leading-none tracking-tight select-none',
+      MONOGRAM_COLORS[hashDomain(domain) % MONOGRAM_COLORS.length],
+      className
+    )}
+  >
+    {getMonogram(domain, letters)}
+  </span>
+);
 
 export const CitationsList = ({ citations, className, compact = false }: CitationsListProps) => {
   if (!citations || citations.length === 0) {
@@ -67,14 +104,7 @@ export const CitationsList = ({ citations, className, compact = false }: Citatio
               className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
               title={citation.title || citation.url}
             >
-              <img 
-                src={getFaviconUrl(citation.url)} 
-                alt=""
-                className="w-3 h-3"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
+              <SourceMonogram domain={domain} letters={1} className="w-3.5 h-3.5 rounded-[3px] text-[8px]" />
               <span className="truncate max-w-[100px]">{domain}</span>
               <ExternalLink className="w-2.5 h-2.5 opacity-50" />
             </a>
@@ -108,19 +138,7 @@ export const CitationsList = ({ citations, className, compact = false }: Citatio
               rel="noopener noreferrer"
               className="flex items-start gap-3 p-3 rounded-lg bg-background/50 border border-border/30 hover:border-primary/30 hover:bg-background/80 transition-all group"
             >
-              <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-muted/30 flex items-center justify-center overflow-hidden">
-                <img 
-                  src={getFaviconUrl(citation.url)} 
-                  alt=""
-                  className="w-5 h-5"
-                  onError={(e) => {
-                    const parent = (e.target as HTMLImageElement).parentElement;
-                    if (parent) {
-                      parent.innerHTML = '<svg class="w-4 h-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>';
-                    }
-                  }}
-                />
-              </div>
+              <SourceMonogram domain={domain} className="flex-shrink-0 w-8 h-8 rounded-lg text-xs" />
               
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">

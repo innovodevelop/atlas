@@ -65,12 +65,28 @@ const persistOptions = {
   },
 };
 
+// Drops the account-scoped query cache — used by sign-out, a dead session and
+// the "delete all my data" control.
+//
+// Order matters. Removing only the storage key is not a clear: the QueryClient
+// still holds the pre-erase snapshots in memory, and PersistQueryClientProvider
+// re-serialises them into the same key on the very next cache event — so rows
+// erased under a right-to-erasure control would be back on disk seconds later.
+// Dropping the in-memory cache FIRST leaves nothing to re-persist; only then is
+// the key removed.
 export const clearPersistedCache = () => {
+  queryClient.clear();
   try {
-    window.localStorage.removeItem("atlas-query-cache");
+    // The persister is a no-op when there's no `window` (see above), so this is
+    // safe outside the browser too.
+    persister.removeClient();
   } catch {
     /* storage unavailable */
   }
+  // createSyncStoragePersister throttles writes behind a 1s trailing timer, so a
+  // write scheduled just before this call can still land right after it. By then
+  // the cache is empty, so the worst case is the key reappearing holding an
+  // empty dehydrated state — never user data.
 };
 
 // Loading fallback for lazy routes

@@ -132,13 +132,9 @@ export type ChatResult =
 // ---------------------------------------------------------------------------
 // Provider configuration
 
-// Chat providers are not addressed here — aiGateway owns the endpoint and
-// selectModel() owns the model id. Only the scrape backend still needs a URL.
-export const PROVIDERS = {
-  jina: {
-    url: "https://r.jina.ai",
-  },
-};
+// No provider endpoints are addressed here — aiGateway owns the chat endpoint
+// and selectModel() owns the model id. Retrieval (search *and* page reading) is
+// Claude's own server-side web_search, so no third-party fetch backend remains.
 
 /**
  * Claude's server-side web search. Declared through the `anthropicTools`
@@ -195,20 +191,6 @@ export const ATLAS_TOOLS = [
           depth: { type: "string", enum: ["quick", "comprehensive", "exhaustive"], description: "How deep to research" },
         },
         required: ["topic"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "web_scrape",
-      description: "Extract content from a specific URL. Use when the user provides a link or you need to read a specific webpage.",
-      parameters: {
-        type: "object",
-        properties: {
-          url: { type: "string", description: "The URL to scrape" },
-        },
-        required: ["url"],
       },
     },
   },
@@ -344,16 +326,13 @@ You have access to powerful tools that you SHOULD USE ACTIVELY:
    - USE THIS when asked about: recent events, news, current prices, today's weather, sports scores, stock prices, anything time-sensitive
    - USE THIS when the user says: "search", "look up", "find out", "what's happening", "latest", "current", "today"
    - USE THIS when you're not 100% certain about a fact
+   - USE THIS to read a specific link the user gives you — search for the page and use what it returns
 
 2. **deep_research**: Comprehensive research with multiple sources.
    - USE THIS when asked to: research, investigate, analyze, compare, "tell me everything about"
    - USE THIS for complex questions requiring thorough analysis
 
-3. **web_scrape**: Read content from a specific URL.
-   - USE THIS when given a link to analyze
-   - USE THIS when asked to read or summarize a webpage
-
-4. **memory_store**: Save important facts about the user.
+3. **memory_store**: Save important facts about the user.
    - USE THIS when they share: personal details, preferences, names, dates, important events
 
 CRITICAL INSTRUCTIONS:
@@ -431,7 +410,16 @@ export async function executeTool(
   supabase: any
 ): Promise<{ name: string; result: unknown }> {
   const { name, arguments: argsStr } = toolCall.function;
-  const args = JSON.parse(argsStr);
+  // Arguments can be missing or malformed when a retired tool replays from a
+  // stored transcript — the adapter re-declares such names with an empty
+  // schema. Degrade to {} so the switch answers with its unknown-tool marker
+  // instead of throwing the whole chat turn away.
+  let args: Record<string, any> = {};
+  try {
+    args = argsStr ? JSON.parse(argsStr) : {};
+  } catch {
+    args = {};
+  }
 
   console.log(`[orchestrator] Executing tool: ${name}`, args);
 
@@ -452,19 +440,6 @@ export async function executeTool(
         return { name, result: { handled_natively: true, note: "Research already ran server-side via web search; use those results." } };
       }
       return { name, result: { error: "Deep research not available", suggestion: "I'll provide what I know from my training" } };
-    }
-
-    case "web_scrape": {
-      const jinaUrl = `${PROVIDERS.jina.url}/${args.url}`;
-      const response = await fetch(jinaUrl, {
-        method: "GET",
-        headers: { "Accept": "text/markdown" },
-      });
-      if (!response.ok) {
-        return { name, result: { error: `Failed to scrape: ${response.status}` } };
-      }
-      const markdown = await response.text();
-      return { name, result: { content: markdown.slice(0, 10000), url: args.url } };
     }
 
     case "memory_store": {

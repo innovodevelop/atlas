@@ -16,60 +16,57 @@
          A[Voice Input / Text]
          B[3D Sphere Visualization]
      end
-     
+
      subgraph Frontend["Frontend (React)"]
          C[useUnifiedChat]
          D[useRealtimeScribe]
          E[useStreamingTTS]
      end
-     
-     subgraph Edge["Edge Functions"]
-         F[chat-with-memory]
-         G[atlas-research]
-         H[atlas-knowledge]
-         I[agent-run]
+
+     subgraph Sidecars["Local Sidecars (Bun)"]
+         F[atlas-brain<br/>chat-with-memory]
+         G[atlas-brain<br/>research + learning]
+         H[voice-gateway<br/>TTS / STT]
      end
-     
-     subgraph AI["AI Providers"]
-         J[Lovable AI Gateway]
-         K[Claude Opus 4.5]
-         L[Perplexity]
+
+     subgraph AI["Model Providers"]
+         I[Anthropic Claude]
+         J[multilingual-e5-base<br/>on-device embeddings]
+         K[ElevenLabs<br/>voice only]
      end
-     
-     subgraph Storage["Data Storage"]
-         M[(ai_memory)]
-         N[(atlas_knowledge)]
-         O[(session_context)]
+
+     subgraph Storage["Local SQLite"]
+         L[(ai_memory)]
+         M[(memory_vec)]
+         N[(memory_fts)]
      end
-     
+
      A --> C
      A --> D
      B --> C
      C --> F
-     D --> F
-     E <-- F
+     D --> H
+     E --> H
      F --> G
-     F --> H
      F --> I
-     G --> J
-     G --> L
+     G --> I
+     F --> J
      H --> K
-     I --> J
-     F --> M
-     H --> N
-     F --> O
- 
+     F --> L
+     J --> M
+     F --> N
+
      classDef user fill:#1e1b4b,stroke:#6366f1,stroke-width:2px
      classDef frontend fill:#1f2937,stroke:#6b7280,stroke-width:1px
-     classDef edge fill:#1e3a5f,stroke:#3b82f6,stroke-width:2px
+     classDef sidecar fill:#1e3a5f,stroke:#3b82f6,stroke-width:2px
      classDef ai fill:#4c1d95,stroke:#a855f7,stroke-width:2px
      classDef storage fill:#1c1917,stroke:#78716c,stroke-width:1px
-     
+
      class A,B user
      class C,D,E frontend
-     class F,G,H,I edge
-     class J,K,L ai
-     class M,N,O storage
+     class F,G,H sidecar
+     class I,J,K ai
+     class L,M,N storage
  `;
  
    useEffect(() => {
@@ -103,7 +100,7 @@
        icon: Mic,
        features: [
          'Real-time STT via ElevenLabs Scribe',
-         'Wake word detection ("Hey Atlas")',
+         'Wake word detection ("Hey Jarvis" — stock openWakeWord model)',
          'Streaming TTS responses',
          '6-state conversation flow'
        ],

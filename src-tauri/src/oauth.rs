@@ -8,10 +8,10 @@
 // The redirect target is a single seam (`REDIRECT_URI`). Today it's the custom
 // scheme `atlas://…`, which works on any build (signed or not). When Atlas gains
 // an Apple Developer Team ID + notarization, flipping to the branded universal
-// link `https://atlas.innovo-studio.com/…` is a one-line change here plus hosting
-// the AASA file (see docs/decisions/007-oauth-deep-link.md) — the flow itself
-// (PKCE → deep-link capture → token exchange) is unchanged. Spotify/librespot is
-// the first consumer; the module is deliberately provider-neutral.
+// link `https://helloatlas.dk/…` is a one-line change here plus hosting the AASA
+// file (see docs/decisions/007-oauth-deep-link.md) — the flow itself (PKCE →
+// deep-link capture → token exchange) is unchanged. Spotify/librespot is the
+// first consumer; the module is deliberately provider-neutral.
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
@@ -26,10 +26,17 @@ pub const REDIRECT_URI: &str = "atlas://oauth/callback";
 /// signed with a Team ID and the AASA file is served from the apex. Flip
 /// `REDIRECT_URI` to this to activate — nothing else in the flow changes.
 #[allow(dead_code)]
-pub const REDIRECT_URI_UNIVERSAL: &str = "https://atlas.innovo-studio.com/oauth/callback";
+pub const REDIRECT_URI_UNIVERSAL: &str = "https://helloatlas.dk/oauth/callback";
 
 /// The custom scheme Atlas registers with the OS (mirrors tauri.conf.json).
 pub const SCHEME: &str = "atlas";
+
+/// Hosts whose `https` deep links count as our universal-link callback.
+/// `helloatlas.dk` is the canonical host and the one we generate;
+/// `atlas.innovo-studio.com` is the pre-migration host, still served by the same
+/// Pages project and still compiled into already-installed builds — so a
+/// callback that started against it must keep being accepted.
+const UNIVERSAL_HOSTS: [&str; 2] = ["helloatlas.dk", "atlas.innovo-studio.com"];
 
 /// A parsed OAuth redirect, forwarded to the webview as the `oauth-callback`
 /// event. Exactly one of `code` / `error` is normally present.
@@ -67,15 +74,18 @@ pub fn code_challenge(verifier: &str) -> String {
 
 /// Parse a redirect URL captured from the deep link into an `OauthCallback`.
 /// Accepts the custom scheme (`atlas://oauth/callback?…`) now and the branded
-/// universal link (`https://atlas.innovo-studio.com/oauth/callback?…`) once it's
-/// live. Returns `None` for anything that isn't one of our OAuth callbacks, so
+/// universal link (`https://helloatlas.dk/oauth/callback?…`, plus the old
+/// `atlas.innovo-studio.com` host — see `UNIVERSAL_HOSTS`) once it's live.
+/// Returns `None` for anything that isn't one of our OAuth callbacks, so
 /// unrelated deep links are ignored rather than mis-handled.
 pub fn parse_callback(raw: &str) -> Option<OauthCallback> {
     let url = url::Url::parse(raw).ok()?;
 
     let is_ours = match url.scheme() {
         SCHEME => true,
-        "https" => url.host_str() == Some("atlas.innovo-studio.com"),
+        "https" => url
+            .host_str()
+            .is_some_and(|h| UNIVERSAL_HOSTS.contains(&h)),
         _ => false,
     };
     if !is_ours {
@@ -174,6 +184,16 @@ mod tests {
 
     #[test]
     fn parses_universal_link_variant() {
+        let cb = parse_callback("https://helloatlas.dk/oauth/callback?provider=spotify&code=AQ9")
+            .expect("should parse");
+        assert_eq!(cb.provider, "spotify");
+        assert_eq!(cb.code.as_deref(), Some("AQ9"));
+    }
+
+    /// The pre-migration host is still live and still baked into installed
+    /// builds, so a callback aimed at it must keep parsing.
+    #[test]
+    fn parses_legacy_universal_link_host() {
         let cb = parse_callback(
             "https://atlas.innovo-studio.com/oauth/callback?provider=spotify&code=AQ9",
         )

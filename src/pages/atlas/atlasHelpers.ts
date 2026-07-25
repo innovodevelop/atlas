@@ -6,7 +6,11 @@ export function atlasStateLabel(state: string): string {
     case 'listening': return 'Listening…';
     case 'thinking': return 'Thinking…';
     case 'speaking': return 'Speaking…';
-    default: return 'Listening for "Hey Atlas"';
+    // The shipped wake model is openWakeWord's stock hey_jarvis_v0.1.onnx
+    // (see src/lib/wakeWord.ts) — a custom "Hey Atlas" model does not exist
+    // yet. Advertising a phrase the detector cannot hear just makes the
+    // feature look broken, so the label names the phrase that actually works.
+    default: return 'Listening for "Hey Jarvis"';
   }
 }
 

@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  CheckCircle2, 
-  XCircle, 
-  Network, 
-  Cpu, 
-  Search, 
-  Globe,
+import {
+  CheckCircle2,
+  XCircle,
+  Network,
+  Cpu,
   Sparkles,
   Zap,
   Brain,
@@ -31,127 +29,103 @@ const AIArchitectureDiagram = () => {
   // Provider status based on typical configuration
   const providers: ProviderStatus[] = [
     {
-      name: 'Lovable AI Gateway',
-      connected: true, // Always available
-      icon: <Sparkles className="w-4 h-4" />,
-      description: 'Primary AI provider for planning, execution, and reasoning',
-      models: ['openai/gpt-5 (Planner/Reasoner)', 'google/gemini-2.5-flash (Worker)'],
-      tier: 'Tier 1 & 2'
-    },
-    {
-      name: 'Claude Opus 4.5',
-      connected: true,
+      name: 'Anthropic Claude',
+      connected: true, // The only remote reasoning provider Atlas talks to
       icon: <Brain className="w-4 h-4" />,
-      description: 'Memory Core - synthesis, consolidation, and advanced reasoning',
-      models: ['claude-opus-4-5 (Memory Core)', 'claude-sonnet-4-5 (Critic/Creative)'],
-      tier: 'Memory Core'
+      description: 'The only remote model provider — reasoning, chat, synthesis',
+      models: ['claude-opus (hard)', 'claude-sonnet (standard)', 'claude-haiku (cheap)'],
+      tier: 'Reasoning'
     },
     {
-      name: 'Perplexity AI',
-      connected: true, // Configured via connector
-      icon: <Search className="w-4 h-4" />,
-      description: 'Web search and research with citations',
-      models: ['sonar-pro (Research)', 'sonar (Search)'],
-      tier: 'Tier 3'
+      name: 'Local Embeddings',
+      connected: true, // Bundled with the brain sidecar, no key needed
+      icon: <Cpu className="w-4 h-4" />,
+      description: 'On-device multilingual-e5-base ONNX — text never leaves the Mac',
+      models: ['multilingual-e5-base (768d, int8)'],
+      tier: 'On-device'
     },
     {
-      name: 'Jina Reader',
-      connected: true, // Free, no key needed
-      icon: <Globe className="w-4 h-4" />,
-      description: 'Web scraping and URL content extraction',
-      models: ['Jina Reader API (Free)'],
-      tier: 'Utility'
+      name: 'Local Recall',
+      connected: true, // SQLite ships with the app
+      icon: <Database className="w-4 h-4" />,
+      description: 'SQLite memory store with sqlite-vec KNN + FTS5 keyword search',
+      models: ['sqlite-vec (vec0)', 'FTS5'],
+      tier: 'On-device'
+    },
+    {
+      name: 'ElevenLabs',
+      connected: true, // Key lives in the macOS Keychain
+      icon: <Sparkles className="w-4 h-4" />,
+      description: 'Voice only — TTS and Scribe STT via the local voice gateway',
+      models: ['Scribe (STT)', 'TTS'],
+      tier: 'Voice'
     }
   ];
 
   const diagramDefinition = `
 %%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#a855f7', 'primaryTextColor': '#fff', 'primaryBorderColor': '#a855f7', 'lineColor': '#6b7280', 'secondaryColor': '#1f2937', 'tertiaryColor': '#111827' }}}%%
 graph TB
-    subgraph Frontend["Frontend (React)"]
+    subgraph Frontend["Frontend (React webview)"]
         A[User Request]
         B[useUnifiedChat Hook]
     end
-    
-    subgraph EdgeFunctions["Edge Functions"]
-        C[chat-with-memory]
-        D[agent-run]
-        E[tool-gateway]
-        F[memory-synthesize]
+
+    subgraph Core["Tauri Core (Rust)"]
+        C["brainClient<br/>atlas_brain_info"]
+        D["Keychain<br/>API keys"]
     end
-    
-    subgraph MemoryCore["Memory Core (Claude Opus 4.5)"]
-        G["claude-opus-4-5"]
-        H["Memory Synthesis"]
-        I["Conflict Resolution"]
-        J["Insight Extraction"]
+
+    subgraph Brain["Atlas Brain (Bun sidecar, local)"]
+        E["/chat-with-memory"]
+        F["orchestrator"]
+        G["claudeAdapter"]
+        H["localEmbed<br/>on-device"]
     end
-    
-    subgraph Tier1["Tier 1: Planning & Reasoning"]
-        K["Lovable AI Gateway"]
-        L["GPT-5<br/>Planner"]
-        M["GPT-5<br/>Reasoner"]
+
+    subgraph Reasoning["Reasoning (Anthropic Claude)"]
+        I["claude-opus<br/>hard tier"]
+        J["claude-sonnet<br/>standard tier"]
+        K["claude-haiku<br/>cheap tier"]
     end
-    
-    subgraph Tier2["Tier 2: Execution"]
-        N["Gemini 2.5 Flash<br/>Worker"]
+
+    subgraph Local["On-device models"]
+        L["multilingual-e5-base<br/>embeddings"]
     end
-    
-    subgraph Tier3["Tier 3: Research"]
-        O["Perplexity AI"]
-        P["sonar-pro<br/>Deep Research"]
+
+    subgraph Memory["Memory Storage (local SQLite)"]
+        M["ai_memory"]
+        N["memory_vec<br/>sqlite-vec KNN"]
+        O["memory_fts<br/>FTS5"]
     end
-    
-    subgraph Tier4["Tier 4: Analysis"]
-        Q["claude-sonnet-4-5<br/>Critic/Creative"]
-    end
-    
-    subgraph Memory["Memory Storage"]
-        R["ai_memory"]
-        S["session_context"]
-        T["atlas_knowledge"]
-    end
-    
+
     A --> B
     B --> C
-    B --> D
-    C --> G
-    C --> K
-    C --> O
-    D --> E
-    D --> F
+    C --> E
+    E --> F
     F --> G
-    G --> H
+    F --> H
+    D --> G
     G --> I
     G --> J
-    E --> K
-    E --> O
-    E --> Q
-    K --> L
-    K --> M
-    K --> N
-    O --> P
-    H --> R
-    I --> R
-    J --> T
-    C --> S
+    G --> K
+    H --> L
+    F --> M
+    H --> N
+    F --> O
 
     classDef frontend fill:#1e1b4b,stroke:#6366f1,stroke-width:2px
-    classDef edge fill:#1f2937,stroke:#6b7280,stroke-width:1px
-    classDef memoryCore fill:#7c2d12,stroke:#f97316,stroke-width:2px
-    classDef tier1 fill:#4c1d95,stroke:#a855f7,stroke-width:2px
-    classDef tier2 fill:#1e3a5f,stroke:#3b82f6,stroke-width:2px
-    classDef tier3 fill:#164e63,stroke:#06b6d4,stroke-width:2px
-    classDef tier4 fill:#4a1d4a,stroke:#d946ef,stroke-width:2px
+    classDef core fill:#1f2937,stroke:#6b7280,stroke-width:1px
+    classDef brain fill:#7c2d12,stroke:#f97316,stroke-width:2px
+    classDef reasoning fill:#4c1d95,stroke:#a855f7,stroke-width:2px
+    classDef local fill:#164e63,stroke:#06b6d4,stroke-width:2px
     classDef storage fill:#1c1917,stroke:#78716c,stroke-width:1px
-    
+
     class A,B frontend
-    class C,D,E,F edge
-    class G,H,I,J memoryCore
-    class K,L,M tier1
-    class N tier2
-    class O,P tier3
-    class Q tier4
-    class R,S,T storage
+    class C,D core
+    class E,F,G,H brain
+    class I,J,K reasoning
+    class L local
+    class M,N,O storage
 `;
 
   useEffect(() => {
@@ -221,7 +195,7 @@ graph TB
             key={provider.name}
             className={`relative p-4 rounded-xl border backdrop-blur-sm transition-all ${
               provider.connected 
-                ? provider.tier === 'Memory Core'
+                ? provider.tier === 'Reasoning'
                   ? 'bg-orange-500/10 border-orange-500/30 hover:border-orange-500/50'
                   : 'bg-primary/5 border-primary/30 hover:border-primary/50' 
                 : 'bg-muted/20 border-border/30'
@@ -234,14 +208,14 @@ graph TB
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <div className={`p-1.5 rounded-lg ${
-                  provider.tier === 'Memory Core' 
+                  provider.tier === 'Reasoning' 
                     ? 'bg-orange-500/20 text-orange-500'
                     : provider.connected ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'
                 }`}>
                   {provider.icon}
                 </div>
                 <span className={`text-xs font-medium ${
-                  provider.tier === 'Memory Core' ? 'text-orange-400' : 'text-muted-foreground'
+                  provider.tier === 'Reasoning' ? 'text-orange-400' : 'text-muted-foreground'
                 }`}>{provider.tier}</span>
               </div>
               {provider.connected ? (
@@ -298,23 +272,19 @@ graph TB
       <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-orange-500/50 border border-orange-500" />
-          <span>Memory Core: Claude Opus 4.5</span>
+          <span>Brain sidecar (local Bun process)</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-primary/50 border border-primary" />
-          <span>Tier 1/2: Lovable AI (Primary)</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-fuchsia-500/50 border border-fuchsia-500" />
-          <span>Tier 4: Claude Sonnet 4.5</span>
+          <span>Reasoning: Anthropic Claude (only remote model)</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-cyan-500/50 border border-cyan-500" />
-          <span>Tier 3: Perplexity (Research)</span>
+          <span>On-device: multilingual-e5-base embeddings</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-stone-500/50 border border-stone-500" />
-          <span>Storage: Memory Tables</span>
+          <span>Storage: local SQLite (sqlite-vec + FTS5)</span>
         </div>
       </div>
     </motion.div>
