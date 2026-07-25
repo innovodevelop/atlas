@@ -241,6 +241,11 @@ export const useUnifiedChat = ({
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
           'x-sidecar-token': brain.token,
+          // Working memory (detected emotion, goals, topics) is keyed by this
+          // id. Without it the brain mints a fresh `session_<now>` per request,
+          // so nothing ever reads back what the previous turn wrote — which
+          // silently disabled the emotion-aware humour gating.
+          'x-session-id': conversationIdRef.current,
         },
         body: JSON.stringify(body),
         signal: abortControllerRef.current.signal,

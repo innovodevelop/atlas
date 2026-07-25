@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Minimize2, Mic, Mail, Wallet, LineChart, Plus, Check, RefreshCw, Trash2, Link2, Brain } from 'lucide-react';
+import { Minimize2, Mic, Mail, Wallet, LineChart, Plus, Check, RefreshCw, Trash2, Link2, Brain, Sparkles } from 'lucide-react';
 import { VoiceSettingsPanel } from '@/components/atlas-health/VoiceSettingsPanel';
 import { BudgetSettingsPanel } from '@/components/atlas-health/BudgetSettingsPanel';
 import { MemoryPrivacyPanel } from '@/components/atlas-health/MemoryPrivacyPanel';
+import { PersonalityPanel } from '@/components/atlas-health/PersonalityPanel';
 import { useMailIntelligence } from '@/hooks/useMailIntelligence';
 import { usePortfolio } from '@/hooks/usePortfolio';
 
@@ -13,13 +14,14 @@ import { usePortfolio } from '@/hooks/usePortfolio';
 // Workshop palette without bespoke restyling. This is also the home for the
 // brokerage/portfolio Connections panel (Phase C).
 
-type SettingsTab = 'voice' | 'mail' | 'portfolio' | 'budget' | 'memory';
+type SettingsTab = 'voice' | 'mail' | 'portfolio' | 'budget' | 'personality' | 'memory';
 
 const TABS: { key: SettingsTab; label: string; icon: typeof Mic }[] = [
   { key: 'voice', label: 'Voice', icon: Mic },
   { key: 'mail', label: 'Mail', icon: Mail },
   { key: 'portfolio', label: 'Portfolio', icon: LineChart },
   { key: 'budget', label: 'Budget & AI', icon: Wallet },
+  { key: 'personality', label: 'Personality', icon: Sparkles },
   { key: 'memory', label: 'Memory & Privacy', icon: Brain },
 ];
 
@@ -72,6 +74,7 @@ export const AtlasSettings = ({ onClose }: { onClose: () => void }) => {
             {tab === 'mail' && <MailSettings />}
             {tab === 'portfolio' && <PortfolioSettings />}
             {tab === 'budget' && <BudgetSettingsPanel />}
+            {tab === 'personality' && <PersonalityPanel />}
             {tab === 'memory' && <MemoryPrivacyPanel />}
           </div>
         </div>

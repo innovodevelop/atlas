@@ -24,10 +24,15 @@ import {
   assistantTextFromSse,
   captureChatTurn,
   createLocalDb,
+  driftPersonalityFromTurn,
   eraseUserData,
   forgetMemories,
+  getPersonality,
+  resetPersonality,
+  savePersonality,
 } from "./localDb.ts";
 import { createLearningHandlers } from "./learningRoutes.ts";
+import { createProactiveHandlers } from "./proactive.ts";
 import { embedText } from "./localEmbed.ts";
 import { AUTO_EMBED_BATCH, embedPending, scheduleAutoEmbed } from "./autoEmbed.ts";
 
@@ -102,6 +107,9 @@ const localDb = createLocalDb();
 // Learning / research / maintenance routes (see learningRoutes.ts).
 const learning = createLearningHandlers({ db: localDb, requireUser, json });
 
+// Proactive digest (Phase 4): scheduler-driven insight generation (proactive.ts).
+const proactive = createProactiveHandlers({ db: localDb, requireUser, json });
+
 // POST /chat-with-memory — full orchestrator: memory recall, tools, streaming.
 async function handleChatWithMemory(req: Request): Promise<Response> {
   const { userId, token } = requireUser(req);
@@ -128,6 +136,9 @@ async function handleChatWithMemory(req: Request): Promise<Response> {
       // prefix is e5's asymmetric-retrieval convention (stored text uses
       // "passage"); it widens the hit/miss margin measurably.
       embed: (text: string) => embedText(text, "query"),
+      // Persisted trait/lexicon state — composed into the system prompt by the
+      // orchestrator (personality.ts). Absent for other callers ⇒ defaults.
+      personality: getPersonality(localDb._db, userId),
     },
     { messages, source, enableTools, teachingMode, systemPromptOverride, conversationId },
   );
@@ -139,6 +150,22 @@ async function handleChatWithMemory(req: Request): Promise<Response> {
 
   const lastUserMessage: string | null =
     [...(messages ?? [])].reverse().find((m: { role: string; content: unknown }) => m.role === "user" && typeof m.content === "string")?.content ?? null;
+
+  // Personality drift input: the user's recent messages this turn. Drift runs
+  // once per turn on the capture path (never the response path) — behavioural
+  // observations only; see personality.ts applyDrift for why approval-shaped
+  // signals are excluded.
+  const recentUserTexts: string[] = (messages ?? [])
+    .filter((m: { role: string; content: unknown }) => m.role === "user" && typeof m.content === "string")
+    .slice(-3)
+    .map((m: { content: string }) => m.content);
+  const driftOnce = () => {
+    try {
+      driftPersonalityFromTurn(localDb._db, userId, recentUserTexts);
+    } catch (e) {
+      console.error("[brain] personality drift failed:", e);
+    }
+  };
 
   switch (result.kind) {
     case "stream": {
@@ -164,6 +191,7 @@ async function handleChatWithMemory(req: Request): Promise<Response> {
         } catch (e) {
           console.error("[brain] turn capture failed:", e);
         }
+        driftOnce();
       })();
       return new Response(clientStream, {
         headers: { ...cors, "Content-Type": "text/event-stream" },
@@ -185,6 +213,7 @@ async function handleChatWithMemory(req: Request): Promise<Response> {
       } catch (e) {
         console.error("[brain] turn capture failed:", e);
       }
+      driftOnce();
       return json(result.body);
     }
     case "error":
@@ -241,6 +270,27 @@ async function handleMemoryEraseAll(req: Request): Promise<Response> {
   if (confirm !== true) return json({ error: "confirm: true required" }, 400);
   const deleted = eraseUserData(localDb._db, userId);
   return json({ deleted });
+}
+
+// POST /personality {action:"get"|"update"|"reset"} — the caller's persisted
+// trait vector + lexicon (atlas_personality). Update takes partial traits
+// (clamped to [0,1]) and/or a full replacement lexicon; reset restores defaults.
+async function handlePersonality(req: Request): Promise<Response> {
+  const { userId } = requireUser(req);
+  const body = await req.json();
+  switch (body?.action) {
+    case "get":
+      return json(getPersonality(localDb._db, userId));
+    case "update": {
+      const traits = body.traits && typeof body.traits === "object" ? body.traits : undefined;
+      const lexicon = body.lexicon && typeof body.lexicon === "object" ? body.lexicon : undefined;
+      return json(savePersonality(localDb._db, userId, { traits, lexicon }));
+    }
+    case "reset":
+      return json(resetPersonality(localDb._db, userId));
+    default:
+      return json({ error: 'action must be "get", "update" or "reset"' }, 400);
+  }
 }
 
 // POST /chat — memory-less fallback: a single streamed completion.
@@ -339,6 +389,8 @@ const server = Bun.serve({
       if (req.method === "POST" && url.pathname === "/chat") return await handleChat(req);
       if (req.method === "POST" && url.pathname === "/search") return await handleSearch(req);
       if (req.method === "POST" && url.pathname === "/embed-backfill") return await handleEmbedBackfill(req);
+      if (req.method === "POST" && url.pathname === "/personality") return await handlePersonality(req);
+      if (req.method === "POST" && url.pathname === "/proactive/cycle") return await proactive.cycle(req);
       if (req.method === "POST" && url.pathname === "/learning/control") return await learning.control(req);
       if (req.method === "POST" && url.pathname === "/learning/cycle") return await learning.cycle(req);
       if (req.method === "POST" && url.pathname === "/learning/intent") return await learning.intent(req);

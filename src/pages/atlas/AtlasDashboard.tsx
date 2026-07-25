@@ -15,6 +15,7 @@ import {
   AtlasWeatherCard, AtlasCalendarCard, AtlasTasksCard,
   AtlasStocksCard, AtlasInboxCard, AtlasBriefingCard,
 } from '@/components/atlas-ui/AtlasCards';
+import { ProactiveInsight } from '@/components/atlas-ui/ProactiveInsight';
 import {
   AtlasAirQualityCard, AtlasNowPlayingCard, AtlasActivityCard, AtlasWorldClockCard,
 } from '@/components/atlas-ui/AtlasExtraCards';
@@ -119,6 +120,7 @@ const AtlasDashboard = () => {
       <div className="auro" />
       <AtmosphereCanvas />
       <div className="grain" />
+      <ProactiveInsight />
 
       {/* Design "Atlas Dashboard (Current)": floating pill header with the
           animated glow wash + full-width audio-wave canvas; the shimmer label

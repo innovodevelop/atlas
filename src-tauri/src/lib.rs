@@ -14,6 +14,7 @@ mod music;
 mod music_engine;
 mod db;
 mod datafetch;
+mod scheduler;
 
 const BUNDLE_ID: &str = "com.magnuspilegaard.atlas";
 
@@ -243,8 +244,11 @@ pub fn run() {
   };
   let gateway = VoiceGateway {
     child: Mutex::new(spawn_voice_gateway(&gateway_token)),
-    token: gateway_token,
+    token: gateway_token.clone(),
   };
+  // Local proactive scheduler (Phase 4): periodically kicks the brain's
+  // /proactive/cycle. All judgement lives brain-side; this only ticks.
+  let proactive = scheduler::ProactiveScheduler::spawn(gateway_token, ATLAS_BRAIN_PORT);
 
   tauri::Builder::default()
     // Mail alerts -> macOS notifications; opener launches the OAuth consent
@@ -256,6 +260,7 @@ pub fn run() {
     .plugin(tauri_plugin_deep_link::init())
     .manage(gateway)
     .manage(brain)
+    .manage(proactive)
     .manage(music::MusicState::new())
     .invoke_handler(tauri::generate_handler![
       voice_gateway_info,
@@ -358,6 +363,9 @@ pub fn run() {
     .run(|app_handle, event| {
       // Kill the sidecars when the app exits — never leave orphans.
       if let tauri::RunEvent::Exit = event {
+        if let Some(sched) = app_handle.try_state::<scheduler::ProactiveScheduler>() {
+          sched.stop();
+        }
         if let Some(gw) = app_handle.try_state::<VoiceGateway>() {
           if let Ok(mut guard) = gw.child.lock() {
             if let Some(mut child) = guard.take() {

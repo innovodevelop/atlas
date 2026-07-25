@@ -1002,3 +1002,14 @@ body{display:block;overflow-x:hidden;overflow-y:visible;max-width:none;flex:none
 @keyframes wfade{from{opacity:0;transform:translateY(.16em);filter:blur(4px)}to{opacity:1;transform:none;filter:blur(0)}}
 @keyframes acblink{0%,50%{opacity:1}51%,100%{opacity:0}}
 @media (max-width:820px){.agrid{grid-template-columns:1fr;align-items:center}.aleft,.aright{padding:0 8%}.aright{margin-top:8px}}
+
+/* Proactive insight toast — the surfacing end of the digest chain. Sits under
+   the floating header, above the band, and never blocks interaction. */
+.proactive{position:fixed;top:74px;left:50%;transform:translateX(-50%);z-index:50;display:flex;align-items:flex-start;gap:10px;max-width:min(560px,calc(100vw - 32px));padding:12px 14px;border-radius:14px;background:rgba(255,253,250,.92);backdrop-filter:blur(18px);box-shadow:0 10px 30px -18px rgba(14,24,78,.55),0 0 0 1px rgba(52,97,242,.10);animation:proactiveIn .42s cubic-bezier(.22,1,.36,1) both}
+@keyframes proactiveIn{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.proactive-icon{flex:none;margin-top:2px;color:var(--acc)}
+.proactive-body{display:flex;flex-direction:column;gap:2px;min-width:0}
+.proactive-title{font-family:'Geist',system-ui,sans-serif;font-size:13.5px;font-weight:500;letter-spacing:-.01em;color:var(--ink)}
+.proactive-text{font-size:13px;line-height:1.45;color:rgba(30,30,36,.72)}
+.proactive-close{flex:none;border:0;background:none;padding:2px;margin:-2px -2px 0 4px;color:rgba(30,30,36,.45);cursor:pointer;border-radius:6px;transition:color .2s,background .2s}
+.proactive-close:hover{color:var(--ink);background:rgba(30,30,36,.06)}

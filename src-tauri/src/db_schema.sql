@@ -628,6 +628,26 @@ CREATE TABLE IF NOT EXISTS atlas_system_settings (
   updated_at                  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 
+-- Seed (idempotent, and re-run on every open since the whole schema batch is):
+-- without any row, isLearningEnabled() reads "disabled" forever — there was no
+-- INSERT anywhere, so fresh installs never learned. Guarded on the table being
+-- empty so a user's later change to learning_enabled is never overwritten.
+-- JS twin lives in services/atlas-brain/src/localDb.ts (keep in lockstep).
+INSERT INTO atlas_system_settings (id, learning_enabled)
+SELECT 'default', 1
+WHERE NOT EXISTS (SELECT 1 FROM atlas_system_settings);
+
+-- Personality as bounded state (MVP Phase 4): trait vector + learned lexicon,
+-- composed into the system prompt by _shared/personality.ts. One row per user.
+CREATE TABLE IF NOT EXISTS atlas_personality (
+  user_id      TEXT PRIMARY KEY,
+  traits_json  TEXT NOT NULL DEFAULT '{}',
+  lexicon_json TEXT NOT NULL DEFAULT '{}',
+  -- Trait names the user set by hand; drift may never move these.
+  pinned_json  TEXT NOT NULL DEFAULT '[]',
+  updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
 CREATE TABLE IF NOT EXISTS atlas_provider_status (
   id                   TEXT PRIMARY KEY,
   provider             TEXT NOT NULL UNIQUE
@@ -782,6 +802,9 @@ CREATE TRIGGER IF NOT EXISTS trg_events_inbox_updated AFTER UPDATE ON events_inb
 CREATE TRIGGER IF NOT EXISTS trg_atlas_system_settings_updated AFTER UPDATE ON atlas_system_settings
   FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
   BEGIN UPDATE atlas_system_settings SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_atlas_personality_updated AFTER UPDATE ON atlas_personality
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE atlas_personality SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE user_id = NEW.user_id; END;
 CREATE TRIGGER IF NOT EXISTS trg_atlas_provider_status_updated AFTER UPDATE ON atlas_provider_status
   FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
   BEGIN UPDATE atlas_provider_status SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;

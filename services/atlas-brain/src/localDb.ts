@@ -10,6 +10,15 @@
 
 import { Database } from "bun:sqlite";
 import { openMemoryDb, recall as localRecall, upsertVector } from "./localMemory.ts";
+import {
+  DEFAULT_TRAITS,
+  applyDrift,
+  clampTraits,
+  observeUserStyle,
+  sanitizeLexicon,
+  type PersonalityState,
+  type Traits,
+} from "../../../supabase/functions/_shared/personality.ts";
 
 type Row = Record<string, unknown>;
 type Result<T> = { data: T; error: { message: string; code?: string } | null };
@@ -244,6 +253,27 @@ CREATE TABLE IF NOT EXISTS chat_turns (
 CREATE INDEX IF NOT EXISTS idx_chat_turns_user ON chat_turns(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_chat_turns_conv ON chat_turns(conversation_id, created_at);`;
 
+// Mirror of the atlas_personality DDL in db_schema.sql (same standalone-brain
+// rationale as CHAT_TURNS_DDL above). Keep the two in lockstep.
+const PERSONALITY_DDL = `
+CREATE TABLE IF NOT EXISTS atlas_personality (
+  user_id      TEXT PRIMARY KEY,
+  traits_json  TEXT NOT NULL DEFAULT '{}',
+  lexicon_json TEXT NOT NULL DEFAULT '{}',
+  pinned_json  TEXT NOT NULL DEFAULT '[]',
+  updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);`;
+
+/** Additive column for tables created before pinning existed (dev DBs). */
+function ensurePersonalityColumns(db: Database): void {
+  try {
+    const cols = db.query(`PRAGMA table_info(atlas_personality)`).all() as { name: string }[];
+    if (!cols.some((c) => c.name === "pinned_json")) {
+      db.exec(`ALTER TABLE atlas_personality ADD COLUMN pinned_json TEXT NOT NULL DEFAULT '[]'`);
+    }
+  } catch { /* table absent — the DDL above creates it with the column */ }
+}
+
 function hasTable(db: Database, name: string): boolean {
   return !!db.query(`SELECT 1 FROM sqlite_master WHERE type='table' AND name = ?`).get(name);
 }
@@ -294,6 +324,171 @@ export function ensureMemoryIntegrity(db: Database): void {
     }
   }
   db.exec(CHAT_TURNS_DDL);
+  db.exec(PERSONALITY_DDL);
+  ensurePersonalityColumns(db);
+  // Seed atlas_system_settings (JS twin of the db_schema.sql seed — keep in
+  // lockstep): without any row, isLearningEnabled() reads "disabled" forever.
+  // Guarded on the table being empty so a user's later change survives, and on
+  // the table existing — a standalone brain DB without the app schema simply
+  // keeps learning off, which is the safe default.
+  if (hasTable(db, "atlas_system_settings")) {
+    db.exec(
+      `INSERT INTO atlas_system_settings (id, learning_enabled)
+       SELECT 'default', 1 WHERE NOT EXISTS (SELECT 1 FROM atlas_system_settings);`,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Personality state (Phase 4) — see _shared/personality.ts for the semantics.
+
+const parseJsonObj = (s: unknown): Record<string, unknown> => {
+  if (typeof s !== "string") return {};
+  try {
+    const v = JSON.parse(s);
+    return v && typeof v === "object" && !Array.isArray(v) ? v : {};
+  } catch {
+    return {};
+  }
+};
+
+export function getPersonality(db: Database, userId: string): PersonalityState {
+  const row = db
+    .query(`SELECT traits_json, lexicon_json, pinned_json FROM atlas_personality WHERE user_id = ?`)
+    .get(userId) as { traits_json?: string; lexicon_json?: string; pinned_json?: string } | null;
+  let pinned: string[] = [];
+  try {
+    const parsed = JSON.parse(row?.pinned_json ?? "[]");
+    if (Array.isArray(parsed)) pinned = parsed.filter((k): k is string => typeof k === "string");
+  } catch { /* corrupt value ⇒ nothing pinned */ }
+  return {
+    traits: clampTraits(parseJsonObj(row?.traits_json) as Partial<Traits>),
+    lexicon: sanitizeLexicon(parseJsonObj(row?.lexicon_json)),
+    pinned,
+  };
+}
+
+/**
+ * Persist personality state. Traits merge over the current row (partial
+ * updates, clamped to [0,1]); a provided lexicon replaces the stored one
+ * wholesale so entries can be removed.
+ */
+/**
+ * Traits the user set by hand are PINNED: drift may never move them again
+ * (until reset). The settings panel promises "your setting always wins", and
+ * without this drift walks an explicit choice back at 0.02/turn — a user who
+ * asks for detailed answers but types tersely gets silently overridden within
+ * ~17 turns. `source: "user"` marks a manual update; drift passes "drift".
+ */
+export function savePersonality(
+  db: Database,
+  userId: string,
+  patch: { traits?: Partial<Traits>; lexicon?: Record<string, string> },
+  source: "user" | "drift" = "user",
+): PersonalityState {
+  const cur = getPersonality(db, userId);
+  const curPinned = cur.pinned ?? [];
+  const pinned = source === "user"
+    ? Array.from(new Set([...curPinned, ...Object.keys(patch.traits ?? {})]))
+    : curPinned;
+  const incoming = { ...(patch.traits ?? {}) };
+  if (source === "drift") {
+    // Drop drift's attempt to move anything the user has pinned.
+    for (const k of curPinned) delete (incoming as Record<string, unknown>)[k];
+  }
+  const traits = clampTraits({ ...cur.traits, ...incoming });
+  const lexicon = patch.lexicon !== undefined ? sanitizeLexicon(patch.lexicon) : cur.lexicon;
+  db.query(
+    `INSERT INTO atlas_personality (user_id, traits_json, lexicon_json, pinned_json, updated_at)
+     VALUES (?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+     ON CONFLICT(user_id) DO UPDATE SET
+       traits_json = excluded.traits_json,
+       lexicon_json = excluded.lexicon_json,
+       pinned_json = excluded.pinned_json,
+       updated_at = excluded.updated_at`,
+  ).run(userId, JSON.stringify(traits), JSON.stringify(lexicon), JSON.stringify(pinned));
+  return { traits, lexicon, pinned };
+}
+
+export function resetPersonality(db: Database, userId: string): PersonalityState {
+  // Also clears pins — reset means Atlas may learn freely again.
+  db.query(`DELETE FROM atlas_personality WHERE user_id = ?`).run(userId);
+  return { traits: { ...DEFAULT_TRAITS }, lexicon: {}, pinned: [] };
+}
+
+/**
+ * Engagement signal for drift: share of recent assistant turns the user
+ * followed up on. Only turns old enough to have HAD a chance at a follow-up
+ * (>1h) count — a just-written turn is always unstamped and would bias the
+ * rate down — and fewer than 10 such turns is too little data to drift on.
+ */
+function recentFollowUpRate(db: Database, userId: string): number | undefined {
+  const row = db
+    .query(
+      `SELECT COUNT(*) AS c, SUM(CASE WHEN followed_up_at IS NOT NULL THEN 1 ELSE 0 END) AS f
+         FROM (SELECT followed_up_at FROM chat_turns
+                WHERE user_id = ? AND role = 'assistant'
+                  AND created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 hour')
+                ORDER BY created_at DESC LIMIT 30)`,
+    )
+    .get(userId) as { c: number; f: number | null } | null;
+  if (!row || row.c < 10) return undefined;
+  return (row.f ?? 0) / row.c;
+}
+
+/**
+ * Conservative lexicon population: ONLY explicit user statements — the profile
+ * nickname and identity/relationships memories whose key literally says what
+ * to call someone. Never inferred from vibes. Discovered entries merge UNDER
+ * the stored lexicon (existing entries, e.g. user-edited ones, always win).
+ */
+export function refreshLexicon(db: Database, userId: string): void {
+  const found: Record<string, string> = {};
+  if (hasTable(db, "profiles")) {
+    const prof = db.query(`SELECT nickname FROM profiles WHERE user_id = ?`).get(userId) as
+      | { nickname?: string | null }
+      | null;
+    if (prof?.nickname && typeof prof.nickname === "string" && prof.nickname.trim()) {
+      found["what you call them"] = prof.nickname.trim();
+    }
+  }
+  if (hasTable(db, "ai_memory")) {
+    const rows = db
+      .query(
+        `SELECT key, value FROM ai_memory
+          WHERE user_id = ? AND category IN ('identity','relationships')
+            AND (key LIKE '%nickname%' OR key LIKE '%call me%' OR key LIKE '%calls me%')
+          ORDER BY importance DESC LIMIT 4`,
+      )
+      .all(userId) as Array<{ key: string; value: unknown }>;
+    for (const r of rows) {
+      let val = typeof r.value === "string" ? r.value : "";
+      // ai_memory.value is JSON text; unwrap plain string values.
+      try {
+        const parsed = JSON.parse(val);
+        if (typeof parsed === "string") val = parsed;
+      } catch { /* stored as a bare string — use as-is */ }
+      if (val.trim()) found[r.key] = val.trim();
+    }
+  }
+  if (!Object.keys(found).length) return;
+  const cur = getPersonality(db, userId);
+  savePersonality(db, userId, { lexicon: sanitizeLexicon({ ...found, ...cur.lexicon }) });
+}
+
+/**
+ * Per-turn drift entry point — called from the turn-capture path in index.ts,
+ * so it runs at most once per turn and never on the response path. Behavioural
+ * observations only; see applyDrift for why approval signals are excluded.
+ */
+export function driftPersonalityFromTurn(db: Database, userId: string, userMessages: string[]): void {
+  const obs = observeUserStyle(userMessages);
+  const followUpRate = recentFollowUpRate(db, userId);
+  if (followUpRate !== undefined) obs.followUpRate = followUpRate;
+  const cur = getPersonality(db, userId);
+  // source "drift" ⇒ savePersonality drops anything the user pinned.
+  savePersonality(db, userId, { traits: applyDrift(cur.traits, obs) }, "drift");
+  refreshLexicon(db, userId);
 }
 
 /**

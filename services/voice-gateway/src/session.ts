@@ -204,6 +204,10 @@ export class VoiceSession {
           "Content-Type": "application/json",
           Authorization: `Bearer ${this.cfg.userJwt}`,
           ...(SIDECAR_TOKEN ? { "x-sidecar-token": SIDECAR_TOKEN } : {}),
+          // Keys the brain's working memory (emotion/goals/topics) to this
+          // voice session — without it each turn gets a fresh id and nothing
+          // reads back what the previous turn detected.
+          "x-session-id": this.conversationId,
         },
         body: JSON.stringify({
           messages: this.history,

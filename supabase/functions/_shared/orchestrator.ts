@@ -21,6 +21,13 @@ import {
 import { aiChatCompletion, hasAIKey, generateEmbedding } from "./aiGateway.ts";
 import { selectModel } from "./providerRouting.ts";
 import { findOrCreateSession } from "./learningGuards.ts";
+import {
+  DEFAULT_PERSONALITY,
+  composePersonality,
+  detectSeriousTopic,
+  type PersonalityContext,
+  type PersonalityState,
+} from "./personality.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -86,6 +93,12 @@ export interface ChatDeps {
    * to the gateway's (Gemini) embedder, which only matches legacy vectors.
    */
   embed?: (text: string) => Promise<number[]>;
+  /**
+   * Persisted personality state (atlas_personality). The brain sidecar injects
+   * it; callers that omit it (voice gateway, edge fns) fall back to
+   * DEFAULT_PERSONALITY and behave exactly as before Phase 4.
+   */
+  personality?: PersonalityState;
 }
 
 export interface ChatOptions {
@@ -283,7 +296,9 @@ export function buildPersonalizedPrompt(
   knowledgeBank: KnowledgeEntry[],
   hasTools: boolean,
   styleNotes: Array<{ key: string; value: unknown }> = [],
-  conversationSummaries: Array<{ key: string; value: unknown; created_at: string }> = []
+  conversationSummaries: Array<{ key: string; value: unknown; created_at: string }> = [],
+  personality: PersonalityState = DEFAULT_PERSONALITY,
+  personalityCtx: PersonalityContext = {}
 ): string {
   const userName = profile?.nickname || profile?.first_name || "there";
   const timeOfDay = profile?.timezone ? getTimeOfDay(profile.timezone) : "day";
@@ -347,25 +362,18 @@ CRITICAL INSTRUCTIONS:
 - When asked about anything current, recent, or real-time, ALWAYS use web_search first.
 - Be proactive about using tools - don't wait to be explicitly asked.` : "";
 
-  return `You are Atlas, a warm, witty, and genuinely caring AI assistant who knows ${userName} personally.
+  // Personality/style is composed from bounded trait state (personality.ts)
+  // instead of the old hardcoded block that mandated humour unconditionally —
+  // the ctx gates suppress it when the moment is wrong. The composed block ends
+  // mid-bullet-list so the contextual bullets below continue it.
+  const personalityBlock = composePersonality(personality, personalityCtx);
 
-## Your Personality
-- You're like a trusted friend who happens to be incredibly knowledgeable
-- You use ${userName}'s name naturally (but not every sentence - that's weird)
-- You have a good sense of humor - light jokes, playful teasing, the occasional pun
-- You remember everything about ${userName} and bring it up when relevant
-- You're genuinely interested in their life, not just their tasks
-- You celebrate their wins and offer support during tough times
-- You can make self-deprecating AI jokes occasionally
+  return `You are Atlas, a genuinely caring AI assistant who knows ${userName} personally.
 
-## Communication Style
+${personalityBlock}
 - Use ${style} tone
 - It's ${timeOfDay} for them, greet appropriately if starting a conversation
 ${isBirthdayToday ? "- 🎂 TODAY IS THEIR BIRTHDAY! Wish them happy birthday warmly and make it special!" : ""}
-- If they seem stressed, acknowledge it gently
-- Remember inside jokes but don't force them
-- Use contractions naturally ("you're", "I'd", "let's")
-- Emoji occasionally but don't overdo it
 ${toolInstructions}
 ${memoryContext}
 ${styleContext}
@@ -693,12 +701,15 @@ async function trackSessionContext(
   }
 }
 
-// Get active session context
+// Get active session context. Also surfaces the most recent detected emotion
+// (written by trackSessionContext with 30-min expiry) in structured form — it
+// gates humour in composePersonality, and reusing this load avoids a second
+// query for the same rows.
 async function getSessionContext(
   supabase: any,
   userId: string,
   sessionId: string
-): Promise<string> {
+): Promise<{ block: string; emotion: string | null }> {
   try {
     const { data: contexts } = await supabase
       .from("session_context")
@@ -709,16 +720,20 @@ async function getSessionContext(
       .order("created_at", { ascending: false })
       .limit(10);
 
-    if (!contexts || contexts.length === 0) return "";
+    if (!contexts || contexts.length === 0) return { block: "", emotion: null };
+
+    // Rows are newest-first, so the first emotion entry is the current one.
+    const emotionRow = contexts.find((c: any) => c.context_type === "emotion");
+    const emotion = typeof emotionRow?.content?.emotion === "string" ? emotionRow.content.emotion : null;
 
     const contextSummary = contexts.map((c: any) =>
       `[${c.context_type}] ${JSON.stringify(c.content)}`
     ).join("\n");
 
-    return `\n## Current Conversation Context (Working Memory)\n${contextSummary}`;
+    return { block: `\n## Current Conversation Context (Working Memory)\n${contextSummary}`, emotion };
   } catch (e) {
     console.log("[orchestrator] Failed to get session context:", e);
-    return "";
+    return { block: "", emotion: null };
   }
 }
 
@@ -800,7 +815,10 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
       : Promise.resolve([]),
   ]);
 
-  const sessionContextStr = typeof sessionContextResult === "string" ? sessionContextResult : "";
+  const sessionContext =
+    sessionContextResult && typeof sessionContextResult === "object"
+      ? (sessionContextResult as { block: string; emotion: string | null })
+      : { block: "", emotion: null };
 
   const profile: UserProfile | null = profileResult.data;
   const memories: Memory[] = memoriesResult.data || [];
@@ -817,7 +835,39 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
   // Build personalized prompt and append session context (working memory)
   const styleNotes = ((styleResult as { data?: Array<{ key: string; value: unknown }> }).data || []);
   const conversationSummaries = ((summaryResult as { data?: Array<{ key: string; value: unknown; created_at: string }> }).data || []);
-  let systemPrompt = systemPromptOverride || buildPersonalizedPrompt(profile, memories, upcomingEvents, recentEvents, knowledgeBank, hasTools, styleNotes, conversationSummaries);
+
+  // Humour gates for composePersonality. All three are discrete state that
+  // flips rarely within a session — the composed prompt stays byte-stable for
+  // Claude's cached prefix except when a gate actually changes:
+  //  - emotion: latest session_context emotion row (30-min expiry, prior turn);
+  //  - terse: the user's recent messages are short/clipped (needs ≥2 messages
+  //    so a lone "hi" opener doesn't gate);
+  //  - seriousTopic: narrow keyword scan (personality.ts) of the latest message.
+  const recentUserTexts = messages
+    .filter((m) => m.role === "user" && typeof m.content === "string")
+    .slice(-3)
+    .map((m) => m.content);
+  const avgUserLen = recentUserTexts.length
+    ? recentUserTexts.reduce((s, t) => s + t.length, 0) / recentUserTexts.length
+    : 0;
+  // `terse` deliberately needs a STRONG, sustained signal: ≥3 recent messages
+  // averaging under 25 chars, and every one of them short. A loose threshold
+  // (e.g. avg < 40 over 2 messages) flips around the boundary during ordinary
+  // chat, and each flip rewrites the top of the system block — which is the
+  // cached prefix, so every flip costs a full cache miss. Requiring unanimity
+  // makes the gate move only when the user genuinely switches to clipped
+  // replies, and back only when they genuinely stop.
+  const terse =
+    recentUserTexts.length >= 3 &&
+    avgUserLen < 25 &&
+    recentUserTexts.every((t) => t.length < 40);
+  const personalityCtx: PersonalityContext = {
+    emotion: sessionContext.emotion,
+    terse,
+    seriousTopic: detectSeriousTopic(recentUserTexts[recentUserTexts.length - 1] ?? ""),
+  };
+
+  let systemPrompt = systemPromptOverride || buildPersonalizedPrompt(profile, memories, upcomingEvents, recentEvents, knowledgeBank, hasTools, styleNotes, conversationSummaries, deps.personality ?? DEFAULT_PERSONALITY, personalityCtx);
 
   // Query-relevant recalled memories (memory v2)
   const recalled = (recallResult || []) as Array<{ id: string; chunk_text: string; score: number }>;
@@ -830,8 +880,8 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
       .then(() => {}, () => {});
   }
 
-  if (sessionContextStr) {
-    systemPrompt += sessionContextStr;
+  if (sessionContext.block) {
+    systemPrompt += sessionContext.block;
   }
 
   const conversationMessages = [
