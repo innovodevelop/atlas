@@ -67,6 +67,30 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at);
 
+-- SFT capture (Phase 3): the full generation transcript, one row per message.
+-- Unlike `messages` (frontend-shaped, user/assistant only), a row here can hold
+-- the whole fine-tuning tuple — role incl. system/tool, tool_calls, model id,
+-- and the composed system prompt at generation time (system_prompt on the
+-- assistant row). conversation_id is a plain TEXT ref on purpose: capture must
+-- never fail on a missing/foreign conversation row.
+CREATE TABLE IF NOT EXISTS chat_turns (
+  id              TEXT PRIMARY KEY,
+  user_id         TEXT NOT NULL,
+  conversation_id TEXT,
+  turn_id         TEXT NOT NULL,                 -- groups all rows of one generation
+  seq             INTEGER NOT NULL DEFAULT 0,   -- order within the turn
+  role            TEXT NOT NULL CHECK (role IN ('system','user','assistant','tool')),
+  content         TEXT NOT NULL,
+  tool_calls      TEXT,                          -- jsonb: assistant tool_calls array
+  model           TEXT,                          -- logical model id used for the turn
+  system_prompt   TEXT,                          -- composed prompt snapshot (assistant row)
+  source          TEXT,                          -- text_chat / voice / teaching
+  followed_up_at  TEXT,                          -- engagement success signal (see brain capture)
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_chat_turns_user ON chat_turns(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_chat_turns_conv ON chat_turns(conversation_id, created_at);
+
 -- ---------------------------------------------------------------------------
 -- Memory / knowledge
 -- ---------------------------------------------------------------------------
@@ -87,6 +111,12 @@ CREATE TABLE IF NOT EXISTS ai_memory (
   updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 CREATE INDEX IF NOT EXISTS idx_memory_validated ON ai_memory(is_validated, is_fake);
+-- One fact per (user, key): restating a fact must UPDATE, not duplicate. Kept
+-- as a unique INDEX (not a table constraint) because that is the migratable
+-- form — existing DBs get deduped first, then this same statement, in
+-- db.rs::migrate_ai_memory / localDb.ts::ensureMemoryIntegrity. Also what the
+-- upserts' ON CONFLICT(user_id, key) resolves against.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_memory_user_key ON ai_memory(user_id, key);
 
 CREATE TABLE IF NOT EXISTS atlas_learning_sessions (
   id             TEXT PRIMARY KEY,

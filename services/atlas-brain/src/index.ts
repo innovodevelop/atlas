@@ -20,7 +20,13 @@
  */
 
 import "./denoShim.ts";
-import { createLocalDb } from "./localDb.ts";
+import {
+  assistantTextFromSse,
+  captureChatTurn,
+  createLocalDb,
+  eraseUserData,
+  forgetMemories,
+} from "./localDb.ts";
 import { createLearningHandlers } from "./learningRoutes.ts";
 import { embedText } from "./localEmbed.ts";
 import { AUTO_EMBED_BATCH, embedPending, scheduleAutoEmbed } from "./autoEmbed.ts";
@@ -131,19 +137,110 @@ async function handleChatWithMemory(req: Request): Promise<Response> {
   // and off the response path (see autoEmbed.ts).
   scheduleAutoEmbed(localDb, userId);
 
+  const lastUserMessage: string | null =
+    [...(messages ?? [])].reverse().find((m: { role: string; content: unknown }) => m.role === "user" && typeof m.content === "string")?.content ?? null;
+
   switch (result.kind) {
-    case "stream":
-      return new Response(result.stream, {
+    case "stream": {
+      // SFT capture: tee the SSE stream — the client branch is returned
+      // unchanged (tee forwards each chunk as it arrives, so the first byte is
+      // never delayed), while the capture branch accumulates only the final
+      // assistant text and persists the turn off the response path.
+      const [clientStream, captureStream] = result.stream.tee();
+      const capture = result.capture;
+      void (async () => {
+        try {
+          const assistantText = await assistantTextFromSse(captureStream);
+          captureChatTurn(localDb._db, {
+            userId,
+            conversationId,
+            source,
+            model: capture?.model ?? null,
+            systemPrompt: capture?.systemPrompt ?? null,
+            userMessage: lastUserMessage,
+            toolMessages: capture?.toolMessages ?? [],
+            assistantText,
+          });
+        } catch (e) {
+          console.error("[brain] turn capture failed:", e);
+        }
+      })();
+      return new Response(clientStream, {
         headers: { ...cors, "Content-Type": "text/event-stream" },
       });
-    case "json":
+    }
+    case "json": {
+      // Teaching mode: the full text is already in the body — capture inline.
+      try {
+        captureChatTurn(localDb._db, {
+          userId,
+          conversationId,
+          source,
+          model: result.capture?.model ?? null,
+          systemPrompt: result.capture?.systemPrompt ?? null,
+          userMessage: lastUserMessage,
+          toolMessages: result.capture?.toolMessages ?? [],
+          assistantText: String((result.body as { response?: unknown })?.response ?? ""),
+        });
+      } catch (e) {
+        console.error("[brain] turn capture failed:", e);
+      }
       return json(result.body);
+    }
     case "error":
       return json(
         { error: result.message, ...(result.reason ? { reason: result.reason } : {}) },
         result.status,
       );
   }
+}
+
+// POST /memory/list — the caller's stored memories for the management panel.
+async function handleMemoryList(req: Request): Promise<Response> {
+  const { userId } = requireUser(req);
+  const { data, error } = await localDb
+    .from("ai_memory")
+    .select()
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(500);
+  if (error) return json({ error: error.message }, 500);
+  const memories = ((data as Array<Record<string, unknown>>) ?? []).map((m) => ({
+    id: m.id,
+    key: m.key,
+    category: m.category,
+    memory_type: m.memory_type,
+    importance: m.importance,
+    mention_count: m.mention_count,
+    preview: (typeof m.value === "object" ? JSON.stringify(m.value) : String(m.value ?? "")).slice(0, 160),
+    created_at: m.created_at,
+    updated_at: m.updated_at,
+  }));
+  return json({ memories });
+}
+
+// POST /memory/forget {id?, key?} — delete the caller's memory row(s) + vectors.
+async function handleMemoryForget(req: Request): Promise<Response> {
+  const { userId } = requireUser(req);
+  const { id, key } = await req.json();
+  if (typeof id !== "string" && typeof key !== "string") {
+    return json({ error: "id or key required" }, 400);
+  }
+  const counts = forgetMemories(localDb._db, userId, {
+    id: typeof id === "string" ? id : undefined,
+    key: typeof key === "string" ? key : undefined,
+  });
+  return json(counts);
+}
+
+// POST /memory/erase-all {confirm: true} — delete everything Atlas stores about
+// the caller (memories, vectors, knowledge, session context, transcripts).
+async function handleMemoryEraseAll(req: Request): Promise<Response> {
+  const { userId } = requireUser(req);
+  const { confirm } = await req.json();
+  if (confirm !== true) return json({ error: "confirm: true required" }, 400);
+  const deleted = eraseUserData(localDb._db, userId);
+  return json({ deleted });
 }
 
 // POST /chat — memory-less fallback: a single streamed completion.
@@ -176,6 +273,8 @@ async function handleChat(req: Request): Promise<Response> {
 
 // POST /search — semantic search over local memory + knowledge (replaces the
 // semantic-search edge fn): embed the query on-device, recall locally, enrich.
+// recall_memories includes the second-stage rerank (localMemory + rerank.ts),
+// so /search results arrive already rerank-ordered — same as the chat path.
 async function handleSearch(req: Request): Promise<Response> {
   const { userId } = requireUser(req);
   // multilingual-e5 cosines sit on a compressed scale — measured on Danish
@@ -245,6 +344,9 @@ const server = Bun.serve({
       if (req.method === "POST" && url.pathname === "/learning/intent") return await learning.intent(req);
       if (req.method === "POST" && url.pathname === "/research") return await learning.research(req);
       if (req.method === "POST" && url.pathname === "/memory/maintenance") return await learning.memoryMaintenance(req);
+      if (req.method === "POST" && url.pathname === "/memory/list") return await handleMemoryList(req);
+      if (req.method === "POST" && url.pathname === "/memory/forget") return await handleMemoryForget(req);
+      if (req.method === "POST" && url.pathname === "/memory/erase-all") return await handleMemoryEraseAll(req);
     } catch (e) {
       if (e instanceof AuthError) return json({ error: e.message }, e.status);
       console.error("[brain] error:", e);

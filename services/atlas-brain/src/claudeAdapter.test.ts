@@ -440,7 +440,7 @@ describe("regressions: request validity", () => {
       temperature: 0.7,
       top_p: 0.9,
       top_k: 40,
-    }) as Record<string, unknown>;
+    }) as unknown as Record<string, unknown>;
     expect(req.temperature).toBeUndefined();
     expect(req.top_p).toBeUndefined();
     expect(req.top_k).toBeUndefined();

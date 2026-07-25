@@ -24,6 +24,23 @@ jobs:
       - name: Tests (auth suite — static checks; live tests skip without secrets)
         run: bun test tests/
 
+  atlas-brain:
+    name: Brain sidecar (typecheck, tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/atlas-brain
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - name: Typecheck
+        run: bunx tsc --noEmit
+      - name: Tests (adapter translation, memory integrity, rerank)
+        run: bun test
+
   voice-gateway:
     name: Voice gateway (typecheck, VAD smoke)
     runs-on: ubuntu-latest

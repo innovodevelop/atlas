@@ -97,9 +97,23 @@ export interface ChatOptions {
   conversationId?: string | null;
 }
 
+/**
+ * Everything a caller needs to persist this generation for later fine-tuning
+ * (the brain sidecar writes it to chat_turns). The composed system prompt is
+ * the load-bearing part — it existed only inside this function before, and an
+ * SFT example without the prompt it was generated under is unusable.
+ */
+export interface TurnCapture {
+  systemPrompt: string;
+  /** Logical model id (providerRouting) — mapModel resolves the concrete one. */
+  model: string;
+  /** Intermediate tool-loop messages: assistant tool_calls + tool results, in order. */
+  toolMessages: Array<{ role: string; content: string; tool_calls?: unknown }>;
+}
+
 export type ChatResult =
-  | { kind: "json"; body: unknown }
-  | { kind: "stream"; stream: ReadableStream<Uint8Array>; citations: string[] }
+  | { kind: "json"; body: unknown; capture?: TurnCapture }
+  | { kind: "stream"; stream: ReadableStream<Uint8Array>; citations: string[]; capture?: TurnCapture }
   | { kind: "error"; status: number; message: string; reason?: string };
 
 // ---------------------------------------------------------------------------
@@ -858,9 +872,10 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
   if (teachingMode) {
     console.log("[orchestrator] Teaching mode: fast path (no tool loop)");
 
+    // Teaching mode only captures memories and acknowledges — cheap tier.
+    const teachModel = selectModel("memory");
     const teachResponse = await aiChatCompletion({
-      // Teaching mode only captures memories and acknowledges — cheap tier.
-      model: selectModel("memory"),
+      model: teachModel,
       messages: currentMessages,
       tools: [{
         type: "function",
@@ -916,7 +931,11 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
       }
     }
 
-    return { kind: "json", body: { response: responseText, message: responseText } };
+    return {
+      kind: "json",
+      body: { response: responseText, message: responseText },
+      capture: { systemPrompt, model: teachModel, toolMessages: [] },
+    };
   }
 
   // Tool execution loop - non-streaming request first to check for tool calls
@@ -1064,5 +1083,18 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
     }
   })();
 
-  return { kind: "stream", stream: readable, citations: allCitations };
+  return {
+    kind: "stream",
+    stream: readable,
+    citations: allCitations,
+    capture: {
+      systemPrompt,
+      model: chatModel,
+      // Everything appended past the initial prompt+history is this turn's
+      // tool loop (assistant tool_calls + tool results).
+      toolMessages: currentMessages.slice(conversationMessages.length) as Array<{
+        role: string; content: string; tool_calls?: unknown;
+      }>,
+    },
+  };
 }

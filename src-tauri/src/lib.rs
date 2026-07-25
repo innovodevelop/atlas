@@ -101,11 +101,11 @@ fn spawn_atlas_brain(token: &str) -> Option<Child> {
     let mut cmd = Command::new(&bin);
     cmd.env("SIDECAR_TOKEN", token)
         .env("ATLAS_BRAIN_PORT", ATLAS_BRAIN_PORT.to_string());
-    // AI keys from the Keychain (never in env files / git). Anthropic is the
-    // reasoning provider; the Gemini key is only a transitional fallback for
-    // installs that predate the Claude swap.
+    // AI key from the Keychain (never in env files / git). Anthropic is the
+    // only chat provider on the app path — the Gemini key is deliberately NOT
+    // injected: a silent fallback would send prompts (which embed the user's
+    // stored memories) to a processor the privacy policy does not disclose.
     if let Some(k) = secrets::core_key("anthropic_api_key") { cmd.env("ANTHROPIC_API_KEY", k); }
-    if let Some(k) = secrets::core_key("gemini_api_key") { cmd.env("GEMINI_API_KEY", k); }
     match cmd.spawn() {
         Ok(child) => {
             eprintln!("[atlas] brain sidecar spawned (pid {})", child.id());

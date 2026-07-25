@@ -7,15 +7,10 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="alternate icon" href="/favicon.ico" sizes="any" />
 
-    <!-- Head start on the fonts origin every session needs.
-         The font stylesheet lives here (not as a CSS @import) so it loads in
-         parallel with the app bundle instead of after it. -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=Newsreader:ital,wght@1,500&display=swap"
-    />
+    <!-- Fonts are self-hosted (public/fonts) — no request to Google on launch
+         (GDPR / LG München I, 3 O 17493/20). The stylesheet lives here (not as
+         a CSS @import) so it loads in parallel with the app bundle. -->
+    <link rel="stylesheet" href="/fonts/fonts.css" />
     <meta name="description" content="Atlas is your personal AI assistant for email, documents, travel, and data research" />
     <meta name="author" content="Atlas AI" />
 

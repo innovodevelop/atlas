@@ -23,13 +23,13 @@ function basis(i: number): Float32Array {
   return v;
 }
 
-test("hybrid recall ranks by similarity and filters", () => {
+test("hybrid recall ranks by similarity and filters", async () => {
   const db = freshDb();
   upsertVector(db, { id: "a", userId: "u", chunkText: "apple pie recipe", embedding: basis(0) });
   upsertVector(db, { id: "b", userId: "u", chunkText: "quantum physics lecture", embedding: basis(1) });
   upsertVector(db, { id: "c", userId: "u", chunkText: "apple orchard tour", embedding: basis(2) });
 
-  const hits = recall(db, { userId: "u", queryEmbedding: basis(0), queryText: "apple", matchCount: 5 });
+  const hits = await recall(db, { userId: "u", queryEmbedding: basis(0), queryText: "apple", matchCount: 5 });
 
   // a is the nearest vector (sim ~1) and matches the term -> ranked first.
   expect(hits[0].id).toBe("a");
@@ -40,18 +40,18 @@ test("hybrid recall ranks by similarity and filters", () => {
   expect(hits.some((h) => h.id === "c")).toBe(true);
 });
 
-test("recall is user-scoped", () => {
+test("recall is user-scoped", async () => {
   const db = freshDb();
   upsertVector(db, { id: "a", userId: "u", chunkText: "apple", embedding: basis(0) });
-  expect(recall(db, { userId: "other", queryEmbedding: basis(0), queryText: "apple" }).length).toBe(0);
+  expect((await recall(db, { userId: "other", queryEmbedding: basis(0), queryText: "apple" })).length).toBe(0);
 });
 
-test("is_fake knowledge is excluded even on a strong vector hit", () => {
+test("is_fake knowledge is excluded even on a strong vector hit", async () => {
   const db = freshDb();
   db.query(
     `INSERT INTO atlas_knowledge_entries (id, user_id, topic, content, is_fake) VALUES (?,?,?,?,1)`,
   ).run("k1", "u", "t", "{}");
   upsertVector(db, { id: "d", userId: "u", chunkText: "apple cider", embedding: basis(0), knowledgeEntryId: "k1" });
-  const hits = recall(db, { userId: "u", queryEmbedding: basis(0), queryText: "apple", matchCount: 5 });
+  const hits = await recall(db, { userId: "u", queryEmbedding: basis(0), queryText: "apple", matchCount: 5 });
   expect(hits.some((h) => h.id === "d")).toBe(false);
 });

@@ -21,6 +21,19 @@ const SEQ: Record<Mode, FieldKey[]> = {
 
 const firstName = (n: string) => n.trim().split(' ')[0] || 'friend';
 
+// Legal pages live on the marketing site; open them in the system browser (the
+// Tauri webview shouldn't navigate away from the app). Falls back to
+// window.open when running as a plain web page (dev server).
+const openLegal = async (e: React.MouseEvent, url: string) => {
+  e.preventDefault();
+  try {
+    const { openUrl } = await import('@tauri-apps/plugin-opener');
+    await openUrl(url);
+  } catch {
+    window.open(url, '_blank', 'noopener');
+  }
+};
+
 function promptFor(mode: Mode, key: FieldKey, name: string): string {
   if (mode === 'signin') return key === 'email' ? 'Welcome back. What’s your email?' : 'And your password?';
   if (key === 'name') return 'Lovely. What should I call you?';
@@ -199,7 +212,25 @@ const Auth = () => {
         </div>
       </div>
 
-      <p className="aterms">By continuing, you agree to our Terms &amp; Privacy Policy.</p>
+      <p className="aterms">
+        By continuing, you agree to our{' '}
+        <a
+          href="https://atlas.innovo-studio.com/terms"
+          onClick={(e) => openLegal(e, 'https://atlas.innovo-studio.com/terms')}
+          style={{ color: 'inherit', textDecoration: 'underline' }}
+        >
+          Terms
+        </a>
+        {' '}&amp;{' '}
+        <a
+          href="https://atlas.innovo-studio.com/privacy"
+          onClick={(e) => openLegal(e, 'https://atlas.innovo-studio.com/privacy')}
+          style={{ color: 'inherit', textDecoration: 'underline' }}
+        >
+          Privacy Policy
+        </a>
+        .
+      </p>
     </div>
   );
 };

@@ -43,13 +43,23 @@ export function getAIConfig(): AIGatewayConfig | null {
   if (anthropicKey) {
     return { chatUrl: ANTHROPIC_MESSAGES_URL, apiKey: anthropicKey, provider: "anthropic" };
   }
-  const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-  if (lovableKey) {
-    return { chatUrl: LOVABLE_CHAT_URL, apiKey: lovableKey, provider: "lovable_ai" };
-  }
-  const geminiKey = Deno.env.get("GEMINI_API_KEY");
-  if (geminiKey) {
-    return { chatUrl: GEMINI_CHAT_URL, apiKey: geminiKey, provider: "gemini" };
+  // Anthropic is the ONLY chat provider on the app path. Falling back to
+  // Google/Lovable when the key is missing would silently ship the user's
+  // prompts — which embed their stored memories — to an undisclosed processor,
+  // contradicting the privacy policy. Fail closed instead: callers surface
+  // "no AI key configured" and nothing leaves the device.
+  //
+  // ATLAS_ALLOW_LEGACY_PROVIDERS is an explicit developer opt-in for comparing
+  // providers locally; it is never set in the packaged app.
+  if (Deno.env.get("ATLAS_ALLOW_LEGACY_PROVIDERS") === "1") {
+    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+    if (lovableKey) {
+      return { chatUrl: LOVABLE_CHAT_URL, apiKey: lovableKey, provider: "lovable_ai" };
+    }
+    const geminiKey = Deno.env.get("GEMINI_API_KEY");
+    if (geminiKey) {
+      return { chatUrl: GEMINI_CHAT_URL, apiKey: geminiKey, provider: "gemini" };
+    }
   }
   return null;
 }

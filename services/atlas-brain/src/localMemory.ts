@@ -8,18 +8,28 @@
  * brute-force cosine over the user's vectors is sub-millisecond and needs no
  * extension — so this works in the compiled sidecar binary with no external
  * dependency. (The Rust side keeps a sqlite-vec index for frontend use; both
- * read the same table and apply the identical scoring formula.)
+ * read the same table and apply the identical base scoring formula.)
  *
- * Scoring (identical to the Postgres RPC + the Rust port):
+ * Base scoring (identical to the Postgres RPC + the Rust port):
  *   score = (0.65*sim + 0.35*min(kw,1)) * (0.5 + 0.5*recency) * (0.5 + importance/20)
  *   sim = cosine(query, embedding); recency = exp(-age_seconds / (86400*65));
  *   importance = ai_memory.importance | knowledge.relevance_score*10 | 5;
  *   keep rows with sim>0.25 OR kw>0.05; drop is_fake; ORDER score DESC.
+ *
+ * On top of that base, recall() runs a second-stage rerank over the top
+ * match_count*8 candidates (mirroring db.rs's 8x over-fetch slot) and blends
+ * final = 0.7*rerank + 0.3*base — the base term keeps the recency/importance
+ * shaping in play. The rerank stage is brain-side ONLY: db.rs still returns
+ * pure base ordering for the frontend's direct recall, so the shared invariant
+ * is the *candidate* scoring above, not the final brain ordering. Rerank
+ * failures fail open to base ordering (logged once) — retrieval never breaks
+ * because reranking did.
  */
 
 import { Database } from "bun:sqlite";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { rerankPairs } from "./rerank.ts";
 
 export const DEFAULT_DB_PATH = join(
   homedir(),
@@ -122,11 +132,25 @@ interface Row {
   ake_fake: number | null;
 }
 
-/** Hybrid semantic+lexical recall over the user's memory vectors. */
-export function recall(
+/** Same 8x over-fetch db.rs uses (`k = match_count * 8`) — the rerank works on this slice. */
+const RERANK_OVERFETCH = 8;
+
+// Rerank failures fall back silently after the first log — one warning per
+// process, not one per recall.
+let rerankWarned = false;
+
+/** Hybrid semantic+lexical recall over the user's memory vectors, reranked. */
+export async function recall(
   db: Database,
-  opts: { userId: string; queryEmbedding: Float32Array | number[]; queryText: string; matchCount?: number },
-): RecallHit[] {
+  opts: {
+    userId: string;
+    queryEmbedding: Float32Array | number[];
+    queryText: string;
+    matchCount?: number;
+    /** Test seam — recall always defaults to rerankPairs. */
+    rerankFn?: (query: string, docs: string[]) => Promise<number[]>;
+  },
+): Promise<RecallHit[]> {
   const q = opts.queryEmbedding instanceof Float32Array ? opts.queryEmbedding : Float32Array.from(opts.queryEmbedding);
   const matchCount = opts.matchCount ?? 12;
 
@@ -167,5 +191,23 @@ export function recall(
     });
   }
   scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, Math.max(0, matchCount));
+  const candidates = scored.slice(0, Math.max(0, matchCount) * RERANK_OVERFETCH);
+
+  // Second stage: rerank the over-fetched candidates, blend with the base score
+  // (which carries the recency/importance shaping), fail open on any error.
+  if (opts.queryText.trim() && candidates.length > 1) {
+    try {
+      const rr = await (opts.rerankFn ?? rerankPairs)(opts.queryText, candidates.map((c) => c.chunk_text));
+      for (let i = 0; i < candidates.length; i++) {
+        candidates[i].score = 0.7 * (rr[i] ?? 0) + 0.3 * candidates[i].score;
+      }
+      candidates.sort((a, b) => b.score - a.score);
+    } catch (e) {
+      if (!rerankWarned) {
+        rerankWarned = true;
+        console.error("[brain] rerank failed — falling back to base recall ordering:", e);
+      }
+    }
+  }
+  return candidates.slice(0, Math.max(0, matchCount));
 }

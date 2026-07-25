@@ -57,6 +57,87 @@ pub struct DbState {
     pub conn: Mutex<Connection>,
 }
 
+/// Dedupe ai_memory to one row per (user_id, key) BEFORE the schema batch runs:
+/// db_schema.sql now carries `CREATE UNIQUE INDEX idx_ai_memory_user_key`, and
+/// on a pre-existing DB with duplicate facts that statement would fail unless
+/// the duplicates are collapsed first. Keeps the newest row per group (by
+/// updated_at, then rowid), sums mention_count into the survivor. Idempotent —
+/// a no-op once unique — and safe on a fresh DB (table may not exist yet).
+fn migrate_ai_memory(conn: &Connection) -> Result<(), String> {
+    let exists: bool = conn
+        .query_row(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='ai_memory'",
+            [],
+            |_| Ok(true),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?
+        .unwrap_or(false);
+    if !exists {
+        return Ok(());
+    }
+    // Order matters for launch latency: the dedupe's correlated subquery is a
+    // full table scan per row without an index (measured: 40k dirty rows =
+    // ~70 s, blocking the window). Build a NON-unique lookup index first, run
+    // the dedupe inside a transaction (so a crash can't leave summed counts
+    // AND their duplicates behind — a re-run would sum twice), then promote to
+    // the unique index the ON CONFLICT upsert targets.
+    //
+    // `SET updated_at = updated_at` looks redundant but is load-bearing: it
+    // suppresses trg_ai_memory_updated, which would otherwise stamp every
+    // deduped survivor as brand-new and skew recall's recency scoring against
+    // memories that were never duplicated.
+    conn.execute_batch(
+        "BEGIN IMMEDIATE;
+         CREATE INDEX IF NOT EXISTS idx_ai_memory_user_key_scan ON ai_memory(user_id, key);
+         WITH survivors AS (
+           SELECT (SELECT a2.id FROM ai_memory a2
+                    WHERE a2.user_id = a1.user_id AND a2.key = a1.key
+                    ORDER BY a2.updated_at DESC, a2.rowid DESC LIMIT 1) AS keep_id,
+                  SUM(COALESCE(a1.mention_count, 1)) AS total_mentions
+           FROM ai_memory a1 GROUP BY a1.user_id, a1.key HAVING COUNT(*) > 1
+         )
+         UPDATE ai_memory
+            SET mention_count = (SELECT s.total_mentions FROM survivors s WHERE s.keep_id = ai_memory.id),
+                updated_at = updated_at
+          WHERE id IN (SELECT keep_id FROM survivors);
+         DELETE FROM ai_memory WHERE EXISTS (
+           SELECT 1 FROM ai_memory a2
+            WHERE a2.user_id = ai_memory.user_id AND a2.key = ai_memory.key
+              AND (a2.updated_at > ai_memory.updated_at
+                   OR (a2.updated_at = ai_memory.updated_at AND a2.rowid > ai_memory.rowid))
+         );
+         COMMIT;",
+    )
+    .map_err(|e| format!("ai_memory dedupe migration failed: {e}"))?;
+
+    // Promote to the unique index separately and non-fatally: if any duplicate
+    // survived (e.g. legacy rows with a NULL updated_at that the comparisons
+    // above can't order), the app must still start — upserts degrade to plain
+    // inserts rather than the window never appearing.
+    if let Err(e) = conn.execute_batch(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_memory_user_key ON ai_memory(user_id, key);",
+    ) {
+        eprintln!("[atlas] ai_memory unique index not created (duplicates remain?): {e}");
+    }
+    Ok(())
+}
+
+/// Post-schema reconciliation: forgetting happens in the brain sidecar too
+/// (bun:sqlite), which can delete memory_vectors rows but cannot touch the
+/// vec0 index (no extension loading there). Purge index entries whose base row
+/// is gone so a forgotten memory can't linger as a KNN/FTS candidate.
+/// Best-effort by design — recall joins memory_vectors, so residue is a rank
+/// artifact, never a data leak; failing here must not brick app startup.
+fn reconcile_vector_indexes(conn: &Connection) {
+    if let Err(e) = conn.execute_batch(
+        "DELETE FROM memory_vec WHERE id NOT IN (SELECT id FROM memory_vectors);\
+         DELETE FROM memory_fts WHERE id NOT IN (SELECT id FROM memory_vectors);",
+    ) {
+        eprintln!("[db] vector-index reconciliation skipped: {e}");
+    }
+}
+
 impl DbState {
     /// Open (creating if absent) the DB at `path`, set pragmas, ensure schema.
     pub fn open(path: &Path) -> Result<Self, String> {
@@ -68,8 +149,10 @@ impl DbState {
              PRAGMA foreign_keys = ON;",
         )
         .map_err(|e| e.to_string())?;
+        migrate_ai_memory(&conn)?;
         conn.execute_batch(SCHEMA).map_err(|e| e.to_string())?;
         conn.execute_batch(VEC_SCHEMA).map_err(|e| e.to_string())?;
+        reconcile_vector_indexes(&conn);
         Ok(DbState { conn: Mutex::new(conn) })
     }
 
@@ -78,8 +161,10 @@ impl DbState {
         ensure_vec_extension();
         let conn = Connection::open_in_memory().map_err(|e| e.to_string())?;
         conn.execute_batch("PRAGMA foreign_keys = ON;").map_err(|e| e.to_string())?;
+        migrate_ai_memory(&conn)?;
         conn.execute_batch(SCHEMA).map_err(|e| e.to_string())?;
         conn.execute_batch(VEC_SCHEMA).map_err(|e| e.to_string())?;
+        reconcile_vector_indexes(&conn);
         Ok(DbState { conn: Mutex::new(conn) })
     }
 }
@@ -738,6 +823,61 @@ mod tests {
         upsert_vector(&conn, "d", "u", "apple cider", &basis(0), None, Some("k1")).unwrap();
         let res2 = recall(&conn, "u", &basis(0), "apple", 5).unwrap();
         assert!(res2.as_array().unwrap().iter().all(|r| r["id"] != json!("d")));
+    }
+
+    #[test]
+    fn ai_memory_migration_dedupes_and_is_idempotent() {
+        ensure_vec_extension();
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+        // Pre-Phase-3 DB: same table shape, but no unique (user_id, key) index,
+        // so duplicate facts exist. The CREATE TABLE here must stay column-
+        // compatible with db_schema.sql (IF NOT EXISTS skips it later).
+        conn.execute_batch(
+            "CREATE TABLE ai_memory (
+               id TEXT PRIMARY KEY, user_id TEXT NOT NULL, memory_type TEXT NOT NULL,
+               category TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL,
+               importance INTEGER DEFAULT 5, last_mentioned TEXT, mention_count INTEGER DEFAULT 1,
+               is_validated INTEGER DEFAULT 0, is_fake INTEGER DEFAULT 0, validation_score REAL DEFAULT 0,
+               created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+               updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')));
+             INSERT INTO ai_memory (id,user_id,memory_type,category,key,value,mention_count,updated_at) VALUES
+               ('a','u','fact','personal','car','old',   2, '2026-01-01T00:00:00.000Z'),
+               ('b','u','fact','personal','car','new',   3, '2026-02-01T00:00:00.000Z'),
+               ('c','v','fact','personal','car','other', 1, '2026-01-15T00:00:00.000Z');",
+        )
+        .unwrap();
+
+        migrate_ai_memory(&conn).unwrap();
+        conn.execute_batch(SCHEMA).unwrap();
+        conn.execute_batch(VEC_SCHEMA).unwrap();
+        reconcile_vector_indexes(&conn);
+
+        // Newest row survives with the group's summed mention_count; the other
+        // user's same key is untouched.
+        let (id, value, mentions): (String, String, i64) = conn
+            .query_row(
+                "SELECT id, value, mention_count FROM ai_memory WHERE user_id='u' AND key='car'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!((id.as_str(), value.as_str(), mentions), ("b", "new", 5));
+        let total: i64 = conn.query_row("SELECT COUNT(*) FROM ai_memory", [], |r| r.get(0)).unwrap();
+        assert_eq!(total, 2);
+
+        // Re-run = no-op (idempotent), and the unique index now enforces the rule.
+        migrate_ai_memory(&conn).unwrap();
+        conn.execute_batch(SCHEMA).unwrap();
+        let total2: i64 = conn.query_row("SELECT COUNT(*) FROM ai_memory", [], |r| r.get(0)).unwrap();
+        assert_eq!(total2, 2);
+        assert!(conn
+            .execute(
+                "INSERT INTO ai_memory (id,user_id,memory_type,category,key,value)
+                 VALUES ('d','u','fact','personal','car','dupe')",
+                [],
+            )
+            .is_err());
     }
 
     #[test]
