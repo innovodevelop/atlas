@@ -159,6 +159,23 @@ the pipeline without burning a version number.
 
 ## 5. How the updater feed works
 
+> **⚠ Unresolved: which repo is the release home?** The endpoint below names
+> `HelloAtlasAI/helloatlas`, but the working branch is pushed to the fork
+> `innovodevelop/helloatlas-1`, and the authenticated account has **no push
+> access** to `HelloAtlasAI/helloatlas`. A tag pushed to the fork publishes the
+> release *on the fork*, while shipped apps would poll `HelloAtlasAI` — a feed
+> that 404s forever. Pick one before the first `v*` tag:
+>
+> - **Release from the fork** → change `plugins.updater.endpoints[0]` in
+>   `src-tauri/tauri.conf.json` to
+>   `https://github.com/innovodevelop/helloatlas-1/releases/latest/download/latest.json`.
+> - **Release from `HelloAtlasAI/helloatlas`** → get push access to that repo
+>   and push tags there; the endpoint is already correct.
+>
+> The `Verify updater endpoint points at this repo` step in `release.yml` fails
+> the build if these disagree, so this cannot ship wrong silently — but it also
+> means a tag pushed to the fork fails until one of the two is done.
+
 - The app's updater config (in `src-tauri/tauri.conf.json`, `plugins.updater`)
   points at the static URL
   `https://github.com/HelloAtlasAI/helloatlas/releases/latest/download/latest.json`.
