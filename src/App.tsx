@@ -22,6 +22,8 @@ const AtlasDemo = lazy(() => import("./pages/AtlasDemo"));
 const AtlasCore = lazy(() => import("./pages/AtlasCore"));
 const AtlasTeach = lazy(() => import("./pages/AtlasTeach"));
 const AtlasArchitecture = lazy(() => import("./pages/AtlasArchitecture"));
+// Internal QA surface for the sphere — a design tool, not on the dock.
+const AtlasSphereGallery = lazy(() => import("./pages/AtlasSphereGallery"));
 
 // Instant startup: dashboard data (weather, stocks, news, tasks…) is
 // persisted to disk-backed localStorage, so the app paints with last-known
@@ -131,6 +133,14 @@ const App = () => (
               <Suspense fallback={<PageLoader />}>
                 <AtlasCore />
             </Suspense>
+            }
+          />
+          <Route
+            path="/atlas-sphere"
+            element={
+              <Suspense fallback={<PageLoader />}>
+                <AtlasSphereGallery />
+              </Suspense>
             }
           />
            <Route
