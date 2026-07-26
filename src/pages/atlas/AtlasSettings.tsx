@@ -19,7 +19,7 @@ import { useMusicPlayer } from '@/hooks/useMusicPlayer';
 // Terms (§4) point at, so it has to be as easy to reach as connecting was
 // (GDPR Art. 7(3)).
 
-type SettingsTab = 'voice' | 'mail' | 'portfolio' | 'music' | 'budget' | 'personality' | 'memory' | 'updates';
+export type SettingsTab = 'voice' | 'mail' | 'portfolio' | 'music' | 'budget' | 'personality' | 'memory' | 'updates';
 
 const TABS: { key: SettingsTab; label: string; icon: typeof Mic }[] = [
   { key: 'voice', label: 'Voice', icon: Mic },
@@ -32,8 +32,8 @@ const TABS: { key: SettingsTab; label: string; icon: typeof Mic }[] = [
   { key: 'updates', label: 'Software Update', icon: Download },
 ];
 
-export const AtlasSettings = ({ onClose }: { onClose: () => void }) => {
-  const [tab, setTab] = useState<SettingsTab>('voice');
+export const AtlasSettings = ({ onClose, initialTab }: { onClose: () => void; initialTab?: SettingsTab }) => {
+  const [tab, setTab] = useState<SettingsTab>(initialTab ?? 'voice');
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';

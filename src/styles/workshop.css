@@ -1024,3 +1024,38 @@ body{display:block;overflow-x:hidden;overflow-y:visible;max-width:none;flex:none
 .proactive-text{font-size:13px;line-height:1.45;color:rgba(30,30,36,.72)}
 .proactive-close{flex:none;border:0;background:none;padding:2px;margin:-2px -2px 0 4px;color:rgba(30,30,36,.45);cursor:pointer;border-radius:6px;transition:color .2s,background .2s}
 .proactive-close:hover{color:var(--ink);background:rgba(30,30,36,.06)}
+
+/* --- Account menu (dock avatar popover) -----------------------------------
+   Atlas had no account surface at all before this: no sign-out, no plan, no
+   route to account deletion — which the published privacy policy promises is
+   available in the app. Anchored above the dock, so it opens upward.        */
+.acctwrap{position:relative}
+.acctmenu{position:absolute;bottom:44px;right:0;z-index:60;min-width:236px;padding:6px;
+  background:var(--ink);border:1px solid rgba(249,247,244,.14);border-radius:18px;
+  box-shadow:0 18px 44px -18px rgba(30,30,36,.6);
+  /* The panel is --ink on --ink; without this any text not covered by a child
+     rule would inherit dark-on-dark and vanish. */
+  color:var(--dkf);
+  animation:acctin .22s cubic-bezier(.22,1,.36,1) both}
+@keyframes acctin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.acctid{padding:10px 12px 12px}
+.acctmail{margin:0;font-size:13px;font-weight:500;color:var(--dkf);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acctplan{margin:5px 0 0;display:flex;align-items:center;gap:5px;
+  font-size:11.5px;letter-spacing:.04em;text-transform:capitalize;color:rgba(249,247,244,.62)}
+.acctitem{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;
+  border:none;border-radius:12px;background:transparent;color:rgba(249,247,244,.86);
+  font-family:inherit;font-size:13px;text-align:left;cursor:pointer;
+  transition:background .18s,color .18s}
+.acctitem:hover{background:rgba(249,247,244,.12);color:#fff}
+.acctsep{height:1px;margin:6px 8px;background:rgba(249,247,244,.12)}
+.acctdanger:hover{background:rgba(208,69,58,.18);color:#ffd9d5}
+
+/* Listening indicator, relocated out of the removed top bar. It is the only
+   text telling the user the wake phrase and that the microphone is live, so it
+   stays visible rather than disappearing with the header. */
+.bandlisten{display:inline-flex;align-items:center;gap:8px;margin-top:10px;
+  padding:5px 11px 5px 9px;border-radius:9999px;
+  background:rgba(var(--surface-rgb),.7);border:1px solid var(--bd);
+  font-size:12px;color:var(--ink2);cursor:pointer;transition:border-color .2s,color .2s}
+.bandlisten:hover{border-color:var(--ink3);color:var(--ink)}

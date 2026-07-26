@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Cpu, Mic, Sparkles, Settings, Shield, CornerUpLeft } from 'lucide-react';
+import { Cpu, Mic, Sparkles, Settings, Home, CornerUpLeft } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWeather } from '@/hooks/useWeather';
@@ -19,11 +19,11 @@ import { ProactiveInsight } from '@/components/atlas-ui/ProactiveInsight';
 import {
   AtlasAirQualityCard, AtlasNowPlayingCard, AtlasActivityCard, AtlasWorldClockCard,
 } from '@/components/atlas-ui/AtlasExtraCards';
-import { HeaderWave } from '@/components/atlas-ui/HeaderWave';
 import { AtmosphereCanvas } from '@/components/atlas-ui/AtmosphereCanvas';
 import { AtlasDrawer } from '@/components/atlas-ui/AtlasDrawer';
 import { AtlasExpanded } from '@/components/atlas-ui/AtlasExpanded';
-import { AtlasSettings } from './AtlasSettings';
+import { AtlasSettings, type SettingsTab } from './AtlasSettings';
+import { AccountMenu } from '@/components/atlas-ui/AccountMenu';
 
 export type AtlasExpandedKey = 'weather' | 'calendar' | 'tasks' | 'stocks' | 'email' | 'news' | 'music' | null;
 
@@ -39,6 +39,10 @@ const AtlasDashboard = () => {
   // region swaps to the focused widget. `gridFolding` runs the staggered
   // fold-out before the focused view mounts; `viewExiting` runs the reverse.
   const [expanded, setExpanded] = useState<AtlasExpandedKey>(null);
+  const [acctOpen, setAcctOpen] = useState(false);
+  // Lets the account menu deep-link straight to Memory & Privacy, which
+  // owns the account-deletion flow the privacy policy points users at.
+  const [settingsTab, setSettingsTab] = useState<SettingsTab | undefined>();
   const [gridFolding, setGridFolding] = useState(false);
   const [viewExiting, setViewExiting] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -122,23 +126,11 @@ const AtlasDashboard = () => {
       <div className="grain" />
       <ProactiveInsight />
 
-      {/* Design "Atlas Dashboard (Current)": floating pill header with the
-          animated glow wash + full-width audio-wave canvas; the shimmer label
-          and eq bars float centered over the wave. */}
-      <header className="hdrB">
-        <div className="hdrbg" />
-        <HeaderWave state={effectiveAtlasState} audioLevel={audioLevel} />
-        <div className="fx ac gap10 pointer" style={{ position: 'relative' }} onClick={() => navigate('/')}>
-          <span className="wm" style={{ fontFamily: "'Geist',system-ui,sans-serif", fontWeight: 500, letterSpacing: '-.035em' }}>atlas</span>
-        </div>
-        <div className="hdrviz" title="Speak to Atlas" onClick={handleManualActivate}>
-          <span className="wavelbl">
-            <span className="eq"><span className="eqb" /><span className="eqb" /><span className="eqb" /><span className="eqb" /><span className="eqb" /></span>
-            <span className="stshimmer">{atlasStateLabel(effectiveAtlasState)}</span>
-          </span>
-        </div>
-      </header>
-
+      {/* The pill top bar is gone (2026-07-26 handoff): the greeting band IS the
+          header now. What the bar carried moved rather than vanished — the
+          wordmark's home action is the dock's Home item, and the listening
+          indicator sits under the subline below, because it is the only text
+          telling the user the wake phrase and that the microphone is live. */}
       <section className={`bandB${swapping ? ' swapping' : ''}`}>
         <div className="orbwrapB" onClick={() => setDrawerOpen(true)}>
           <div className="orbhalo" />
@@ -151,6 +143,14 @@ const AtlasDashboard = () => {
             title={expanded ? 'Return to dashboard' : undefined}
           >{band.lead}<span className="accw">{band.accent}</span></h2>
           <p className="gsubB">{band.subline}</p>
+          {/* Relocated from the removed top bar. Kept as a live disclosure that
+              the microphone is on and which phrase wakes it — dropping it with
+              the header would have made an always-listening app say so
+              nowhere. Still the manual-activate affordance. */}
+          <button className="bandlisten" onClick={handleManualActivate} title="Speak to Atlas">
+            <span className="eq"><span className="eqb" /><span className="eqb" /><span className="eqb" /><span className="eqb" /><span className="eqb" /></span>
+            <span>{atlasStateLabel(effectiveAtlasState)}</span>
+          </button>
         </div>
         <div className="bandmetaB">
           <p className="bmvB tnum">{band.metaBig}</p>
@@ -160,11 +160,18 @@ const AtlasDashboard = () => {
 
       {/* Bottom dock — Workshop's fixed centered pill with hover-expanding labels */}
       <div className="dock">
+        {/* Was two buttons, both navigating to /atlas-core. The duplicate is now
+            Home — the affordance the wordmark took with it. On the dashboard it
+            closes a focused widget; elsewhere it returns here. */}
+        <button
+          className="dockb"
+          onClick={() => { if (expanded) closeWidget(); else navigate('/'); }}
+          aria-label="Home"
+        >
+          <Home className="i16" /><span className="dockl">Home</span>
+        </button>
         <button className="dockb" onClick={() => navigate('/atlas-core')} aria-label="Atlas Core">
           <Cpu className="i16" /><span className="dockl">Core</span>
-        </button>
-        <button className="dockb" onClick={() => navigate('/atlas-core')} aria-label="Control">
-          <Shield className="i16" /><span className="dockl">Control</span>
         </button>
         <button className="dockb" onClick={handleManualActivate} aria-label="Voice">
           <Mic className="i16" /><span className="dockl">Voice</span>
@@ -175,7 +182,22 @@ const AtlasDashboard = () => {
         <button className="dockb dockcta" onClick={() => setDrawerOpen(true)} aria-label="New chat">
           <Sparkles className="i16" /><span className="dockl">New chat</span>
         </button>
-        <button className="dockav" onClick={() => navigate('/atlas-core')} aria-label="Profile">{initials}</button>
+        {/* Was a navigate('/atlas-core') with no account surface behind it. */}
+        <div className="acctwrap">
+          <button
+            className="dockav"
+            onClick={() => setAcctOpen((v) => !v)}
+            aria-label="Account"
+            aria-haspopup="menu"
+            aria-expanded={acctOpen}
+          >{initials}</button>
+          {acctOpen && (
+            <AccountMenu
+              onClose={() => setAcctOpen(false)}
+              onOpenSettings={(tab) => { setSettingsTab(tab); setSettingsOpen(true); }}
+            />
+          )}
+        </div>
       </div>
 
       {/* Grid region: shows the widget grid, OR the focused widget — the header
@@ -219,7 +241,12 @@ const AtlasDashboard = () => {
         onSend={send}
       />
 
-      {settingsOpen && <AtlasSettings onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && (
+        <AtlasSettings
+          initialTab={settingsTab}
+          onClose={() => { setSettingsOpen(false); setSettingsTab(undefined); }}
+        />
+      )}
     </div>
   );
 };
