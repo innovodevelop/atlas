@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Cpu, Mic, Sparkles, Settings, Home, CornerUpLeft } from 'lucide-react';
+import { Cpu, Mic, MicOff, Sparkles, Settings, Home, CornerUpLeft } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWeather } from '@/hooks/useWeather';
@@ -8,8 +8,12 @@ import { useCalendarEvents } from '@/hooks/useCalendarEvents';
 import { useUnifiedChat } from '@/hooks/useUnifiedChat';
 import { useVoiceSession } from '@/hooks/useVoiceSession';
 import { useAtlasSettings } from '@/hooks/useAtlasSettings';
+import { useAgentRuns } from '@/hooks/useAgentRuns';
+import { useAtlasPresence } from '@/hooks/useAtlasPresence';
+import { presenceToWebGL, presenceLabel } from '@/components/atlas/presenceBridge';
+import { getActiveWakePhrases } from '@/lib/wakeWord';
 import { AtlasSphereLazy as AtlasSphere } from '@/components/atlas/AtlasSphereLazy';
-import { timeOfDayGreeting, atlasStateLabel } from './atlasHelpers';
+import { timeOfDayGreeting } from './atlasHelpers';
 import { useBandNarration, type BandContent } from './useBandNarration';
 import {
   AtlasWeatherCard, AtlasCalendarCard, AtlasTasksCard,
@@ -58,7 +62,7 @@ const AtlasDashboard = () => {
   const { settings: atlasSettings } = useAtlasSettings();
   const {
     audioLevel, effectiveAtlasState,
-    handleManualActivate,
+    handleManualActivate, muted, toggleMute,
   } = useVoiceSession({
     voiceId: atlasSettings.voiceId,
     ttsModelId: atlasSettings.ttsModel,
@@ -117,6 +121,26 @@ const AtlasDashboard = () => {
   }), [greetingPrefix, name, eventCount, weather.location, weather.condition, weather.temp]);
   const { content: band, swapping } = useBandNarration(expanded, home);
 
+  // Sphere presence: four of the six previously-dead states now have real
+  // triggers. `working` from an executing run, `success` from one that just
+  // finished, `alert` from one that failed, `muted` from the new mic gate.
+  const { runs, activeRun } = useAgentRuns(10);
+  const lastDone = useMemo(() => {
+    const done = runs.filter((r) => r.status === 'completed' && r.finished_at);
+    return done.length ? Date.parse(done[0].finished_at as string) : null;
+  }, [runs]);
+  const lastFault = useMemo(() => {
+    const failed = runs.filter((r) => r.status === 'failed' && r.finished_at);
+    return failed.length ? Date.parse(failed[0].finished_at as string) : null;
+  }, [runs]);
+  const presence = useAtlasPresence({
+    voiceState: effectiveAtlasState,
+    muted,
+    runActive: !!activeRun,
+    runCompletedAt: lastDone,
+    faultAt: lastFault,
+  });
+
   const initials = (name[0] || 'A').toUpperCase();
 
   return (
@@ -134,7 +158,7 @@ const AtlasDashboard = () => {
       <section className={`bandB${swapping ? ' swapping' : ''}`}>
         <div className="orbwrapB" onClick={() => setDrawerOpen(true)}>
           <div className="orbhalo" />
-          <AtlasSphere state={effectiveAtlasState} audioLevel={audioLevel} context="dashboard" className="orbcvB" />
+          <AtlasSphere state={presenceToWebGL(presence)} audioLevel={audioLevel} context="dashboard" className="orbcvB" />
         </div>
         <div>
           <h2
@@ -147,9 +171,13 @@ const AtlasDashboard = () => {
               the microphone is on and which phrase wakes it — dropping it with
               the header would have made an always-listening app say so
               nowhere. Still the manual-activate affordance. */}
-          <button className="bandlisten" onClick={handleManualActivate} title="Speak to Atlas">
+          <button
+            className="bandlisten"
+            onClick={muted ? toggleMute : handleManualActivate}
+            title={muted ? 'Turn the microphone back on' : 'Speak to Atlas'}
+          >
             <span className="eq"><span className="eqb" /><span className="eqb" /><span className="eqb" /><span className="eqb" /><span className="eqb" /></span>
-            <span>{atlasStateLabel(effectiveAtlasState)}</span>
+            <span>{presenceLabel(presence, getActiveWakePhrases())}</span>
           </button>
         </div>
         <div className="bandmetaB">
@@ -175,6 +203,18 @@ const AtlasDashboard = () => {
         </button>
         <button className="dockb" onClick={handleManualActivate} aria-label="Voice">
           <Mic className="i16" /><span className="dockl">Voice</span>
+        </button>
+        {/* The `muted` sphere state was specified with no way to reach it —
+            the audit's rule was to build the control before the visual. */}
+        <button
+          className="dockb"
+          onClick={toggleMute}
+          aria-label={muted ? 'Unmute microphone' : 'Mute microphone'}
+          aria-pressed={muted}
+          style={muted ? { color: '#fff', background: 'rgba(208,69,58,.28)' } : undefined}
+        >
+          {muted ? <MicOff className="i16" /> : <Mic className="i16" />}
+          <span className="dockl">{muted ? 'Unmute' : 'Mute'}</span>
         </button>
         <button className="dockb" onClick={() => setSettingsOpen(true)} aria-label="Settings">
           <Settings className="i16" /><span className="dockl">Settings</span>

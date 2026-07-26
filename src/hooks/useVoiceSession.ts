@@ -55,6 +55,10 @@ export interface UseVoiceSessionResult {
   connected: boolean;
   /** Live partial transcript while listening. */
   partialTranscript: string;
+  /** Microphone gated off — the track is disabled, so nothing is captured. */
+  muted: boolean;
+  /** Toggle the microphone. */
+  toggleMute: () => void;
   /** Mic button / wake action. */
   handleManualActivate: () => void;
   /** Stop everything (Esc). */
@@ -78,6 +82,12 @@ export function useVoiceSession(options?: {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
+  // Mute is a real capture gate, not a UI flag: it disables the MediaStream
+  // track, so neither the gateway nor the local wake detector receives a
+  // single frame. A "muted" indicator that still captured audio would be the
+  // worst kind of lie for a microphone.
+  const [muted, setMuted] = useState(false);
+  const mutedRef = useRef(false);
 
   // Wake word (B2): openWakeWord runs locally on every frame while IDLE;
   // frames stream to the gateway only during an active turn. Pre-wake audio
@@ -279,6 +289,8 @@ export function useVoiceSession(options?: {
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
     });
     micStreamRef.current = stream;
+    // A stream opened while muted (e.g. reconnect) must start disabled.
+    if (mutedRef.current) stream.getAudioTracks().forEach((tr) => { tr.enabled = false; });
 
     if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
       audioCtxRef.current = new AudioContext();
@@ -291,6 +303,9 @@ export function useVoiceSession(options?: {
     const node = new AudioWorkletNode(ctx, "pcm-capture");
     node.port.onmessage = (ev) => {
       const { pcm, rms } = ev.data as { pcm: ArrayBuffer; rms: number };
+      // Belt and braces: the track is already disabled, but dropping frames
+      // here means a race on toggle cannot leak one through.
+      if (mutedRef.current) return;
       if (inTurnRef.current) {
         // Active turn: frames go to the gateway (STT + server VAD barge-in).
         const ws = wsRef.current;
@@ -335,6 +350,16 @@ export function useVoiceSession(options?: {
   // ---------------------------------------------------------------------
   // Public API
 
+  /** Toggle the microphone. Disables the track itself, so capture truly stops. */
+  const toggleMute = useCallback(() => {
+    setMuted((prev) => {
+      const next = !prev;
+      mutedRef.current = next;
+      micStreamRef.current?.getAudioTracks().forEach((tr) => { tr.enabled = !next; });
+      return next;
+    });
+  }, []);
+
   const handleManualActivate = useCallback(() => {
     void (async () => {
       await connect();
@@ -372,6 +397,8 @@ export function useVoiceSession(options?: {
   }, []);
 
   return {
+    muted,
+    toggleMute,
     effectiveAtlasState: state,
     audioLevel,
     connected,
