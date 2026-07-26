@@ -473,4 +473,30 @@ strip). Ship with undo-send, keyboard nav, virtualisation and timezone-correct
 scheduling — those are not polish, they are what makes an autonomous mail agent
 safe to use.
 
-**Awaiting your go-ahead.**
+---
+
+## Addendum — 2026-07-26, after implementing stages 1–5
+
+**§P0-1 (canvas vs WebGL) now has evidence rather than argument.** /atlas-sphere
+mounts both renderers on the same state. Two things came out of it:
+
+1. The WebGL sphere appeared blank there, which I first reported as a possible
+   shipped bug. **That was wrong.** `AtlasCore` pauses rendering when the window
+   is unfocused (`useWindowActivity`, a deliberate power win) and used
+   `frameloop='never'`, which refuses even the first draw — so a sphere mounted
+   in an unfocused window never drew once and stayed an empty box. Fixed to
+   `'demand'`: it now paints on mount. The diagnosis that settled it was
+   `CURRENT_PROGRAM === null` on a live GL context with a correct viewport — not
+   one draw call had ever been issued.
+2. **The comparison favours the canvas renderer, visibly.** On `alert` the
+   canvas sphere turns red; the WebGL one stays pale, because its palette has no
+   red *and*, while unfocused, it cannot animate a state transition at all
+   (state is expressed through `useFrame` over time, not static props). The
+   canvas renderer also costs 0.84 ms/frame against three.js's ~1 MB of bundle.
+
+Recommendation: **adopt the canvas renderer and drop three.js**, once you have
+looked at both on `/atlas-sphere` yourself. Nothing has been deleted — both are
+still mounted.
+
+Stages 2, 3, 4 and 5 are implemented and pushed. Stage 6 (Mail) remains blocked
+on the Phase-7 mail worker and on the audit-trail decision in §2.3.

@@ -471,7 +471,22 @@ export const AtlasCore = memo(forwardRef<HTMLDivElement, AtlasCoreProps>(({
         gl={{ antialias: false, alpha: true, premultipliedAlpha: false, powerPreference: 'default', failIfMajorPerformanceCaveat: false }}
         style={{ background: 'transparent' }}
         dpr={pixelRatio}
-        frameloop={windowActive ? 'always' : 'never'}
+        // 'demand' rather than 'never' while unfocused. Both stop the continuous
+        // rAF loop, so the power win is identical, but 'never' also refused the
+        // one-off render — a sphere mounted while the window was unfocused drew
+        // nothing at all and stayed an empty box until focus returned. That was
+        // reproducible on /atlas-sphere and /atlas-demo: live GL context,
+        // correct viewport, and CURRENT_PROGRAM still null, i.e. not one draw
+        // call had ever been issued.
+        //
+        // Known and accepted limit: 'demand' fixes the blank mount but does not
+        // make state transitions visible while unfocused, because this sphere
+        // expresses state through useFrame animation over time rather than
+        // static props — with no frameloop there are no frames to animate over.
+        // So an unfocused window holds a still frame of the previous state and
+        // catches up the moment focus returns. Nobody is looking in between,
+        // which is the whole premise of pausing.
+        frameloop={windowActive ? 'always' : 'demand'}
         onCreated={({ gl }) => { gl.setClearColor(0x000000, 0); }}
         fallback={<CSSFallbackOrb state={state} audioLevel={audioLevelRefToUse.current} />}
       >

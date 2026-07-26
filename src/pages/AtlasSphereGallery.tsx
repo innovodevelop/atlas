@@ -16,16 +16,17 @@
  * as unreachable, because this is the page where you would judge whether they
  * are worth reviving.
  *
- * OPEN FINDING (2026-07-26): the WebGL sphere renders NOTHING here, and not for
- * a want of trying — its canvas has a live, unlost WebGL context, a 448x448
- * buffer, 224x224 CSS box, opacity 1 and visibility visible, mounted inside the
- * dashboard's own .orbwrapB/.orbcvB wrapper. So it is not a sizing or class
- * problem. It could not be compared against the dashboard because that route is
- * behind auth. Two possibilities, and they matter very differently:
- *   a) it needs an ancestor or provider only the dashboard supplies, or
- *   b) it does not render on the dashboard either — a shipped visual bug.
- * Log in and look at the dashboard before reading anything into the empty box
- * below. If (b), the canvas/WebGL decision answers itself.
+ * RESOLVED (2026-07-26): the WebGL sphere first appeared blank here, which was
+ * briefly mistaken for a shipped bug. It was not. AtlasCore pauses rendering
+ * when the window is unfocused (useWindowActivity — the deliberate power win
+ * for the Mac app), and it used frameloop='never', which refused even the first
+ * draw. A preview pane is never focused, so it never drew once. Changed to
+ * 'demand' so it paints on mount; both spheres now render side by side here.
+ *
+ * What the comparison shows, and it is the argument for the canvas renderer:
+ * switch to `alert` and the canvas sphere turns red while the WebGL one stays
+ * pale, because the WebGL palette has no red AND, unfocused, it cannot animate
+ * a state transition at all.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -143,11 +144,6 @@ export default function AtlasSphereGallery() {
             </div>
             <figcaption style={{ fontSize: 11, letterSpacing: '.13em', textTransform: 'uppercase', color: 'var(--ink3)' }}>
               webgl · three.js
-              {/* Honest label: an empty box here is a known open question, not a
-                  verdict on the renderer. */}
-              <span style={{ display: 'block', textTransform: 'none', letterSpacing: 0, color: 'var(--red)', fontSize: 10, marginTop: 2 }}>
-                blank here — see file header
-              </span>
             </figcaption>
           </figure>
         </div>
