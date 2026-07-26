@@ -104,6 +104,7 @@ class QueryBuilder<T = any> implements PromiseLike<Result<T>> {
   private _values: unknown = null;
   private _patch: Row | null = null;
   private _select = false;
+  private _head = false;
   private _single = false;
   private _maybeSingle = false;
   private _orderCol: string | null = null;
@@ -113,8 +114,11 @@ class QueryBuilder<T = any> implements PromiseLike<Result<T>> {
 
   constructor(private table: string) {}
 
-  select(_cols?: string): this {
+  select(_cols?: string, opts?: { count?: "exact" | "planned" | "estimated"; head?: boolean }): this {
+    // `count` is implicit: every select result carries `count`. `head: true`
+    // returns only the count (data: null), mirroring supabase-js.
     this._select = true;
+    this._head = opts?.head ?? false;
     return this;
   }
   insert(values: unknown): this {
@@ -217,6 +221,7 @@ class QueryBuilder<T = any> implements PromiseLike<Result<T>> {
   private async execute(): Promise<Result<T>> {
     if (!isTauri()) {
       if (this._op === "select") {
+        if (this._head) return { data: null as T, error: null, count: 0 };
         return { data: (this._single || this._maybeSingle ? null : []) as T, error: null };
       }
       return { data: null as T, error: { message: "Local database is only available in the Atlas desktop app." } };
@@ -240,6 +245,10 @@ class QueryBuilder<T = any> implements PromiseLike<Result<T>> {
       }
       // select: narrow server-side by eq, then filter/order/limit client-side.
       const raw = await invoke<Row[]>("db_select", { table: this.table, filters: this.eqFilterObj() });
+      if (this._head) {
+        // Count-only query: count matches BEFORE limit/range, no row payload.
+        return { data: null as T, error: null, count: this.applyFilters(raw ?? []).length };
+      }
       const rows = this.postProcess(raw ?? []);
       if (this._single) {
         return {
@@ -267,6 +276,18 @@ class QueryBuilder<T = any> implements PromiseLike<Result<T>> {
 // backed by the Tauri `db:changed` event. Fine-grained filters are ignored; the
 // consumer re-queries on any change to the table (which is what the hooks do).
 // ---------------------------------------------------------------------------
+// Supabase-style filter config. Only `table` is consumed; `event`, `schema`
+// and `filter` are accepted for call-site compatibility but deliberately
+// ignored — every change to the table fires every handler, and `new`/`old`
+// in the payload are ALWAYS null (the Tauri event carries no row data), so
+// consumers must re-query instead of reading rows off the payload.
+interface ChangeFilter {
+  event?: string;
+  schema?: string;
+  table?: string;
+  filter?: string;
+}
+
 interface ChangeHandler {
   table: string | null;
   cb: (payload: { eventType: string; new: Row | null; old: Row | null; table: string }) => void;
@@ -277,7 +298,7 @@ class LocalChannel {
   private unlisten: (() => void) | null = null;
   constructor(public name: string) {}
 
-  on(_type: string, cfg: { table?: string } | undefined, cb: ChangeHandler["cb"]): this {
+  on(_type: string, cfg: ChangeFilter | undefined, cb: ChangeHandler["cb"]): this {
     this.handlers.push({ table: cfg?.table ?? null, cb });
     return this;
   }

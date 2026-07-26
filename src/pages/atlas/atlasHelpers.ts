@@ -1,16 +1,25 @@
 // Small shared helpers for the Atlas screens.
 
+import { getActiveWakePhrases } from '@/lib/wakeWord';
+
 /** Header status label — mirrors the Workshop design's Atlas state readout. */
-export function atlasStateLabel(state: string): string {
+export function atlasStateLabel(
+  state: string,
+  // Defaults to the wake lib's active set so the label only ever advertises
+  // phrase(s) the detector can actually hear: stock "Hey Jarvis" today,
+  // "Hey Atlas"/"Atlas" automatically once trained models land in
+  // public/models/ (see src/lib/wakeWord.ts). getActiveWakePhrases is a pure
+  // read — this module stays side-effect-free at import time.
+  wakePhrases: string[] = getActiveWakePhrases(),
+): string {
   switch (state) {
     case 'listening': return 'Listening…';
     case 'thinking': return 'Thinking…';
     case 'speaking': return 'Speaking…';
-    // The shipped wake model is openWakeWord's stock hey_jarvis_v0.1.onnx
-    // (see src/lib/wakeWord.ts) — a custom "Hey Atlas" model does not exist
-    // yet. Advertising a phrase the detector cannot hear just makes the
-    // feature look broken, so the label names the phrase that actually works.
-    default: return 'Listening for "Hey Jarvis"';
+    default:
+      return wakePhrases.length === 0
+        ? 'Listening…'
+        : `Listening for ${wakePhrases.map((p) => `"${p}"`).join(' or ')}`;
   }
 }
 

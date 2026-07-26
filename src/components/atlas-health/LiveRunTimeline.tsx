@@ -150,8 +150,9 @@ export function LiveRunTimeline() {
           table: 'run_steps',
           filter: `run_id=eq.${activeRun.id}`
         },
-        (payload) => {
-          setSteps((prev) => [...prev, payload.new as RunStep]);
+        () => {
+          // Local realtime events carry no row data — re-query instead.
+          fetchActiveRun();
         }
       )
       .on(
@@ -162,10 +163,8 @@ export function LiveRunTimeline() {
           table: 'run_steps',
           filter: `run_id=eq.${activeRun.id}`
         },
-        (payload) => {
-          setSteps((prev) =>
-            prev.map((s) => (s.id === payload.new.id ? (payload.new as RunStep) : s))
-          );
+        () => {
+          fetchActiveRun();
         }
       )
       .subscribe();
@@ -173,7 +172,7 @@ export function LiveRunTimeline() {
     return () => {
       supabase.removeChannel(stepsChannel);
     };
-  }, [activeRun]);
+  }, [activeRun, fetchActiveRun]);
 
   if (isLoading) {
     return (

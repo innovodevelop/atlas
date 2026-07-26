@@ -16,7 +16,9 @@ jobs:
           bun-version: latest
       - run: bun install --frozen-lockfile
       - name: Typecheck
-        run: bunx tsc --noEmit
+        # -b is required: the root tsconfig uses project references with
+        # "files": [], so a plain `tsc --noEmit` checks nothing.
+        run: bunx tsc -b --force
       - name: Lint
         run: bunx eslint .
       - name: Build

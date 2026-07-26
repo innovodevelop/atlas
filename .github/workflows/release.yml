@@ -159,6 +159,31 @@ jobs:
           prerelease: false
           includeUpdaterJson: true
 
+      # The .dmg tauri-action just built (and, on tag runs, already uploaded to
+      # the draft release — the action builds and uploads in one step, so there
+      # is no hook between the two) is zlib-compressed (UDZO). Recompress it as
+      # ULMO (LZMA, ~25-30 MB smaller) and, on tags, REPLACE the draft-release
+      # asset under the same name via --clobber. Replacing the .dmg is safe:
+      # latest.json and the minisign .sig reference only Atlas.app.tar.gz — the
+      # updater payload is deliberately NOT touched, because minisign signed
+      # those exact bytes. Runs before the dry-run artifact upload so
+      # workflow_dispatch builds surface the recompressed .dmg too.
+      - name: Recompress .dmg as ULMO (smaller download)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          shopt -s nullglob
+          dmgs=(src-tauri/target/release/bundle/dmg/*.dmg)
+          if [ "${#dmgs[@]}" -ne 1 ]; then
+            echo "::error::Expected exactly one built .dmg in src-tauri/target/release/bundle/dmg/, found ${#dmgs[@]}. Not recompressing."
+            exit 1
+          fi
+          bash scripts/compress-dmg.sh "${dmgs[0]}"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            gh release upload "${GITHUB_REF_NAME}" "${dmgs[0]}" --clobber
+            echo "Replaced the draft-release .dmg asset with the ULMO version."
+          fi
+
       # Dry-run builds (workflow_dispatch) don't create a release — surface the
       # bundle as a workflow artifact instead so it can be inspected/tested.
       - name: Upload bundle as workflow artifact (dry-run only)

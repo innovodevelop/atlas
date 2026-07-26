@@ -374,15 +374,30 @@ const AtlasTeach = () => {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'ai_memory' },
-        (payload) => {
-          const newMemory = payload.new as Memory;
-          setRecentlyLearned(prev => [{
-            id: newMemory.id,
-            key: newMemory.key,
-            category: newMemory.category,
-            timestamp: Date.now()
-          }, ...prev.slice(0, 4)]);
-          
+        async (payload) => {
+          // Local realtime events carry no row data, and the shim fires this
+          // handler for every op — re-query the newest memory on inserts to
+          // feed the "recently learned" ticker.
+          if (payload.eventType === 'INSERT') {
+            const { data } = await supabase
+              .from('ai_memory')
+              .select('id, key, category')
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            const newMemory = data as Pick<Memory, 'id' | 'key' | 'category'> | null;
+            if (newMemory) {
+              setRecentlyLearned(prev => prev.some(item => item.id === newMemory.id)
+                ? prev
+                : [{
+                    id: newMemory.id,
+                    key: newMemory.key,
+                    category: newMemory.category,
+                    timestamp: Date.now()
+                  }, ...prev.slice(0, 4)]);
+            }
+          }
+
           fetchMemories();
         }
       )

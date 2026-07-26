@@ -26,5 +26,8 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src"],
+  // *.test.ts files run under `bun test` (bun:test / bun:sqlite), not in the
+  // Vite app graph — they are type-checked by bun itself, not this project.
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }

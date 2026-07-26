@@ -263,7 +263,7 @@ export const useBrainSearch = (options: BrainSearchOptions = {}) => {
         createdAt: r.createdAt,
         source: 'semantic' as const,
         metadata: r.metadata || {},
-        matchScore: Math.round((r.similarity || 0) * 100),
+        matchScore: Math.round(((r.similarity as number) || 0) * 100),
       }));
       
       setSemanticResults(results);

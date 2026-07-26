@@ -60,8 +60,9 @@ export const ErrorLogStream = ({ compact = false, limit }: ErrorLogStreamProps) 
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'atlas_error_logs' },
-        (payload) => {
-          setErrors(prev => [payload.new as ErrorLog, ...prev].slice(0, limit || 100));
+        () => {
+          // Local realtime events carry no row data — re-query instead.
+          fetchErrors();
         }
       )
       .subscribe();

@@ -171,14 +171,8 @@ export function useAtlasLearning() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'atlas_brain_runs' },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setRealtimeRuns(prev => [payload.new as BrainRun, ...prev].slice(0, 20));
-          } else if (payload.eventType === 'UPDATE') {
-            setRealtimeRuns(prev => 
-              prev.map(run => run.id === (payload.new as BrainRun).id ? payload.new as BrainRun : run)
-            );
-          }
+        () => {
+          // Local realtime events carry no row data — refetch via react-query.
           queryClient.invalidateQueries({ queryKey: ['atlas-brain-runs'] });
         }
       )
@@ -190,16 +184,7 @@ export function useAtlasLearning() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'atlas_research_queue' },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setRealtimeQueue(prev => [payload.new as QueueItem, ...prev].slice(0, 50));
-          } else if (payload.eventType === 'UPDATE') {
-            setRealtimeQueue(prev =>
-              prev.map(item => item.id === (payload.new as QueueItem).id ? payload.new as QueueItem : item)
-            );
-          } else if (payload.eventType === 'DELETE') {
-            setRealtimeQueue(prev => prev.filter(item => item.id !== (payload.old as QueueItem).id));
-          }
+        () => {
           queryClient.invalidateQueries({ queryKey: ['atlas-research-queue'] });
         }
       )
@@ -211,8 +196,7 @@ export function useAtlasLearning() {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'validation_logs' },
-        (payload) => {
-          setRealtimeValidations(prev => [payload.new as ValidationLog, ...prev].slice(0, 50));
+        () => {
           queryClient.invalidateQueries({ queryKey: ['atlas-validation-logs'] });
         }
       )

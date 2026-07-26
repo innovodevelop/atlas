@@ -68,7 +68,7 @@ export function useDataFetching<T>({
         setData(fallbackData);
       }
       
-      onError?.(err);
+      onError?.(err instanceof Error ? err : new Error(errorMessage));
       
       // Retry logic with exponential backoff
       if (retryCountRef.current < retryCount) {

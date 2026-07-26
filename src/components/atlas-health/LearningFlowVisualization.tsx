@@ -63,16 +63,26 @@ export const LearningFlowVisualization = ({ compact = false }: LearningFlowVisua
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'atlas_knowledge_entries' },
-        (payload) => {
-          const validationStatus = payload.new.validation_status as string;
+        async () => {
+          // Local realtime events carry no row data — fetch the newest entry.
+          const { data } = await supabase
+            .from('atlas_knowledge_entries')
+            .select('id, topic, validation_status')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (!data) return;
+          const validationStatus = data.validation_status as string;
           const newFlow: DataFlow = {
-            id: payload.new.id as string,
+            id: data.id as string,
             type: validationStatus === 'flagged' ? 'flagged' : 'knowledge',
-            content: payload.new.topic as string,
+            content: data.topic as string,
             timestamp: new Date(),
             validationStatus,
           };
-          setDataFlows(prev => [newFlow, ...prev].slice(0, 15));
+          setDataFlows(prev => prev.some(f => f.id === newFlow.id)
+            ? prev
+            : [newFlow, ...prev].slice(0, 15));
         }
       )
       .subscribe();
@@ -82,15 +92,26 @@ export const LearningFlowVisualization = ({ compact = false }: LearningFlowVisua
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'atlas_research_topics' },
-        (payload) => {
+        async (payload) => {
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            // Local realtime events carry no row data — fetch the most
+            // recently touched topic instead.
+            const { data } = await supabase
+              .from('atlas_research_topics')
+              .select('id, topic, status')
+              .order('updated_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (!data) return;
             const newFlow: DataFlow = {
-              id: payload.new.id as string,
+              id: data.id as string,
               type: 'research',
-              content: `${payload.new.status}: ${payload.new.topic}`,
+              content: `${data.status}: ${data.topic}`,
               timestamp: new Date(),
             };
-            setDataFlows(prev => [newFlow, ...prev].slice(0, 15));
+            setDataFlows(prev => prev.some(f => f.id === newFlow.id && f.content === newFlow.content)
+              ? prev
+              : [newFlow, ...prev].slice(0, 15));
           }
         }
       )

@@ -1,0 +1,20 @@
+# Base deps for openWakeWord automatic training (train.sh installs the
+# openWakeWord repo itself editable, plus piper-sample-generator's own
+# requirements, on top of these).
+#
+# NOTE: torch here is CPU (or CUDA on Linux/NVIDIA). There is no Apple
+# Silicon GPU path for this training stack — expect hours per model on CPU.
+openwakeword>=0.6.0
+torch>=2.0
+torchaudio
+torchmetrics
+speechbrain
+audiomentations
+torch-audiomentations
+datasets
+scipy
+numpy
+tqdm
+mutagen
+pyyaml
+onnx

@@ -58,7 +58,7 @@ const persistOptions = {
   maxAge: 24 * 60 * 60 * 1000,
   buster: "v2",
   dehydrateOptions: {
-    shouldDehydrateQuery: (query: { queryKey: unknown[] }) => {
+    shouldDehydrateQuery: (query: { queryKey: readonly unknown[] }) => {
       const head = String(query.queryKey?.[0] ?? "").toLowerCase();
       return PERSIST_ALLOWLIST.some((k) => head.includes(k));
     },

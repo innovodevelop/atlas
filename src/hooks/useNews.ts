@@ -24,7 +24,7 @@ export const useNews = (category?: string) => {
     {
       fallbackData: FALLBACK_NEWS,
       refreshInterval: 15 * 60 * 1000, // 15 minutes
-      transform: (response) => response?.articles || [],
+      transform: (response) => (response as { articles?: NewsItem[] } | null)?.articles || [],
     }
   );
 

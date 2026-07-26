@@ -100,7 +100,7 @@
        icon: Mic,
        features: [
          'Real-time STT via ElevenLabs Scribe',
-         'Wake word detection ("Hey Jarvis" — stock openWakeWord model)',
+         'Wake word detection — custom "Hey Atlas"/"Atlas" openWakeWord models (stock "Hey Jarvis" until they ship)',
          'Streaming TTS responses',
          '6-state conversation flow'
        ],

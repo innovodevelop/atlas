@@ -117,20 +117,9 @@ export function useAtlasProviderStatus() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'atlas_provider_status' },
-        (payload) => {
-          if (payload.new) {
-            setRealtimeProviders(prev => {
-              const updated = [...prev];
-              const idx = updated.findIndex(p => p.id === (payload.new as ProviderStatus).id);
-              if (idx >= 0) {
-                updated[idx] = payload.new as ProviderStatus;
-              } else {
-                updated.push(payload.new as ProviderStatus);
-              }
-              return updated;
-            });
-            queryClient.invalidateQueries({ queryKey: ['atlas-provider-status'] });
-          }
+        () => {
+          // Local realtime events carry no row data — refetch via react-query.
+          queryClient.invalidateQueries({ queryKey: ['atlas-provider-status'] });
         }
       )
       .on(

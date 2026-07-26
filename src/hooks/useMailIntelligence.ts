@@ -45,25 +45,42 @@ const ACCOUNT_COLUMNS = 'id, provider, email_address, status, last_synced_at';
 // joins on one socket — a join/rejoin ping-pong that churns the Networking
 // process. One module-level channel per user, refcounted across consumers
 // (same pattern as useWindowActivity's shared listeners).
-type AlertListener = (alert: MailAlert) => void;
+type AlertListener = (alerts: MailAlert[]) => void;
 let alertListeners: AlertListener[] = [];
 let alertChannel: ReturnType<typeof supabase.channel> | null = null;
 let alertChannelUserId: string | null = null;
+let knownAlertIds: Set<string> | null = null;
+
+// Local realtime events carry no row data, so on every change we re-query the
+// open alerts, hand every listener the fresh list, and native-notify only the
+// alerts not seen before (the first fetch seeds the set without notifying).
+async function refetchAlerts() {
+  const { data } = await supabase
+    .from('mail_alerts')
+    .select('id, alert_type, title, body, payload, acknowledged, created_at')
+    .eq('acknowledged', false)
+    .order('created_at', { ascending: false })
+    .limit(20);
+  const alerts = (data as MailAlert[] | null) ?? [];
+  const fresh = knownAlertIds ? alerts.filter((a) => !knownAlertIds.has(a.id)) : [];
+  knownAlertIds = new Set(alerts.map((a) => a.id));
+  for (const l of alertListeners) l(alerts);
+  for (const a of fresh) notifyNative('Atlas Mail', a.title);
+}
 
 function subscribeAlerts(userId: string, listener: AlertListener): () => void {
   alertListeners.push(listener);
   if (!alertChannel || alertChannelUserId !== userId) {
     if (alertChannel) supabase.removeChannel(alertChannel);
     alertChannelUserId = userId;
+    knownAlertIds = null;
     alertChannel = supabase
       .channel(`mail-alerts-${userId}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'mail_alerts', filter: `user_id=eq.${userId}` },
-        (payload) => {
-          const alert = payload.new as MailAlert;
-          for (const l of alertListeners) l(alert);
-          notifyNative('Atlas Mail', alert.title);
+        () => {
+          void refetchAlerts();
         },
       )
       .subscribe();
@@ -74,6 +91,7 @@ function subscribeAlerts(userId: string, listener: AlertListener): () => void {
       supabase.removeChannel(alertChannel);
       alertChannel = null;
       alertChannelUserId = null;
+      knownAlertIds = null;
     }
   };
 }
@@ -132,8 +150,8 @@ export function useMailIntelligence() {
   // by the effect itself.
   useEffect(() => {
     if (!user) return;
-    return subscribeAlerts(user.id, (alert) => {
-      setAlerts((prev) => [alert, ...prev].slice(0, 20));
+    return subscribeAlerts(user.id, (freshAlerts) => {
+      setAlerts(freshAlerts);
     });
   }, [user]);
 

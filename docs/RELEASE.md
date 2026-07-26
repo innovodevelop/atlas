@@ -140,7 +140,11 @@ Then:
 5. The workflow creates a **draft** release named `Atlas 0.2.0` with these
    assets: `Atlas_0.2.0_aarch64.dmg` (human download), `Atlas.app.tar.gz` +
    `Atlas.app.tar.gz.sig` (updater payload + minisign signature), and
-   `latest.json` (the update feed manifest).
+   `latest.json` (the update feed manifest). After the build, CI recompresses
+   the `.dmg` as ULMO (LZMA, ~25-30 MB smaller) via `scripts/compress-dmg.sh`
+   and replaces the draft asset under the same name; the updater payload
+   (`.app.tar.gz` + `.sig`) is never rewritten — minisign signed those exact
+   bytes.
 6. **Verify before publishing** (the draft is your safety gate):
    - Download the `.dmg`, install, launch (right-click → Open while unsigned),
      smoke-test chat + voice.
@@ -266,6 +270,13 @@ Verify the draft, publish, and everyone — including users stuck on the bad
 
   ```bash
   bun run tauri build --no-sign
+  ```
+
+  To shrink the resulting `.dmg` the same way CI does (ULMO recompression,
+  ~25-30 MB smaller — human download only, never the updater archive):
+
+  ```bash
+  bash scripts/compress-dmg.sh src-tauri/target/release/bundle/dmg/*.dmg
   ```
 
   To produce a *real*, updatable bundle locally, export the key first:

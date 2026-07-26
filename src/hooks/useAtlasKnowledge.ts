@@ -44,16 +44,9 @@ export const useAtlasKnowledge = () => {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'atlas_knowledge_entries' },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setKnowledge(prev => [payload.new as KnowledgeEntry, ...prev].slice(0, 100));
-          } else if (payload.eventType === 'UPDATE') {
-            setKnowledge(prev => 
-              prev.map(k => k.id === payload.new.id ? payload.new as KnowledgeEntry : k)
-            );
-          } else if (payload.eventType === 'DELETE') {
-            setKnowledge(prev => prev.filter(k => k.id !== payload.old.id));
-          }
+        () => {
+          // Local realtime events carry no row data — re-query instead.
+          fetchKnowledge();
         }
       )
       .subscribe();

@@ -67,16 +67,9 @@ export const useAtlasResearch = () => {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'atlas_research_topics' },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setTopics(prev => [payload.new as ResearchTopic, ...prev]);
-          } else if (payload.eventType === 'UPDATE') {
-            setTopics(prev => 
-              prev.map(t => t.id === payload.new.id ? payload.new as ResearchTopic : t)
-            );
-          } else if (payload.eventType === 'DELETE') {
-            setTopics(prev => prev.filter(t => t.id !== payload.old.id));
-          }
+        () => {
+          // Local realtime events carry no row data — re-query instead.
+          fetchTopics();
         }
       )
       .subscribe();

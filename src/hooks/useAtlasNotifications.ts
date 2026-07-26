@@ -47,11 +47,14 @@ export const useAtlasNotifications = (config: NotificationConfig = {}) => {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'atlas_knowledge_entries' },
         (payload) => {
+          // Local realtime events carry no row data (payload.new is null) —
+          // skip rather than crash; the dashboards re-query on change.
           const entry = payload.new as {
             topic: string;
             category: string;
             confidence: number;
-          };
+          } | null;
+          if (!entry) return;
           showNotification(
             'New Knowledge Discovered',
             `Topic: ${entry.topic} (${entry.category}) - ${Math.round(entry.confidence * 100)}% confidence`,
@@ -72,9 +75,9 @@ export const useAtlasNotifications = (config: NotificationConfig = {}) => {
             topic: string;
             status: string;
             findings: unknown;
-          };
-          
-          if (topic.status === 'completed' && topic.findings) {
+          } | null;
+
+          if (topic && topic.status === 'completed' && topic.findings) {
             showNotification(
               'Research Complete',
               `Findings available for: ${topic.topic}`,
@@ -87,7 +90,8 @@ export const useAtlasNotifications = (config: NotificationConfig = {}) => {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'atlas_research_topics' },
         (payload) => {
-          const topic = payload.new as { topic: string };
+          const topic = payload.new as { topic: string } | null;
+          if (!topic) return;
           showNotification(
             'Research Started',
             `Now researching: ${topic.topic}`,
@@ -108,9 +112,9 @@ export const useAtlasNotifications = (config: NotificationConfig = {}) => {
             topic: string;
             status: string;
             discoveries: unknown;
-          };
-          
-          if (session.status === 'completed' && session.discoveries) {
+          } | null;
+
+          if (session && session.status === 'completed' && session.discoveries) {
             showNotification(
               'Learning Session Complete',
               `New discoveries for: ${session.topic}`,

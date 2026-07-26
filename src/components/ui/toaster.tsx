@@ -1,6 +1,6 @@
 import { useToast } from "@/hooks/use-toast";
 import { AnimatePresence } from "framer-motion";
-import { HolographicToast } from "@/components/ui/holographic-toast";
+import { HolographicToast, type HolographicToastProps } from "@/components/ui/holographic-toast";
 
 export function Toaster() {
   const { toasts, dismiss } = useToast();
@@ -22,7 +22,7 @@ export function Toaster() {
               title={typeof toast.title === 'string' ? toast.title : undefined}
               description={typeof toast.description === 'string' ? toast.description : undefined}
               action={toast.action}
-              variant={(toast as { variant?: string }).variant || "default"}
+              variant={(toast as { variant?: HolographicToastProps["variant"] }).variant || "default"}
               onDismiss={() => dismiss(toast.id)}
               duration={5000}
             />

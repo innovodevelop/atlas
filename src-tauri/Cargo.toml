@@ -58,3 +58,10 @@ uuid = { version = "1", features = ["v4"] }
 # minisign signature against plugins.updater.pubkey in tauri.conf.json BEFORE
 # installing anything. The private key lives in CI secrets / Keychain only.
 tauri-plugin-updater = "2.10.1"
+
+# Download-size trim: strip symbols and thin-LTO the release binary. Deliberately
+# NOT setting panic = "abort" — unwind behaviour must stay unchanged. Profile
+# settings never touch Cargo.lock (the vergen pin above stays intact).
+[profile.release]
+strip = true
+lto = "thin"
