@@ -706,11 +706,22 @@ CREATE TABLE IF NOT EXISTS mail_accounts (
   user_id                 TEXT NOT NULL,
   provider                TEXT NOT NULL CHECK (provider IN ('gmail','outlook','imap')),
   email_address           TEXT NOT NULL,
+  -- Legacy column from the Supabase-era mail functions, which held a
+  -- server-encrypted Gmail refresh token. The local flow keeps the token in the
+  -- macOS Keychain instead (secrets.rs) and leaves this NULL. Kept so existing
+  -- rows still load; migrate_mail adds the columns below beside it.
   encrypted_refresh_token TEXT,
   sync_cursor             TEXT,
   status                  TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','error','disconnected')),
   last_error              TEXT,
   last_synced_at          TEXT,
+  -- Per-mailbox autonomy (the design's "Mailbox" record). 'approve_all' is the
+  -- deliberate default: an agent that sends mail unsupervised is the highest-risk
+  -- behaviour in the product, so 'autonomous' must be chosen, never inherited.
+  autonomy_mode           TEXT NOT NULL DEFAULT 'approve_all'
+                            CHECK (autonomy_mode IN ('approve_all','conditional','autonomous')),
+  autonomy_condition      TEXT NOT NULL DEFAULT '{}',
+  colour                  TEXT,
   created_at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   UNIQUE (user_id, provider, email_address)
 );
@@ -719,6 +730,9 @@ CREATE TABLE IF NOT EXISTS mail_messages (
   id                  TEXT PRIMARY KEY,
   user_id             TEXT NOT NULL,
   account_id          TEXT NOT NULL REFERENCES mail_accounts(id) ON DELETE CASCADE,
+  -- Nullable on purpose: a message can be stored before its thread row exists
+  -- (and every row written by the pre-Phase-7a builds has no thread at all).
+  thread_id           TEXT REFERENCES mail_threads(id) ON DELETE SET NULL,
   provider_message_id TEXT NOT NULL,
   from_address        TEXT,
   subject             TEXT,
@@ -733,6 +747,7 @@ CREATE TABLE IF NOT EXISTS mail_messages (
   UNIQUE (account_id, provider_message_id)
 );
 CREATE INDEX IF NOT EXISTS idx_mail_messages_user_recent ON mail_messages(user_id, received_at DESC);
+CREATE INDEX IF NOT EXISTS idx_mail_messages_thread ON mail_messages(thread_id, received_at);
 
 CREATE TABLE IF NOT EXISTS mail_alerts (
   id           TEXT PRIMARY KEY,
@@ -754,6 +769,129 @@ CREATE TABLE IF NOT EXISTS mail_oauth_states (
   code_verifier TEXT NOT NULL,
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
+
+-- ---------------------------------------------------------------------------
+-- Mail — threads, rules, drafts and the audit trail (Phase 7a).
+--
+-- Everything the Mail design works in is thread-shaped, and mail_messages above
+-- is message-shaped with no grouping key at all — see the audit's P1-7
+-- (docs/design-sync/2026-07-26-audit-sphere-mail-header.md §2.1). These tables
+-- close that gap. They are the data layer only; nothing populates them until
+-- the sync path lands.
+-- ---------------------------------------------------------------------------
+
+-- A thread is the unit every Mail view lists, filters and acts on.
+-- `status` carries the six states the design's views map 1:1 onto, plus
+-- 'triage' — a thread that has arrived and not yet been placed, which is what
+-- the catch-all Triage view actually shows.
+CREATE TABLE IF NOT EXISTS mail_threads (
+  id                 TEXT PRIMARY KEY,
+  user_id            TEXT NOT NULL,
+  account_id         TEXT NOT NULL REFERENCES mail_accounts(id) ON DELETE CASCADE,
+  provider_thread_id TEXT NOT NULL,
+  subject            TEXT,
+  participants       TEXT NOT NULL DEFAULT '[]',   -- JSON array of addresses
+  status             TEXT NOT NULL DEFAULT 'triage'
+                       CHECK (status IN ('triage','approve','drafting','escalate','snooze','handled','handoff')),
+  snoozed_until      TEXT,
+  unread_count       INTEGER NOT NULL DEFAULT 0,
+  last_message_at    TEXT,
+  -- Stamped when status becomes 'handled'. This is what makes the design's
+  -- "Atlas answered 14 threads since 6am" a real count instead of a mock.
+  handled_at         TEXT,
+  created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE (account_id, provider_thread_id)
+);
+CREATE INDEX IF NOT EXISTS idx_mail_threads_user_status ON mail_threads(user_id, status, last_message_at DESC);
+CREATE INDEX IF NOT EXISTS idx_mail_threads_snoozed ON mail_threads(user_id, snoozed_until) WHERE snoozed_until IS NOT NULL;
+
+-- Autonomy rules are per-mailbox and USER-OWNED data, not constants: the
+-- prototype hardcoded three of them (audit Q7). `predicate` and `action_config`
+-- are JSON so a rule can grow new match/condition fields without a migration.
+CREATE TABLE IF NOT EXISTS mail_rules (
+  id            TEXT PRIMARY KEY,
+  user_id       TEXT NOT NULL,
+  account_id    TEXT REFERENCES mail_accounts(id) ON DELETE CASCADE,
+  label         TEXT NOT NULL,
+  predicate     TEXT NOT NULL DEFAULT '{}',
+  action        TEXT NOT NULL CHECK (action IN ('approve','draft','escalate','snooze','handoff','handle')),
+  action_config TEXT NOT NULL DEFAULT '{}',
+  enabled       INTEGER NOT NULL DEFAULT 1,
+  position      INTEGER NOT NULL DEFAULT 0,
+  created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_mail_rules_user ON mail_rules(user_id, account_id, position);
+
+-- A reply Atlas has written. 'proposed' waits for approval, 'scheduled' has a
+-- send time, 'sent' is done. `model`/`prompt_version` are recorded per draft so
+-- the audit trail can answer "which model wrote this" years later.
+CREATE TABLE IF NOT EXISTS mail_drafts (
+  id             TEXT PRIMARY KEY,
+  user_id        TEXT NOT NULL,
+  thread_id      TEXT NOT NULL REFERENCES mail_threads(id) ON DELETE CASCADE,
+  body           TEXT NOT NULL DEFAULT '',
+  state          TEXT NOT NULL DEFAULT 'proposed'
+                   CHECK (state IN ('proposed','scheduled','sent','discarded')),
+  scheduled_for  TEXT,
+  sent_at        TEXT,
+  model          TEXT,
+  prompt_version TEXT,
+  created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_mail_drafts_thread ON mail_drafts(thread_id, state);
+CREATE INDEX IF NOT EXISTS idx_mail_drafts_due ON mail_drafts(user_id, scheduled_for) WHERE state = 'scheduled';
+
+-- The audit trail. DECIDED 2026-07-26: it is LOCAL — it lives here, next to the
+-- mail it describes, and nothing derived from message content is uploaded. The
+-- reasoning is in the audit doc §2.3.1; the short version is that the reader of
+-- this table is the account owner asking "why did Atlas send that", and a local
+-- log answers that completely, whereas putting it on our servers would falsify
+-- the privacy policy published at helloatlas.dk.
+--
+-- `seq` is INTEGER PRIMARY KEY AUTOINCREMENT rather than plain rowid because
+-- AUTOINCREMENT is what guarantees ids are never reused after a delete — a
+-- reused id in an audit trail is a silently rewritten history.
+--
+-- `thread_id` is deliberately NOT a foreign key. A CASCADE from mail_threads
+-- would delete the record of what Atlas did to a thread at the moment the
+-- thread is deleted, which is precisely when you want to keep it. It also could
+-- not work: the append-only trigger below aborts the cascade, taking the
+-- thread delete down with it.
+CREATE TABLE IF NOT EXISTS mail_audit_events (
+  seq            INTEGER PRIMARY KEY AUTOINCREMENT,
+  id             TEXT NOT NULL UNIQUE,
+  user_id        TEXT NOT NULL,
+  thread_id      TEXT,
+  ts             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  actor          TEXT NOT NULL CHECK (actor IN ('atlas','user','rule')),
+  action         TEXT NOT NULL,
+  detail         TEXT NOT NULL DEFAULT '',
+  rule_id        TEXT,
+  model          TEXT,
+  prompt_version TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_mail_audit_user_ts ON mail_audit_events(user_id, ts DESC);
+CREATE INDEX IF NOT EXISTS idx_mail_audit_thread ON mail_audit_events(thread_id, seq);
+
+-- Append-only, enforced. Not tamper-PROOF: this is the owner's own machine and
+-- any SQLite client can drop these triggers. That is fine and is stated in the
+-- audit doc rather than hidden. What they do buy is the failure mode that
+-- actually matters — Atlas cannot quietly edit or drop its own record through a
+-- bug or a careless query.
+--
+-- Erasure is the one legitimate delete, and it works by DROPPING the delete
+-- trigger, deleting, and recreating it (see eraseUserData in the brain). A
+-- WHEN-clause escape hatch was tried first and is not possible: SQLite refuses
+-- to compile a trigger that references temp.* ("cannot reference objects in
+-- database temp"). If the process dies mid-erase the trigger is restored on the
+-- next launch by this file's CREATE TRIGGER IF NOT EXISTS.
+CREATE TRIGGER IF NOT EXISTS trg_mail_audit_no_update BEFORE UPDATE ON mail_audit_events
+  BEGIN SELECT RAISE(ABORT, 'mail_audit_events is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS trg_mail_audit_no_delete BEFORE DELETE ON mail_audit_events
+  BEGIN SELECT RAISE(ABORT, 'mail_audit_events is append-only (erase via the account-erase path)'); END;
 
 -- ---------------------------------------------------------------------------
 -- updated_at triggers (mirror Postgres update_updated_at_column()).

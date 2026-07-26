@@ -123,6 +123,66 @@ fn migrate_ai_memory(conn: &Connection) -> Result<(), String> {
     Ok(())
 }
 
+/// Add the Phase-7a mail columns to a DB created before they existed.
+/// `CREATE TABLE IF NOT EXISTS` in db_schema.sql silently skips an existing
+/// table, so new columns on `mail_accounts` / `mail_messages` only ever reach a
+/// fresh install unless they are ALTERed in here.
+///
+/// Runs BEFORE the schema batch: `mail_messages.thread_id` references
+/// `mail_threads`, and adding the column first keeps the two paths (fresh DB vs
+/// migrated DB) converging on the same shape.
+///
+/// Every step is individually non-fatal. A column that is already present makes
+/// SQLite return "duplicate column name", which is the normal steady state on
+/// every launch after the first — treating that as an error would mean the app
+/// never starts again.
+fn migrate_mail(conn: &Connection) -> Result<(), String> {
+    let table_exists = |name: &str| -> bool {
+        conn.query_row(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?1",
+            [name],
+            |_| Ok(true),
+        )
+        .optional()
+        .unwrap_or(None)
+        .unwrap_or(false)
+    };
+
+    // (table, column, definition). Defaults mirror db_schema.sql exactly, so a
+    // migrated DB and a fresh one are indistinguishable afterwards.
+    const ADDITIONS: [(&str, &str, &str); 4] = [
+        (
+            "mail_accounts",
+            "autonomy_mode",
+            "TEXT NOT NULL DEFAULT 'approve_all' \
+             CHECK (autonomy_mode IN ('approve_all','conditional','autonomous'))",
+        ),
+        ("mail_accounts", "autonomy_condition", "TEXT NOT NULL DEFAULT '{}'"),
+        ("mail_accounts", "colour", "TEXT"),
+        // No REFERENCES clause: SQLite cannot add a column with a foreign key
+        // to a table that already holds rows ("Cannot add a REFERENCES column
+        // with non-NULL default value" / FK-on-ALTER limits). The fresh schema
+        // declares the FK; on a migrated DB the column is a plain TEXT that the
+        // application populates. The join works identically either way.
+        ("mail_messages", "thread_id", "TEXT"),
+    ];
+
+    for (table, column, definition) in ADDITIONS {
+        if !table_exists(table) {
+            continue; // fresh DB — the schema batch creates it complete
+        }
+        if let Err(e) = conn.execute_batch(&format!(
+            "ALTER TABLE \"{table}\" ADD COLUMN \"{column}\" {definition};"
+        )) {
+            let msg = e.to_string();
+            if !msg.contains("duplicate column name") {
+                eprintln!("[db] mail migration: {table}.{column} not added: {msg}");
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Post-schema reconciliation: forgetting happens in the brain sidecar too
 /// (bun:sqlite), which can delete memory_vectors rows but cannot touch the
 /// vec0 index (no extension loading there). Purge index entries whose base row
@@ -150,6 +210,7 @@ impl DbState {
         )
         .map_err(|e| e.to_string())?;
         migrate_ai_memory(&conn)?;
+        migrate_mail(&conn)?;
         conn.execute_batch(SCHEMA).map_err(|e| e.to_string())?;
         conn.execute_batch(VEC_SCHEMA).map_err(|e| e.to_string())?;
         reconcile_vector_indexes(&conn);
@@ -162,6 +223,7 @@ impl DbState {
         let conn = Connection::open_in_memory().map_err(|e| e.to_string())?;
         conn.execute_batch("PRAGMA foreign_keys = ON;").map_err(|e| e.to_string())?;
         migrate_ai_memory(&conn)?;
+        migrate_mail(&conn)?;
         conn.execute_batch(SCHEMA).map_err(|e| e.to_string())?;
         conn.execute_batch(VEC_SCHEMA).map_err(|e| e.to_string())?;
         reconcile_vector_indexes(&conn);
