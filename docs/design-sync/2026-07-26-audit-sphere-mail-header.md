@@ -171,6 +171,12 @@ machine, rules and an audit log are all net-new tables.
 
 ### 2.3 The audit trail
 
+> **DECIDED 2026-07-26 — the trail is LOCAL.** It lives in `atlas.db` alongside
+> the mail content it describes. Nothing about it is uploaded. The reasoning and
+> the consequences are in §2.3.1 below; the rest of this section is the original
+> analysis of what a *server-side* trail would have required, kept because it is
+> the argument the decision was made against.
+
 The prototype's trail is display-only, assembled client-side. For it to carry
 the weight the design gives it ("Atlas keeps the record"), it must be:
 
@@ -190,6 +196,45 @@ currently says "the only personal data we hold on our own servers is your
 account email, a salted password hash, plan fields and timestamps". **Either
 the trail stays local (and is not tamper-evident), or the privacy policy
 changes.** That is a product decision, not an implementation detail.
+
+### 2.3.1 The decision, and what it costs
+
+**Local.** The trail is a table in `atlas.db`; no mail-derived content leaves the
+machine.
+
+Why: the trail's actual job is the owner reading their own history — *why did
+Atlas send that, which rule fired, which model wrote it.* A local log serves
+that completely. The thing a local log cannot do is prove to a **third party**
+that the record was not edited, and Atlas has no third party: no shared
+workspace, no compliance reviewer, no adversary the owner needs to convince. So
+tamper-evidence buys nothing here, while server-side storage would cost the
+privacy claim the whole product is sold on — helloatlas.dk states, verbatim,
+that the only personal data on our servers is the account email, a salted
+password hash, plan and subscription fields, timestamps and the waitlist /
+login-throttle records, and that your content is "not uploaded to our servers,
+and we cannot read them." Putting message-derived audit rows on the server would
+make both sentences false. Bad trade.
+
+Consequences to honour when Stage 6 is built:
+
+1. **No privacy-policy change is needed.** §4/§6 stay as published. Confirm this
+   again before shipping Mail — if any mail feature does start uploading
+   content, the policy moves first, not after.
+2. **Append-only is still worth enforcing, locally.** Insert-only table, no
+   `UPDATE`/`DELETE` path in the app, monotonic id, `ts` from the local clock.
+   Somebody with a SQLite client can rewrite it; that is fine and should not be
+   hidden. It stops Atlas from quietly editing its own record, which is the
+   failure mode that actually matters.
+3. **Same per-event fields as specified above** — `actor`, `action`, `detail`,
+   `thread_id`, `rule_id`, `model`, `prompt_version`. Nothing is dropped by
+   going local.
+4. **Retention is the user's**, since deletion is theirs: the trail is erased
+   with the local data, and it must be covered by the existing local-erase path
+   rather than surviving it.
+5. **The copy has to change.** The handoff's *"Atlas keeps the record"* implies
+   an authority that a local file does not have. Ship something true —
+   *"Logged on this Mac"* — and let the honesty be the feature. Overclaiming
+   here is worse than claiming less.
 
 ---
 
@@ -417,11 +462,12 @@ Air (Apple-silicon-only build). No capability tier needed. Add a
 slower spin; continuous motion is the trigger regardless of speed.
 
 **6. Is the audit trail append-only and server-owned?**
-It must be, to mean anything. But doing so puts message-derived content on the
-server for the first time, which contradicts the published privacy policy's
-"the only personal data we hold on our own servers is your account email…".
-**This needs your decision before the trail is designed** — local (honest, not
-tamper-evident) or server (trustworthy, requires a policy update).
+**Append-only yes, server-owned no — ANSWERED 2026-07-26: local.** Server storage
+would put message-derived content on our servers for the first time and falsify
+the published privacy policy; the trail's real reader is the account owner, who
+does not need to be convinced by tamper-evidence. It lives in `atlas.db`,
+insert-only, with the full event schema, and the design copy drops from "Atlas
+keeps the record" to "Logged on this Mac". See §2.3.1.
 
 **7. What are the real autonomy rules?**
 None exist; the prototype hardcodes them. They must become user-editable data
@@ -440,6 +486,11 @@ first. **Nothing starts until the P0 decisions are made.**
 **Stage 0 — decisions (you).** (a) Canvas sphere replaces WebGL, or not?
 (b) Audit trail local or server? (c) Mail before or after the Phase-7 mail
 worker? (d) Accept the three token value changes?
+
+> Status 2026-07-26: **(b) decided — local** (§2.3.1). **(d) decided — accepted**,
+> shipped in Stage 2. **(a) is now a look-at-it call** on `/atlas-sphere`, with
+> the evidence in the addendum; both renderers are still mounted, nothing
+> deleted. **(c) open**, and effectively answered by Phase 7's schedule.
 
 **Stage 1 — sphere renderer (1–2 days).** Port `atlas-sphere.js` into
 `src/lib/atlasSphere.ts` with the five fixes: remount bug, watchdog rewrite,
@@ -466,8 +517,10 @@ mute control, then `muted`. Cut `waking`/`dissolving` from the contract.
 internal QA route; it is a design tool, not a user feature. Behind the same
 dev-route treatment as `/atlas-architecture`.
 
-**Stage 6 — Mail (blocked, then 1–2 weeks).** Requires the Phase-7 mail worker,
-the thread/rule/audit schema, and the Stage-0(b) decision. Build the data layer
+**Stage 6 — Mail (blocked, then 1–2 weeks).** Requires the Phase-7 mail worker
+and the thread/rule/audit schema; Stage-0(b) is settled (local trail, §2.3.1),
+so the audit table is a plain `atlas.db` migration alongside the rest of the mail
+schema rather than a new server surface. Build the data layer
 and the three-pane shell before any of the delight (drafting shimmer, ambient
 strip). Ship with undo-send, keyboard nav, virtualisation and timezone-correct
 scheduling — those are not polish, they are what makes an autonomous mail agent
@@ -498,5 +551,13 @@ Recommendation: **adopt the canvas renderer and drop three.js**, once you have
 looked at both on `/atlas-sphere` yourself. Nothing has been deleted — both are
 still mounted.
 
-Stages 2, 3, 4 and 5 are implemented and pushed. Stage 6 (Mail) remains blocked
-on the Phase-7 mail worker and on the audit-trail decision in §2.3.
+Stages 2, 3, 4 and 5 are implemented and pushed.
+
+**§2.3 (audit trail) is decided: local.** Recorded in §2.3.1 with the reasoning
+and the five consequences for Stage 6 — including the copy change from "Atlas
+keeps the record" to "Logged on this Mac", which is the one place the handoff
+now overstates what the product does.
+
+Stage 6 (Mail) therefore has **one** remaining blocker: the Phase-7 Cloudflare
+mail worker. Nothing about Mail should be started before it exists — the backend
+is stubbed out in `localClient.ts:411-412` and table reads return empty forever.
