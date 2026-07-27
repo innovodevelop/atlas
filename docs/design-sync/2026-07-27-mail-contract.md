@@ -742,7 +742,18 @@ mail-compose  mail-compose-body  mail-compose-actions  mail-compose-pills  mail-
 mail-compose-undo  mail-compose-blocked
 mail-rules  mail-rules-row  mail-rules-form  mail-rules-autonomy  mail-rules-autonomy-warn
 mail-danger  mail-muted  mail-kbd
+mail-route
+mail-notices  mail-notice  mail-notice-warn  mail-notice-error
+mail-ingest-errors  mail-ingest-error
 ```
+
+Added after the first build (2026-07-27): `mail-route`, the four `mail-notice*`
+names, and the `mail-ingest-error*` pair. This list predated the route-level
+notice surface, which did not exist when the contract was written — the error
+banner originally lived inside the reading pane, where a send refusal was only
+visible if a thread happened to be open. Folding the names in here rather than
+leaving the `CONTRACT-GAP` comments to rot, since the whole point of §6.4 is
+that neither side has to guess.
 
 Colours: the handoff is 100% inline hex with zero custom properties, so **none of it ports
 directly**. Use the existing `workshop.css` tokens — `--pg --rz --sk --wt --ink --ink2 --ink3
