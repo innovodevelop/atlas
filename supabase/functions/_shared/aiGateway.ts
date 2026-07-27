@@ -23,6 +23,12 @@ import {
   claudeDocumentExtract,
   mapModelToClaude,
 } from "./claudeAdapter.ts";
+import {
+  awsCredentialsFromEnv,
+  bedrockChatCompletion,
+  bedrockRegion,
+  mapModelToBedrock,
+} from "./bedrockAdapter.ts";
 
 const LOVABLE_CHAT_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const GEMINI_CHAT_URL =
@@ -35,10 +41,31 @@ export const EMBEDDING_DIMENSIONS = 768;
 export interface AIGatewayConfig {
   chatUrl: string;
   apiKey: string;
-  provider: "anthropic" | "lovable_ai" | "gemini";
+  provider: "anthropic" | "bedrock" | "lovable_ai" | "gemini";
 }
 
 export function getAIConfig(): AIGatewayConfig | null {
+  // ATLAS_AI_PROVIDER is the migration switch. "bedrock" runs background
+  // inference on AWS (Activate credits, EU residency); the default keeps the
+  // first-party Anthropic path. The later Path-B value ("aws" — Claude Platform
+  // on AWS) will reuse the very same SigV4 auth + AWS creds, so adding it is a
+  // one-branch change here, not a rewrite.
+  const provider = (Deno.env.get("ATLAS_AI_PROVIDER") ?? "").toLowerCase();
+  if (provider === "bedrock") {
+    const creds = awsCredentialsFromEnv();
+    if (creds) {
+      return {
+        chatUrl: `https://bedrock-runtime.${bedrockRegion()}.amazonaws.com`,
+        apiKey: creds.accessKeyId, // only used for the fail-closed presence check
+        provider: "bedrock",
+      };
+    }
+    // Fail closed exactly like the Anthropic branch: if the operator asked for
+    // Bedrock but the AWS creds are absent, do NOT silently fall through to a
+    // different processor — surface "no AI key configured" instead.
+    return null;
+  }
+
   const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (anthropicKey) {
     return { chatUrl: ANTHROPIC_MESSAGES_URL, apiKey: anthropicKey, provider: "anthropic" };
@@ -83,10 +110,26 @@ export function mapModel(model: string): string {
   const config = getAIConfig();
   if (!config || config.provider === "lovable_ai") return model;
   if (config.provider === "anthropic") return mapModelToClaude(model);
+  if (config.provider === "bedrock") return mapModelToBedrock(model);
   return (
     GEMINI_MODEL_MAP[model] ??
     (model.startsWith("google/") ? model.slice("google/".length) : model)
   );
+}
+
+/**
+ * True when the request carries a native Anthropic server tool
+ * (web_search_/web_fetch_) that only api.anthropic.com can execute — Bedrock's
+ * Messages API has no server-tool runtime. This is the single capability the
+ * Bedrock path cannot serve.
+ */
+function requestNeedsNativeServerTool(body: Record<string, unknown>): boolean {
+  const tools = body.anthropicTools as Array<Record<string, unknown>> | undefined;
+  if (!Array.isArray(tools)) return false;
+  return tools.some((t) => {
+    const type = String(t.type ?? "");
+    return type.startsWith("web_search") || type.startsWith("web_fetch");
+  });
 }
 
 /**
@@ -101,6 +144,24 @@ export function aiChatCompletion(body: Record<string, unknown>): Promise<Respons
       new Error("No AI key configured: set ANTHROPIC_API_KEY (or GEMINI_API_KEY / LOVABLE_API_KEY)"),
     );
   }
+
+  // Bedrock is the credit-funded background tier. The ONE thing it cannot serve
+  // is native web search, so web-search-dependent turns bridge to first-party
+  // Anthropic (small real $ while on credits). This is the only provider branch
+  // that keys on capability, and it evaporates on the flip to Path B (Claude
+  // Platform on AWS serves the native web_search tool itself).
+  if (config.provider === "bedrock") {
+    if (requestNeedsNativeServerTool(body)) {
+      const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+      if (anthropicKey) return claudeChatCompletion(body, anthropicKey);
+      // No first-party bridge key: serve on Bedrock WITHOUT the server tools
+      // (degraded — no live search) rather than 400 the whole request.
+      const { anthropicTools: _drop, ...rest } = body;
+      return bedrockChatCompletion(rest);
+    }
+    return bedrockChatCompletion(body);
+  }
+
   // Claude is not OpenAI-compatible; the adapter translates both directions and
   // still hands back a raw Response, so no call site changes.
   if (config.provider === "anthropic") {
