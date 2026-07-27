@@ -15,7 +15,7 @@ the diff baseline is untouched until you decide to sync it.
 | # | Gap | Why it blocks |
 |---|---|---|
 | 1 | **The handoff silently proposes replacing the WebGL sphere with a canvas-2D one.** The shipped sphere is `AtlasSphere.tsx` → `AtlasCore.tsx`, three.js + `@react-three/fiber` + postprocessing Bloom, with five particle systems. `atlas-sphere.js` is canvas 2D. The handoff never mentions the swap — it says "lift it directly". | This is an architecture decision, not a port. three.js is **1,008 kB** of the bundle (~275 kB gzipped). Dropping it is a big win; keeping both is the worst outcome. Nothing else in the handoff can be scoped until this is settled. |
-| 2 | **Mail has no backend.** `localClient.ts:411-412` intercepts `mail-oauth-start`/`mail-sync`/`mail-disconnect` and returns `"Mail sync is temporarily unavailable — migrating to the new mail service"`. Table reads fall through to local SQLite and return empty forever, because nothing can populate them. | Building a three-pane autonomous mail client on a disabled backend produces a second prototype, not a product. The Phase-7 Cloudflare mail worker is the prerequisite. |
+| 2 | **Mail has no backend.** `localClient.ts:411-412` intercepts `mail-oauth-start`/`mail-sync`/`mail-disconnect` and returns `"Mail sync is temporarily unavailable — migrating to the new mail service"`. Table reads fall through to local SQLite and return empty forever, because nothing can populate them. | Building a three-pane autonomous mail client on a disabled backend produces a second prototype, not a product. **Resolved 2026-07-26 (§7.1):** the backend is the hosted admin mailbox, built first; consumer providers become fetch adapters behind the same pipeline afterwards. |
 | 3 | **6 of the 10 sphere states have no trigger anywhere.** `working`, `success`, `alert`, `muted`, `waking`, `dissolving` return zero hits across `src/` — no type member, no config entry, no assignment. | 60 % of the specified contract is dead visuals on arrival. |
 | 4 | **`atlas-sphere.js` watchdog can multiply the render loop and death-spiral.** See §3.2. | Fails worst on the slowest hardware — the opposite of the intent. |
 | 5 | **Remount bug in `atlas-sphere.js`.** `frame()` prunes disconnected elements from `entries` but never clears `el.__atlasSphere`; `mount()` then sees it truthy and returns early **without re-adding to `entries`**. The canvas never paints again. | This is almost certainly the "host environment can leave a rAF loop dead after a remount" bug the watchdog was added to paper over. The watchdog cannot fix it — the entry is not in the array at all. |
@@ -490,7 +490,9 @@ worker? (d) Accept the three token value changes?
 > Status 2026-07-26: **(b) decided — local** (§2.3.1). **(d) decided — accepted**,
 > shipped in Stage 2. **(a) is now a look-at-it call** on `/atlas-sphere`, with
 > the evidence in the addendum; both renderers are still mounted, nothing
-> deleted. **(c) open**, and effectively answered by Phase 7's schedule.
+> deleted. **(c) decided — Mail starts now**, on our own hosted admin inbox
+> rather than waiting on a consumer mail backend that the §7.1 re-plan removed
+> from the critical path entirely.
 
 **Stage 1 — sphere renderer (1–2 days).** Port `atlas-sphere.js` into
 `src/lib/atlasSphere.ts` with the five fixes: remount bug, watchdog rewrite,
@@ -517,14 +519,75 @@ mute control, then `muted`. Cut `waking`/`dissolving` from the contract.
 internal QA route; it is a design tool, not a user feature. Behind the same
 dev-route treatment as `/atlas-architecture`.
 
-**Stage 6 — Mail (blocked, then 1–2 weeks).** Requires the Phase-7 mail worker
-and the thread/rule/audit schema; Stage-0(b) is settled (local trail, §2.3.1),
-so the audit table is a plain `atlas.db` migration alongside the rest of the mail
-schema rather than a new server surface. Build the data layer
-and the three-pane shell before any of the delight (drafting shimmer, ambient
-strip). Ship with undo-send, keyboard nav, virtualisation and timezone-correct
-scheduling — those are not polish, they are what makes an autonomous mail agent
-safe to use.
+**Stage 6 — Mail. Re-planned 2026-07-26; no longer blocked.** See §7.1.
+
+### 7.1 Stage 6 re-planned — build Mail on our own inbox first
+
+The original Stage 6 was blocked on "the Phase-7 mail worker", which assumed one
+mail system serving everybody. It is two, and separating them unblocks the work.
+
+- **Admin mail** (`contact@helloatlas.dk`) — ours. We host it.
+- **Consumer mail** — Gmail/Outlook/IMAP accounts the user already has. We only
+  ever connect to them, and **only from the Mac** (P0-2 decision, below).
+
+**§P0-2 is resolved: consumer mail stays local-only.** No cloud worker holds a
+Gmail refresh token. Reasons, strongest first: `gmail.readonly` is a Google
+*restricted* scope whose annual CASA assessment tier turns on server-side token
+storage — a recurring cost that exists only in the worker design; a worker
+holding N users' refresh tokens is the highest-value target in the product,
+where one breach is every mailbox rather than one Mac; and §2/§4.6/§6/§7 of the
+published policy all stay as written. What is lost is small on a Mac: Power Nap
+covers the AC case, and a catch-up scan on wake means the user hears at 08:00
+rather than 03:00, which is when they would act anyway.
+
+The hybrid was checked and is genuinely dead: Gmail's `users.watch` push is
+content-free and needs no server-side token, but a sleeping Mac cannot receive
+the nudge, and on wake a catch-up scan finds the same thing unaided. It is a
+server for zero benefit.
+
+**Why the admin inbox goes first — this is the real change.** Sending mail
+unsupervised is the highest-risk behaviour in the product. Building the rules
+engine, the drafting loop and the approve-and-send path against *our own*
+mailbox means the only person exposed by a misfire is us. The Gmail connector
+then arrives as a data source plugged into a proven pipeline, instead of being
+the thing the pipeline is debugged against. It also needs no OAuth, no CASA and
+no policy change, so it can start now.
+
+**Stage 6a — admin mailbox backend (Cloudflare).** Email Routing → a Worker's
+`email()` handler → `postal-mime` → a Durable Object with SQLite, one per
+mailbox address. Buffer `message.raw` once (single-use stream). Extract
+`Message-ID`/`In-Reply-To`/`References` at ingest, subject-matching as fallback.
+Attachments to R2, metadata in SQLite. Outbound through the `send_email`
+binding with threading headers. Never auto-send from the `email()` handler —
+store a draft, approve, send separately.
+
+> Settle one thing before starting: this is a **programmatic** mailbox, not
+> IMAP. `contact@helloatlas.dk` cannot be opened in Apple Mail. If that access
+> is wanted, the answer is a real provider (Fastmail/Migadu/Workspace) with
+> Atlas connecting over IMAP — which is not wasted work, since IMAP is also the
+> third consumer connector.
+
+**Stage 6b — data layer.** Sync admin threads into `atlas.db`. The schema
+shipped in `266d754` is provider-agnostic; only the fetch layer differs. The
+audit trail stays local and stays the record of *what Atlas did*, which is
+consistent with §2.3.1 — Atlas runs on the Mac, so its actions are logged there
+even when the mailbox it acted on is hosted.
+
+**Stage 6c — the three-pane shell.** Including the empty-state distinction the
+audit found missing: inbox-zero and an empty *filter* must not read the same.
+Drop `confidence 0.94` and "matched 214 prior answers" — §2.2 found no source
+for either; show what it matched on instead, which the fact pills already do
+honestly.
+
+**Stage 6d — rules, drafting, approve-and-send.** User-editable `mail_rules`
+replacing the prototype's hardcoded three. `approve_all` stays the default;
+`autonomous` must be chosen, never inherited. Ship with undo-send, keyboard
+nav, virtualisation and timezone-correct scheduling — not polish, but what
+makes an autonomous mail agent safe to use. Delight (drafting shimmer, ambient
+strip) last.
+
+**Stage 6e — consumer connectors.** Gmail (the deprioritised Phase 7a work),
+then Outlook, then IMAP. Each is a fetch adapter behind the same pipeline.
 
 ---
 
@@ -558,6 +621,9 @@ and the five consequences for Stage 6 — including the copy change from "Atlas
 keeps the record" to "Logged on this Mac", which is the one place the handoff
 now overstates what the product does.
 
-Stage 6 (Mail) therefore has **one** remaining blocker: the Phase-7 Cloudflare
-mail worker. Nothing about Mail should be started before it exists — the backend
-is stubbed out in `localClient.ts:411-412` and table reads return empty forever.
+**Stage 6 (Mail) is no longer blocked** — re-planned in §7.1 on 2026-07-26.
+The blocker was the assumption of one mail system for everyone; there are two.
+Admin mail is hosted by us and can start now; consumer mail stays local-only and
+becomes a set of fetch adapters once the pipeline is proven on our own inbox.
+The `localClient.ts:411-412` stub still stands and still returns empty for the
+consumer path — that is correct until Stage 6e.
