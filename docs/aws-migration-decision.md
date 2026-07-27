@@ -15,6 +15,17 @@ Supersedes the "recommend B / hybrid" framing below. Reason: **we are credit-dep
 
 **Built + verified (2026-07-28):** `supabase/functions/_shared/awsSigV4.ts` — runtime-neutral (pure WebCrypto, no dep, works verbatim under Deno edge + Bun) SigV4 signer, shared by Bedrock/P-AWS/SES/S3. 5 tests pass incl. AWS's published `get-vanilla` vector reproduced exactly. This is the auth foundation for every AWS piece; because A and B share it, the B-migration auth is already done.
 
+**Also built + verified (2026-07-28, commit `fa1d7f6`):** `_shared/bedrockAdapter.ts` + the `aiGateway.ts` seam.
+- `mapModelToBedrock()` with the `BEDROCK_ID` short-circuit — the `startsWith("claude-")` trap flagged in §1 is handled, and per-tier ids are env-overridable (`BEDROCK_MODEL_{HAIKU,SONNET,OPUS}`) so a wrong id is a config fix, not a redeploy.
+- **Streaming needed more than expected:** Bedrock streams the AWS binary event-stream (`application/vnd.amazon.eventstream`), not `text/event-stream`. Each frame wraps a base64 Anthropic SSE event, so the adapter carries a frame decoder that buffers across reads and surfaces post-header exception frames *inside* the stream (the only way a throttling error reaches the user).
+- `ATLAS_AI_PROVIDER=bedrock` switch; the Bedrock branch **fails closed** like the Anthropic one (no silent fall-through to another processor when AWS creds are missing).
+- Capability router: `web_search`/`web_fetch` turns bridge to first-party; without a bridge key it degrades (drops server tools) rather than 400ing.
+- Verified: 13 adapter/signer tests, 91/91 brain tests, `tsc -b` exit 0, `deno check` exit 0 (both runtimes, since `_shared/*` is imported verbatim by each).
+
+**Correction to §6 below:** `generateEmbedding()` is **NOT dead code.** It has seven live callers, including `orchestrator.ts:776`'s recall fallback (`deps.embed ?? generateEmbedding`). Deleting it standalone breaks the typecheck — its removal is genuinely coupled to the Phase-8 edge-function deletion (task #13), not a free cleanup in this phase. Embeddings staying local is unchanged and still correct.
+
+**Remaining before Bedrock can actually serve traffic:** (1) the one-time Anthropic use-case form in the Bedrock console — filled, awaiting the user's Submit; (2) a least-privilege IAM policy + access keys in the brain env; (3) the model-id + prompt-caching confirmation against a live invoke.
+
 ---
 
 # Atlas → AWS migration — decision record
