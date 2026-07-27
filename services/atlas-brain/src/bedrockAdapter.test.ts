@@ -19,22 +19,46 @@ import {
 // ---------------------------------------------------------------------------
 // Model mapping
 
+// Every id asserted below was verified to exist via
+// `aws bedrock list-inference-profiles --region eu-central-1` (2026-07-28).
 test("mapModelToBedrock: logical ids resolve to EU inference profiles", () => {
   expect(mapModelToBedrock("google/gemini-2.5-flash")).toBe("eu.anthropic.claude-sonnet-5");
-  expect(mapModelToBedrock("google/gemini-2.5-flash-lite")).toBe("eu.anthropic.claude-haiku-4-5");
-  expect(mapModelToBedrock("openai/gpt-5")).toBe("eu.anthropic.claude-opus-4-8");
+  expect(mapModelToBedrock("openai/gpt-5")).toBe("eu.anthropic.claude-opus-5");
 });
 
-test("mapModelToBedrock: claude tiers map to their EU profile", () => {
-  expect(mapModelToBedrock("claude-haiku-4-5")).toBe("eu.anthropic.claude-haiku-4-5");
+test("mapModelToBedrock: the cheap tier stays in the EEA (no EU Haiku exists)", () => {
+  // Bedrock publishes Haiku 4.5 only as a `global.*` profile, which routes
+  // worldwide. Mapping the cheap tier to EU Sonnet is what keeps the privacy
+  // policy's residency claim true; if this ever returns a `global.` id, that
+  // claim silently breaks — hence the explicit assertion.
+  expect(mapModelToBedrock("claude-haiku-4-5")).toBe("eu.anthropic.claude-sonnet-5");
+  expect(mapModelToBedrock("google/gemini-2.5-flash-lite")).toBe("eu.anthropic.claude-sonnet-5");
   expect(mapModelToBedrock("claude-sonnet-5")).toBe("eu.anthropic.claude-sonnet-5");
+});
+
+test("mapModelToBedrock: every default resolves to an eu. profile", () => {
+  for (const logical of [
+    "google/gemini-2.5-flash-lite",
+    "google/gemini-2.5-flash",
+    "google/gemini-2.5-pro",
+    "openai/gpt-5-nano",
+    "openai/gpt-5-mini",
+    "openai/gpt-5",
+    "claude-haiku-4-5",
+    "claude-sonnet-5",
+    "claude-opus-4-8",
+  ]) {
+    expect(mapModelToBedrock(logical).startsWith("eu.anthropic.")).toBe(true);
+  }
 });
 
 test("mapModelToBedrock: an already-resolved Bedrock id passes through untouched", () => {
   // This is the load-bearing guard — without it the `eu.` id (which does not
   // start with "claude-") would collapse to the default tier.
-  expect(mapModelToBedrock("eu.anthropic.claude-opus-4-8")).toBe("eu.anthropic.claude-opus-4-8");
+  expect(mapModelToBedrock("eu.anthropic.claude-opus-5")).toBe("eu.anthropic.claude-opus-5");
   expect(mapModelToBedrock("us.anthropic.claude-sonnet-5")).toBe("us.anthropic.claude-sonnet-5");
+  expect(mapModelToBedrock("global.anthropic.claude-haiku-4-5-20251001-v1:0"))
+    .toBe("global.anthropic.claude-haiku-4-5-20251001-v1:0");
 });
 
 // ---------------------------------------------------------------------------

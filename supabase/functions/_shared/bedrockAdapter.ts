@@ -40,12 +40,22 @@ const DEFAULT_REGION = "eu-central-1";
 /**
  * Logical/first-party model id -> Bedrock EU inference-profile id.
  *
- * The exact Bedrock model-id strings can be confirmed in the console (Model
- * catalog → the model's detail page), so each tier is env-overridable
- * (`BEDROCK_MODEL_{HAIKU,SONNET,OPUS}`) — a wrong id fails with an opaque 404,
- * and we do NOT want a code edit + redeploy to correct a string. The defaults
- * follow the documented EU cross-region profile naming (`eu.` prefix keeps the
- * request inside the EEA — the residency guarantee the privacy policy leans on).
+ * The defaults below are VERIFIED against `aws bedrock list-inference-profiles
+ * --region eu-central-1` (2026-07-28), not inferred from naming conventions.
+ * Each tier stays env-overridable (`BEDROCK_MODEL_{HAIKU,SONNET,OPUS}`) because
+ * a wrong id fails with an opaque 404 and that should be a config fix, not a
+ * redeploy.
+ *
+ * THE HAIKU FINDING — deliberate, not an oversight: **no `eu.anthropic.claude-
+ * haiku-*` profile exists.** Haiku 4.5 is published only as a `global.*` profile,
+ * and `global.` routes worldwide, which would put background requests outside
+ * the EEA and silently contradict the privacy policy's residency commitment. The
+ * cheapest EU-resident Claude is Sonnet, so the cheap tier maps to the EU Sonnet
+ * profile: correctness of the published claim outranks the token saving. This
+ * costs real money (Sonnet ~3x Haiku) on the highest-volume background path —
+ * revisit if/when an EU Haiku profile ships. The IAM policy grants only
+ * `inference-profile/eu.anthropic.claude-*`, so a `global.` id is denied by
+ * construction rather than quietly working.
  */
 function bedrockIdForTier(tier: string): string {
   const overrides: Record<string, string | undefined> = {
@@ -54,15 +64,22 @@ function bedrockIdForTier(tier: string): string {
     "claude-opus-4-8": Deno.env.get("BEDROCK_MODEL_OPUS"),
   };
   const defaults: Record<string, string> = {
-    "claude-haiku-4-5": "eu.anthropic.claude-haiku-4-5",
+    // No EU Haiku profile — see the note above. EU-resident Sonnet instead.
+    "claude-haiku-4-5": "eu.anthropic.claude-sonnet-5",
     "claude-sonnet-5": "eu.anthropic.claude-sonnet-5",
-    "claude-opus-4-8": "eu.anthropic.claude-opus-4-8",
+    // eu.anthropic.claude-opus-4-8 does NOT exist; Opus 5 is the EU top tier.
+    "claude-opus-4-8": "eu.anthropic.claude-opus-5",
   };
   return overrides[tier] ?? defaults[tier] ?? `eu.anthropic.${tier}`;
 }
 
-/** A value that is already a Bedrock/inference-profile id (region-prefixed). */
-const BEDROCK_ID = /^(eu|us|apac|anthropic)\./;
+/**
+ * A value that is already a resolved Bedrock/inference-profile id. `global` is
+ * included so an explicit env override is passed through verbatim rather than
+ * being re-prefixed into nonsense — the IAM policy, not this regex, is what
+ * keeps traffic in the EEA.
+ */
+const BEDROCK_ID = /^(eu|us|apac|global|anthropic)\./;
 
 /**
  * Resolve any model id the call sites use to a Bedrock invocation id. Reuses
