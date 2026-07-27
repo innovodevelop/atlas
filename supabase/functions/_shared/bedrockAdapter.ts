@@ -40,22 +40,32 @@ const DEFAULT_REGION = "eu-central-1";
 /**
  * Logical/first-party model id -> Bedrock EU inference-profile id.
  *
- * The defaults below are VERIFIED against `aws bedrock list-inference-profiles
- * --region eu-central-1` (2026-07-28), not inferred from naming conventions.
- * Each tier stays env-overridable (`BEDROCK_MODEL_{HAIKU,SONNET,OPUS}`) because
- * a wrong id fails with an opaque 404 and that should be a config fix, not a
- * redeploy.
+ * Every default below was verified by an ACTUAL InvokeModel call against
+ * eu-central-1, signing as the atlas-brain IAM user (2026-07-28) — not read off
+ * a docs page and not inferred from naming.
  *
- * THE HAIKU FINDING — deliberate, not an oversight: **no `eu.anthropic.claude-
- * haiku-*` profile exists.** Haiku 4.5 is published only as a `global.*` profile,
- * and `global.` routes worldwide, which would put background requests outside
- * the EEA and silently contradict the privacy policy's residency commitment. The
- * cheapest EU-resident Claude is Sonnet, so the cheap tier maps to the EU Sonnet
- * profile: correctness of the published claim outranks the token saving. This
- * costs real money (Sonnet ~3x Haiku) on the highest-volume background path —
- * revisit if/when an EU Haiku profile ships. The IAM policy grants only
- * `inference-profile/eu.anthropic.claude-*`, so a `global.` id is denied by
- * construction rather than quietly working.
+ * That distinction turned out to matter twice:
+ *
+ * 1. **Listing a profile proves it exists, NOT that this account may invoke it.**
+ *    `list-inference-profiles` happily returns `eu.anthropic.claude-sonnet-5`,
+ *    `…opus-4-8` and `…opus-4-7`, but invoking any of them fails with
+ *    `AccessDeniedException: <model> is not available for this account`. The
+ *    newest tier is simply not entitled here yet. So each tier maps to the
+ *    newest model that actually *answers*, and every tier stays env-overridable
+ *    (`BEDROCK_MODEL_{HAIKU,SONNET,OPUS}`) — the day Sonnet 5 is enabled, that
+ *    is a config change, not a deploy.
+ *
+ * 2. **The id shapes are not derivable.** Some carry a date+version suffix
+ *    (`-20251001-v1:0`), some do not (`sonnet-4-6`). Hence literal strings.
+ *
+ * Verified invocable: haiku-4-5-20251001-v1:0, sonnet-4-6,
+ * sonnet-4-5-20250929-v1:0, opus-4-6-v1.
+ * Verified DENIED: sonnet-5, opus-4-8, opus-4-7.
+ *
+ * All of these are `eu.` profiles, which keeps inference inside the EEA — the
+ * residency guarantee the privacy policy leans on. The IAM policy grants only
+ * `inference-profile/eu.anthropic.claude-*`, so a worldwide-routing `global.`
+ * id is denied by construction rather than quietly working.
  */
 function bedrockIdForTier(tier: string): string {
   const overrides: Record<string, string | undefined> = {
@@ -64,11 +74,11 @@ function bedrockIdForTier(tier: string): string {
     "claude-opus-4-8": Deno.env.get("BEDROCK_MODEL_OPUS"),
   };
   const defaults: Record<string, string> = {
-    // No EU Haiku profile — see the note above. EU-resident Sonnet instead.
-    "claude-haiku-4-5": "eu.anthropic.claude-sonnet-5",
-    "claude-sonnet-5": "eu.anthropic.claude-sonnet-5",
-    // eu.anthropic.claude-opus-4-8 does NOT exist; Opus 5 is the EU top tier.
-    "claude-opus-4-8": "eu.anthropic.claude-opus-5",
+    "claude-haiku-4-5": "eu.anthropic.claude-haiku-4-5-20251001-v1:0",
+    // Sonnet 5 exists as a profile but is not entitled on this account yet.
+    "claude-sonnet-5": "eu.anthropic.claude-sonnet-4-6",
+    // Opus 4.8 and 4.7 are likewise unentitled; 4.6 is the newest that answers.
+    "claude-opus-4-8": "eu.anthropic.claude-opus-4-6-v1",
   };
   return overrides[tier] ?? defaults[tier] ?? `eu.anthropic.${tier}`;
 }

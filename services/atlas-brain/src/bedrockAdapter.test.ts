@@ -19,21 +19,32 @@ import {
 // ---------------------------------------------------------------------------
 // Model mapping
 
-// Every id asserted below was verified to exist via
-// `aws bedrock list-inference-profiles --region eu-central-1` (2026-07-28).
-test("mapModelToBedrock: logical ids resolve to EU inference profiles", () => {
-  expect(mapModelToBedrock("google/gemini-2.5-flash")).toBe("eu.anthropic.claude-sonnet-5");
-  expect(mapModelToBedrock("openai/gpt-5")).toBe("eu.anthropic.claude-opus-5");
+// Every id asserted below was verified by an actual InvokeModel call against
+// eu-central-1 as the atlas-brain IAM user (2026-07-28) — existence in
+// `list-inference-profiles` was NOT sufficient, since sonnet-5 / opus-4-8 /
+// opus-4-7 all list fine yet fail with "not available for this account".
+test("mapModelToBedrock: logical ids resolve to invocable EU profiles", () => {
+  expect(mapModelToBedrock("google/gemini-2.5-flash")).toBe("eu.anthropic.claude-sonnet-4-6");
+  expect(mapModelToBedrock("openai/gpt-5")).toBe("eu.anthropic.claude-opus-4-6-v1");
+  expect(mapModelToBedrock("claude-haiku-4-5"))
+    .toBe("eu.anthropic.claude-haiku-4-5-20251001-v1:0");
+  expect(mapModelToBedrock("google/gemini-2.5-flash-lite"))
+    .toBe("eu.anthropic.claude-haiku-4-5-20251001-v1:0");
 });
 
-test("mapModelToBedrock: the cheap tier stays in the EEA (no EU Haiku exists)", () => {
-  // Bedrock publishes Haiku 4.5 only as a `global.*` profile, which routes
-  // worldwide. Mapping the cheap tier to EU Sonnet is what keeps the privacy
-  // policy's residency claim true; if this ever returns a `global.` id, that
-  // claim silently breaks — hence the explicit assertion.
-  expect(mapModelToBedrock("claude-haiku-4-5")).toBe("eu.anthropic.claude-sonnet-5");
-  expect(mapModelToBedrock("google/gemini-2.5-flash-lite")).toBe("eu.anthropic.claude-sonnet-5");
-  expect(mapModelToBedrock("claude-sonnet-5")).toBe("eu.anthropic.claude-sonnet-5");
+test("mapModelToBedrock: never targets a model this account cannot invoke", () => {
+  // Guards the exact regression that a well-meaning "upgrade to the newest
+  // model" edit would introduce: these three profiles exist but are denied, so
+  // mapping to one turns every background call into an AccessDeniedException.
+  // If entitlement changes, flip via BEDROCK_MODEL_* and update this list.
+  const denied = [
+    "eu.anthropic.claude-sonnet-5",
+    "eu.anthropic.claude-opus-4-8",
+    "eu.anthropic.claude-opus-4-7",
+  ];
+  for (const logical of ["claude-haiku-4-5", "claude-sonnet-5", "claude-opus-4-8"]) {
+    expect(denied).not.toContain(mapModelToBedrock(logical));
+  }
 });
 
 test("mapModelToBedrock: every default resolves to an eu. profile", () => {
@@ -70,7 +81,7 @@ test("toBedrockRequest: model leaves the body, anthropic_version enters it", () 
     messages: [{ role: "user", content: "hi" }],
   });
 
-  expect(modelId).toBe("eu.anthropic.claude-sonnet-5");
+  expect(modelId).toBe("eu.anthropic.claude-sonnet-4-6");
   expect(stream).toBe(false);
   expect(invokeBody.anthropic_version).toBe("bedrock-2023-05-31");
 
