@@ -33,6 +33,7 @@ import {
 } from "./localDb.ts";
 import { createLearningHandlers } from "./learningRoutes.ts";
 import { createProactiveHandlers } from "./proactive.ts";
+import { createMailDraftHandlers } from "./mailDraft.ts";
 import { embedText } from "./localEmbed.ts";
 import { AUTO_EMBED_BATCH, embedPending, scheduleAutoEmbed } from "./autoEmbed.ts";
 
@@ -109,6 +110,10 @@ const learning = createLearningHandlers({ db: localDb, requireUser, json });
 
 // Proactive digest (Phase 4): scheduler-driven insight generation (proactive.ts).
 const proactive = createProactiveHandlers({ db: localDb, requireUser, json });
+
+// Atlas Mail draft composer (Stage 6D): one AI pass per call, reads atlas.db
+// only — never the Cloudflare mail worker, never sends (see mailDraft.ts).
+const mailDraft = createMailDraftHandlers({ db: localDb, requireUser, json });
 
 // POST /chat-with-memory — full orchestrator: memory recall, tools, streaming.
 async function handleChatWithMemory(req: Request): Promise<Response> {
@@ -395,6 +400,7 @@ const server = Bun.serve({
       if (req.method === "POST" && url.pathname === "/learning/cycle") return await learning.cycle(req);
       if (req.method === "POST" && url.pathname === "/learning/intent") return await learning.intent(req);
       if (req.method === "POST" && url.pathname === "/research") return await learning.research(req);
+      if (req.method === "POST" && url.pathname === "/mail/draft") return await mailDraft.draft(req);
       if (req.method === "POST" && url.pathname === "/memory/maintenance") return await learning.memoryMaintenance(req);
       if (req.method === "POST" && url.pathname === "/memory/list") return await handleMemoryList(req);
       if (req.method === "POST" && url.pathname === "/memory/forget") return await handleMemoryForget(req);

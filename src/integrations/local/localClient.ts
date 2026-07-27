@@ -133,7 +133,13 @@ class QueryBuilder<T = any> implements PromiseLike<Result<T>> {
     return this;
   }
   upsert(values: unknown): this {
-    // The local layer's insert uses INSERT OR REPLACE, so upsert == insert here.
+    // NOT a real upsert. `db_insert` builds a plain `INSERT ... RETURNING *`
+    // (src-tauri/src/db.rs), NOT `INSERT OR REPLACE`, so passing a row whose
+    // primary key already exists rejects with "UNIQUE constraint failed" —
+    // there is no conflict target to honour and no ON CONFLICT clause to hit.
+    // Callers that may be writing an existing row must branch themselves
+    // (update when it exists, insert when it does not); see saveRule in
+    // useAtlasMail.ts. Kept only so the supabase-js call shape still compiles.
     this._op = "insert";
     this._values = values;
     return this;
@@ -388,14 +394,24 @@ const realtime = {
 };
 
 // Edge functions now served by local Tauri commands. Anything not in this map
-// has no backend anymore — mail waits on the Phase-7 CF mail worker.
+// has no backend anymore.
+//
+// Mail is deliberately absent. The admin mailbox is reached through the `mail_*`
+// Tauri commands via useAtlasMail; routing it here too would give it a second
+// entry point that bypasses the local audit trail.
 const LOCAL_FN: Record<string, string> = {
   "get-weather": "fetch_weather",
   "get-stocks": "fetch_stocks",
   "get-news": "fetch_news",
 };
 
-const MAIL_FNS = new Set(["mail-oauth-start", "mail-sync", "mail-disconnect"]);
+// The two consumer-mailbox edge functions that still have no local replacement —
+// connecting and disconnecting a personal Gmail/IMAP account is Stage 6e. They
+// keep a stub so the legacy useMailIntelligence call sites fail legibly instead
+// of pretending. `mail-sync` is gone from this set on purpose: the admin mailbox
+// syncs through the `mail_sync` Tauri command now, so the old edge-function name
+// is a dead route rather than an unavailable one.
+const UNBUILT_MAIL_FNS = new Set(["mail-oauth-start", "mail-disconnect"]);
 
 const functions = {
   async invoke(name: string, opts?: { body?: unknown; headers?: Record<string, string> }): Promise<Result<any>> {
@@ -408,8 +424,8 @@ const functions = {
         return { data: null, error: { message: e instanceof Error ? e.message : String(e) } };
       }
     }
-    if (MAIL_FNS.has(name)) {
-      return { data: null, error: new Error("Mail sync is temporarily unavailable — migrating to the new mail service") };
+    if (UNBUILT_MAIL_FNS.has(name)) {
+      return { data: null, error: new Error("Connecting a personal mailbox isn't available in Atlas yet.") };
     }
     return { data: null, error: new Error(`${name} is not available locally`) };
   },

@@ -14,6 +14,7 @@ mod music;
 mod music_engine;
 mod db;
 mod datafetch;
+mod mail;
 mod scheduler;
 mod integrity;
 
@@ -362,6 +363,12 @@ pub fn run() {
       datafetch::fetch_weather,
       datafetch::fetch_stocks,
       datafetch::fetch_news,
+      mail::mail_sync,
+      mail::mail_thread_fetch,
+      mail::mail_mark_read,
+      mail::mail_set_status,
+      mail::mail_send_reply,
+      mail::mail_ingest_errors,
     ])
     .setup(|app| {
       // Local app database (Supabase migration). Open once at startup under the

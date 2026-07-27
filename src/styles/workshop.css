@@ -1059,3 +1059,21 @@ body{display:block;overflow-x:hidden;overflow-y:visible;max-width:none;flex:none
   background:rgba(var(--surface-rgb),.7);border:1px solid var(--bd);
   font-size:12px;color:var(--ink2);cursor:pointer;transition:border-color .2s,color .2s}
 .bandlisten:hover{border-color:var(--ink3);color:var(--ink)}
+
+/* --- Reduced motion, app-wide (audit §P1-10) -------------------------------
+   Honoured nowhere in the handoff and only in one weather rule here, while the
+   app animates on nearly every surface — card rise, dock labels, the header
+   flow, the drawer slide, and now the mail panes. Rather than repeat the query
+   per component, motion is neutralised once, at the end of the cascade.
+   Durations collapse to ~0 instead of `animation:none` on purpose: a keyframe
+   that ends at `opacity:1` must still reach its end state, and `none` would
+   leave every `rise`/`fadeX` element stuck at its `from` frame — invisible.
+   The renderers that drive their own rAF loops (sphere, atmosphere, header
+   wave) check the same media query in JS and paint a single static frame. */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.001ms!important;animation-delay:0ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.001ms!important;transition-delay:0ms!important;
+    scroll-behavior:auto!important}
+}

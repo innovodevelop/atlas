@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Cpu, Mic, MicOff, Sparkles, Settings, Home, CornerUpLeft } from 'lucide-react';
+import { Cpu, Mail, Mic, MicOff, Sparkles, Settings, Home, CornerUpLeft } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWeather } from '@/hooks/useWeather';
@@ -200,6 +200,11 @@ const AtlasDashboard = () => {
         </button>
         <button className="dockb" onClick={() => navigate('/atlas-core')} aria-label="Atlas Core">
           <Cpu className="i16" /><span className="dockl">Core</span>
+        </button>
+        {/* The inbox card is a glance; supervising what Atlas does with mail
+            needs the full three-pane route. */}
+        <button className="dockb" onClick={() => navigate('/mail')} aria-label="Mail">
+          <Mail className="i16" /><span className="dockl">Mail</span>
         </button>
         <button className="dockb" onClick={handleManualActivate} aria-label="Voice">
           <Mic className="i16" /><span className="dockl">Voice</span>

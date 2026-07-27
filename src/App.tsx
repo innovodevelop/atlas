@@ -17,6 +17,9 @@ import { useRealtimePauseOnInactivity } from "./hooks/useRealtimePauseOnInactivi
 // and the whole legacy card stack into whatever chunk it lands in.
 const AtlasHome = lazy(() => import("./pages/atlas/AtlasHome"));
 const AtlasCoreScreen = lazy(() => import("./pages/atlas/AtlasCoreScreen"));
+// Mail is a full route, not the dashboard's `expanded === 'email'` overlay —
+// the overlay stays as the glanceable card, this is the supervision surface.
+const AtlasMail = lazy(() => import("./pages/atlas/AtlasMail"));
 const Auth = lazy(() => import("./pages/Auth"));
 const AtlasDemo = lazy(() => import("./pages/AtlasDemo"));
 const AtlasCore = lazy(() => import("./pages/AtlasCore"));
@@ -123,6 +126,7 @@ const App = () => (
           <Route path="/dashboard" element={<AtlasDashboard />} />
           <Route path="/home" element={<AtlasHome />} />
           <Route path="/atlas-core" element={<AtlasCoreScreen />} />
+          <Route path="/mail" element={<AtlasMail />} />
           <Route path="/auth" element={<Auth />} />
 
           {/* Legacy Atlas Core health dashboard (settings still live here until
