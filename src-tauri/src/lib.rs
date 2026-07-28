@@ -150,6 +150,29 @@ fn spawn_atlas_brain(token: &str) -> SidecarSpawn {
     // injected: a silent fallback would send prompts (which embed the user's
     // stored memories) to a processor the privacy policy does not disclose.
     if let Some(k) = secrets::core_key("anthropic_api_key") { cmd.env("ANTHROPIC_API_KEY", k); }
+
+    // Amazon Bedrock (background inference on AWS Activate credits, EU-resident).
+    // Both halves of the AWS credential must be present or neither is injected:
+    // a half-configured pair makes aiGateway fail closed with a confusing "no AI
+    // key configured" instead of an obvious missing-credential error.
+    if let (Some(id), Some(secret)) = (
+        secrets::core_key("aws_access_key_id"),
+        secrets::core_key("aws_secret_access_key"),
+    ) {
+        cmd.env("AWS_ACCESS_KEY_ID", id).env("AWS_SECRET_ACCESS_KEY", secret);
+        // eu-central-1 is where the eu.anthropic.* inference profiles live; the
+        // `eu.` prefix is what keeps background inference inside the EEA.
+        cmd.env(
+            "AWS_REGION",
+            secrets::core_key("aws_region").unwrap_or_else(|| "eu-central-1".to_string()),
+        );
+        // Switching providers stays EXPLICIT: having AWS keys in the Keychain
+        // must not silently redirect inference away from Anthropic. Only the
+        // stored atlas_ai_provider preference flips it.
+        if let Some(p) = secrets::core_key("atlas_ai_provider") {
+            cmd.env("ATLAS_AI_PROVIDER", p);
+        }
+    }
     match cmd.spawn() {
         Ok(child) => {
             eprintln!("[atlas] brain sidecar spawned (pid {})", child.id());
@@ -179,6 +202,11 @@ fn atlas_brain_info(state: tauri::State<AtlasBrain>) -> serde_json::Value {
 fn core_account(provider: &str) -> Option<&'static str> {
     Some(match provider {
         "anthropic" => "anthropic_api_key",
+        // AWS credential pair + region/provider for the Bedrock background tier.
+        "aws_access_key_id" => "aws_access_key_id",
+        "aws_secret_access_key" => "aws_secret_access_key",
+        "aws_region" => "aws_region",
+        "atlas_ai_provider" => "atlas_ai_provider",
         "gemini" => "gemini_api_key",
         "perplexity" => "perplexity_api_key",
         "openweather" => "openweather_api_key",
@@ -206,6 +234,10 @@ fn brain_ai_status() -> serde_json::Value {
     let present = |a: &str| secrets::core_key(a).is_some();
     serde_json::json!({
         "anthropic": present("anthropic_api_key"),
+        // Bedrock needs BOTH halves; report the pair, not each half, so the UI
+        // cannot show "configured" for a credential that will not authenticate.
+        "bedrock": present("aws_access_key_id") && present("aws_secret_access_key"),
+        "ai_provider": secrets::core_key("atlas_ai_provider").unwrap_or_else(|| "anthropic".to_string()),
         "gemini": present("gemini_api_key"),
         "perplexity": present("perplexity_api_key"),
         "openweather": present("openweather_api_key"),
