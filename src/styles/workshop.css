@@ -755,7 +755,16 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 .pillAcc{color:var(--acc);background:rgba(52,97,242,.12);border:1px solid rgba(52,97,242,.28)}
 .strokeAcc{stroke:var(--acc);fill:none}
 .wkbar{background:rgba(52,97,242,.32)}
-.on{background:var(--acc);box-shadow:0 0 10px rgba(52,97,242,.45)}
+/* REMOVED: a bare, unscoped `.on{background:var(--acc);box-shadow:...}` lived
+   here. `on` is this codebase's generic *state* token (.dotB.on, .h24.on,
+   .ctab.on, .adot.on, .aans.on …), so an unscoped rule painted an accent
+   background + blue glow onto ANY element toggled on. It was invisible for the
+   ~7 elements that have their own compound `.x.on` rule (two-class selectors
+   outrank one), which is why it survived — but it hit `.aans` on the login
+   screen, drawing a solid #3461f2 slab behind "Yes, we've met before / No,
+   we're just meeting". Deleted rather than re-scoped: every element that wants
+   an on-state background already declares its own. Do not reintroduce a bare
+   `.on` — always scope state rules to their component class. */
 .expwash{background:radial-gradient(58% 44% at 50% 2%,rgba(52,97,242,.10),transparent 62%),linear-gradient(180deg,var(--wt),var(--pg) 72%)}
 .featImg{background:rgba(52,97,242,.12);border:1px solid rgba(52,97,242,.18)}
 
