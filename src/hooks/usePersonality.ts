@@ -40,6 +40,7 @@ function normalizeTraits(raw: unknown): Traits {
 }
 
 // Same local-sidecar fetch pattern as useBrainSearch.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- brain sidecar returns free-form JSON; `unknown` here would force a cast at every call site without adding safety
 async function brainPost(path: string, body: unknown): Promise<{ data: any; error: Error | null }> {
   const brain = await getBrainEndpoint();
   if (!brain) return { data: null, error: new Error('Personality settings are only available in the desktop app.') };

@@ -95,7 +95,7 @@ export const AtlasNowPlayingCard = memo(({ onOpen }: { onOpen?: () => void }) =>
         <button
           className="npplay"
           aria-label={isPlaying ? 'Pause' : 'Play'}
-          onClick={(e) => { e.stopPropagation(); isPlaying ? m.pause() : m.play(); }}
+          onClick={(e) => { e.stopPropagation(); if (isPlaying) m.pause(); else m.play(); }}
         >
           {isPlaying ? <Pause className="i16" /> : <Play className="i16" />}
         </button>

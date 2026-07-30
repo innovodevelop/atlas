@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- test code deliberately builds
+   partial fixtures and reaches into internals to assert on them. Precise types
+   here would mean mirroring production shapes in the tests, which adds churn
+   without adding safety: the assertions, not the annotations, are the contract. */
 // Integration test for the local Supabase-shim: a mocked Tauri `invoke` runs the
 // shim's generated operations against a REAL bun:sqlite copy of the app schema,
 // so the whole round-trip (query building → db_* → SQLite → type reconstruction)

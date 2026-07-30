@@ -5,6 +5,7 @@ import { getBrainEndpoint } from '@/lib/brainClient';
 import { useToast } from '@/hooks/use-toast';
 
 // Research runs on the local brain sidecar.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- brain sidecar returns free-form JSON; `unknown` here would force a cast at every call site without adding safety
 async function brainPost(path: string, body: unknown): Promise<{ data: any; error: any }> {
   const brain = await getBrainEndpoint();
   if (!brain) return { data: null, error: new Error('Research is only available in the desktop app.') };

@@ -1,3 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- this file is the local SQL
+   shim that mimics the Supabase query-builder result shape. Row contents are
+   determined by the caller-supplied table and select, so the result type is
+   genuinely dynamic; using `unknown` would push an unchecked cast to every
+   call site instead of containing the looseness here. */
 // Local Supabase-compatible client for the brain sidecar (Supabase-removal,
 // Phase 6 / Phase-3 tail). Same surface the shared orchestrator uses
 // (`.from(table)…`, `.rpc(name)`), but backed by bun:sqlite over the on-device

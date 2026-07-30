@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- test code deliberately builds
+   partial fixtures and reaches into internals to assert on them. Precise types
+   here would mean mirroring production shapes in the tests, which adds churn
+   without adding safety: the assertions, not the annotations, are the contract. */
 // Phase 3 memory integrity + SFT capture: dedup upserts, the idempotent
 // (user_id, key) migration, forget/erase scoping, and chat-turn round-trips.
 import { test, expect } from "bun:test";

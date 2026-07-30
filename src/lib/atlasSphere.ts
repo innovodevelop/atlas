@@ -278,7 +278,7 @@ function paint(entry: Entry, t: number): void {
 // --- loop -------------------------------------------------------------------
 
 const registry = new WeakMap<HTMLCanvasElement, Entry>();
-let entries: Entry[] = [];
+const entries: Entry[] = [];
 let raf = 0, guard = 0, prev = 0, last = 0;
 
 const reduceMotion = (): boolean =>

@@ -52,7 +52,8 @@ function drawOrb(x: CanvasRenderingContext2D, w: number, h: number, amp: number,
   const rrad = R * (1 + amp * 0.06);
   for (let i = 0; i < N; i++) {
     const p = pts[i];
-    let X = p[0] * ca + p[2] * sa, Z = -p[0] * sa + p[2] * ca;
+    const X = p[0] * ca + p[2] * sa;
+    let Z = -p[0] * sa + p[2] * ca;
     const Y = p[1] * cx2 - Z * sx2; Z = p[1] * sx2 + Z * cx2;
     const depth = (Z + 1) / 2;
     const sx = cx + X * rrad, sy = cy + Y * rrad;
@@ -75,7 +76,7 @@ function drawRings(x: CanvasRenderingContext2D, w: number, h: number, amp: numbe
       const X = Math.cos(th), Y = Math.sin(th) * Math.cos(tilt), Z = Math.sin(th) * Math.sin(tilt);
       const ca = Math.cos(ph), sa = Math.sin(ph); const X2 = X * ca + Z * sa;
       const sx = cx + X2 * R, sy = cy + Y * R;
-      a === 0 ? x.moveTo(sx, sy) : x.lineTo(sx, sy);
+      if (a === 0) x.moveTo(sx, sy); else x.lineTo(sx, sy);
     }
     x.strokeStyle = 'rgba(255,255,255,' + (0.32 + amp * 0.4) + ')'; x.lineWidth = 1.6; x.stroke();
   });
@@ -105,7 +106,7 @@ function drawBloom(x: CanvasRenderingContext2D, w: number, h: number, amp: numbe
     const th = a / 120 * Math.PI * 2;
     const rad = R * (1 + 0.13 * Math.sin(th * 3 + t * 1.6) + 0.09 * Math.sin(th * 5 - t * 2.3) + 0.06 * Math.sin(th * 7 + t * 3.1) + (0.11 + amp * 0.36) * Math.sin(th * 2 + t * 4));
     const sx = cx + Math.cos(th) * rad, sy = cy + Math.sin(th) * rad;
-    a === 0 ? x.moveTo(sx, sy) : x.lineTo(sx, sy);
+    if (a === 0) x.moveTo(sx, sy); else x.lineTo(sx, sy);
   }
   x.closePath();
   const g = x.createRadialGradient(cx, cy, 0, cx, cy, R * 1.4);

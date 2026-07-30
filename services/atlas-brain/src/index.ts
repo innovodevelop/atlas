@@ -130,7 +130,9 @@ async function handleChatWithMemory(req: Request): Promise<Response> {
   const result = await runChat(
     {
       // Local DB stands in for both the user + service-role Supabase clients.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- structural bridge to the legacy Supabase-shaped surface; the target interface is not exported to name here
       supabase: localDb as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- structural bridge to the legacy Supabase-shaped surface; the target interface is not exported to name here
       systemDb: localDb as any,
       userId,
       userToken: token,
@@ -348,6 +350,7 @@ async function handleSearch(req: Request): Promise<Response> {
   });
 
   const results: Array<Record<string, unknown>> = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- structural bridge to the legacy Supabase-shaped surface; the target interface is not exported to name here
   for (const h of (hits as any[]) ?? []) {
     if (h.knowledge_entry_id) {
       const { data: k } = await localDb.from("atlas_knowledge_entries").select().eq("id", h.knowledge_entry_id).single();

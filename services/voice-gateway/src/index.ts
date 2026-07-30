@@ -116,7 +116,7 @@ async function handleTts(req: Request): Promise<Response> {
           if (!controller.signal.aborted) console.error("[gateway] /tts failed:", e);
           try {
             sink.error(e);
-          } catch {}
+          } catch { /* sink already closed by the client disconnecting — nothing to report to */ }
         });
     },
     cancel() {

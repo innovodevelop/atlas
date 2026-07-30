@@ -241,7 +241,7 @@ export type MailView =
   | 'handoff'
   | 'sent_today';
 
-export interface MailCounts extends Record<MailView, number> {}
+export type MailCounts = Record<MailView, number>;
 
 /**
  * Why a list is empty. The UI must never render "inbox zero" copy for a filtered view —

@@ -153,6 +153,7 @@ export interface UseAtlasMail {
 // not own (contract §1 gives I3 only the MAIL_FNS edit in localClient.ts).
 // ---------------------------------------------------------------------------
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- DB row / free-form JSON shape is decided at runtime by the query and payload
 type Row = Record<string, any>;
 
 const uuid = () =>
@@ -211,6 +212,7 @@ function toThread(row: Row, mailbox: string): MailThread {
 }
 
 function toMessage(row: Row): MailMessage {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- DB row / free-form JSON shape is decided at runtime by the query and payload
   const extracted = parseJson<Record<string, any>>(row.extracted, {});
   return {
     id: row.id,
@@ -288,6 +290,7 @@ async function tauriInvoke<T>(cmd: string, args: Record<string, unknown>): Promi
 }
 
 /** Drafting runs on the local brain sidecar; the CF JWT and the sidecar token are different tokens. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- DB row / free-form JSON shape is decided at runtime by the query and payload
 async function brainPost(path: string, body: unknown): Promise<any> {
   const brain = await getBrainEndpoint();
   if (!brain) throw new Error(DESKTOP_ONLY);

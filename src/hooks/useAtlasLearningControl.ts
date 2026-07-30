@@ -5,6 +5,7 @@ import { useAtlasProviderStatus } from './useAtlasProviderStatus';
 import { useToast } from './use-toast';
 
 // Learning control runs on the local brain sidecar.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- brain sidecar returns free-form JSON; `unknown` here would force a cast at every call site without adding safety
 async function brainPost(path: string, body: unknown): Promise<{ data: any; error: any }> {
   const brain = await getBrainEndpoint();
   if (!brain) return { data: null, error: new Error('Learning is only available in the desktop app.') };

@@ -49,6 +49,7 @@ async function brainPost(
   path: string,
   body: unknown,
   { token, timeoutMs = BRAIN_TIMEOUT_MS }: { token?: string; timeoutMs?: number } = {},
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- brain sidecar returns free-form JSON; `unknown` here would force a cast at every call site without adding safety
 ): Promise<{ data: any; error: Error | null }> {
   const brain = await getBrainEndpoint();
   if (!brain) return { data: null, error: new Error('Memory management is only available in the desktop app.') };
