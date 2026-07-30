@@ -42,6 +42,35 @@ async function sha256Hex(data: string): Promise<string> {
   return toHex(await crypto.subtle.digest("SHA-256", encoder.encode(data)));
 }
 
+/**
+ * Percent-encode per RFC 3986. `encodeURIComponent` leaves `!'()*` alone, but
+ * AWS treats them as reserved, so they are escaped manually.
+ */
+function rfc3986(segment: string): string {
+  return encodeURIComponent(segment).replace(
+    /[!'()*]/g,
+    (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase(),
+  );
+}
+
+/**
+ * The canonical URI for the signature — each path segment URI-encoded a SECOND
+ * time (S3 is the lone exception, and Atlas does not sign S3 paths here).
+ *
+ * This is not pedantry: Bedrock inference-profile ids carry a version suffix
+ * like `-v1:0`, the caller already percent-encodes the id into the URL (`%3A`),
+ * and AWS then expects `%253A` in the string it signs. Signing the once-encoded
+ * path yields a 403 "signature we calculated does not match" whose message
+ * helpfully prints the canonical string AWS wanted — that is how this was found,
+ * against a real Bedrock call. Ids without a colon (e.g. `sonnet-4-6`) sign
+ * correctly either way, which is exactly why the unit tests missed it: the
+ * aws4_testsuite vector signs path "/".
+ */
+function canonicalUri(pathname: string): string {
+  if (!pathname || pathname === "/") return "/";
+  return pathname.split("/").map(rfc3986).join("/");
+}
+
 async function hmac(key: ArrayBuffer | Uint8Array, data: string): Promise<ArrayBuffer> {
   const cryptoKey = await crypto.subtle.importKey(
     "raw",
@@ -139,12 +168,9 @@ export async function signRequest(opts: SignOptions): Promise<Record<string, str
   const signedHeaders = sortedNames.join(";");
   const canonicalHeaders = sortedNames.map((n) => `${n}:${signed[n]}\n`).join("");
 
-  // Canonical URI must be the path, URI-encoded per RFC 3986 but with "/" kept.
-  // The AWS bedrock/messages paths contain no characters that require encoding
-  // beyond what URL already normalises, so url.pathname is used directly.
   const canonicalRequest = [
     opts.method.toUpperCase(),
-    url.pathname || "/",
+    canonicalUri(url.pathname),
     url.search.slice(1), // canonical query string (already sorted by URL for our callers; no query params today)
     canonicalHeaders,
     signedHeaders,

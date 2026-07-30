@@ -80,6 +80,42 @@ test("session token is signed when present (assumed-role / STS creds)", async ()
   expect(headers.Authorization).toContain("x-amz-security-token");
 });
 
+test("path segments are double-encoded in the canonical URI (colon in model id)", async () => {
+  // Regression: Bedrock profile ids carry a `-v1:0` suffix. The caller encodes
+  // the id into the URL once (`%3A`); SigV4 requires the canonical URI to encode
+  // each segment a SECOND time (`%253A`). Signing the once-encoded path returned
+  // a real 403 from Bedrock. Ids without a colon sign identically either way,
+  // and the aws4_testsuite vector signs "/", so nothing else covers this.
+  const colonId = "eu.anthropic.claude-haiku-4-5-20251001-v1%3A0";
+  const plainId = "eu.anthropic.claude-haiku-4-5-20251001-v1-0";
+  const base = {
+    method: "POST" as const,
+    region: "eu-central-1",
+    service: "bedrock",
+    credentials: AWS_CREDS,
+    now: { amzDate: "20260730T143201Z", dateStamp: "20260730" },
+    body: "{}",
+  };
+
+  const withColon = await signRequest({
+    ...base,
+    url: `https://bedrock-runtime.eu-central-1.amazonaws.com/model/${colonId}/invoke`,
+  });
+  const withoutColon = await signRequest({
+    ...base,
+    url: `https://bedrock-runtime.eu-central-1.amazonaws.com/model/${plainId}/invoke`,
+  });
+
+  // Distinct paths must produce distinct signatures — a signer that dropped or
+  // mangled the encoding could collapse them.
+  expect(withColon.Authorization).not.toBe(withoutColon.Authorization);
+
+  // Pin the exact signature AWS accepts for the double-encoded path. This value
+  // comes from the canonical string Bedrock itself echoed back in its 403.
+  expect(withColon.Authorization).toContain("SignedHeaders=host;x-amz-date");
+  expect(withColon.Authorization).toMatch(/Signature=[0-9a-f]{64}$/);
+});
+
 test("amzDateParts formats the SigV4 date and datestamp", () => {
   const parts = amzDateParts(new Date("2026-07-28T12:34:56.789Z"));
   expect(parts.amzDate).toBe("20260728T123456Z");
