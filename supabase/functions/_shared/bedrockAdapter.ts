@@ -38,6 +38,23 @@ const DEFAULT_REGION = "eu-central-1";
 // Model mapping
 
 /**
+ * Per-tier env override names. Every tier stays overridable so an entitlement
+ * change is a config change, not a deploy — see the entitlement note below.
+ *
+ * NB: `src-tauri/src/lib.rs` currently forwards only AWS_* + ATLAS_AI_PROVIDER
+ * to the brain sidecar, and a Finder-launched .app inherits no shell env, so
+ * these overrides are a dev/CI lever today, NOT a knob a shipped desktop build
+ * can turn. For the Fable entry that is the desired property, not a gap.
+ */
+const TIER_ENV: Record<string, string> = {
+  "claude-haiku-4-5": "BEDROCK_MODEL_HAIKU",
+  "claude-sonnet-5": "BEDROCK_MODEL_SONNET",
+  "claude-opus-4-8": "BEDROCK_MODEL_OPUS",
+  "claude-opus-5": "BEDROCK_MODEL_OPUS_5",
+  "claude-fable-5": "BEDROCK_MODEL_FABLE_5",
+};
+
+/**
  * Logical/first-party model id -> Bedrock EU inference-profile id.
  *
  * Every default below was verified by an ACTUAL InvokeModel call against
@@ -51,45 +68,126 @@ const DEFAULT_REGION = "eu-central-1";
  *    `…opus-4-8` and `…opus-4-7`, but invoking any of them fails with
  *    `AccessDeniedException: <model> is not available for this account`. The
  *    newest tier is simply not entitled here yet. So each tier maps to the
- *    newest model that actually *answers*, and every tier stays env-overridable
- *    (`BEDROCK_MODEL_{HAIKU,SONNET,OPUS}`) — the day Sonnet 5 is enabled, that
- *    is a config change, not a deploy.
+ *    newest model that actually *answers*.
  *
  * 2. **The id shapes are not derivable.** Some carry a date+version suffix
  *    (`-20251001-v1:0`), some do not (`sonnet-4-6`). Hence literal strings.
  *
  * Verified invocable: haiku-4-5-20251001-v1:0, sonnet-4-6,
  * sonnet-4-5-20250929-v1:0, opus-4-6-v1.
- * Verified DENIED: sonnet-5, opus-4-8, opus-4-7.
+ * Verified DENIED: sonnet-5, opus-4-8, opus-4-7, opus-5.
  *
- * All of these are `eu.` profiles, which keeps inference inside the EEA — the
- * residency guarantee the privacy policy leans on. The IAM policy grants only
- * `inference-profile/eu.anthropic.claude-*`, so a worldwide-routing `global.`
- * id is denied by construction rather than quietly working.
+ * **`eu.anthropic.claude-opus-5` is deliberately NOT a default.** It is the
+ * newest EU Opus profile and would be the obvious upgrade, but on 2026-07-30 it
+ * was denied to the ROOT account as well as to atlas-brain, which rules IAM out:
+ * the newest Anthropic tier needs a separate model-access request on the AWS
+ * side. Pointing a default at it would put `[AccessDeniedException: …]` straight
+ * into the user's transcript, because on a streaming call the error is injected
+ * into the stream rather than merely logged (see `bedrockEventStreamToOpenAI`).
+ * It stays reachable via `BEDROCK_MODEL_OPUS_5` or as an already-resolved id;
+ * promoting it into the table below belongs in a follow-up commit whose message
+ * cites a successful live InvokeModel.
+ *
+ * SUBSCRIPTIONS ARE PER-MODEL. Bedrock auto-subscribes an account to a model on
+ * first invoke via AWS Marketplace, and a least-privilege caller cannot complete
+ * that: it fails with "not authorized to perform the required AWS Marketplace
+ * actions" until an identity holding `aws-marketplace:Subscribe` invokes that
+ * SPECIFIC model once. Adding a new profile here therefore needs a one-time
+ * bootstrap invoke by an admin — the IAM policy alone is not enough.
+ *
+ * All defaults are `eu.` profiles, which keeps inference inside the EEA — the
+ * residency guarantee the privacy policy leans on (docs/aws-migration-decision.md
+ * §7). `assertEeaProfile` below enforces that in code rather than trusting the
+ * IAM policy to be the only line of defence.
+ */
+const TIER_DEFAULT: Record<string, string> = {
+  "claude-haiku-4-5": "eu.anthropic.claude-haiku-4-5-20251001-v1:0",
+  // Sonnet 5 exists as a profile but is not entitled on this account yet.
+  "claude-sonnet-5": "eu.anthropic.claude-sonnet-4-6",
+  // Opus 4.8 and 4.7 are likewise unentitled; 4.6 is the newest that answers.
+  "claude-opus-4-8": "eu.anthropic.claude-opus-4-6-v1",
+  // Same tier, newer name: a caller asking for Opus 5 gets the newest Opus that
+  // is actually entitled, exactly as `claude-sonnet-5` resolves to Sonnet 4.6.
+  "claude-opus-5": "eu.anthropic.claude-opus-4-6-v1",
+  // NO entry for "claude-fable-5" — that is the whole point. See below.
+};
+
+/**
+ * Fable 5 has NO `eu.` inference profile. The only way to reach it on Bedrock is
+ * `global.anthropic.claude-fable-5`, and a `global.` cross-region profile routes
+ * to whichever region has capacity, WORLDWIDE — it is by definition not
+ * EEA-confined, and Bedrock has no `inference_geo` escape hatch (that parameter
+ * is Claude-Platform-on-AWS only). On Bedrock the EU guarantee IS the profile
+ * prefix.
+ *
+ * So enabling Fable 5 is a POLICY decision, not a config decision. It is blocked
+ * twice over, and BOTH blockers must be lifted deliberately:
+ *
+ *   1. IAM — `AtlasBedrockInvoke` grants only
+ *      `inference-profile/eu.anthropic.claude-*`. Reaching Fable needs the
+ *      global profile ARN (anchored in us-east-1) *and* the underlying
+ *      foundation-model ARNs in every region the profile can route to — i.e. a
+ *      `arn:aws:bedrock:*::foundation-model/...` wildcard. That deletes the
+ *      containment property and leaves the policy as a name filter.
+ *   2. PRIVACY POLICY — the planned §6 processor row commits background
+ *      inference to "EU (Frankfurt/Ireland)"
+ *      (docs/aws-migration-decision.md:87-88). Fable removes that slice
+ *      entirely, requiring a §8 third-country-transfer entry on an SCC basis.
+ *      Fable additionally mandates 30-day retention and is unavailable under
+ *      zero-data-retention.
+ *
+ * Hence: no `TIER_DEFAULT` entry (mapping throws), and reaching it requires BOTH
+ * `BEDROCK_MODEL_FABLE_5` and `ATLAS_BEDROCK_ALLOW_NON_EEA=1`. Never set either
+ * in a shipped build.
  */
 function bedrockIdForTier(tier: string): string {
-  const overrides: Record<string, string | undefined> = {
-    "claude-haiku-4-5": Deno.env.get("BEDROCK_MODEL_HAIKU"),
-    "claude-sonnet-5": Deno.env.get("BEDROCK_MODEL_SONNET"),
-    "claude-opus-4-8": Deno.env.get("BEDROCK_MODEL_OPUS"),
-  };
-  const defaults: Record<string, string> = {
-    "claude-haiku-4-5": "eu.anthropic.claude-haiku-4-5-20251001-v1:0",
-    // Sonnet 5 exists as a profile but is not entitled on this account yet.
-    "claude-sonnet-5": "eu.anthropic.claude-sonnet-4-6",
-    // Opus 4.8 and 4.7 are likewise unentitled; 4.6 is the newest that answers.
-    "claude-opus-4-8": "eu.anthropic.claude-opus-4-6-v1",
-  };
-  return overrides[tier] ?? defaults[tier] ?? `eu.anthropic.${tier}`;
+  // Guard the lookup rather than passing `?? ""` to Deno.env.get: real Deno
+  // rejects an empty key with `TypeError: Key is an empty string`, which would
+  // replace the deliberate error below with an opaque one for any unknown tier.
+  // The Bun shim in the brain sidecar does not validate, so this only bites in
+  // the edge runtime — i.e. exactly where it would be hardest to read.
+  const envName = TIER_ENV[tier];
+  const id = (envName ? Deno.env.get(envName) : undefined) || TIER_DEFAULT[tier];
+  if (!id) {
+    // Never synthesise `eu.anthropic.${tier}`. The old fallback did, which meant
+    // an unknown tier became a plausible-looking profile id that may not exist
+    // at all (`claude-fable-5` -> `eu.anthropic.claude-fable-5`, which does not)
+    // and only failed per-request as a ValidationException. Failing at map time
+    // is louder and cheaper.
+    throw new Error(
+      `[bedrock] no inference profile mapped for tier "${tier}"` +
+        (TIER_ENV[tier] ? ` (set ${TIER_ENV[tier]} to opt in)` : ""),
+    );
+  }
+  return id;
 }
 
 /**
- * A value that is already a resolved Bedrock/inference-profile id. `global` is
- * included so an explicit env override is passed through verbatim rather than
- * being re-prefixed into nonsense — the IAM policy, not this regex, is what
- * keeps traffic in the EEA.
+ * A value that is already a resolved Bedrock/inference-profile id. Non-`eu.`
+ * prefixes are RECOGNISED here (so an explicit env override is passed through
+ * verbatim rather than being re-prefixed into nonsense) but not AUTHORISED —
+ * `assertEeaProfile` is the authorisation step.
  */
 const BEDROCK_ID = /^(eu|us|apac|global|anthropic)\./;
+
+/**
+ * A non-`eu.` profile routes OUTSIDE the EEA. Previously the argument was that
+ * "the IAM policy, not this regex, is what keeps traffic in the EEA" — but that
+ * made a single console edit to `AtlasBedrockInvoke` enough to silently unlock
+ * worldwide routing everywhere, with zero resistance from the code. This flag
+ * makes the residency commitment self-enforcing and makes any future non-EEA
+ * traffic a deliberate, greppable act rather than a copy-pasted env var.
+ */
+function assertEeaProfile(id: string): string {
+  if (id.startsWith("eu.")) return id;
+  if (Deno.env.get("ATLAS_BEDROCK_ALLOW_NON_EEA") === "1") return id;
+  throw new Error(
+    `[bedrock] refusing to invoke non-EEA inference profile "${id}": the privacy ` +
+      `policy commits background inference to EU (Frankfurt/Ireland). Leaving the ` +
+      `EEA requires a widened AtlasBedrockInvoke IAM resource AND a published ` +
+      `privacy-policy change; set ATLAS_BEDROCK_ALLOW_NON_EEA=1 only once both have landed.`,
+  );
+}
 
 /**
  * Resolve any model id the call sites use to a Bedrock invocation id. Reuses
@@ -101,8 +199,32 @@ const BEDROCK_ID = /^(eu|us|apac|global|anthropic)\./;
  * it as unknown and collapse everything to the default tier.
  */
 export function mapModelToBedrock(model: string): string {
-  if (BEDROCK_ID.test(model)) return model;
-  return bedrockIdForTier(mapModelToClaude(model));
+  if (BEDROCK_ID.test(model)) return assertEeaProfile(model);
+  return assertEeaProfile(bedrockIdForTier(mapModelToClaude(model)));
+}
+
+/**
+ * Whether the resolved profile needs `thinking` stated EXPLICITLY rather than by
+ * omission — and if so, what to send.
+ *
+ * `toBedrockRequest` drops `thinking` entirely (see its comment). On Opus 4.6 —
+ * today's default everywhere — omitting the field means NO thinking, so dropping
+ * it is free. That stops being true for the newer models:
+ *
+ *  - Opus 5 THINKS when `thinking` is omitted. Combined with
+ *    `DEFAULT_MAX_TOKENS = 4096` (which caps thinking + text *together*),
+ *    background summary/classify/title calls would start truncating mid-answer
+ *    and cost materially more. So a silent model swap is a behaviour change, not
+ *    a model swap — send `{type:"disabled"}` explicitly. Bedrock accepts that at
+ *    the default effort (`high`); it 400s only at `xhigh`/`max`, which this path
+ *    never sends.
+ *  - Fable 5 thinks UNCONDITIONALLY and 400s on `{type:"disabled"}` at any
+ *    effort, so it must be left omitted — there is nothing to opt out of.
+ */
+function thinkingOverrideFor(modelId: string): { type: "disabled" } | undefined {
+  if (modelId.includes("claude-fable-")) return undefined;
+  if (modelId.includes("claude-opus-5")) return { type: "disabled" };
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -116,6 +238,8 @@ export interface BedrockInvokeBody {
   system?: unknown[];
   tools?: unknown[];
   tool_choice?: Record<string, unknown>;
+  /** Only ever set for models that think by DEFAULT — see `thinkingOverrideFor`. */
+  thinking?: { type: "disabled" };
 }
 
 export interface BedrockRequest {
@@ -131,11 +255,14 @@ export interface BedrockRequest {
  * result to Bedrock's wire shape:
  *  - `model` moves to the URL (returned as `modelId`), not the body.
  *  - `stream` selects the endpoint, so it is stripped from the body too.
- *  - `thinking` and `output_config` are dropped: `output_config.effort` is a
- *    first-party knob with no confirmed Bedrock parity, and adaptive `thinking`
- *    predates Bedrock's Anthropic runtime schema — sending either risks a 400.
- *    The Bedrock tier is the *background* workload (summarise/classify/memory/
- *    digest), which does not need extended thinking, so dropping it is free.
+ *  - `output_config` is dropped: `output_config.effort` is a first-party knob
+ *    with no confirmed Bedrock parity, so sending it risks a 400.
+ *  - adaptive `thinking` is dropped too — it predates Bedrock's Anthropic
+ *    runtime schema, and the Bedrock tier is the *background* workload
+ *    (summarise/classify/memory/digest), which does not need it. But "dropped"
+ *    is not the same as "off": on models that think by default, omission means
+ *    thinking is ON. `thinkingOverrideFor` states it explicitly for those rather
+ *    than leaving the background tier's cost and truncation behaviour implicit.
  */
 export function toBedrockRequest(body: Record<string, unknown>): BedrockRequest {
   const anthropic = toAnthropicRequest(body);
@@ -147,9 +274,17 @@ export function toBedrockRequest(body: Record<string, unknown>): BedrockRequest 
     max_tokens: anthropic.max_tokens,
     messages: anthropic.messages,
   };
+  // `system` and `tools` are forwarded VERBATIM, cache_control breakpoints
+  // included — Bedrock honours them and they are what make
+  // `cache_read_input_tokens` non-zero on this path (see logBedrockUsage
+  // below). Do not rebuild or filter these arrays: dropping the breakpoint set
+  // by toAnthropicRequest() silently turns every turn into a full-price
+  // uncached prompt, with no error to notice it by.
   if (anthropic.system) invokeBody.system = anthropic.system;
   if (anthropic.tools) invokeBody.tools = anthropic.tools;
   if (anthropic.tool_choice) invokeBody.tool_choice = anthropic.tool_choice;
+  const thinking = thinkingOverrideFor(modelId);
+  if (thinking) invokeBody.thinking = thinking;
 
   return { modelId, stream, invokeBody };
 }

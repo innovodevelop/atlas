@@ -19,6 +19,37 @@ import {
 // ---------------------------------------------------------------------------
 // Model mapping
 
+/** Every logical id a call site can hand the gateway, plus the tier names. */
+const ALL_MAPPED_IDS = [
+  "google/gemini-2.5-flash-lite",
+  "google/gemini-2.5-flash",
+  "google/gemini-2.5-pro",
+  "openai/gpt-5-nano",
+  "openai/gpt-5-mini",
+  "openai/gpt-5",
+  "claude-haiku-4-5",
+  "claude-sonnet-5",
+  "claude-opus-4-8",
+  "claude-opus-5",
+];
+
+/** Run `fn` with env vars set, restoring the prior values afterwards. */
+function withEnv(vars: Record<string, string | undefined>, fn: () => void) {
+  const prior = Object.fromEntries(Object.keys(vars).map((k) => [k, process.env[k]]));
+  try {
+    for (const [k, v] of Object.entries(vars)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+    fn();
+  } finally {
+    for (const [k, v] of Object.entries(prior)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  }
+}
+
 // Every id asserted below was verified by an actual InvokeModel call against
 // eu-central-1 as the atlas-brain IAM user (2026-07-28) — existence in
 // `list-inference-profiles` was NOT sufficient, since sonnet-5 / opus-4-8 /
@@ -34,42 +65,85 @@ test("mapModelToBedrock: logical ids resolve to invocable EU profiles", () => {
 
 test("mapModelToBedrock: never targets a model this account cannot invoke", () => {
   // Guards the exact regression that a well-meaning "upgrade to the newest
-  // model" edit would introduce: these three profiles exist but are denied, so
-  // mapping to one turns every background call into an AccessDeniedException.
-  // If entitlement changes, flip via BEDROCK_MODEL_* and update this list.
-  const denied = [
+  // model" edit would introduce: these profiles exist but are denied (or, for
+  // opus-5, have never returned a successful InvokeModel), so mapping to one
+  // turns every background call into an AccessDeniedException — which on a
+  // streaming call is injected into the user's transcript, not just logged.
+  // Promote an entry out of this list only alongside a live invocation.
+  const notProvenInvocable = [
     "eu.anthropic.claude-sonnet-5",
     "eu.anthropic.claude-opus-4-8",
     "eu.anthropic.claude-opus-4-7",
+    // Confirmed DENIED 2026-07-30, and denied to the ROOT account too — so this
+    // is an Anthropic-side entitlement, not an IAM gap. Reachable via
+    // BEDROCK_MODEL_OPUS_5 once access is granted; never a default until then.
+    "eu.anthropic.claude-opus-5",
   ];
-  for (const logical of ["claude-haiku-4-5", "claude-sonnet-5", "claude-opus-4-8"]) {
-    expect(denied).not.toContain(mapModelToBedrock(logical));
+  for (const logical of ALL_MAPPED_IDS) {
+    expect(notProvenInvocable).not.toContain(mapModelToBedrock(logical));
   }
 });
 
 test("mapModelToBedrock: every default resolves to an eu. profile", () => {
-  for (const logical of [
-    "google/gemini-2.5-flash-lite",
-    "google/gemini-2.5-flash",
-    "google/gemini-2.5-pro",
-    "openai/gpt-5-nano",
-    "openai/gpt-5-mini",
-    "openai/gpt-5",
-    "claude-haiku-4-5",
-    "claude-sonnet-5",
-    "claude-opus-4-8",
-  ]) {
+  for (const logical of ALL_MAPPED_IDS) {
     expect(mapModelToBedrock(logical).startsWith("eu.anthropic.")).toBe(true);
   }
 });
 
-test("mapModelToBedrock: an already-resolved Bedrock id passes through untouched", () => {
+test("mapModelToBedrock: claude-opus-5 is reachable only via its env override", () => {
+  // The tier key exists so callers can ask for Opus 5 by name, but until a live
+  // InvokeModel proves entitlement it resolves to the newest Opus that answers.
+  expect(mapModelToBedrock("claude-opus-5")).toBe("eu.anthropic.claude-opus-4-6-v1");
+  withEnv({ BEDROCK_MODEL_OPUS_5: "eu.anthropic.claude-opus-5" }, () => {
+    expect(mapModelToBedrock("claude-opus-5")).toBe("eu.anthropic.claude-opus-5");
+  });
+});
+
+test("mapModelToBedrock: Fable 5 is unreachable without both blockers lifted", () => {
+  // There is no `eu.` Fable profile at all, so Fable can only be reached through
+  // a worldwide-routing `global.` id. That is a policy decision (IAM + published
+  // privacy policy), so it must take two deliberate env vars, never a default.
+  expect(() => mapModelToBedrock("claude-fable-5")).toThrow(/no inference profile mapped/);
+
+  withEnv({ BEDROCK_MODEL_FABLE_5: "global.anthropic.claude-fable-5" }, () => {
+    // Env override alone is not enough — the residency guard still refuses.
+    expect(() => mapModelToBedrock("claude-fable-5")).toThrow(/non-EEA/);
+  });
+
+  withEnv(
+    {
+      BEDROCK_MODEL_FABLE_5: "global.anthropic.claude-fable-5",
+      ATLAS_BEDROCK_ALLOW_NON_EEA: "1",
+    },
+    () => {
+      expect(mapModelToBedrock("claude-fable-5")).toBe("global.anthropic.claude-fable-5");
+    },
+  );
+});
+
+test("mapModelToBedrock: an unknown tier throws instead of synthesising an id", () => {
+  // The old fallback returned `eu.anthropic.${tier}`, inventing profile ids that
+  // may not exist. A map-time throw beats a per-request ValidationException.
+  expect(() => mapModelToBedrock("claude-imaginary-9")).toThrow(/no inference profile mapped/);
+});
+
+test("mapModelToBedrock: an already-resolved eu. id passes through untouched", () => {
   // This is the load-bearing guard — without it the `eu.` id (which does not
   // start with "claude-") would collapse to the default tier.
   expect(mapModelToBedrock("eu.anthropic.claude-opus-5")).toBe("eu.anthropic.claude-opus-5");
-  expect(mapModelToBedrock("us.anthropic.claude-sonnet-5")).toBe("us.anthropic.claude-sonnet-5");
-  expect(mapModelToBedrock("global.anthropic.claude-haiku-4-5-20251001-v1:0"))
-    .toBe("global.anthropic.claude-haiku-4-5-20251001-v1:0");
+  expect(mapModelToBedrock("eu.anthropic.claude-sonnet-4-6")).toBe("eu.anthropic.claude-sonnet-4-6");
+});
+
+test("mapModelToBedrock: a non-EEA passthrough id is refused by default", () => {
+  // Residency is enforced in code, not only by the IAM policy — one console edit
+  // to AtlasBedrockInvoke must not be enough to route prompts out of the EEA.
+  expect(() => mapModelToBedrock("us.anthropic.claude-sonnet-5")).toThrow(/non-EEA/);
+  expect(() => mapModelToBedrock("global.anthropic.claude-haiku-4-5-20251001-v1:0"))
+    .toThrow(/non-EEA/);
+
+  withEnv({ ATLAS_BEDROCK_ALLOW_NON_EEA: "1" }, () => {
+    expect(mapModelToBedrock("us.anthropic.claude-sonnet-5")).toBe("us.anthropic.claude-sonnet-5");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -95,6 +169,33 @@ test("toBedrockRequest: model leaves the body, anthropic_version enters it", () 
   expect(asRecord.output_config).toBeUndefined();
   expect(invokeBody.max_tokens).toBeGreaterThan(0);
   expect(Array.isArray(invokeBody.messages)).toBe(true);
+});
+
+test("toBedrockRequest: thinking is stated explicitly for models that think by default", () => {
+  // Omitting `thinking` means NO thinking on Opus 4.6 but thinking ON on Opus 5.
+  // Since max_tokens caps thinking + text together, a silent swap would truncate
+  // background summaries mid-answer, so the background tier opts out explicitly.
+  const onDefault = toBedrockRequest({
+    model: "openai/gpt-5",
+    messages: [{ role: "user", content: "hi" }],
+  });
+  expect(onDefault.modelId).toBe("eu.anthropic.claude-opus-4-6-v1");
+  expect(onDefault.invokeBody.thinking).toBeUndefined();
+
+  const onOpus5 = toBedrockRequest({
+    model: "eu.anthropic.claude-opus-5",
+    messages: [{ role: "user", content: "hi" }],
+  });
+  expect(onOpus5.invokeBody.thinking).toEqual({ type: "disabled" });
+
+  // Fable 5 thinks unconditionally and 400s on {type:"disabled"} — leave it off.
+  withEnv({ ATLAS_BEDROCK_ALLOW_NON_EEA: "1" }, () => {
+    const onFable = toBedrockRequest({
+      model: "global.anthropic.claude-fable-5",
+      messages: [{ role: "user", content: "hi" }],
+    });
+    expect(onFable.invokeBody.thinking).toBeUndefined();
+  });
 });
 
 test("toBedrockRequest: stream=true selects the streaming endpoint", () => {
