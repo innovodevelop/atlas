@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { supabase } from '@/integrations/supabase/client';
+import { localClient as supabase } from '@/integrations/local/localClient';
 import { getToken } from '@/lib/authClient';
 import { getBrainEndpoint } from '@/lib/brainClient';
 import { useToast } from '@/hooks/use-toast';

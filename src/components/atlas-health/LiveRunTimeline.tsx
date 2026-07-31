@@ -11,7 +11,7 @@ import {
   ChevronUp,
   Loader2
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { localClient as supabase } from '@/integrations/local/localClient';
 import { useAuth } from '@/hooks/useAuth';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -63,14 +63,11 @@ export function LiveRunTimeline() {
     if (!user) return;
     
     try {
+      // The local shim has no relational embeds (`agent:agents(name)` would be
+      // silently dropped) — resolve the agent name with a second tiny query.
       const { data: runs, error: runsError } = await supabase
         .from('runs')
-        .select(`
-          id,
-          goal_text,
-          status,
-          agent:agents(name)
-        `)
+        .select('id, goal_text, status, agent_id')
         .eq('user_id', user.id)
         .in('status', ['running', 'pending'])
         .order('created_at', { ascending: false })
@@ -80,11 +77,16 @@ export function LiveRunTimeline() {
 
       if (runs && runs.length > 0) {
         const run = runs[0];
+        const { data: agent } = await supabase
+          .from('agents')
+          .select('id, name')
+          .eq('id', run.agent_id)
+          .maybeSingle();
         setActiveRun({
           id: run.id,
           goal_text: run.goal_text,
           status: run.status,
-          agent_name: (run.agent as { name?: string } | null)?.name,
+          agent_name: (agent as { name?: string } | null)?.name,
         });
 
         // Fetch steps for active run

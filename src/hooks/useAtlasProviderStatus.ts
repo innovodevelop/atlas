@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { localClient as supabase } from '@/integrations/local/localClient';
 import { isWindowActive } from '@/hooks/useWindowActivity';
 
 export type ProviderName = 'lovable_ai' | 'perplexity' | 'anthropic' | 'jina' | 'openai';
@@ -152,13 +152,16 @@ export function useAtlasProviderStatus() {
   // Toggle learning mutation
   const toggleLearningMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
+      // The settings table holds a single row; target it by id (the local
+      // shim's writes only support .eq() filters — .neq() would be refused).
+      if (!settings?.id) throw new Error('System settings not loaded yet');
       const { error } = await supabase
         .from('atlas_system_settings')
-        .update({ 
+        .update({
           learning_enabled: enabled,
           updated_at: new Date().toISOString()
         })
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+        .eq('id', settings.id);
 
       if (error) throw error;
       return enabled;
@@ -171,13 +174,14 @@ export function useAtlasProviderStatus() {
   // Update settings mutation
   const updateSettingsMutation = useMutation({
     mutationFn: async (updates: Partial<SystemSettings>) => {
+      if (!settings?.id) throw new Error('System settings not loaded yet');
       const { error } = await supabase
         .from('atlas_system_settings')
-        .update({ 
+        .update({
           ...updates,
           updated_at: new Date().toISOString()
         })
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+        .eq('id', settings.id);
 
       if (error) throw error;
       return updates;

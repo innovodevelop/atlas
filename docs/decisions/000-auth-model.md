@@ -34,11 +34,14 @@ profile, memories, and knowledge by POSTing an arbitrary `userId`.
    (provider status/settings/learning logs), OAuth state + encrypted-token
    columns (revoked from clients), cross-user cron iteration, and the agent
    scaffolding (which verifies the JWT in code and scopes by the verified id).
-5. **Cron secret lives in Supabase Vault** (`cron_secret`) so the rescheduling
-   migration can reference it without the value entering git; the same value
-   is the `CRON_SECRET` function secret. `EVENTS_WEBHOOK_KEY` similarly
-   validates `X-API-Key` on `/events/ingest` (previously ANY non-empty header
-   was accepted).
+5. **[Superseded]** Cron secret lived in Supabase Vault (`cron_secret`) so the
+   rescheduling migration could reference it without the value entering git;
+   the same value was the `CRON_SECRET` function secret, and
+   `EVENTS_WEBHOOK_KEY` similarly validated `X-API-Key` on `/events/ingest`
+   (previously ANY non-empty header was accepted). Supabase — and everything
+   this bullet describes — has since been removed; scheduled/cron-style work
+   now runs from the local Rust scheduler (`src-tauri/src/scheduler.rs`),
+   which needs no cross-network secret because it isn't reachable over HTTP.
 6. **Permissive policies:** all 19 `(true)` policies sat on system tables the
    client only reads. Reads re-scoped `TO authenticated`; permissive write
    policies dropped (writers are service-role and bypass RLS).

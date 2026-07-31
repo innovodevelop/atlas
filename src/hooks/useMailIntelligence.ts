@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { localClient as supabase } from '@/integrations/local/localClient';
 import { useAuth } from '@/hooks/useAuth';
 
 // Mail intelligence (read-only Gmail scanning — see docs/mail-setup.md).
 // Data lands server-side via the mail-sync cron; this hook reads it, streams
 // new alerts over realtime, and exposes the connect/disconnect flow.
-// NOTE: mail_accounts.encrypted_refresh_token is column-revoked for clients —
-// always select explicit columns from mail_accounts, never `*`.
+// NOTE: mail_accounts.encrypted_refresh_token must never reach React state.
+// The local shim ignores select() column lists and returns full rows, so the
+// projection is enforced in JS here (pickAccount) — every mail_accounts result
+// is mapped through it before landing in state.
 
 export interface MailAccount {
   id: string;
@@ -38,6 +40,20 @@ export interface MailAlert {
 }
 
 const ACCOUNT_COLUMNS = 'id, provider, email_address, status, last_synced_at';
+
+// The shim returns whole rows regardless of the select() column string, so
+// project mail_accounts rows down in JS — this is the only thing standing
+// between encrypted_refresh_token and React state. Exported for the shim's
+// projection test (localClient.test.ts).
+export function pickAccount(r: Record<string, unknown>): MailAccount {
+  return {
+    id: r.id as string,
+    provider: r.provider as string,
+    email_address: r.email_address as string,
+    status: r.status as string,
+    last_synced_at: (r.last_synced_at as string | null) ?? null,
+  };
+}
 
 // --- Shared alert stream -----------------------------------------------
 // The hook is mounted by BOTH the Inbox card (always) and the expanded Mail
@@ -135,7 +151,7 @@ export function useMailIntelligence() {
         .order('created_at', { ascending: false })
         .limit(20),
     ]);
-    setAccounts((accountsRes.data as MailAccount[]) || []);
+    setAccounts(((accountsRes.data as Record<string, unknown>[] | null) || []).map(pickAccount));
     setMessages((messagesRes.data as MailMessage[]) || []);
     setAlerts((alertsRes.data as MailAlert[]) || []);
     setIsLoading(false);
@@ -177,8 +193,9 @@ export function useMailIntelligence() {
       // Poll for the account row while the user completes consent (3 min max)
       const started = Date.now();
       const poll = setInterval(async () => {
-        const { data: rows } = await supabase.from('mail_accounts').select(ACCOUNT_COLUMNS);
-        if ((rows?.length ?? 0) > accounts.length) {
+        const { data } = await supabase.from('mail_accounts').select(ACCOUNT_COLUMNS);
+        const rows = ((data as Record<string, unknown>[] | null) || []).map(pickAccount);
+        if (rows.length > accounts.length) {
           clearInterval(poll);
           setIsConnecting(false);
           refresh();

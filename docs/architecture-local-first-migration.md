@@ -1,4 +1,10 @@
-# Atlas — local-first migration (remove Supabase)
+# Atlas — local-first migration (Supabase removed)
+
+**Status: complete.** All 8 phases below have shipped — Supabase is fully
+excised (client, all edge functions, `_shared/supabase.ts`). This doc is kept
+as the historical record of the decision and the phase sequence; see
+`CLAUDE.md` for the current architecture summary and the follow-up cleanup
+items (test/script/dep references) tracked outside the app runtime.
 
 **Decision (2026-07-21):** remove Supabase completely; go **fully local-first**
 with **one thin always-on worker** for 24/7 mail (user requires mail scanning
@@ -35,16 +41,16 @@ secrets + Vault.
 | Catch-up crons (digest, usage) | **local scheduler** (Tauri background task), runs/catches up on launch |
 | **24/7 mail (the one cloud piece)** | **thin Cloudflare Worker** (Cron /15m) holding ONLY the encrypted Gmail refresh token + a queue of new-message-IDs + alert flags. Detects important mail, sends a notification; the local app fetches bodies + analyses + stores locally on wake. Mail bodies/memories never in cloud. *(Zero-cloud alternative: a local `launchd` agent does the same poll if the Mac stays awake.)* |
 
-## Phased roadmap (each phase shippable; not big-bang)
+## Phased roadmap (each phase shippable; not big-bang) — ALL DONE
 
-1. **Local data layer** — SQLite `db.rs` + schema mirroring the Postgres tables; a one-time importer pulling the live Supabase data → local. App reads/writes go through Rust commands. (Supabase still present, dual-write optional.)
-2. **Brain sidecar** — stand up `services/atlas-brain` (Bun) importing `orchestrator.ts`; route chat + AI-gateway + tools through it; keys from Keychain. Retire `chat-with-memory` + the AI edge functions.
-3. **Memory/vectors local** — sqlite-vec + FTS5; port `recall_memories`; embeddings via sidecar. Retire memory/search/embeddings functions.
-4. **Realtime → events** — rewrite the 10 realtime hooks to Tauri events + local queries; delete Supabase channels.
-5. **Voice + data-fetch functions local** — fold elevenlabs-* into voice gateway; weather/stocks/news local. Retire those functions.
-6. **Auth local** — local profile; strip JWT/RLS/`requireUser`; delete auth dependency.
-7. **Mail: local + thin worker** — mail OAuth via the atlas-site callback (already built) or loopback; bodies/analysis local; deploy the thin Cloudflare mail-cron worker for 24/7 detection.
-8. **Delete Supabase** — remove the client, the 36 functions, migrations, secrets, config; update CI. Data already migrated in phase 1.
+1. **Local data layer** — DONE. SQLite `db.rs` + schema mirroring the Postgres tables; one-time importer pulled the live Supabase data → local. App reads/writes go through Rust commands.
+2. **Brain sidecar** — DONE. `services/atlas-brain` (Bun) imports `orchestrator.ts` from `supabase/functions/_shared/` (name is legacy, no Supabase dependency); routes chat + AI-gateway + tools. `chat-with-memory` + the AI edge functions retired.
+3. **Memory/vectors local** — DONE. sqlite-vec + FTS5; `recall_memories` ported to a local hybrid query; embeddings local (e5). Memory/search/embeddings functions retired.
+4. **Realtime → events** — DONE. The realtime hooks were rewritten to Tauri events (`app.emit`/`listen`) + local queries; Supabase channels are gone (`localClient.ts` stubs `.channel()`).
+5. **Voice + data-fetch functions local** — DONE. `elevenlabs-*` folded into the voice gateway; weather/stocks/news moved to Rust.
+6. **Auth local** — DONE, but landed as **Cloudflare D1**, not a local-only profile (see CLAUDE.md): email/password + entitlement live on D1 so web + app share one account; Atlas itself still runs fully local otherwise. JWT/RLS/`requireUser` deleted with the Supabase auth dependency.
+7. **Mail: local, no cloud worker** — DONE, but decided differently than drafted: consumer mail stays **local-only** (no thin Cloudflare mail-cron worker); see the Phase 7b decision record. 24/7 mail-while-Mac-is-off was deprioritized rather than solved with the cloud piece described below.
+8. **Delete Supabase** — DONE. Client, all 34 edge functions (2 fewer than the 36 originally inventoried — some were already-dead duplicates), and `_shared/supabase.ts` removed. `supabase/migrations/`, the `supabase` CLI config, and the `@supabase/supabase-js`/`postgres` deps are tracked as a separate follow-up cleanup (blocked on `tests/auth.spec.ts`, owned outside this migration) — they are inert, not part of the running app.
 
 ## Risks / honest caveats
 - Biggest change in the project; multi-week; entangled with in-flight WS-B (voice) + music. Sequence deliberately.

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useScribe, CommitStrategy } from "@elevenlabs/react";
-import { supabase } from "@/integrations/supabase/client";
+import { localClient as supabase } from '@/integrations/local/localClient';
 import { getVoiceEndpoint } from "@/lib/voiceClient";
 
 interface UseRealtimeScribeOptions {

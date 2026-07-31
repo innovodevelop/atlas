@@ -237,6 +237,21 @@ class QueryBuilder<T = any> implements PromiseLike<Result<T>> {
         const rows = await invoke<Row[]>("db_insert", { table: this.table, values: this._values });
         return this.finalizeWrite(rows ?? []);
       }
+      // Writes only honour .eq() filters (db_update/db_delete take an equality
+      // map). A dropped .neq()/.in()/... would silently widen the WHERE clause
+      // to EVERY row, so refuse loudly instead — call sites `throw error`.
+      if (this._op === "update" || this._op === "delete") {
+        const unsupported = this.filters.filter((f) => f.op !== "eq");
+        if (unsupported.length > 0) {
+          const ops = [...new Set(unsupported.map((f) => f.op))].join(", ");
+          return {
+            data: null as T,
+            error: {
+              message: `localClient: ${this._op} on ${this.table} only supports .eq() filters — got ${ops}`,
+            },
+          };
+        }
+      }
       if (this._op === "update") {
         const rows = await invoke<Row[]>("db_update", {
           table: this.table,

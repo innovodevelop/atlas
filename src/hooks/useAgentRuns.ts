@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { localClient as supabase } from '@/integrations/local/localClient';
 import { useAuth } from '@/hooks/useAuth';
 
 export interface AgentRun {
@@ -44,25 +44,35 @@ export function useAgentRuns(limit = 10) {
     if (!user) return;
     
     try {
-      const { data, error } = await supabase
-        .from('runs')
-        .select(`
-          *,
-          agent:agents(name)
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(limit);
+      // The local shim has no relational embeds (`agent:agents(name)` would be
+      // silently dropped) — resolve agent names with a second tiny query.
+      const [{ data, error }, { data: agentRows, error: agentsError }] = await Promise.all([
+        supabase
+          .from('runs')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(limit),
+        supabase.from('agents').select('id, name'),
+      ]);
 
       if (error) throw error;
-      
-      const typedData = (data || []).map(run => ({
-        ...run,
-        tokens_planner: run.tokens_planner || 0,
-        tokens_worker: run.tokens_worker || 0,
-        tokens_reasoner: run.tokens_reasoner || 0,
-        agent: run.agent as { name: string } | undefined
-      }));
+      if (agentsError) throw agentsError;
+
+      const agentNames = new Map<string, string>(
+        (agentRows || []).map((a: { id: string; name: string }) => [a.id, a.name])
+      );
+
+      const typedData = (data || []).map(run => {
+        const name = agentNames.get(run.agent_id);
+        return {
+          ...run,
+          tokens_planner: run.tokens_planner || 0,
+          tokens_worker: run.tokens_worker || 0,
+          tokens_reasoner: run.tokens_reasoner || 0,
+          agent: name != null ? { name } : undefined,
+        };
+      });
       
       setRuns(typedData);
       

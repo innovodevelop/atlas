@@ -44,19 +44,29 @@ the Mac).
 - `design/brand-icons/` — Atlas particle-sphere icon sources + generator.
 - `docs/architecture-local-first-migration.md` — the migration plan.
 
-## Local-first migration (in progress)
+## Local-first migration (Supabase removed)
 
-Migrating off Supabase to local-first.
-- **Done:** SQLite core (rusqlite) + generic CRUD + Tauri events; brain sidecar;
-  sqlite-vec + FTS5 recall; Cloudflare **D1** email/password auth + entitlement;
-  app rewired to CF auth; `supabase.from/channel/rpc` shimmed to local
-  (`src/integrations/local/localClient.ts`); data-fetch (weather/stocks/news) →
-  Rust; ElevenLabs → voice gateway; brain on CF-JWT + fully local via bun:sqlite.
-- **Auth = Cloudflare D1** (not local): users sign in / manage billing on web +
-  app; Atlas itself runs locally.
-- **Pending:** Phase 7 (mail + thin CF worker + local scheduler), Phase 8 (delete
-  remaining Supabase client + edge fns — only after the ~6 edge deps migrate),
-  Phase 9 (billing, last).
+Supabase is gone. Local-first is the architecture, not a migration in progress.
+- **Data:** SQLite core (rusqlite) + generic CRUD + Tauri events; sqlite-vec +
+  FTS5 recall (local hybrid semantic search, ported from the old
+  `recall_memories` RPC).
+- **AI:** Bun "brain" sidecar (`services/atlas-brain/`) is the sole chat/tool
+  orchestrator, importing the runtime-neutral `supabase/functions/_shared/`
+  modules directly (that directory name is legacy — it holds shared TS, not a
+  Supabase dependency). Reasoning is **Anthropic Claude first-party** for chat
+  and **Amazon Bedrock (EU)** for background/batch work, selected per
+  `ATLAS_AI_PROVIDER`; local `e5` embeddings for recall.
+- **Auth = Cloudflare D1** (not local): email/password + entitlement on D1;
+  users sign in / manage billing on web + app; Atlas itself runs locally.
+  `supabase.from/channel/rpc` calls are shimmed to local equivalents
+  (`src/integrations/local/localClient.ts`) — there is no Supabase client in
+  the app.
+- **Everything else local:** data-fetch (weather/stocks/news) → Rust;
+  ElevenLabs → voice gateway; scheduler → local Tauri background task.
+- **Remaining cleanup (not this app's runtime):** `@supabase/supabase-js` /
+  `supabase` CLI / `postgres` deps, `tests/auth.spec.ts`, and
+  `supabase/migrations/` still reference the old stack and are tracked as
+  follow-up removals — they don't affect the shipped app.
 
 ## Commands (native steps are macOS-only)
 

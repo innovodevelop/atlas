@@ -1,4 +1,10 @@
-# One-time data import: Supabase → local SQLite
+# One-time data import: Supabase → local SQLite — SUPERSEDED
+
+**This migration already happened.** Supabase has since been deleted entirely
+(Phase 8 of `docs/architecture-local-first-migration.md`), so the source
+project this script pointed at no longer exists and it cannot be re-run. Kept
+for historical reference only; the scripts it documents (`scripts/import-*.ts`)
+are dead one-offs, not part of any current workflow.
 
 Part of the local-first migration (`docs/architecture-local-first-migration.md`,
 Phase 1). Copies every existing row out of the live Supabase project into the

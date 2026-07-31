@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { localClient as supabase } from '@/integrations/local/localClient';
 import { useDataFetching, UseDataFetchingReturn } from './useDataFetching';
 
 export interface UseEdgeFunctionOptions<T> {

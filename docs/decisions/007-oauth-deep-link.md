@@ -28,11 +28,14 @@ The redirect target is a single seam, `oauth::REDIRECT_URI`:
   IP in the consent redirect and needs a free local port. We prefer a deep link
   for the branded end state, and do our own PKCE so the redirect isn't tied to
   librespot's loopback helper.
-- **Branded domain as a *server* redirect (like Gmail)** — correct for the mail
-  flow, which is a *confidential* client running in Supabase functions. Wrong
-  here: a desktop app is a *public* client (no secret in a shipped binary), and
-  the code must reach the *app instance*, not a server. Routing through the
-  domain would force a fragile relay back down to the right desktop process.
+- **Branded domain as a *server* redirect (like Gmail)** — was correct for the
+  mail flow when it ran as a *confidential* client in Supabase functions;
+  mail OAuth has since moved to a local desktop-client flow (Phase 7b: no
+  cloud piece, see `docs/mail-setup.md`), so this alternative no longer
+  applies to either flow. Still wrong for Spotify regardless: a desktop app is
+  a *public* client (no secret in a shipped binary), and the code must reach
+  the *app instance*, not a server. Routing through the domain would force a
+  fragile relay back down to the right desktop process.
 
 ## Why custom scheme first, universal link later
 

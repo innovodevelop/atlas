@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { BarChart3, Brain, Zap, Lightbulb, TrendingUp, Loader2, DollarSign, AlertTriangle, Settings2, Sparkles } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { localClient as supabase } from '@/integrations/local/localClient';
 import { useAuth } from '@/hooks/useAuth';
 import { Badge } from '@/components/ui/badge';
 import { useAtlasProviderStatus } from '@/hooks/useAtlasProviderStatus';

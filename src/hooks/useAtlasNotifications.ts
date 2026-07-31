@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useRef } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { localClient as supabase } from '@/integrations/local/localClient';
 import { useHolographicToast } from '@/hooks/useHolographicToast';
 
 interface NotificationConfig {

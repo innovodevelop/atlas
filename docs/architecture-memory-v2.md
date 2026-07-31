@@ -5,7 +5,12 @@ refactors implemented alongside this doc.*
 
 ## What works (keep, do not touch)
 
-- **Learning containment**: DB trigger (`enforce_session_limits`) + `learningGuards.ts` + gated feeders + budgeted daily digest. Layered, verified live, non-negotiable.
+- **Learning containment**: DB trigger (`enforce_session_limits`) + `learningGuards.ts` + gated feeders + budgeted daily digest. Layered, verified live, non-negotiable. The trigger's limits (spec, not the SQL — the enforcing migration itself is scheduled for deletion once local containment is fully ported):
+  - Every research topic must belong to an `active`, unexpired `atlas_learning_sessions` row (rejected otherwise).
+  - `max_topics_per_session` (default 3) and `max_research_depth` (default 2), read from `atlas_system_settings`, hard-cap a session's topic count and a topic's `depth_level`.
+  - A parent topic may have **at most 2** sub-topics (sibling count checked on insert).
+  - Circuit breaker: a session may never hold more than **15 queued** topics at once.
+  - On session expiry the row flips to `expired` and the insert that discovered it is rejected — expiry is enforced at write time, not by a separate sweep.
 - **Real embeddings**: 768-dim `gemini-embedding-001` via `aiGateway.generateEmbedding`, consistent column/RPC dims.
 - **Conversation scoping**: sessions tie research to what the user actually talked about.
 

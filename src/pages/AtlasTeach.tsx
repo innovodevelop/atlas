@@ -4,7 +4,7 @@ import { Mic, MicOff, Volume2, VolumeX, ChevronRight, ChevronLeft, Brain, Heart,
 import { Button } from '@/components/ui/button';
 import { useRealtimeScribeStable as useRealtimeScribe } from '@/hooks/useRealtimeScribeStable';
 import { useStreamingTTS } from '@/hooks/useStreamingTTS';
-import { supabase } from '@/integrations/supabase/client';
+import { localClient as supabase } from '@/integrations/local/localClient';
 import { getToken } from '@/lib/authClient';
 import { getBrainEndpoint } from '@/lib/brainClient';
 import { useToast } from '@/hooks/use-toast';

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { localClient as supabase } from '@/integrations/local/localClient';
 import { useMemo } from "react";
 import { subDays, startOfWeek, format, parseISO } from "date-fns";
 

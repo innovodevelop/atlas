@@ -79,6 +79,9 @@ mock.module("@/lib/authClient", () => ({
   subscribe: () => () => {},
   hasFeature: () => false,
 }));
+// Stops the import chain of useMailIntelligence (whose pickAccount projection
+// is under test) from dragging in the real auth stack.
+mock.module("@/hooks/useAuth", () => ({ useAuth: () => ({ user: null }) }));
 (globalThis as any).window = { __TAURI_INTERNALS__: {} };
 
 const { localClient: supabase } = await import("./localClient.ts");
@@ -131,4 +134,107 @@ test("single() on no rows returns PGRST116 error, not throw", async () => {
   const { data, error } = await supabase.from("user_tasks").select("*").eq("id", "nope").single();
   expect(data).toBeNull();
   expect(error?.code).toBe("PGRST116");
+});
+
+test("update/delete with non-eq filters is refused loudly, not applied to every row", async () => {
+  await supabase.from("user_tasks").insert({ user_id: "u4", title: "keep-a", completed: false });
+  await supabase.from("user_tasks").insert({ user_id: "u4", title: "keep-b", completed: false });
+
+  // .neq() on update: db_update only takes an eq-map, so silently dropping the
+  // filter would rewrite EVERY row — the shim must return an error instead.
+  const { error: updErr } = await supabase
+    .from("user_tasks")
+    .update({ completed: true })
+    .neq("id", "00000000-0000-0000-0000-000000000000");
+  expect(updErr).not.toBeNull();
+  expect(updErr!.message).toContain("only supports .eq() filters");
+  expect(updErr!.message).toContain("neq");
+
+  // .in() on delete: same refusal.
+  const { error: delErr } = await supabase.from("user_tasks").delete().in("id", ["x", "y"]);
+  expect(delErr).not.toBeNull();
+  expect(delErr!.message).toContain("only supports .eq() filters");
+
+  // Nothing was touched.
+  const { data: rows } = await supabase.from("user_tasks").select("*").eq("user_id", "u4");
+  expect(rows.length).toBe(2);
+  expect(rows.every((r: any) => r.completed === false)).toBe(true);
+
+  // Mixed filters still refused (an eq alongside a neq must not slip through).
+  const { error: mixedErr } = await supabase
+    .from("user_tasks")
+    .update({ completed: true })
+    .eq("user_id", "u4")
+    .neq("title", "keep-a");
+  expect(mixedErr).not.toBeNull();
+
+  // Pure .eq() writes keep working.
+  const { error: okErr } = await supabase
+    .from("user_tasks")
+    .update({ completed: true })
+    .eq("user_id", "u4");
+  expect(okErr).toBeNull();
+
+  // Selects still support the full filter set client-side.
+  const { data: sel } = await supabase.from("user_tasks").select("*").eq("user_id", "u4").neq("title", "keep-a");
+  expect(sel.map((r: any) => r.title)).toEqual(["keep-b"]);
+});
+
+test("agent-name join pattern (runs/schedules → agents map) resolves names without embeds", async () => {
+  // The shim ignores relational embed strings like `agent:agents(name)`; the
+  // hooks resolve names via a second query + Map. Exercise that exact path.
+  const { data: agent } = await supabase
+    .from("agents")
+    .insert({ user_id: "u5", name: "Research Agent", system_prompt: "x" })
+    .select()
+    .single();
+  await supabase
+    .from("runs")
+    .insert({ user_id: "u5", agent_id: agent.id, goal_text: "goal", status: "pending" });
+
+  const [{ data: runs }, { data: agentRows }] = await Promise.all([
+    supabase.from("runs").select("*").eq("user_id", "u5"),
+    supabase.from("agents").select("id, name"),
+  ]);
+  const agentNames = new Map<string, string>((agentRows || []).map((a: any) => [a.id, a.name]));
+  const joined = (runs || []).map((run: any) => {
+    const name = agentNames.get(run.agent_id);
+    return { ...run, agent: name != null ? { name } : undefined };
+  });
+
+  expect(joined.length).toBe(1);
+  expect(joined[0].agent).toEqual({ name: "Research Agent" }); // was undefined pre-fix
+});
+
+test("mail_accounts projection: encrypted_refresh_token cannot survive pickAccount", async () => {
+  const { pickAccount } = await import("@/hooks/useMailIntelligence.ts");
+
+  await supabase.from("mail_accounts").insert({
+    user_id: "u6",
+    provider: "gmail",
+    email_address: "u6@example.com",
+    status: "active",
+    encrypted_refresh_token: "SECRET-TOKEN",
+  });
+
+  // The shim ignores select() column lists — the full row (token included)
+  // comes back from the DB layer...
+  const { data } = await supabase
+    .from("mail_accounts")
+    .select("id, provider, email_address, status, last_synced_at")
+    .eq("user_id", "u6");
+  expect(data.length).toBe(1);
+  expect(data[0].encrypted_refresh_token).toBe("SECRET-TOKEN");
+
+  // ...so pickAccount is the enforcement point: exactly the 5 public keys.
+  const account = pickAccount(data[0]);
+  expect(Object.keys(account).sort()).toEqual([
+    "email_address",
+    "id",
+    "last_synced_at",
+    "provider",
+    "status",
+  ]);
+  expect("encrypted_refresh_token" in account).toBe(false);
+  expect(JSON.stringify(account)).not.toContain("SECRET-TOKEN");
 });

@@ -4,7 +4,7 @@ import { Zap, Brain, Database, ArrowRight, Play, Pause, AlertCircle, CheckCircle
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/integrations/supabase/client';
+import { localClient as supabase } from '@/integrations/local/localClient';
 import { getToken } from '@/lib/authClient';
 import { getBrainEndpoint } from '@/lib/brainClient';
 import { useToast } from '@/hooks/use-toast';

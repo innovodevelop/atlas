@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { localClient as supabase } from '@/integrations/local/localClient';
 import { useAuth } from './useAuth';
 import { useDataFetching } from './useDataFetching';
 import { useCrudOperations } from './useCrudOperations';

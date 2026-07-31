@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, AlertCircle, Info, XCircle, Check, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
+import { localClient as supabase } from '@/integrations/local/localClient';
 
 interface ErrorLog {
   id: string;

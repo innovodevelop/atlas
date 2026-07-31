@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { localClient as supabase } from '@/integrations/local/localClient';
 import { isWindowActive } from "@/hooks/useWindowActivity";
 
 // The shimmed local client's channel handle — enough for stash + removeChannel.
