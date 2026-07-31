@@ -10,6 +10,29 @@ fn entry(account: &str) -> keyring::Result<keyring::Entry> {
     keyring::Entry::new(SERVICE, account)
 }
 
+/// Write a Keychain item with an ACL that does not interrogate WHICH binary is
+/// asking. See the long note on `write_blob` below: the default per-binary ACL
+/// re-prompts after every rebuild, which is what made Atlas nag on launch. Used
+/// for the SnapTrade and Spotify items too, since the frontend reads them from
+/// startup screens (portfolio/music status) — a restrictive ACL there froze the
+/// UI exactly like the core keys did.
+fn set_permissive(service: &str, account: &str, value: &str) -> Result<(), String> {
+    let out = std::process::Command::new("/usr/bin/security")
+        .args(["add-generic-password", "-s", service, "-a", account, "-w", value, "-A", "-U"])
+        .output()
+        .map_err(|e| format!("security add-generic-password failed to run: {e}"))?;
+    if out.status.success() {
+        return Ok(());
+    }
+    eprintln!(
+        "[secrets] permissive-ACL write failed for {service}/{account} ({}), falling back to keyring",
+        String::from_utf8_lossy(&out.stderr).trim()
+    );
+    keyring::Entry::new(service, account)
+        .and_then(|e| e.set_password(value))
+        .map_err(|e| e.to_string())
+}
+
 /// (client_id, consumer_key) — the SnapTrade developer credentials.
 pub fn app_credentials() -> Result<(String, String), String> {
     let client_id = entry("client_id")
@@ -33,8 +56,8 @@ pub fn snaptrade_user() -> Option<(String, String)> {
 }
 
 pub fn set_snaptrade_user(user_id: &str, user_secret: &str) -> Result<(), String> {
-    entry("user_id").and_then(|e| e.set_password(user_id)).map_err(|e| e.to_string())?;
-    entry("user_secret").and_then(|e| e.set_password(user_secret)).map_err(|e| e.to_string())?;
+    set_permissive(SERVICE, "user_id", user_id)?;
+    set_permissive(SERVICE, "user_secret", user_secret)?;
     Ok(())
 }
 
@@ -61,9 +84,7 @@ pub fn music_refresh_token() -> Option<String> {
 }
 
 pub fn set_music_refresh_token(token: &str) -> Result<(), String> {
-    music_entry("spotify_refresh_token")
-        .and_then(|e| e.set_password(token))
-        .map_err(|e| e.to_string())
+    set_permissive(MUSIC_SERVICE, "spotify_refresh_token", token)
 }
 
 pub fn clear_music_refresh_token() -> Result<(), String> {
@@ -144,22 +165,7 @@ fn core_entry(account: &str) -> keyring::Result<keyring::Entry> {
 /// coherent line, and the cost was a dialog storm on every launch.
 fn write_blob(map: &HashMap<String, String>) -> Result<(), String> {
     let raw = serde_json::to_string(map).map_err(|e| e.to_string())?;
-    let out = std::process::Command::new("/usr/bin/security")
-        .args(["add-generic-password", "-s", CORE_SERVICE, "-a", CORE_BLOB_ACCOUNT, "-w", &raw, "-A", "-U"])
-        .output()
-        .map_err(|e| format!("security add-generic-password failed to run: {e}"))?;
-    if !out.status.success() {
-        // Fall back to the keyring crate so a sandbox/PATH oddity cannot lose a
-        // secret outright — it just costs the per-binary ACL (and its prompts).
-        eprintln!(
-            "[secrets] permissive-ACL write failed ({}), falling back to keyring",
-            String::from_utf8_lossy(&out.stderr).trim()
-        );
-        return core_entry(CORE_BLOB_ACCOUNT)
-            .and_then(|e| e.set_password(&raw))
-            .map_err(|e| e.to_string());
-    }
-    Ok(())
+    set_permissive(CORE_SERVICE, CORE_BLOB_ACCOUNT, &raw)
 }
 
 /// Load the blob, folding in any legacy per-key items still present.
