@@ -128,32 +128,54 @@ fn write_blob(map: &HashMap<String, String>) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-/// Load the blob, migrating legacy per-key items into it on first run.
+/// Load the blob, folding in any legacy per-key items still present.
+///
+/// RESUMABLE BY DESIGN: a migration round can end partially done — the user
+/// answers some Keychain dialogs and dismisses others, or the app is killed
+/// mid-round. So this does not treat "blob exists" as "migration finished":
+/// every load also sweeps the legacy account list, and any item that can be
+/// read (silently if its ACL already allows Atlas, else via one dialog) is
+/// folded in and deleted. A denied item stays put and is simply retried on
+/// the next launch — the dialogs stop exactly when none are left.
 fn load_or_migrate() -> HashMap<String, String> {
-    if let Some(raw) = core_entry(CORE_BLOB_ACCOUNT).ok().and_then(|e| e.get_password().ok()) {
-        if let Ok(map) = serde_json::from_str::<HashMap<String, String>>(&raw) {
-            return map;
-        }
-        // A corrupt blob is unrecoverable data — do not overwrite it silently.
-        eprintln!("[secrets] atlas-core blob exists but is not valid JSON; treating as empty (item preserved)");
-        return HashMap::new();
-    }
+    let mut map: HashMap<String, String> = match core_entry(CORE_BLOB_ACCOUNT)
+        .ok()
+        .and_then(|e| e.get_password().ok())
+    {
+        Some(raw) => match serde_json::from_str(&raw) {
+            Ok(m) => m,
+            Err(_) => {
+                // A corrupt blob is unrecoverable data — do not overwrite it silently.
+                eprintln!("[secrets] atlas-core blob exists but is not valid JSON; treating as empty (item preserved)");
+                return HashMap::new();
+            }
+        },
+        None => HashMap::new(),
+    };
 
-    // First run: fold every readable legacy item into the new blob. Reads may
-    // prompt — this is the single final round of dialogs.
-    let mut map = HashMap::new();
+    // Sweep stragglers. The blob value wins on a name collision (it is the
+    // store of record once a key has been written through the app).
     let mut migrated: Vec<&str> = Vec::new();
     for account in LEGACY_CORE_ACCOUNTS {
         if let Ok(entry) = core_entry(account) {
             if let Ok(value) = entry.get_password() {
-                map.insert((*account).to_string(), value);
+                map.entry((*account).to_string()).or_insert(value);
                 migrated.push(account);
             }
         }
     }
-    // Create the blob even when empty, so it exists (Atlas-owned, promptless)
-    // before any key is ever stored. Delete legacy items only after the blob
-    // write succeeded — a failed write must not lose the only copy.
+
+    if migrated.is_empty() {
+        // Nothing legacy readable. Still ensure the blob item exists so it is
+        // Atlas-owned (promptless) before any key is ever stored through the app.
+        if core_entry(CORE_BLOB_ACCOUNT).ok().and_then(|e| e.get_password().ok()).is_none() {
+            let _ = write_blob(&map);
+        }
+        return map;
+    }
+
+    // Delete legacy items only after the blob write succeeded — a failed write
+    // must not lose the only copy of a secret.
     match write_blob(&map) {
         Ok(()) => {
             for account in &migrated {
@@ -161,9 +183,10 @@ fn load_or_migrate() -> HashMap<String, String> {
                     let _ = entry.delete_password();
                 }
             }
-            if !migrated.is_empty() {
-                eprintln!("[secrets] migrated {} legacy Keychain items into the consolidated atlas-core blob", migrated.len());
-            }
+            eprintln!(
+                "[secrets] migrated {} legacy Keychain item(s) into the consolidated atlas-core blob",
+                migrated.len()
+            );
         }
         Err(e) => eprintln!("[secrets] blob write failed; legacy items left in place: {e}"),
     }
