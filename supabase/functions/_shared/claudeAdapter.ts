@@ -159,8 +159,28 @@ export function toAnthropicRequest(body: Record<string, unknown>): AnthropicRequ
   const rawMessages = (body.messages ?? []) as OpenAIMessage[];
   const useCache = overrides.cache !== false;
 
-  // System blocks: the composed personality + memory prefix. This is the stable
-  // prefix worth caching, so the last block carries the breakpoint.
+  // System blocks, in caller order.
+  //
+  // CONTRACT: system[0] is the STABLE prefix and is the only block inside the
+  // cache breakpoint. Every block after it is treated as per-turn volatile and
+  // deliberately sits OUTSIDE the cached prefix.
+  //
+  // Anthropic renders `tools` -> `system` -> `messages`, so a breakpoint on
+  // system[0] covers `tools ++ system[0]` — byte-identical turn to turn, which
+  // is what actually produces `cache_read_input_tokens`.
+  //
+  // Putting the breakpoint on the LAST block instead (the previous behaviour)
+  // is worse than having no breakpoint at all as soon as any caller appends
+  // per-turn context: the tail of the cached prefix then differs every turn,
+  // the prefix match always fails, and the entire system prompt is re-written
+  // at the 1.25x cache-write rate on every single turn with a permanent
+  // `cache_read_input_tokens: 0`.
+  //
+  // Callers must therefore emit volatile per-turn context — recalled memories,
+  // session/working-memory blocks, anything derived from the latest user
+  // message — as a SEPARATE system message after the stable one, never
+  // concatenated onto it. Single-block callers are unaffected: system[0] is
+  // then also the last block.
   const systemTexts = rawMessages
     .filter((m) => m.role === "system")
     .map((m) => textOf(m.content))
@@ -168,7 +188,7 @@ export function toAnthropicRequest(body: Record<string, unknown>): AnthropicRequ
   let system: AnthropicTextBlock[] | undefined;
   if (systemTexts.length > 0) {
     system = systemTexts.map((text) => ({ type: "text" as const, text }));
-    if (useCache) system[system.length - 1].cache_control = { type: "ephemeral" };
+    if (useCache) system[0].cache_control = { type: "ephemeral" };
   }
 
   const messages: AnthropicMessage[] = [];
@@ -233,9 +253,16 @@ export function toAnthropicRequest(body: Record<string, unknown>): AnthropicRequ
         properties: {},
       },
     }));
-    // Tools render before system in the cache prefix, so a breakpoint here
-    // covers the tool block on its own when the system prompt churns.
-    if (useCache) tools[tools.length - 1].cache_control = { type: "ephemeral" };
+    // Deliberately NO cache_control here. Tools render before system, so the
+    // system[0] breakpoint above already covers the whole tool block; a second
+    // breakpoint on the last tool would only add an earlier boundary. At ~515
+    // tokens (ATLAS_TOOLS, measured: 1803 JSON chars) the tools-only prefix is
+    // below the minimum cacheable size on every tier this repo routes to —
+    // 1024 on Sonnet 5 / Opus 4.8, 4096 on Opus 4.6 / Haiku 4.5 — so such a
+    // breakpoint is silently ignored (no error, `cache_creation_input_tokens:
+    // 0`) while still consuming one of the 4 breakpoints per request. Re-add
+    // one here only if the tool set ALONE grows past the target model's
+    // minimum, and verify with `cache_creation_input_tokens` before trusting it.
   }
 
   // Anthropic server-side tools (currently web_search_20260209) ride in on a

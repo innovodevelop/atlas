@@ -842,13 +842,27 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
     seriousTopic: detectSeriousTopic(recentUserTexts[recentUserTexts.length - 1] ?? ""),
   };
 
-  let systemPrompt = systemPromptOverride || buildPersonalizedPrompt(profile, memories, upcomingEvents, recentEvents, knowledgeBank, hasTools, styleNotes, conversationSummaries, deps.personality ?? DEFAULT_PERSONALITY, personalityCtx);
+  const systemPrompt = systemPromptOverride || buildPersonalizedPrompt(profile, memories, upcomingEvents, recentEvents, knowledgeBank, hasTools, styleNotes, conversationSummaries, deps.personality ?? DEFAULT_PERSONALITY, personalityCtx);
+
+  // Per-turn context goes in a SECOND system message, never onto systemPrompt.
+  //
+  // This split is what makes prompt caching work at all: the adapter puts the
+  // cache breakpoint on system[0] (see toAnthropicRequest), so system[0] must
+  // be byte-identical turn to turn. Recalled memories are a function of the
+  // latest user message and the session block changes as the conversation
+  // moves — concatenating either onto the stable prompt (the previous
+  // behaviour) changed the cached prefix every turn, which meant a permanent
+  // cache_read of 0 plus the 1.25x write premium on the whole prompt, every
+  // turn. The adapter hoists all system-role messages into the top-level
+  // `system` array in order, so nothing here reaches the wire as an unsupported
+  // in-messages system entry.
+  let volatileContext = "";
 
   // Query-relevant recalled memories (memory v2)
   const recalled = (recallResult || []) as Array<{ id: string; chunk_text: string; score: number }>;
   if (recalled.length > 0) {
-    systemPrompt +=
-      "\n\n## Relevant memories for this message\n" +
+    volatileContext +=
+      "## Relevant memories for this message\n" +
       recalled.map((r) => `- ${r.chunk_text}`).join("\n");
     // Fire-and-forget access bump — consolidation decays what never recalls
     supabase.rpc("touch_memory_vectors", { p_ids: recalled.map((r) => r.id) })
@@ -856,13 +870,21 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
   }
 
   if (sessionContext.block) {
-    systemPrompt += sessionContext.block;
+    volatileContext += sessionContext.block;
   }
 
   const conversationMessages = [
     { role: "system", content: systemPrompt },
+    ...(volatileContext ? [{ role: "system", content: volatileContext }] : []),
     ...messages,
   ];
+
+  // TurnCapture exists for SFT: an example is only usable with the prompt it
+  // was actually generated under, and the model saw stable + volatile. The
+  // split above is a caching concern, not a data-model change.
+  const capturedSystemPrompt = volatileContext
+    ? `${systemPrompt}\n\n${volatileContext}`
+    : systemPrompt;
 
   const allToolResults: Array<{ name: string; result: unknown; citations?: string[] }> = [];
   let maxToolIterations = teachingMode ? 0 : 3;
@@ -959,7 +981,7 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
     return {
       kind: "json",
       body: { response: responseText, message: responseText },
-      capture: { systemPrompt, model: teachModel, toolMessages: [] },
+      capture: { systemPrompt: capturedSystemPrompt, model: teachModel, toolMessages: [] },
     };
   }
 
@@ -1113,7 +1135,7 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
     stream: readable,
     citations: allCitations,
     capture: {
-      systemPrompt,
+      systemPrompt: capturedSystemPrompt,
       model: chatModel,
       // Everything appended past the initial prompt+history is this turn's
       // tool loop (assistant tool_calls + tool results).

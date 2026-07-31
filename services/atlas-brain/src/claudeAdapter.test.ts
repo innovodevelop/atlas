@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- test code deliberately builds
+   partial fixtures and reaches into internals to assert on them. Precise types
+   here would mean mirroring production shapes in the tests, which adds churn
+   without adding safety: the assertions, not the annotations, are the contract. */
 /**
  * Translation tests for the OpenAI <-> Messages API seam. Pure functions only —
  * no network, no env. The invariant under test is that orchestrator.ts's tool
@@ -32,7 +36,11 @@ describe("mapModelToClaude", () => {
 });
 
 describe("toAnthropicRequest — system hoisting", () => {
-  it("moves system messages to the top-level param and caches the last block", () => {
+  it("moves system messages to the top-level param and caches the FIRST block", () => {
+    // Anthropic renders tools -> system -> messages, so the breakpoint must sit
+    // on the stable head of the system array. Block 0 is the stable prefix;
+    // every later block is per-turn volatile and must stay OUTSIDE the cached
+    // prefix, or the prefix match fails on every turn.
     const req = toAnthropicRequest({
       model: "google/gemini-2.5-flash",
       messages: [
@@ -43,10 +51,44 @@ describe("toAnthropicRequest — system hoisting", () => {
     });
 
     expect(req.system).toEqual([
-      { type: "text", text: "You are Atlas." },
-      { type: "text", text: "## Memories\n- likes coffee", cache_control: { type: "ephemeral" } },
+      { type: "text", text: "You are Atlas.", cache_control: { type: "ephemeral" } },
+      { type: "text", text: "## Memories\n- likes coffee" },
     ]);
     expect(req.messages).toEqual([{ role: "user", content: [{ type: "text", text: "hi" }] }]);
+  });
+
+  it("keeps the breakpoint fixed when only the volatile tail changes", () => {
+    // The regression this guards: a churning tail inside the cached prefix
+    // means cache_read_input_tokens is structurally 0 and every turn pays the
+    // 1.25x cache-write premium on the whole system prompt.
+    const stable = "You are Atlas.";
+    const build = (volatile: string) =>
+      toAnthropicRequest({
+        messages: [
+          { role: "system", content: stable },
+          { role: "system", content: volatile },
+          { role: "user", content: "hi" },
+        ],
+      });
+
+    const turnA = build("## Relevant memories\n- a");
+    const turnB = build("## Relevant memories\n- b");
+
+    // Byte-identical cached prefix across turns...
+    expect(turnA.system?.[0]).toEqual(turnB.system?.[0]);
+    expect(turnA.system?.[0].cache_control).toEqual({ type: "ephemeral" });
+    // ...and the churn lives after the breakpoint, uncached and free.
+    expect(turnA.system?.[1].cache_control).toBeUndefined();
+    expect(turnB.system?.[1].cache_control).toBeUndefined();
+    expect(turnA.system?.[1].text).not.toBe(turnB.system?.[1].text);
+  });
+
+  it("still caches a single system block (single-block callers unaffected)", () => {
+    const req = toAnthropicRequest({
+      messages: [{ role: "system", content: "You are Atlas." }, { role: "user", content: "hi" }],
+    });
+    expect(req.system).toHaveLength(1);
+    expect(req.system?.[0].cache_control).toEqual({ type: "ephemeral" });
   });
 
   it("omits system entirely when there are no system messages", () => {
@@ -165,7 +207,7 @@ describe("toAnthropicRequest — tool definitions", () => {
     tool_choice: "auto",
   };
 
-  it("rewrites parameters to input_schema and caches the last tool", () => {
+  it("rewrites parameters to input_schema and sets no tool breakpoint", () => {
     const req = toAnthropicRequest(body);
     expect(req.tools?.[0]).toEqual({
       name: "web_search",
@@ -173,7 +215,11 @@ describe("toAnthropicRequest — tool definitions", () => {
       input_schema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
     });
     expect(req.tools?.[1].input_schema).toEqual({ type: "object", properties: {} });
-    expect(req.tools?.[1].cache_control).toEqual({ type: "ephemeral" });
+    // No breakpoint on tools: they render before system, so the system[0]
+    // breakpoint already covers them, and a tools-only prefix (~515 tokens for
+    // ATLAS_TOOLS) is under the minimum cacheable size on every tier we route
+    // to — it would be silently ignored while burning one of the 4 breakpoints.
+    expect(req.tools?.every((t) => t.cache_control === undefined)).toBe(true);
   });
 
   it("maps tool_choice", () => {
