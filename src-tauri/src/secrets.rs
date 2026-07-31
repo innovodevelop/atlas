@@ -123,11 +123,43 @@ fn core_entry(account: &str) -> keyring::Result<keyring::Entry> {
     keyring::Entry::new(CORE_SERVICE, account)
 }
 
+/// Write the blob with an ACL that does NOT interrogate which binary is asking.
+///
+/// This is the whole reason the app stopped nagging. The `keyring` crate (and
+/// the SecItemAdd default) attaches an ACL trusting exactly ONE binary — the
+/// one that created the item. Every rebuild produces a different binary, so
+/// macOS treats the new build as a stranger and prompts again, forever, on a
+/// project that is rebuilt constantly. Consolidating to a single item cut the
+/// prompt COUNT (~10 -> 1) but not the RECURRENCE.
+///
+/// `security add-generic-password -A` sets "allow any application", which is
+/// the only ACL that survives a rebuild. We shell out because `keyring` exposes
+/// no way to set the access list.
+///
+/// Threat model, stated honestly: any process running as this user can now read
+/// these API keys without a dialog. That matches what already holds for the
+/// data they protect — Atlas keeps memories, chat history and mail bodies as
+/// PLAINTEXT SQLite in Application Support, readable by any such process today.
+/// Guarding the keys more strictly than the content they generate was never a
+/// coherent line, and the cost was a dialog storm on every launch.
 fn write_blob(map: &HashMap<String, String>) -> Result<(), String> {
     let raw = serde_json::to_string(map).map_err(|e| e.to_string())?;
-    core_entry(CORE_BLOB_ACCOUNT)
-        .and_then(|e| e.set_password(&raw))
-        .map_err(|e| e.to_string())
+    let out = std::process::Command::new("/usr/bin/security")
+        .args(["add-generic-password", "-s", CORE_SERVICE, "-a", CORE_BLOB_ACCOUNT, "-w", &raw, "-A", "-U"])
+        .output()
+        .map_err(|e| format!("security add-generic-password failed to run: {e}"))?;
+    if !out.status.success() {
+        // Fall back to the keyring crate so a sandbox/PATH oddity cannot lose a
+        // secret outright — it just costs the per-binary ACL (and its prompts).
+        eprintln!(
+            "[secrets] permissive-ACL write failed ({}), falling back to keyring",
+            String::from_utf8_lossy(&out.stderr).trim()
+        );
+        return core_entry(CORE_BLOB_ACCOUNT)
+            .and_then(|e| e.set_password(&raw))
+            .map_err(|e| e.to_string());
+    }
+    Ok(())
 }
 
 /// Load the blob, folding in any legacy per-key items still present.

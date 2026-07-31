@@ -41,7 +41,9 @@ struct VoiceGateway {
     child: Mutex<Option<Child>>,
     token: String,
     /// Set when the bundled binary failed integrity verification (not spawned).
-    integrity_error: Option<String>,
+    /// Mutex because the spawn now happens on a background thread AFTER the
+    /// window is up, so this is filled in later (see `run`).
+    integrity_error: Mutex<Option<String>>,
 }
 
 fn spawn_voice_gateway(token: &str) -> SidecarSpawn {
@@ -98,7 +100,7 @@ fn voice_gateway_info(state: tauri::State<VoiceGateway>) -> serde_json::Value {
         "port": VOICE_GATEWAY_PORT,
         "token": state.token,
         "running": running,
-        "integrity_error": state.integrity_error,
+        "integrity_error": state.integrity_error.lock().ok().and_then(|g| g.clone()),
     })
 }
 
@@ -114,7 +116,8 @@ struct AtlasBrain {
     child: Mutex<Option<Child>>,
     token: String,
     /// Set when the bundled binary failed integrity verification (not spawned).
-    integrity_error: Option<String>,
+    /// Mutex: filled in by the background spawn thread (see `run`).
+    integrity_error: Mutex<Option<String>>,
 }
 
 fn spawn_atlas_brain(token: &str) -> SidecarSpawn {
@@ -192,7 +195,7 @@ fn atlas_brain_info(state: tauri::State<AtlasBrain>) -> serde_json::Value {
         "port": ATLAS_BRAIN_PORT,
         "token": state.token,
         "running": running,
-        "integrity_error": state.integrity_error,
+        "integrity_error": state.integrity_error.lock().ok().and_then(|g| g.clone()),
     })
 }
 
@@ -314,32 +317,32 @@ pub fn run() {
 
   let gateway_token = uuid::Uuid::new_v4().to_string();
   // Both sidecars share one per-launch token (127.0.0.1-only, token-gated).
-  // Each spawn is integrity-gated (SHA-256 vs the compile-time manifest); a
-  // refused binary is NOT spawned and the reason is surfaced via *_info.
-  // Hashing costs ~0.6s for the 372MB brain + ~0.2s for the voice gateway, so
-  // verify/spawn them in parallel — launch pays max(~0.6s), not the sum.
-  let brain_handle = {
-    let token = gateway_token.clone();
-    std::thread::spawn(move || spawn_atlas_brain(&token))
-  };
-  let gateway_spawn = spawn_voice_gateway(&gateway_token);
-  let brain_spawn = brain_handle.join().unwrap_or_else(|_| SidecarSpawn {
-    child: None,
-    integrity_error: Some("brain sidecar spawn thread panicked".to_string()),
-  });
+  //
+  // NOTHING BLOCKING HAPPENS HERE. Sidecar startup used to run to completion
+  // before `tauri::Builder` was even constructed, which meant the window could
+  // not render until it finished: ~0.6s hashing the 372MB brain + ~0.2s for the
+  // gateway (integrity verification against the compile-time manifest), plus a
+  // Keychain read that blocks INDEFINITELY whenever macOS decides to show a
+  // consent dialog. The user-visible symptom was a blank, unclickable window
+  // with a spinner until the dialog was answered.
+  //
+  // Now the states are managed empty and filled in by a background thread once
+  // the app is up, so the UI is interactive immediately and a slow (or stuck)
+  // sidecar degrades one feature instead of freezing the whole app. The
+  // frontend already polls *_info and handles the not-running case.
   let brain = AtlasBrain {
-    child: Mutex::new(brain_spawn.child),
+    child: Mutex::new(None),
     token: gateway_token.clone(),
-    integrity_error: brain_spawn.integrity_error,
+    integrity_error: Mutex::new(None),
   };
   let gateway = VoiceGateway {
-    child: Mutex::new(gateway_spawn.child),
+    child: Mutex::new(None),
     token: gateway_token.clone(),
-    integrity_error: gateway_spawn.integrity_error,
+    integrity_error: Mutex::new(None),
   };
   // Local proactive scheduler (Phase 4): periodically kicks the brain's
   // /proactive/cycle. All judgement lives brain-side; this only ticks.
-  let proactive = scheduler::ProactiveScheduler::spawn(gateway_token, ATLAS_BRAIN_PORT);
+  let proactive = scheduler::ProactiveScheduler::spawn(gateway_token.clone(), ATLAS_BRAIN_PORT);
 
   tauri::Builder::default()
     // Mail alerts -> macOS notifications; opener launches the OAuth consent
@@ -403,6 +406,41 @@ pub fn run() {
       mail::mail_ingest_errors,
     ])
     .setup(|app| {
+      // Sidecars come up in the BACKGROUND so the window is interactive at
+      // once. Integrity hashing (~0.8s for both binaries) and the Keychain read
+      // used to run before the Tauri builder existed, which is what made the
+      // app open blank and unclickable until a consent dialog was answered.
+      // Both sidecars are verified+spawned in parallel here; each writes its
+      // own result into the managed state, and the frontend's *_info polling
+      // picks them up whenever they land.
+      {
+        let handle = app.handle().clone();
+        std::thread::spawn(move || {
+          let token = handle.state::<AtlasBrain>().token.clone();
+          let brain_token = token.clone();
+          let brain_thread = std::thread::spawn(move || spawn_atlas_brain(&brain_token));
+
+          let gw = spawn_voice_gateway(&token);
+          {
+            // `.map` (not `if let`) so each lock guard is consumed within its
+            // own statement — an `if let` guard would outlive the State borrow.
+            let gw_state = handle.state::<VoiceGateway>();
+            let _ = gw_state.child.lock().map(|mut c| *c = gw.child);
+            let _ = gw_state.integrity_error.lock().map(|mut e| *e = gw.integrity_error);
+          }
+
+          let brain = brain_thread.join().unwrap_or(SidecarSpawn {
+            child: None,
+            integrity_error: Some("brain sidecar spawn thread panicked".to_string()),
+          });
+          {
+            let brain_state = handle.state::<AtlasBrain>();
+            let _ = brain_state.child.lock().map(|mut c| *c = brain.child);
+            let _ = brain_state.integrity_error.lock().map(|mut e| *e = brain.integrity_error);
+          }
+        });
+      }
+
       // Local app database (Supabase migration). Open once at startup under the
       // app-data dir; register the WAL connection for all db commands.
       {
