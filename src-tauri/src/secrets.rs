@@ -72,29 +72,127 @@ pub fn clear_music_refresh_token() -> Result<(), String> {
 }
 
 // --- Brain sidecar / AI provider keys -----------------------------------
-// The brain sidecar's AI keys (Gemini required for completions + embeddings;
-// Perplexity optional for web-search tools) live under the "atlas-core"
-// service and are injected into the sidecar's env at spawn — never in the DB,
-// git, or the JS layer (Supabase-migration local-first model).
+// All atlas-core secrets live in ONE Keychain item ("atlas-core" / "secrets")
+// holding a JSON object, instead of one item per key.
+//
+// WHY ONE ITEM: macOS authorises Keychain access PER ITEM. With ~10 separate
+// items the user was clicking through ~10 permission dialogs — and because
+// several of them were created from Terminal (the `security` CLI), Atlas was
+// never in their ACLs at all, so the dialogs came back on every launch and
+// every dashboard refresh. An item that Atlas itself CREATES lists Atlas in
+// its ACL from birth, so reading it back never prompts — zero dialogs on
+// every subsequent launch, across rebuilds too (the app's cert-based code
+// signature keeps its identity stable; see the ship pipeline).
+//
+// MIGRATION: on first read, if the blob item does not exist yet, each legacy
+// per-key item is read (this is the one final round of prompts), folded into
+// the blob, and deleted only after the blob write succeeds. A legacy item
+// whose read is denied stays put and is retried on the next launch.
+//
+// The parsed blob is cached in-process, so a launch performs at most one
+// Keychain read no matter how many keys the spawns and data-fetch timers ask
+// for. Writers update the cache and the item together.
+
+use std::collections::HashMap;
+use std::sync::Mutex;
 
 const CORE_SERVICE: &str = "atlas-core";
+const CORE_BLOB_ACCOUNT: &str = "secrets";
+
+/// Every account name ever written as its own atlas-core item. Used only by
+/// the one-time migration; extend it if a new legacy name ever existed.
+const LEGACY_CORE_ACCOUNTS: &[&str] = &[
+    "gemini_api_key",
+    "perplexity_api_key",
+    "openweather_api_key",
+    "finnhub_api_key",
+    "news_api_key",
+    "elevenlabs_api_key",
+    "anthropic_api_key",
+    "aws_access_key_id",
+    "aws_secret_access_key",
+    "aws_region",
+    "atlas_ai_provider",
+];
+
+static CORE_CACHE: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);
 
 fn core_entry(account: &str) -> keyring::Result<keyring::Entry> {
     keyring::Entry::new(CORE_SERVICE, account)
 }
 
-/// Read an atlas-core secret (e.g. "gemini_api_key", "perplexity_api_key").
-pub fn core_key(account: &str) -> Option<String> {
-    core_entry(account).ok()?.get_password().ok()
-}
-
-pub fn set_core_key(account: &str, value: &str) -> Result<(), String> {
-    core_entry(account)
-        .and_then(|e| e.set_password(value))
+fn write_blob(map: &HashMap<String, String>) -> Result<(), String> {
+    let raw = serde_json::to_string(map).map_err(|e| e.to_string())?;
+    core_entry(CORE_BLOB_ACCOUNT)
+        .and_then(|e| e.set_password(&raw))
         .map_err(|e| e.to_string())
 }
 
+/// Load the blob, migrating legacy per-key items into it on first run.
+fn load_or_migrate() -> HashMap<String, String> {
+    if let Some(raw) = core_entry(CORE_BLOB_ACCOUNT).ok().and_then(|e| e.get_password().ok()) {
+        if let Ok(map) = serde_json::from_str::<HashMap<String, String>>(&raw) {
+            return map;
+        }
+        // A corrupt blob is unrecoverable data — do not overwrite it silently.
+        eprintln!("[secrets] atlas-core blob exists but is not valid JSON; treating as empty (item preserved)");
+        return HashMap::new();
+    }
+
+    // First run: fold every readable legacy item into the new blob. Reads may
+    // prompt — this is the single final round of dialogs.
+    let mut map = HashMap::new();
+    let mut migrated: Vec<&str> = Vec::new();
+    for account in LEGACY_CORE_ACCOUNTS {
+        if let Ok(entry) = core_entry(account) {
+            if let Ok(value) = entry.get_password() {
+                map.insert((*account).to_string(), value);
+                migrated.push(account);
+            }
+        }
+    }
+    // Create the blob even when empty, so it exists (Atlas-owned, promptless)
+    // before any key is ever stored. Delete legacy items only after the blob
+    // write succeeded — a failed write must not lose the only copy.
+    match write_blob(&map) {
+        Ok(()) => {
+            for account in &migrated {
+                if let Ok(entry) = core_entry(account) {
+                    let _ = entry.delete_password();
+                }
+            }
+            if !migrated.is_empty() {
+                eprintln!("[secrets] migrated {} legacy Keychain items into the consolidated atlas-core blob", migrated.len());
+            }
+        }
+        Err(e) => eprintln!("[secrets] blob write failed; legacy items left in place: {e}"),
+    }
+    map
+}
+
+fn with_core_map<R>(f: impl FnOnce(&mut HashMap<String, String>) -> R) -> R {
+    let mut guard = CORE_CACHE.lock().unwrap_or_else(|p| p.into_inner());
+    if guard.is_none() {
+        *guard = Some(load_or_migrate());
+    }
+    f(guard.as_mut().expect("cache initialised above"))
+}
+
+/// Read an atlas-core secret (e.g. "gemini_api_key", "aws_access_key_id").
+pub fn core_key(account: &str) -> Option<String> {
+    with_core_map(|m| m.get(account).cloned())
+}
+
+pub fn set_core_key(account: &str, value: &str) -> Result<(), String> {
+    with_core_map(|m| {
+        m.insert(account.to_string(), value.to_string());
+        write_blob(m)
+    })
+}
+
 pub fn clear_core_key(account: &str) -> Result<(), String> {
-    if let Ok(e) = core_entry(account) { let _ = e.delete_password(); }
-    Ok(())
+    with_core_map(|m| {
+        m.remove(account);
+        write_blob(m)
+    })
 }
