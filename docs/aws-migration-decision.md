@@ -140,3 +140,7 @@ Landed in **`atlas-site/public/privacy.html`** — the only copy of the policy t
 2. ~~Which Claude models are actually served in eu-central-1/eu-west-1?~~ **PARTLY RESOLVED (2026-07-28, live InvokeModel as `atlas-brain`).** Invocable: `haiku-4-5-20251001-v1:0`, `sonnet-4-6`, `sonnet-4-5-20250929-v1:0`, `opus-4-6-v1`. Denied ("not available for this account"): `sonnet-5`, `opus-4-8`, `opus-4-7`. **Still untested: `eu.anthropic.claude-opus-5`** — one live call closes this and, if it answers, promotes the hard tier with zero policy delta (task #28). Separately: **Fable 5 can never match** — it has no `eu.` profile at all, so matching the first-party frontier tier on Bedrock is not an entitlement question but a residency one. See the model-mapping note in §1.
 3. SES / VAT credit-eligibility — immaterial to the decision (SES ~$0 either way).
 4. Bedrock default quotas — fine for one user; increases are self-serve.
+
+## See also
+
+- **`docs/aws-admin-checklist.md`** — the runnable admin checklist (SES identity/DKIM/MAIL-FROM/production access, S3 attachment + release buckets, CloudFront OAC, IAM least-priv, worker secrets) with per-step pending/done status. Implements §3 and §6 of this document; worker code lives in the separate `atlas-mail` repo.

@@ -116,6 +116,58 @@ test("path segments are double-encoded in the canonical URI (colon in model id)"
   expect(withColon.Authorization).toMatch(/Signature=[0-9a-f]{64}$/);
 });
 
+test("binary bodies (Uint8Array) hash byte-for-byte like the equivalent string", async () => {
+  // S3 object puts sign raw bytes. For ASCII content the byte body and the
+  // string body are the same octets, so the payload hash — and therefore the
+  // whole signature — must be identical. A signer that stringified the bytes
+  // ("[object Uint8Array]" or comma-joined) would diverge here.
+  const base = {
+    method: "PUT" as const,
+    url: "https://atlas-mail-attachments-389642461729.s3.eu-central-1.amazonaws.com/att/a/b",
+    region: "eu-central-1",
+    service: "s3",
+    credentials: AWS_CREDS,
+    now: { amzDate: "20260731T120000Z", dateStamp: "20260731" },
+    signContentHeader: true,
+  };
+  const asString = await signRequest({ ...base, body: "hello attachment" });
+  const asBytes = await signRequest({ ...base, body: new TextEncoder().encode("hello attachment") });
+  expect(asBytes["x-amz-content-sha256"]).toBe(asString["x-amz-content-sha256"]);
+  expect(asBytes.Authorization).toBe(asString.Authorization);
+
+  // And non-UTF8-roundtrippable bytes still hash: 0x00 0xff 0xfe is not valid
+  // UTF-8 text, which is exactly why the string-only body type had to widen.
+  const binary = await signRequest({ ...base, body: new Uint8Array([0x00, 0xff, 0xfe]) });
+  expect(binary["x-amz-content-sha256"]).toMatch(/^[0-9a-f]{64}$/);
+  expect(binary.Authorization).not.toBe(asString.Authorization);
+});
+
+test("singleEncodePath signs the once-encoded path (S3's documented exception)", async () => {
+  // A pre-encoded segment (`%3A`): default double-encoding turns it into
+  // `%253A` in the canonical URI; S3 mode signs it as-is. The two canonical
+  // requests differ, so the signatures must differ — and the S3-mode flag must
+  // be a no-op for encoding-neutral paths (UUID-style attachment keys).
+  const base = {
+    method: "GET" as const,
+    url: "https://bucket.s3.eu-central-1.amazonaws.com/att/file%3Aname",
+    region: "eu-central-1",
+    service: "s3",
+    credentials: AWS_CREDS,
+    now: { amzDate: "20260731T120000Z", dateStamp: "20260731" },
+    signContentHeader: true,
+    body: "",
+  };
+  const doubled = await signRequest(base);
+  const single = await signRequest({ ...base, singleEncodePath: true });
+  expect(single.Authorization).not.toBe(doubled.Authorization);
+
+  // Encoding-neutral key: both modes agree (belt-and-braces for att/<uuid>/<uuid> keys).
+  const neutral = { ...base, url: "https://bucket.s3.eu-central-1.amazonaws.com/att/aaaa/bbbb" };
+  const nDoubled = await signRequest(neutral);
+  const nSingle = await signRequest({ ...neutral, singleEncodePath: true });
+  expect(nSingle.Authorization).toBe(nDoubled.Authorization);
+});
+
 test("amzDateParts formats the SigV4 date and datestamp", () => {
   const parts = amzDateParts(new Date("2026-07-28T12:34:56.789Z"));
   expect(parts.amzDate).toBe("20260728T123456Z");

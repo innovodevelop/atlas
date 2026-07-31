@@ -38,8 +38,9 @@ function toHex(buffer: ArrayBuffer): string {
   return [...new Uint8Array(buffer)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function sha256Hex(data: string): Promise<string> {
-  return toHex(await crypto.subtle.digest("SHA-256", encoder.encode(data)));
+async function sha256Hex(data: string | Uint8Array): Promise<string> {
+  const bytes = typeof data === "string" ? encoder.encode(data) : data;
+  return toHex(await crypto.subtle.digest("SHA-256", bytes as BufferSource));
 }
 
 /**
@@ -55,7 +56,7 @@ function rfc3986(segment: string): string {
 
 /**
  * The canonical URI for the signature — each path segment URI-encoded a SECOND
- * time (S3 is the lone exception, and Atlas does not sign S3 paths here).
+ * time (S3 is the lone exception — S3 callers set `singleEncodePath`).
  *
  * This is not pedantry: Bedrock inference-profile ids carry a version suffix
  * like `-v1:0`, the caller already percent-encodes the id into the URL (`%3A`),
@@ -66,8 +67,12 @@ function rfc3986(segment: string): string {
  * correctly either way, which is exactly why the unit tests missed it: the
  * aws4_testsuite vector signs path "/".
  */
-function canonicalUri(pathname: string): string {
+function canonicalUri(pathname: string, singleEncode?: boolean): string {
   if (!pathname || pathname === "/") return "/";
+  // S3 is AWS's documented lone exception: the canonical URI is the
+  // once-encoded path exactly as sent on the wire — no second encoding pass.
+  // `URL.pathname` is already that once-encoded form, so pass it through.
+  if (singleEncode) return pathname;
   return pathname.split("/").map(rfc3986).join("/");
 }
 
@@ -108,7 +113,8 @@ export interface SignOptions {
   url: string;
   /** Non-authorization headers to include in the signature (e.g. content-type). */
   headers?: Record<string, string>;
-  body?: string;
+  /** Request payload. Strings for JSON APIs; raw bytes for S3 object bodies. */
+  body?: string | Uint8Array;
   region: string;
   /** SigV4 service name: "bedrock", "aws-external-anthropic", "ses", "s3", … */
   service: string;
@@ -129,6 +135,13 @@ export interface SignOptions {
    * this flag — this only controls whether the header itself is signed.
    */
   signContentHeader?: boolean;
+  /**
+   * Use the once-encoded URL path as the canonical URI instead of the default
+   * double-encoding. Set ONLY by S3 callers — S3 is AWS's documented lone
+   * exception to double-encoding. Everything else (Bedrock, SES, …) must keep
+   * the default: see the `canonicalUri` comment for the hard-won `-v1:0` story.
+   */
+  singleEncodePath?: boolean;
 }
 
 /**
@@ -170,7 +183,7 @@ export async function signRequest(opts: SignOptions): Promise<Record<string, str
 
   const canonicalRequest = [
     opts.method.toUpperCase(),
-    canonicalUri(url.pathname),
+    canonicalUri(url.pathname, opts.singleEncodePath),
     url.search.slice(1), // canonical query string (already sorted by URL for our callers; no query params today)
     canonicalHeaders,
     signedHeaders,
