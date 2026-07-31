@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# pre-push hook — runs the cheap CI gates (eslint + tsc -b --force) before
+# every push, via `bun run ci:quick`.
+#
+# WHY THIS EXISTS: 61 eslint errors accumulated invisibly on this repo because
+# nothing ever ran eslint locally — CI was the first (and only) place lint ran,
+# and red CI was discovered long after the commits landed. This hook makes the
+# cheap gates impossible to skip by accident.
+#
+# BYPASS: `git push --no-verify` skips this hook. Use it for genuine
+# emergencies (e.g. pushing a WIP branch you know is red) — never for pushes
+# to the main integration branches.
+#
+# INSTALL: `bun run hooks:install` (sets `git config core.hooksPath
+# scripts/hooks` so this committed hook is used instead of .git/hooks).
+set -e
+cd "$(git rev-parse --show-toplevel)"
+
+echo "pre-push: running cheap CI gates (bun run ci:quick)…"
+if ! bun run ci:quick; then
+  echo
+  echo "pre-push: ci:quick FAILED — push aborted."
+  echo "Fix the errors above, or bypass deliberately with: git push --no-verify"
+  exit 1
+fi
+echo "pre-push: gates clean."

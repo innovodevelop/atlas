@@ -29,3 +29,7 @@ dist-ssr
 deno.lock
 tsconfig.app.tsbuildinfo
 tsconfig.node.tsbuildinfo
+
+# Local CI parity runner artifacts
+.ci-logs/
+services/voice-gateway/vad.out

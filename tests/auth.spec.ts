@@ -3,9 +3,12 @@
  *
  * Run with: bun test tests/auth.spec.ts
  *
- * Hits the LIVE Supabase project (from .env). Written BEFORE the fix, so on
- * the unhardened deploy the core tests FAIL (chat-with-memory returns 200 to
- * anonymous callers). After hardening they must pass.
+ * Static config-discipline tests always run. The LIVE tests (hitting a
+ * deployed project from .env) only run when explicitly opted in:
+ *   RUN_LIVE_AUTH_TESTS=1 bun test tests/auth.spec.ts
+ * Written BEFORE the fix, so on the unhardened deploy the core live tests
+ * FAIL (chat-with-memory returns 200 to anonymous callers). After hardening
+ * they must pass.
  *
  * Cross-user isolation tests need two real accounts; provide them via env:
  *   TEST_USER_A_EMAIL / TEST_USER_A_PASSWORD
@@ -34,10 +37,14 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? fileEnv.VITE_SUPABASE_URL;
 const PUBLISHABLE_KEY =
   process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? fileEnv.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-// Live tests hit the deployed project and need the URL/key (.env is
-// untracked, so CI doesn't have them). The static config-discipline tests
-// always run; the live ones skip cleanly when unconfigured.
-const haveLiveTarget = Boolean(SUPABASE_URL && PUBLISHABLE_KEY);
+// Live tests hit a deployed project and are OPT-IN: set RUN_LIVE_AUTH_TESTS=1
+// (plus the URL/key) to run them. Previously they ran whenever .env carried
+// VITE_SUPABASE_URL, which made them fail locally against the dead Supabase
+// project while silently skipping in CI — the inverse of useful. The static
+// config-discipline tests always run. The live tests are kept (not deleted)
+// because the URLs may point at helloatlas.dk targets later.
+const liveOptIn = process.env.RUN_LIVE_AUTH_TESTS === "1";
+const haveLiveTarget = liveOptIn && Boolean(SUPABASE_URL && PUBLISHABLE_KEY);
 
 const FN = (name: string) => `${SUPABASE_URL}/functions/v1/${name}`;
 

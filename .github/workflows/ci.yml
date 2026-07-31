@@ -23,7 +23,7 @@ jobs:
         run: bunx eslint .
       - name: Build
         run: bun run build
-      - name: Tests (auth suite — static checks; live tests skip without secrets)
+      - name: Tests (auth suite — static checks; live tests are opt-in via RUN_LIVE_AUTH_TESTS=1 and skip here)
         run: bun test tests/
 
   atlas-brain:
