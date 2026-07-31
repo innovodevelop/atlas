@@ -22,6 +22,7 @@ const AtlasCoreScreen = lazy(() => import("./pages/atlas/AtlasCoreScreen"));
 const AtlasMail = lazy(() => import("./pages/atlas/AtlasMail"));
 const Auth = lazy(() => import("./pages/Auth"));
 const AtlasPermissions = lazy(() => import("./pages/AtlasPermissions"));
+import { OnboardingGate } from "./components/OnboardingGate";
 const AtlasDemo = lazy(() => import("./pages/AtlasDemo"));
 const AtlasCore = lazy(() => import("./pages/AtlasCore"));
 const AtlasTeach = lazy(() => import("./pages/AtlasTeach"));
@@ -123,8 +124,8 @@ const App = () => (
         <Suspense fallback={<PageLoader />}>
         <Routes>
           {/* Atlas screens */}
-          <Route path="/" element={<AtlasDashboard />} />
-          <Route path="/dashboard" element={<AtlasDashboard />} />
+          <Route path="/" element={<OnboardingGate><AtlasDashboard /></OnboardingGate>} />
+          <Route path="/dashboard" element={<OnboardingGate><AtlasDashboard /></OnboardingGate>} />
           <Route path="/home" element={<AtlasHome />} />
           <Route path="/atlas-core" element={<AtlasCoreScreen />} />
           <Route path="/mail" element={<AtlasMail />} />
