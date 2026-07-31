@@ -21,6 +21,7 @@ const AtlasCoreScreen = lazy(() => import("./pages/atlas/AtlasCoreScreen"));
 // the overlay stays as the glanceable card, this is the supervision surface.
 const AtlasMail = lazy(() => import("./pages/atlas/AtlasMail"));
 const Auth = lazy(() => import("./pages/Auth"));
+const AtlasPermissions = lazy(() => import("./pages/AtlasPermissions"));
 const AtlasDemo = lazy(() => import("./pages/AtlasDemo"));
 const AtlasCore = lazy(() => import("./pages/AtlasCore"));
 const AtlasTeach = lazy(() => import("./pages/AtlasTeach"));
@@ -128,6 +129,8 @@ const App = () => (
           <Route path="/atlas-core" element={<AtlasCoreScreen />} />
           <Route path="/mail" element={<AtlasMail />} />
           <Route path="/auth" element={<Auth />} />
+          {/* First-run consent. Reachable again from Settings so choices are revisitable. */}
+          <Route path="/permissions" element={<AtlasPermissions />} />
 
           {/* Legacy Atlas Core health dashboard (settings still live here until
               wired into the Workshop app) */}

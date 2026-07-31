@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
 import { AuthSphere, type OrbState } from './AuthSphere';
+import { readOnboarding } from '@/lib/atlasPermissions';
 
 // Split conversational login (design "Atlas Login C1 - Split"): flat #3461f2
 // scene, the Atlas Sphere on the right. Atlas talks on the left (typed word by
@@ -65,7 +66,11 @@ const Auth = () => {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (isAuthenticated && !loading) navigate('/');
+    if (!isAuthenticated || loading) return;
+    // First run goes through consent before the dashboard: macOS used to fire
+    // its permission prompts unannounced mid-launch, and a brand-new account
+    // then landed on an empty dashboard with nothing to explain either.
+    navigate(readOnboarding() ? '/' : '/permissions');
   }, [isAuthenticated, loading, navigate]);
 
   const typeMsg = useCallback((text: string) => {

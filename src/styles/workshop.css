@@ -1079,6 +1079,43 @@ body{display:block;overflow-x:hidden;overflow-y:visible;max-width:none;flex:none
    leave every `rise`/`fadeX` element stuck at its `from` frame — invisible.
    The renderers that drive their own rAF loops (sphere, atmosphere, header
    wave) check the same media query in JS and paint a single static frame. */
+
+/* ===================================================================
+   First-run permissions (AtlasPermissions.tsx). Lives inside the login
+   .ascene so consent reads as the same conversation, not a settings dialog.
+   Toggles are built from the existing pill vocabulary (.achoice/.adot)
+   rather than native checkboxes, which WKWebView styles inconsistently.
+   =================================================================== */
+.permlist{list-style:none;margin:0 0 26px;padding:0;display:flex;flex-direction:column;gap:18px}
+.permrow{display:flex;align-items:flex-start;gap:14px}
+/* The track. Off-state is a low-alpha wash of the surface colour so it reads as
+   "available but not chosen" against the flat blue, not as a disabled control. */
+.permtog{flex:0 0 auto;width:46px;height:27px;margin-top:2px;padding:0;border:0;border-radius:999px;
+  background:rgba(var(--surface-rgb),.22);cursor:pointer;position:relative;
+  transition:background .32s cubic-bezier(.22,1,.36,1);-webkit-appearance:none;appearance:none}
+.permrow.on .permtog{background:var(--surface)}
+.permtog:disabled{cursor:default;opacity:.55}
+.permtog:focus-visible{outline:2px solid var(--surface);outline-offset:3px}
+.permknob{position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;
+  background:#3461f2;box-shadow:0 1px 3px rgba(10,18,64,.45);
+  transition:transform .32s cubic-bezier(.22,1,.36,1)}
+/* Knob is the scene blue on an "on" track, and near-white on an "off" one, so
+   the contrast never inverts into an unreadable pale-on-pale state. */
+.permrow:not(.on) .permknob{background:rgba(var(--surface-rgb),.75);box-shadow:none}
+.permrow.on .permknob{transform:translateX(19px)}
+.permtext{display:flex;flex-direction:column;gap:3px;min-width:0}
+.permtitle{display:flex;align-items:center;gap:8px;font-family:'Hanken Grotesk',sans-serif;
+  font-size:17px;font-weight:600;letter-spacing:-.02em;color:var(--surface)}
+.permdenied{font-family:'Newsreader',Georgia,serif;font-style:italic;font-size:13px;font-weight:400;
+  color:rgba(var(--surface-rgb),.72)}
+/* The blurb swaps to the honest "what you lose" line when switched off, so the
+   consequence is visible at the moment of choosing rather than buried in help. */
+.permblurb{font-size:14px;line-height:1.45;color:rgba(var(--surface-rgb),.74);max-width:34ch}
+@media (max-width:900px){
+  .permlist{gap:14px}
+  .permblurb{max-width:none}
+}
+
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{
     animation-duration:.001ms!important;animation-delay:0ms!important;
