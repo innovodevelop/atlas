@@ -98,6 +98,8 @@ use std::sync::Mutex;
 
 const CORE_SERVICE: &str = "atlas-core";
 const CORE_BLOB_ACCOUNT: &str = "secrets";
+/// Staging item for scripted, promptless secret injection — see load_or_migrate.
+const CORE_IMPORT_ACCOUNT: &str = "secrets-import";
 
 /// Every account name ever written as its own atlas-core item. Used only by
 /// the one-time migration; extend it if a new legacy name ever existed.
@@ -161,6 +163,27 @@ fn load_or_migrate() -> HashMap<String, String> {
             if let Ok(value) = entry.get_password() {
                 map.entry((*account).to_string()).or_insert(value);
                 migrated.push(account);
+            }
+        }
+    }
+
+    // The zero-dialog hand-off: tooling can stage secrets in a "secrets-import"
+    // item created with `security add-generic-password -T <Atlas binary>`, which
+    // puts Atlas in the item's ACL at creation — so this read never prompts.
+    // The item is a JSON object like the blob; it merges (blob wins) and is
+    // deleted once absorbed. This is how the CLI-created legacy keys were moved
+    // without a single dialog, and it remains the sanctioned way to inject
+    // secrets from scripts without re-triggering Keychain consent UI.
+    if let Ok(entry) = core_entry(CORE_IMPORT_ACCOUNT) {
+        if let Ok(raw) = entry.get_password() {
+            match serde_json::from_str::<HashMap<String, String>>(&raw) {
+                Ok(imported) => {
+                    for (k, v) in imported {
+                        map.entry(k).or_insert(v);
+                    }
+                    migrated.push(CORE_IMPORT_ACCOUNT);
+                }
+                Err(_) => eprintln!("[secrets] secrets-import exists but is not valid JSON; leaving it in place"),
             }
         }
     }
