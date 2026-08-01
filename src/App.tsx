@@ -21,8 +21,10 @@ const AtlasCoreScreen = lazy(() => import("./pages/atlas/AtlasCoreScreen"));
 // the overlay stays as the glanceable card, this is the supervision surface.
 const AtlasMail = lazy(() => import("./pages/atlas/AtlasMail"));
 const Auth = lazy(() => import("./pages/Auth"));
-const AtlasPermissions = lazy(() => import("./pages/AtlasPermissions"));
 import { OnboardingGate } from "./components/OnboardingGate";
+// Statically imported (not lazy): this is the first screen a new user sees, so
+// it must not depend on a runtime chunk fetch that could fail in the webview.
+import AtlasPermissions from "./pages/AtlasPermissions";
 const AtlasDemo = lazy(() => import("./pages/AtlasDemo"));
 const AtlasCore = lazy(() => import("./pages/AtlasCore"));
 const AtlasTeach = lazy(() => import("./pages/AtlasTeach"));
