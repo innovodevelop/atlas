@@ -34,9 +34,37 @@
          it never runs when the app boots normally. -->
     <script>
       (function () {
+        // Describe a thrown value that is NOT an Error. WASM (onnxruntime-web,
+        // Emscripten) rejects with bare integers, and `String(2675)` on its own
+        // tells you nothing about where it came from.
+        function describe(r) {
+          if (r instanceof Error) return (r.stack || r.message);
+          var out = 'typeof ' + typeof r;
+          try { out += ' · ctor ' + ((r && r.constructor && r.constructor.name) || 'none'); } catch (e) {}
+          out += '\nvalue: ' + String(r);
+          try {
+            var j = JSON.stringify(r);
+            if (j && j !== String(r)) out += '\njson: ' + j;
+          } catch (e) {}
+          try {
+            var k = r && typeof r === 'object' ? Object.keys(r) : [];
+            if (k.length) out += '\nkeys: ' + k.join(', ');
+          } catch (e) {}
+          return out;
+        }
+
         function show(kind, detail) {
           var root = document.getElementById('root');
           if (!root || root.dataset.crash) return;
+
+          // Only take over the screen if NOTHING has rendered. A late rejection
+          // from an optional subsystem (wake word, TTS, a background fetch) must
+          // not destroy an app that is up and working — that turns a warning into
+          // an outage. Once devtools exist, the console is the right channel.
+          if (root.children.length > 0) {
+            console.error('[atlas] ' + kind + ' after mount (UI left intact):\n' + detail);
+            return;
+          }
           root.dataset.crash = '1';
           root.innerHTML =
             '<div style="font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;' +
@@ -49,11 +77,10 @@
         }
         window.addEventListener('error', function (e) {
           show('script error', (e.message || 'unknown') + '\n' + (e.filename || '') + ':' + (e.lineno || 0) +
-            '\n' + ((e.error && e.error.stack) || ''));
+            '\n' + (e.error ? describe(e.error) : ''));
         });
         window.addEventListener('unhandledrejection', function (e) {
-          var r = e.reason;
-          show('unhandled rejection', (r && (r.stack || r.message)) || String(r));
+          show('unhandled rejection', describe(e.reason));
         });
         // If nothing has rendered a few seconds in, say so rather than sit white.
         setTimeout(function () {

@@ -312,7 +312,21 @@ export function useVoiceSession(options?: {
         if (ws && ws.readyState === WebSocket.OPEN) ws.send(pcm);
       } else {
         // Idle: frames feed ONLY the local wake detector.
-        void wakeRef.current?.push(new Int16Array(pcm));
+        //
+        // MUST be caught. This runs once per audio frame, and ORT's WASM backend
+        // rejects with a bare Emscripten integer (not an Error) when inference
+        // fails. A plain `void` here meant every failing frame raised an
+        // unhandled rejection — which the index.html reporter treated as a fatal
+        // start-up crash and painted over a perfectly working app.
+        //
+        // Wake word is optional, exactly like its init path above: on failure we
+        // retire the detector and carry on. Push-to-talk and typing are unaffected.
+        wakeRef.current?.push(new Int16Array(pcm)).catch((e) => {
+          const d = wakeRef.current;
+          wakeRef.current = null; // stop 50 rejections/second from one broken session
+          d?.destroy();
+          console.warn("[voice] wake word inference failed — detector retired:", e);
+        });
       }
       // Drive the level from the mic while listening (playback drives it
       // while speaking).
