@@ -24,7 +24,10 @@ tauri-build = { version = "2.6.3", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-tauri = { version = "2.11.3", features = [] }
+# `devtools` in RELEASE builds too: a packaged webview exposes no console, so a
+# blank window was previously undiagnosable except by painting errors into the
+# DOM. With this, Safari > Develop > <Mac> > Atlas attaches a real inspector.
+tauri = { version = "2.11.3", features = ["devtools"] }
 tauri-plugin-log = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-opener = "2"
