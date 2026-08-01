@@ -155,7 +155,7 @@ fn refresh_access_token() -> Result<AccessToken, String> {
 }
 
 fn post_token(body: &str) -> Result<Value, String> {
-    match ureq::post(TOKEN_URL)
+    match crate::http::agent().post(TOKEN_URL)
         .set("Content-Type", "application/x-www-form-urlencoded")
         .send_string(body)
     {
@@ -185,7 +185,7 @@ fn valid_token(state: &MusicState) -> Result<String, String> {
 // Spotify Web API
 
 fn api_get(token: &str, path_and_query: &str) -> Result<Value, String> {
-    match ureq::get(&format!("{API}{path_and_query}"))
+    match crate::http::agent().get(&format!("{API}{path_and_query}"))
         .set("Authorization", &format!("Bearer {token}"))
         .call()
     {
@@ -222,7 +222,7 @@ pub struct MusicStatus {
     device_name: &'static str,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn music_status(state: State<'_, MusicState>) -> MusicStatus {
     let connected = secrets::music_refresh_token().is_some();
     let premium = connected
@@ -271,7 +271,7 @@ fn send_cmd(app: &AppHandle, state: &MusicState, cmd: EngineCmd) -> Result<(), S
 /// Begin the OAuth flow: stash a fresh PKCE pair + CSRF state and return the
 /// Spotify consent URL for the webview to open in the system browser. The
 /// redirect comes back through the atlas:// deep link into `complete_oauth`.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn music_connect(state: State<'_, MusicState>) -> Result<String, String> {
     let (verifier, challenge) = oauth::generate_pkce();
     let csrf = uuid::Uuid::new_v4().simple().to_string();
@@ -283,7 +283,7 @@ pub fn music_connect(state: State<'_, MusicState>) -> Result<String, String> {
     Ok(url)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn music_disconnect(state: State<'_, MusicState>) -> Result<(), String> {
     if let Some(engine) = state.engine.lock().unwrap().take() {
         engine.shutdown();
@@ -337,7 +337,7 @@ fn emit_status(app: &AppHandle, connected: bool, error: Option<&str>) {
 // These return Spotify's raw JSON; the webview models only the fields it uses
 // (avoids mirroring Spotify's large schema in Rust).
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn music_search(
     state: State<'_, MusicState>,
     query: String,
@@ -354,7 +354,7 @@ pub fn music_search(
     )
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn music_library_tracks(
     state: State<'_, MusicState>,
     offset: Option<u32>,
@@ -365,7 +365,7 @@ pub fn music_library_tracks(
     api_get(&token, &format!("/me/tracks?offset={o}&limit={l}"))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn music_playlists(
     state: State<'_, MusicState>,
     offset: Option<u32>,
@@ -376,7 +376,7 @@ pub fn music_playlists(
     api_get(&token, &format!("/me/playlists?offset={o}&limit={l}"))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn music_playlist_tracks(
     state: State<'_, MusicState>,
     playlist_id: String,
@@ -392,7 +392,7 @@ pub fn music_playlist_tracks(
 }
 
 /// Current playback snapshot from Spotify (`/me/player`); `Null` when idle.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn music_now_playing(state: State<'_, MusicState>) -> Result<Value, String> {
     let token = valid_token(&state)?;
     api_get(&token, "/me/player")
@@ -402,32 +402,32 @@ pub fn music_now_playing(state: State<'_, MusicState>) -> Result<Value, String> 
 // Commands — transport. Each ensures the librespot engine is running (connects
 // the Atlas playback device on first use) then forwards the command.
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn music_load(app: AppHandle, state: State<'_, MusicState>, uri: String) -> Result<(), String> {
     send_cmd(&app, &state, EngineCmd::Load(uri))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn music_play(app: AppHandle, state: State<'_, MusicState>) -> Result<(), String> {
     send_cmd(&app, &state, EngineCmd::Play)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn music_pause(app: AppHandle, state: State<'_, MusicState>) -> Result<(), String> {
     send_cmd(&app, &state, EngineCmd::Pause)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn music_next(app: AppHandle, state: State<'_, MusicState>) -> Result<(), String> {
     send_cmd(&app, &state, EngineCmd::Next)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn music_prev(app: AppHandle, state: State<'_, MusicState>) -> Result<(), String> {
     send_cmd(&app, &state, EngineCmd::Prev)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn music_seek(
     app: AppHandle,
     state: State<'_, MusicState>,
@@ -436,7 +436,7 @@ pub fn music_seek(
     send_cmd(&app, &state, EngineCmd::Seek(position_ms))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn music_volume(
     app: AppHandle,
     state: State<'_, MusicState>,

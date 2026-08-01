@@ -5,6 +5,7 @@ use std::sync::Mutex;
 
 use tauri::Manager;
 
+mod http;
 mod secrets;
 mod snaptrade;
 mod portfolio_db;

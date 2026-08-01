@@ -11,7 +11,8 @@ use serde_json::{json, Value};
 use crate::secrets::core_key;
 
 fn get_json(url: &str) -> Result<Value, String> {
-    ureq::get(url)
+    crate::http::agent()
+        .get(url)
         .call()
         .map_err(|e| e.to_string())?
         .into_json::<Value>()
@@ -59,7 +60,7 @@ fn mock_weather(city: &str) -> Value {
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn fetch_weather(city: Option<String>, lat: Option<f64>, lon: Option<f64>) -> Result<Value, String> {
     let city = city.unwrap_or_else(|| "San Francisco".to_string());
     let Some(api) = core_key("openweather_api_key") else { return Ok(mock_weather(&city)) };
@@ -68,7 +69,8 @@ pub fn fetch_weather(city: Option<String>, lat: Option<f64>, lon: Option<f64>) -
     // ureq's .query() percent-encodes the city (which may contain spaces/commas).
     let data = match (lat, lon) {
         (Some(la), Some(lo)) => get_json(&format!("{base}/weather?appid={api}&units=imperial&lat={la}&lon={lo}"))?,
-        _ => ureq::get(&format!("{base}/weather"))
+        _ => crate::http::agent()
+            .get(&format!("{base}/weather"))
             .query("appid", &api)
             .query("units", "imperial")
             .query("q", &city)
@@ -180,7 +182,7 @@ fn mock_stock(symbol: &str) -> Value {
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn fetch_stocks(symbols: Option<Vec<String>>) -> Result<Value, String> {
     let symbols = symbols.unwrap_or_else(|| ["AAPL", "GOOGL", "MSFT", "NVDA"].iter().map(|s| s.to_string()).collect());
     let Some(api) = core_key("finnhub_api_key") else {
@@ -262,7 +264,7 @@ fn mock_news() -> Value {
     ]})
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn fetch_news(category: Option<String>) -> Result<Value, String> {
     let category = category.unwrap_or_else(|| "general".to_string());
     let Some(api) = core_key("news_api_key") else { return Ok(mock_news()) };

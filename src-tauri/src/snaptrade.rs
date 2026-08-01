@@ -65,7 +65,7 @@ impl Client {
         let signature = sign(&self.consumer_key, &full_path, &query, body.as_ref());
         let url = format!("{}{}?{}", BASE, path, query);
 
-        let req = ureq::request(method, &url)
+        let req = crate::http::agent().request(method, &url)
             .set("Signature", &signature)
             .set("Content-Type", "application/json")
             .set("Accept", "application/json");

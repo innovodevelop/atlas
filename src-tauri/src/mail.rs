@@ -69,7 +69,7 @@ fn http_err(e: ureq::Error) -> String {
 }
 
 fn get_json(token: &str, path: &str) -> Result<Value, String> {
-    ureq::get(&format!("{}{path}", api_base()))
+    crate::http::agent().get(&format!("{}{path}", api_base()))
         .set("Authorization", &format!("Bearer {token}"))
         .call()
         .map_err(http_err)?
@@ -78,7 +78,7 @@ fn get_json(token: &str, path: &str) -> Result<Value, String> {
 }
 
 fn post_json(token: &str, path: &str, body: Value) -> Result<Value, String> {
-    ureq::post(&format!("{}{path}", api_base()))
+    crate::http::agent().post(&format!("{}{path}", api_base()))
         .set("Authorization", &format!("Bearer {token}"))
         .send_json(body)
         .map_err(http_err)?
@@ -671,7 +671,7 @@ fn apply_rules(
 /// Deliberately does NOT fan out a detail fetch per thread — 200 requests on
 /// every refresh is exactly the behaviour the perf review exists to prevent.
 /// Message bodies arrive via `mail_thread_fetch` for the selected thread only.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn mail_sync(
     app: AppHandle,
     state: State<'_, DbState>,
@@ -814,7 +814,7 @@ fn resolve_thread(conn: &Connection, user_id: &str, thread_id: &str) -> Result<(
 /// Attachments have no local table and the worker has no byte-fetch route, so
 /// their metadata is folded into the owning message's `extracted` JSON and the
 /// UI shows name/type/size with nothing clickable.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn mail_thread_fetch(
     app: AppHandle,
     state: State<'_, DbState>,
@@ -1003,7 +1003,7 @@ pub fn mail_thread_fetch(
 /// Clear the unread badge. The worker is told first: an unread count the server
 /// does not agree with is overwritten by the next sync, and the user would
 /// watch their own action undo itself minutes later.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn mail_mark_read(
     app: AppHandle,
     state: State<'_, DbState>,
@@ -1031,7 +1031,7 @@ pub fn mail_mark_read(
 
 /// Move a thread between views. Same server-first ordering as mark_read, for
 /// the same reason.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn mail_set_status(
     app: AppHandle,
     state: State<'_, DbState>,
@@ -1073,7 +1073,7 @@ pub fn mail_set_status(
 
 /// The approve-and-send path's last hop. It is fully wired from the UI down to
 /// here and stops exactly here.
-#[tauri::command]
+#[tauri::command(async)]
 #[allow(unused_variables)]
 pub fn mail_send_reply(
     app: AppHandle,
@@ -1110,7 +1110,7 @@ pub fn mail_send_reply(
 
 /// Messages the worker could not store. Read-only passthrough — these rows live
 /// on the server side and have no local mirror.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn mail_ingest_errors(token: String) -> Result<Value, String> {
     let payload = get_json(&token, "/api/ingest-errors")?;
     Ok(json!({ "errors": payload["errors"].clone() }))

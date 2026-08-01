@@ -57,7 +57,7 @@ fn ensure_user(client: &Client) -> Result<(String, String), String> {
 #[derive(serde::Serialize)]
 pub struct Status { pub has_credentials: bool, pub connected: bool }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn portfolio_status(app: tauri::AppHandle) -> Status {
     let connected = secrets::snaptrade_user().is_some()
         && db_path(&app).ok().and_then(|p| Db::open(&p).ok())
@@ -67,7 +67,7 @@ pub fn portfolio_status(app: tauri::AppHandle) -> Status {
 }
 
 /// Register the SnapTrade user if needed and return the connection-portal URL.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn portfolio_connect_url() -> Result<String, String> {
     let client = Client::from_keychain()?;
     let (uid, secret) = ensure_user(&client)?;
@@ -75,7 +75,7 @@ pub fn portfolio_connect_url() -> Result<String, String> {
 }
 
 /// Pull accounts/positions/balances/activities from SnapTrade into DuckDB.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn portfolio_sync(app: tauri::AppHandle) -> Result<crate::portfolio_db::Summary, String> {
     let client = Client::from_keychain()?;
     let (uid, secret) = secrets::snaptrade_user().ok_or("Not connected — link a brokerage first")?;
@@ -132,27 +132,27 @@ pub fn portfolio_sync(app: tauri::AppHandle) -> Result<crate::portfolio_db::Summ
     db.summary()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn portfolio_summary(app: tauri::AppHandle) -> Result<crate::portfolio_db::Summary, String> {
     Db::open(&db_path(&app)?)?.summary()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn portfolio_holdings(app: tauri::AppHandle) -> Result<Vec<crate::portfolio_db::Holding>, String> {
     Db::open(&db_path(&app)?)?.top_holdings(50)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn portfolio_history(app: tauri::AppHandle) -> Result<Vec<crate::portfolio_db::HistoryPoint>, String> {
     Db::open(&db_path(&app)?)?.history()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn portfolio_allocation(app: tauri::AppHandle) -> Result<Vec<crate::portfolio_db::AllocSlice>, String> {
     Db::open(&db_path(&app)?)?.allocation()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn portfolio_disconnect(app: tauri::AppHandle) -> Result<(), String> {
     secrets::clear_snaptrade_user()?;
     if let Ok(p) = db_path(&app) {
