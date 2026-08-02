@@ -42,8 +42,17 @@ fi
 pip install -e ./openWakeWord
 
 # --- 3) piper-sample-generator (synthetic positive samples via Piper TTS) ----
+# PINNED to v2.0.0 on purpose. Upstream v3 rewrote this into a pip package that
+# consumes Piper *voice* .onnx files and dropped both requirements.txt and
+# generate_samples.py. openWakeWord's training pipeline still drives the v2
+# layout, and the checkpoint downloaded just below is the v2.0.0 release asset,
+# so a floating clone of `main` breaks the run immediately:
+#     ERROR: Could not open requirements file: piper-sample-generator/requirements.txt
+# Revisit only alongside an openWakeWord release that targets piper v3.
+PIPER_SAMPLE_GEN_TAG="v2.0.0"
 if [[ ! -d piper-sample-generator ]]; then
-  git clone https://github.com/rhasspy/piper-sample-generator.git
+  git clone --branch "${PIPER_SAMPLE_GEN_TAG}" --depth 1 \
+    https://github.com/rhasspy/piper-sample-generator.git
   pip install -r piper-sample-generator/requirements.txt
 fi
 if [[ ! -f piper-sample-generator/models/en_US-libritts_r-medium.pt ]]; then
