@@ -50,6 +50,15 @@ the atlas-site privacy policy say **"Hey Atlas"**. Either train the model
 premature. It must deploy with the app build that has the Bedrock provider
 active — and must be stashed around any unrelated atlas-site deploy.
 
+**Riding along with this deploy:** `atlas-site/public/favicon.svg` is also
+modified and uncommitted (the 2026-08-02 icon retune — the mark was illegible at
+favicon size for the same reason it was illegible in the dock). Deliberately
+held back rather than committed on its own, because any atlas-site deploy risks
+shipping the privacy delta early. Commit and deploy both together.
+
+Two uncommitted files in a repo nobody is watching is a fragile way to hold a
+release gate. If this drags, stash them with a named stash instead.
+
 ### 4. Rotate the Mastercard webhook secret
 
 Exposed in a transcript. Still valid. Security item, user-only.
@@ -103,6 +112,29 @@ runtime-neutral shared orchestrator the brain imports, and has no Supabase
 dependency. Do not "clean it up".
 
 ---
+
+## The 2026-07-30 workflow plan — what actually landed
+
+That plan ran Stage 0, then four parallel workflows, then W-SHIP. It was never
+finished, and the earlier claim in this file that "all four Stage-1 workflows
+landed" was wrong. Verified against the tree on 2026-08-02:
+
+| | State | Evidence |
+|---|---|---|
+| **Stage 0** — prompt caching | ✅ done | `b6e1741` stable/volatile system split + `system[0]` breakpoint |
+| **W-SUPA** — finish Supabase removal | ✅ done | `6208892` (34 edge fns, client alias, 3 shim bugs) + `6b16d45` (last 3 npm deps) |
+| **W-AUTH** — audit + harden auth | ✅ mostly | login/signup wrap D1 access; `auth_attempts` pruning exists in `login.ts` |
+| **W-CI** — permanent CI fix | ✅ done | `bun run ci` → `scripts/ci/run.sh`, `scripts/hooks/pre-push`. **Its tail sat uncommitted for days** — the `RUN_LIVE_AUTH_TESTS` gating only landed in `41fcc35` |
+| **W-AWS** — complete the AWS migration | ❌ **not done** | No SES send path anywhere. Updater still points at GitHub releases, not S3/CloudFront. `r2_key` → `blob_key` never migrated (`src/types/mail.ts`) |
+| **W-SHIP** (Stage 2) — build + runtime verify | ❌ **not done** | Atlas Mail 6b–6d still never runtime-executed; the privacy delta is still undeployed, which was W-SHIP's final step |
+
+So the outstanding half is **W-AWS and W-SHIP**, and their open items are already
+listed above: SES sending, the updater release home, the `r2_key` migration, the
+mail runtime verification, and the privacy-policy deploy.
+
+Worth noting *why* this went unnoticed: W-CI's work was complete on disk but
+uncommitted, so the tree looked further along than git did. Uncommitted work is
+invisible to every audit — this file included.
 
 ## Superseded documents
 
