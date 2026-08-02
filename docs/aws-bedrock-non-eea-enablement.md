@@ -103,7 +103,68 @@ and confirmed by measurement, not by reading the policy back:
 The error moving from *permission* to *entitlement* is the proof. The control
 model still answering proves credentials and the signing path are untouched.
 
-## 2. Model entitlement — **the remaining gate**
+## 2. Model entitlement — **BLOCKED, and not self-service** (2026-08-02)
+
+**Outcome: the frontier tier is unreachable on this Bedrock account by any route
+we control.** Recording the full error, because every truncated version of it
+sent us down a wrong path:
+
+```
+AccessDeniedException: anthropic.claude-fable-5 is not available for this
+account. You can explore other available models on Amazon Bedrock. For
+additional access options, contact AWS Sales at
+https://aws.amazon.com/contact-us/sales-support/
+```
+
+"Contact AWS Sales" — not a use-case form, not a Marketplace subscribe, not an
+IAM fix. It is a **commercial gate on the account**.
+
+Established by measurement:
+
+| Probe | Result |
+|---|---|
+| `anthropic.claude-fable-5` bare, us-east-1 **and** eu-central-1 | not available for this account |
+| `global.anthropic.claude-fable-5`, both regions | not available for this account |
+| `eu.` and `global.` opus-5 / sonnet-5 / opus-4-8 | not available for this account |
+| Same model in the **console playground, as account admin** | access denied |
+| `eu.anthropic.claude-sonnet-4-6` control | real completion |
+
+Bare foundation-model ids are covered by IAM v4, so this is not profile routing.
+The console admin failing too means it is not a `atlas-brain` privilege gap. And
+`list-foundation-models` cheerfully returns `anthropic.claude-fable-5` with
+`modelLifecycle: ACTIVE` — **`ACTIVE` means the model exists and is not
+deprecated, not that this account may invoke it.** That is the same
+listing-≠-entitlement trap that already caught sonnet-5, opus-4-8 and opus-4-7,
+now confirmed a fourth time. Stop using the model list as evidence of access.
+
+### What this does to the premise of the whole change
+
+The residency withdrawal was justified by: *the frontier models are reachable
+only via `global.` profiles, so EEA confinement costs us a model tier.* Half of
+that is true — Fable has no `eu.` profile. But the operative fact is that this
+account cannot invoke the frontier tier on **any** profile, EU or global. So
+lifting the EEA restriction currently buys **nothing**.
+
+The code change stays (it is guarded, default-EU, and is the flip we would need
+later). **The published privacy policy should NOT be weakened for a capability we
+do not have** — see the hold note in `docs/ROADMAP.md`.
+
+### Routes that actually exist
+
+1. **Contact AWS Sales** — the path the error names. Unknown timeline; likely
+   wants a commitment conversation for a pre-revenue account on Activate credits.
+2. **Accept Bedrock's ceiling.** `opus-4-6` / `sonnet-4-6` are the newest that
+   answer, which is exactly what `TIER_DEFAULT` already targets. Nothing is
+   broken today.
+3. **First-party Anthropic for the frontier tier**, via the bridge the capability
+   router already has. Real money rather than credits, but single-user volume.
+   Also the fix for the missing `anthropic_api_key`.
+4. **Claude Platform on AWS.** Marketplace-billed so *not* credit-eligible, but
+   same SigV4 auth, one config flip, and it serves both the frontier models and
+   native web search. The credit argument for Bedrock weakens considerably once
+   Bedrock cannot serve the models we want.
+
+## 3. (historical) How enablement works now that Model access is retired
 
 > ⚠️ **The Bedrock "Model access" page has been RETIRED** (observed in-console
 > 2026-08-02). Earlier revisions of this document, and the roadmap task "request

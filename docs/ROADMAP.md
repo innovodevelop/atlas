@@ -50,18 +50,28 @@ the atlas-site privacy policy say **"Hey Atlas"**. Either train the model
 premature. It must deploy with the app build that has the Bedrock provider
 active — and must be stashed around any unrelated atlas-site deploy.
 
-**Stacked on top of it (2026-08-02): the EEA-confinement withdrawal.** §2, §4.3,
-§4.7, §5, §6, §7 and §8 were rewritten to remove the "background inference is
-processed inside the EEA, and is therefore not a third-country transfer" claim,
-because non-EU inference profiles are now permitted in code. **Sequencing is
-load-bearing: this text must be live before any non-EEA profile serves a real
-request.** No default routes to one today, so nothing is currently false — the
-gap opens the moment a `BEDROCK_MODEL_*` override names a `global.` id.
+**Stacked on top of it (2026-08-02): the EEA-confinement withdrawal — written, and
+now DELIBERATELY HELD.** §2, §4.3, §4.7, §5, §6, §7 and §8 were rewritten to
+remove the "background inference is processed inside the EEA, and is therefore
+not a third-country transfer" claim, because non-EU inference profiles became
+permitted in code.
 
-Withdrawing a published residency guarantee is a **material change** under §12
-("Material changes will be communicated in the app or by email"). Deploying the
-page is not sufficient on its own; the notice is owed to anyone already running
-Atlas.
+**Do not deploy that part yet.** The justification evaporated the same day: this
+AWS account cannot invoke the frontier tier on **any** profile, EU or global —
+`AccessDeniedException … contact AWS Sales`, confirmed as the account admin in
+the console, not just as `atlas-brain`. So the residency withdrawal currently
+buys nothing, and weakening a published privacy commitment for a capability we
+do not have is a bad trade. The sequencing rule still governs and now cuts the
+other way: the text must be live *before* a non-EEA profile serves a real
+request, and none can. Detail: `docs/aws-bedrock-non-eea-enablement.md` §2.
+
+The code change stays — it is guarded, defaults to EU, and is the flip we would
+need if access is ever granted.
+
+If it is deployed later: withdrawing a published residency guarantee is a
+**material change** under §12 ("Material changes will be communicated in the app
+or by email"). Deploying the page is not sufficient on its own; the notice is
+owed to anyone already running Atlas.
 
 **Riding along with this deploy:** `atlas-site/public/favicon.svg` is also
 modified and uncommitted (the 2026-08-02 icon retune — the mark was illegible at
