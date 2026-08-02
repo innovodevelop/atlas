@@ -13,14 +13,16 @@
 | Guard | `assertEeaProfile` — threw on non-`eu.` unless `ATLAS_BEDROCK_ALLOW_NON_EEA=1` | `assertAllowedProfile` — permits non-`eu.`; `ATLAS_BEDROCK_EEA_ONLY=1` restores confinement |
 | `TIER_DEFAULT` | all `eu.` | **all `eu.` — unchanged** |
 | Rust env forwarding | `AWS_*` + `ATLAS_AI_PROVIDER` only | + five `BEDROCK_MODEL_*` overrides + `ATLAS_BEDROCK_EEA_ONLY`, from the Keychain |
-| IAM | `inference-profile/eu.anthropic.claude-*` | + `global.anthropic.claude-*` (us-east-1 ARN) + `foundation-model/anthropic.*` |
+| IAM | v2 | v3 = v2 + one resource: `global.anthropic.claude-*` (us-east-1 ARN) |
 | Privacy policy | background tier "processed inside the EEA", explicitly *not* a transfer | split withdrawn; AWS listed as a third-country transfer on an SCC basis |
 
 **Three things deliberately NOT done, each for a reason worth keeping:**
 
 1. **No default moved.** Permitting a non-EEA profile and routing to one are separate decisions; only the first was taken. An ordinary install still runs entirely on `eu.` profiles. Guarded by a test.
 2. **Fable 5 still has no `TIER_DEFAULT` entry.** Not for residency reasons any more — for the rule that binds every tier: a default may only name a profile a live `InvokeModel` has answered on. Nothing has invoked Fable yet.
-3. **The guard was inverted, not deleted.** With the `foundation-model/anthropic.*` wildcard in IAM, the policy is now a *name filter* rather than a geographic boundary, so `ATLAS_BEDROCK_EEA_ONLY=1` is the only remaining containment control. It is also the one-line revert, and the switch an enterprise/DPA-constrained deployment would turn on.
+3. **The guard was inverted, not deleted.** `ATLAS_BEDROCK_EEA_ONLY=1` is the only real containment control, because IAM is a *name filter*, not a geographic boundary — it grants `foundation-model/anthropic.claude-*` in all regions and has since v2 (2026-07-30). It is also the one-line revert, and the switch an enterprise/DPA-constrained deployment would turn on.
+
+**Correction to the first draft of this update (same day).** It said the IAM apply would widen the policy to the all-region `foundation-model` wildcard and that this was the step surrendering containment. Reading the live v2 document showed the wildcard already there, so the actual delta is one resource, not three, and nothing new is given up at the IAM layer. The first draft also omitted v2's `aws-marketplace:Subscribe` statement, which — applied as written — would have revoked the grant the per-model bootstrap depends on. Read the live policy before replacing it; a managed policy is not what the decision record says it is.
 
 **Outstanding, in order:** ① account owner applies `docs/aws-iam-bedrock-invoke-policy.json`; ② account owner requests model access in **us-east-1** (separate from eu-central-1) and does the per-model Marketplace bootstrap invoke; ③ live-invoke verification, then promote a default in a commit citing it; ④ **deploy the privacy policy — this must be live before any non-EEA profile serves a real request.**
 

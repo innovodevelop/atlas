@@ -35,29 +35,48 @@ than the original problem.
 
 ## 1. Widen the IAM policy — **account owner**
 
-`docs/aws-iam-bedrock-invoke-policy.json` replaces the inline `AtlasBedrockInvoke`
-policy on IAM user `atlas-brain`.
+`AtlasBedrockInvoke` is a **customer-managed** policy
+(`arn:aws:iam::389642461729:policy/AtlasBedrockInvoke`) attached to `atlas-brain`
+— *not* an inline policy. `atlas-brain` also carries one genuinely inline policy,
+`atlas-mail-ses-s3`, which is unrelated. So this is `create-policy-version`, and
+**`put-user-policy` would be wrong**: it would create a second, inline policy of
+the same name alongside the managed one, leaving two same-named policies
+disagreeing about what Atlas may invoke (IAM unions the Allows, so it would
+"work" while being untraceable).
+
+`docs/aws-iam-bedrock-invoke-policy.json` is **v3 = the live v2 document plus one
+added resource**, the `global.` inference-profile ARN. Verified against v2 as
+read from the account on 2026-08-02.
 
 ```bash
-aws iam put-user-policy \
-  --user-name atlas-brain \
-  --policy-name AtlasBedrockInvoke \
-  --policy-document file://docs/aws-iam-bedrock-invoke-policy.json
+aws iam create-policy-version \
+  --policy-arn arn:aws:iam::389642461729:policy/AtlasBedrockInvoke \
+  --policy-document file://docs/aws-iam-bedrock-invoke-policy.json \
+  --set-as-default
 ```
 
-Three things to understand before applying it:
+Things to understand before applying it:
 
 - **`global.` profiles are anchored in `us-east-1`.** The ARN region is
-  `us-east-1` even though the request is *sent* to `eu-central-1`. That is not a
-  typo; a cross-region profile's ARN lives in its home region while the request
-  enters AWS wherever you address it.
-- **The `foundation-model` wildcard is the part that gives up containment.** A
-  global profile fans out to the underlying model in whichever region has
-  capacity, so `arn:aws:bedrock:*::foundation-model/anthropic.*` is required for
-  it to work at all. Once that statement exists, the policy is a *name filter*,
-  not a geographic boundary — `ATLAS_BEDROCK_EEA_ONLY=1` in the code is then the
-  only remaining control, which is why the guard was inverted rather than deleted.
-- It is scoped to `anthropic.*`, so it does not open Bedrock's other vendors.
+  `us-east-1` even though the request may be *sent* to another region. That is
+  not a typo; a cross-region profile's ARN lives in its home region.
+- **The `foundation-model` wildcard was already there.** v2 already grants
+  `arn:aws:bedrock:*::foundation-model/anthropic.claude-*` across all regions,
+  which is what a global profile needs to fan out to the underlying model. An
+  earlier draft of this document claimed adding it was the step that surrendered
+  containment — wrong. It had been surrendered since at least 2026-07-30; the
+  geographic boundary was the `eu.` inference-profile pattern alone, exactly as
+  the code comments said. This apply gives up nothing new at the IAM layer.
+- **v2 also carries `aws-marketplace:Subscribe`** (`MarketplaceSubscribeForModelAccess`)
+  and the four discovery reads. Both are preserved verbatim in v3. An earlier
+  draft of the policy file omitted the Marketplace statement entirely, which
+  would have revoked the grant the per-model bootstrap in step 2 depends on.
+- Resources stay scoped to `anthropic.claude-*`, so Bedrock's other vendors —
+  and Anthropic non-Claude models — remain closed.
+- **Reverting is one command**, since the old version is retained:
+  `aws iam set-default-policy-version --policy-arn <arn> --version-id v2`.
+  Managed policies cap at **five versions**; the account was at two before this,
+  so v3 fits. Past five, delete an old version first.
 
 ## 2. Request model access — **account owner, AWS console**
 

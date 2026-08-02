@@ -2,31 +2,29 @@
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "AtlasBedrockInvokeEeaProfiles",
+      "Sid": "InvokeClaudeViaEUInferenceProfiles",
       "Effect": "Allow",
       "Action": ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
-      "Resource": "arn:aws:bedrock:eu-central-1:389642461729:inference-profile/eu.anthropic.claude-*"
+      "Resource": [
+        "arn:aws:bedrock:*::foundation-model/anthropic.claude-*",
+        "arn:aws:bedrock:eu-central-1:389642461729:inference-profile/eu.anthropic.claude-*",
+        "arn:aws:bedrock:us-east-1:389642461729:inference-profile/global.anthropic.claude-*"
+      ]
     },
     {
-      "Sid": "AtlasBedrockInvokeGlobalProfiles",
+      "Sid": "MarketplaceSubscribeForModelAccess",
       "Effect": "Allow",
-      "Action": ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
-      "Resource": "arn:aws:bedrock:us-east-1:389642461729:inference-profile/global.anthropic.claude-*"
+      "Action": ["aws-marketplace:ViewSubscriptions", "aws-marketplace:Subscribe"],
+      "Resource": "*"
     },
     {
-      "Sid": "AtlasBedrockInvokeUnderlyingFoundationModels",
-      "Effect": "Allow",
-      "Action": ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
-      "Resource": "arn:aws:bedrock:*::foundation-model/anthropic.*"
-    },
-    {
-      "Sid": "AtlasBedrockDiscovery",
+      "Sid": "DiscoverModelsAndProfiles",
       "Effect": "Allow",
       "Action": [
-        "bedrock:ListInferenceProfiles",
-        "bedrock:GetInferenceProfile",
         "bedrock:ListFoundationModels",
-        "bedrock:GetFoundationModel"
+        "bedrock:GetFoundationModel",
+        "bedrock:ListInferenceProfiles",
+        "bedrock:GetInferenceProfile"
       ],
       "Resource": "*"
     }

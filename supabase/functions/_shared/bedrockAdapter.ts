@@ -124,11 +124,13 @@ const TIER_DEFAULT: Record<string, string> = {
  * **Both blockers were lifted deliberately on 2026-08-02** (decision: reach the
  * frontier tier; see docs/aws-migration-decision.md, "UPDATE 2026-08-02"):
  *
- *   1. IAM — `AtlasBedrockInvoke` was widened to the global profile ARN plus the
- *      underlying `arn:aws:bedrock:*::foundation-model/anthropic.*` wildcard the
- *      global profile needs in each region it can route to. See
- *      `docs/aws-iam-bedrock-invoke-policy.json`. The policy is now a name
- *      filter, not a containment mechanism — that is the accepted cost.
+ *   1. IAM — `AtlasBedrockInvoke` was widened by exactly one resource: the
+ *      `global.anthropic.claude-*` inference-profile ARN. The all-region
+ *      `foundation-model/anthropic.claude-*` wildcard a global profile needs to
+ *      fan out was ALREADY present (v2, 2026-07-30), so the policy was already a
+ *      name filter rather than a geographic boundary — the `eu.` profile pattern
+ *      was doing that work alone, exactly as this file has always said. See
+ *      `docs/aws-iam-bedrock-invoke-policy.json`.
  *   2. PRIVACY POLICY — §4.3/§6/§7 no longer claim EEA-confinement for the
  *      background tier; AWS is listed as a third-country transfer on an SCC
  *      basis, and §8 discloses Fable's mandatory 30-day retention (it is
@@ -186,10 +188,11 @@ const BEDROCK_ID = /^(eu|us|apac|global|anthropic)\./;
  * future EEA-only deployment (an enterprise tenant, a DPA that demands it) turns
  * on without a code change. Deleting the guard would make that a rewrite.
  *
- * NOTE the asymmetry with IAM: `AtlasBedrockInvoke` is now a name filter rather
- * than a containment mechanism, so this function is no longer a second line of
- * defence over it — it is the only one. Setting `ATLAS_BEDROCK_EEA_ONLY=1` is
- * therefore a real control, not belt-and-braces.
+ * NOTE the asymmetry with IAM: `AtlasBedrockInvoke` is a name filter, not a
+ * containment mechanism — it grants the underlying foundation models in ALL
+ * regions and always has. So this function is not a second line of defence over
+ * IAM; for anything reachable through a cross-region profile it is the only one.
+ * Setting `ATLAS_BEDROCK_EEA_ONLY=1` is therefore a real control.
  */
 function assertAllowedProfile(id: string): string {
   if (id.startsWith("eu.")) return id;
