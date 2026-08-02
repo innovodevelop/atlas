@@ -2,6 +2,67 @@
  import { motion } from 'framer-motion';
  import { Database, Layers, Clock, Brain, Shield, Zap } from 'lucide-react';
  import mermaid from 'mermaid';
+
+ // Static mermaid source. MODULE SCOPE on purpose: as a const inside the
+ // component it is a fresh string every render, so naming it in the effect
+ // deps would re-run mermaid.render() on every render instead of once.
+ const tierDiagram = `
+ %%{init: {'theme': 'dark'}}%%
+ flowchart TB
+     subgraph Conversation["Conversation Flow"]
+         A[User Message] --> B[Extract Context]
+     end
+     
+     subgraph Working["Working Memory (30 min)"]
+         B --> C[session_context]
+         C -->|Important| D{Promote?}
+     end
+     
+     subgraph ShortTerm["Short-Term (24 hr)"]
+         D -->|Yes| E[Temporary Storage]
+         E -->|Repeated| F{Consolidate?}
+     end
+     
+     subgraph LongTerm["Long-Term (Persistent)"]
+         F -->|Yes| G[ai_memory]
+         G --> H[Generate Embeddings]
+         H --> I[memory_vectors]
+     end
+     
+     subgraph Semantic["Semantic Core"]
+         I --> J[Claude Opus]
+         J --> K[Synthesized Themes]
+     end
+     
+     style C fill:#164e63,stroke:#06b6d4
+     style E fill:#1e3a5f,stroke:#3b82f6
+     style G fill:#065f46,stroke:#10b981
+     style I fill:#065f46,stroke:#10b981
+     style K fill:#4c1d95,stroke:#a855f7
+ `;
+
+ const validationDiagram = `
+ %%{init: {'theme': 'dark'}}%%
+ flowchart LR
+     A[New Knowledge] --> B[Validation Pipeline]
+     B --> C[Claude Opus]
+     B --> D[Gemini Pro]
+     B --> E[Perplexity]
+     C --> F{Consensus?}
+     D --> F
+     E --> F
+     F -->|2+ Agree Valid| G[Store Knowledge]
+     F -->|Suspicious| H[Flag for Review]
+     F -->|Fake| I[Reject]
+     
+     style C fill:#7c2d12,stroke:#f97316
+     style D fill:#4c1d95,stroke:#a855f7
+     style E fill:#164e63,stroke:#06b6d4
+     style G fill:#065f46,stroke:#10b981
+     style H fill:#78350f,stroke:#f59e0b
+     style I fill:#7f1d1d,stroke:#ef4444
+ `;
+
  
  const MemoryArchitectureSection = () => {
    const tierDiagramRef = useRef<HTMLDivElement>(null);
@@ -44,62 +105,7 @@
      }
    ];
  
-   const tierDiagram = `
- %%{init: {'theme': 'dark'}}%%
- flowchart TB
-     subgraph Conversation["Conversation Flow"]
-         A[User Message] --> B[Extract Context]
-     end
-     
-     subgraph Working["Working Memory (30 min)"]
-         B --> C[session_context]
-         C -->|Important| D{Promote?}
-     end
-     
-     subgraph ShortTerm["Short-Term (24 hr)"]
-         D -->|Yes| E[Temporary Storage]
-         E -->|Repeated| F{Consolidate?}
-     end
-     
-     subgraph LongTerm["Long-Term (Persistent)"]
-         F -->|Yes| G[ai_memory]
-         G --> H[Generate Embeddings]
-         H --> I[memory_vectors]
-     end
-     
-     subgraph Semantic["Semantic Core"]
-         I --> J[Claude Opus]
-         J --> K[Synthesized Themes]
-     end
-     
-     style C fill:#164e63,stroke:#06b6d4
-     style E fill:#1e3a5f,stroke:#3b82f6
-     style G fill:#065f46,stroke:#10b981
-     style I fill:#065f46,stroke:#10b981
-     style K fill:#4c1d95,stroke:#a855f7
- `;
  
-   const validationDiagram = `
- %%{init: {'theme': 'dark'}}%%
- flowchart LR
-     A[New Knowledge] --> B[Validation Pipeline]
-     B --> C[Claude Opus]
-     B --> D[Gemini Pro]
-     B --> E[Perplexity]
-     C --> F{Consensus?}
-     D --> F
-     E --> F
-     F -->|2+ Agree Valid| G[Store Knowledge]
-     F -->|Suspicious| H[Flag for Review]
-     F -->|Fake| I[Reject]
-     
-     style C fill:#7c2d12,stroke:#f97316
-     style D fill:#4c1d95,stroke:#a855f7
-     style E fill:#164e63,stroke:#06b6d4
-     style G fill:#065f46,stroke:#10b981
-     style H fill:#78350f,stroke:#f59e0b
-     style I fill:#7f1d1d,stroke:#ef4444
- `;
  
    useEffect(() => {
      const renderDiagrams = async () => {

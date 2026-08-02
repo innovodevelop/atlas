@@ -5,6 +5,44 @@
    ArrowRight, Zap, DollarSign, AlertTriangle 
  } from 'lucide-react';
  import mermaid from 'mermaid';
+
+ // Static mermaid source. MODULE SCOPE on purpose: as a const inside the
+ // component it is a fresh string every render, so naming it in the effect
+ // deps would re-run mermaid.render() on every render instead of once.
+ const routingDiagram = `
+ %%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#a855f7' }}}%%
+ flowchart LR
+     A[Task] --> B{Task Type?}
+     B -->|Planning| C[GPT-5]
+     B -->|Execution| D[Gemini Flash]
+     B -->|Research| E[Perplexity]
+     B -->|Memory| F[Claude Opus]
+     B -->|Creative| G[Claude Sonnet]
+     
+     style C fill:#4c1d95,stroke:#a855f7
+     style D fill:#1e3a5f,stroke:#3b82f6
+     style E fill:#164e63,stroke:#06b6d4
+     style F fill:#7c2d12,stroke:#f97316
+     style G fill:#4a1d4a,stroke:#d946ef
+ `;
+
+ const fallbackDiagram = `
+ %%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#a855f7' }}}%%
+ flowchart TB
+     A[Request] --> B[Primary Provider]
+     B -->|Success| C[Return Response]
+     B -->|Failure/Rate Limit| D{Check Fallback}
+     D -->|Available| E[Fallback Provider]
+     D -->|None| F[Return Error]
+     E -->|Success| C
+     E -->|Failure| F
+     
+     style B fill:#4c1d95,stroke:#a855f7
+     style E fill:#164e63,stroke:#06b6d4
+     style C fill:#065f46,stroke:#10b981
+     style F fill:#7f1d1d,stroke:#ef4444
+ `;
+
  
  const AIProvidersSection = () => {
    const routingDiagramRef = useRef<HTMLDivElement>(null);
@@ -62,39 +100,7 @@
      }
    ];
  
-   const routingDiagram = `
- %%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#a855f7' }}}%%
- flowchart LR
-     A[Task] --> B{Task Type?}
-     B -->|Planning| C[GPT-5]
-     B -->|Execution| D[Gemini Flash]
-     B -->|Research| E[Perplexity]
-     B -->|Memory| F[Claude Opus]
-     B -->|Creative| G[Claude Sonnet]
-     
-     style C fill:#4c1d95,stroke:#a855f7
-     style D fill:#1e3a5f,stroke:#3b82f6
-     style E fill:#164e63,stroke:#06b6d4
-     style F fill:#7c2d12,stroke:#f97316
-     style G fill:#4a1d4a,stroke:#d946ef
- `;
  
-   const fallbackDiagram = `
- %%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#a855f7' }}}%%
- flowchart TB
-     A[Request] --> B[Primary Provider]
-     B -->|Success| C[Return Response]
-     B -->|Failure/Rate Limit| D{Check Fallback}
-     D -->|Available| E[Fallback Provider]
-     D -->|None| F[Return Error]
-     E -->|Success| C
-     E -->|Failure| F
-     
-     style B fill:#4c1d95,stroke:#a855f7
-     style E fill:#164e63,stroke:#06b6d4
-     style C fill:#065f46,stroke:#10b981
-     style F fill:#7f1d1d,stroke:#ef4444
- `;
  
    useEffect(() => {
      const renderDiagrams = async () => {

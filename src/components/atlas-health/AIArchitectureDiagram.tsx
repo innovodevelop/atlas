@@ -12,57 +12,10 @@ import {
 } from 'lucide-react';
 import mermaid from 'mermaid';
 
-interface ProviderStatus {
-  name: string;
-  connected: boolean;
-  icon: React.ReactNode;
-  description: string;
-  models: string[];
-  tier: string;
-}
-
-const AIArchitectureDiagram = () => {
-  const diagramRef = useRef<HTMLDivElement>(null);
-  const [isRendered, setIsRendered] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Provider status based on typical configuration
-  const providers: ProviderStatus[] = [
-    {
-      name: 'Anthropic Claude',
-      connected: true, // The only remote reasoning provider Atlas talks to
-      icon: <Brain className="w-4 h-4" />,
-      description: 'The only remote model provider — reasoning, chat, synthesis',
-      models: ['claude-opus (hard)', 'claude-sonnet (standard)', 'claude-haiku (cheap)'],
-      tier: 'Reasoning'
-    },
-    {
-      name: 'Local Embeddings',
-      connected: true, // Bundled with the brain sidecar, no key needed
-      icon: <Cpu className="w-4 h-4" />,
-      description: 'On-device multilingual-e5-base ONNX — text never leaves the Mac',
-      models: ['multilingual-e5-base (768d, int8)'],
-      tier: 'On-device'
-    },
-    {
-      name: 'Local Recall',
-      connected: true, // SQLite ships with the app
-      icon: <Database className="w-4 h-4" />,
-      description: 'SQLite memory store with sqlite-vec KNN + FTS5 keyword search',
-      models: ['sqlite-vec (vec0)', 'FTS5'],
-      tier: 'On-device'
-    },
-    {
-      name: 'ElevenLabs',
-      connected: true, // Key lives in the macOS Keychain
-      icon: <Sparkles className="w-4 h-4" />,
-      description: 'Voice only — TTS and Scribe STT via the local voice gateway',
-      models: ['Scribe (STT)', 'TTS'],
-      tier: 'Voice'
-    }
-  ];
-
-  const diagramDefinition = `
+ // Static mermaid source. MODULE SCOPE on purpose: as a const inside the
+ // component it is a fresh string every render, so naming it in the effect
+ // deps would re-run mermaid.render() on every render instead of once.
+ const diagramDefinition = `
 %%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#a855f7', 'primaryTextColor': '#fff', 'primaryBorderColor': '#a855f7', 'lineColor': '#6b7280', 'secondaryColor': '#1f2937', 'tertiaryColor': '#111827' }}}%%
 graph TB
     subgraph Frontend["Frontend (React webview)"]
@@ -127,6 +80,58 @@ graph TB
     class L local
     class M,N,O storage
 `;
+
+
+interface ProviderStatus {
+  name: string;
+  connected: boolean;
+  icon: React.ReactNode;
+  description: string;
+  models: string[];
+  tier: string;
+}
+
+const AIArchitectureDiagram = () => {
+  const diagramRef = useRef<HTMLDivElement>(null);
+  const [isRendered, setIsRendered] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Provider status based on typical configuration
+  const providers: ProviderStatus[] = [
+    {
+      name: 'Anthropic Claude',
+      connected: true, // The only remote reasoning provider Atlas talks to
+      icon: <Brain className="w-4 h-4" />,
+      description: 'The only remote model provider — reasoning, chat, synthesis',
+      models: ['claude-opus (hard)', 'claude-sonnet (standard)', 'claude-haiku (cheap)'],
+      tier: 'Reasoning'
+    },
+    {
+      name: 'Local Embeddings',
+      connected: true, // Bundled with the brain sidecar, no key needed
+      icon: <Cpu className="w-4 h-4" />,
+      description: 'On-device multilingual-e5-base ONNX — text never leaves the Mac',
+      models: ['multilingual-e5-base (768d, int8)'],
+      tier: 'On-device'
+    },
+    {
+      name: 'Local Recall',
+      connected: true, // SQLite ships with the app
+      icon: <Database className="w-4 h-4" />,
+      description: 'SQLite memory store with sqlite-vec KNN + FTS5 keyword search',
+      models: ['sqlite-vec (vec0)', 'FTS5'],
+      tier: 'On-device'
+    },
+    {
+      name: 'ElevenLabs',
+      connected: true, // Key lives in the macOS Keychain
+      icon: <Sparkles className="w-4 h-4" />,
+      description: 'Voice only — TTS and Scribe STT via the local voice gateway',
+      models: ['Scribe (STT)', 'TTS'],
+      tier: 'Voice'
+    }
+  ];
+
 
   useEffect(() => {
     const renderDiagram = async () => {

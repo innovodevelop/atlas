@@ -36,6 +36,7 @@ const MOCK_STOCKS: StockData[] = [
 export const useStocks = (symbols: string[]) => {
   // Stabilize symbols for memoization
   const symbolsKey = useMemo(() => JSON.stringify(symbols.slice().sort()), [symbols]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: callers pass fresh array literals every render; keying on the serialized value is the whole point, depending on `symbols` would defeat the stabilization
   const stableSymbols = useMemo(() => symbols, [symbolsKey]);
 
   const fallbackData = useMemo(

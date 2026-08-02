@@ -4,12 +4,11 @@
  import mermaid from 'mermaid';
  import ConceptCard from './ConceptCard';
  import TechStackTable from './TechStackTable';
- 
- const ArchitectureOverview = () => {
-   const diagramRef = useRef<HTMLDivElement>(null);
-   const [isRendered, setIsRendered] = useState(false);
- 
-   const systemDiagram = `
+
+ // Static mermaid source. MODULE SCOPE on purpose: as a const inside the
+ // component it is a fresh string every render, so naming it in the effect
+ // deps would re-run mermaid.render() on every render instead of once.
+ const systemDiagram = `
  %%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#a855f7', 'primaryTextColor': '#fff', 'lineColor': '#6b7280' }}}%%
  graph TB
      subgraph User["User Interface"]
@@ -68,6 +67,12 @@
      class I,J,K ai
      class L,M,N storage
  `;
+
+ 
+ const ArchitectureOverview = () => {
+   const diagramRef = useRef<HTMLDivElement>(null);
+   const [isRendered, setIsRendered] = useState(false);
+ 
  
    useEffect(() => {
      const renderDiagram = async () => {

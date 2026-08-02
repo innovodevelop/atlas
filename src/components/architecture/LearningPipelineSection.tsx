@@ -5,44 +5,11 @@
    Clock, Brain, Zap, RefreshCw 
  } from 'lucide-react';
  import mermaid from 'mermaid';
- 
- const LearningPipelineSection = () => {
-   const pipelineDiagramRef = useRef<HTMLDivElement>(null);
-   const [pipelineRendered, setPipelineRendered] = useState(false);
- 
-   const scheduledJobs = [
-     { name: 'News Pulse', interval: 'Every 15 min', icon: Newspaper, color: 'cyan', description: 'Fetches breaking news and trending topics' },
-     { name: 'Brain Orchestrator', interval: 'Every 30 min', icon: Brain, color: 'primary', description: 'Coordinates all learning activities' },
-     { name: 'Topic Discovery', interval: 'Every 1 hour', icon: Lightbulb, color: 'amber', description: 'Identifies knowledge gaps and new topics' },
-     { name: 'Batch Validation', interval: 'Every 2 hours', icon: Shield, color: 'emerald', description: 'Validates pending knowledge entries' },
-     { name: 'Memory Consolidation', interval: 'Every 6 hours', icon: Database, color: 'blue', description: 'Consolidates and deduplicates memory' },
-     { name: 'Full Synthesis', interval: 'Daily 2 AM', icon: RefreshCw, color: 'orange', description: 'Deep synthesis via Claude Opus' },
-   ];
- 
-   const pipelineStages = [
-     {
-       name: 'Collection',
-       description: 'News Pulse and Topic Discovery gather raw information from multiple sources.',
-       sources: ['NewsAPI', 'Perplexity Trending', 'User Conversations', 'Web Search']
-     },
-     {
-       name: 'Research',
-       description: 'Topics are queued and processed in parallel with priority scoring.',
-       features: ['Priority Queue', 'Parallel Processing', 'Depth Control', 'Source Tracking']
-     },
-     {
-       name: 'Validation',
-       description: 'Multi-model consensus ensures accuracy before storage.',
-       validators: ['Claude Opus', 'Gemini Pro', 'Perplexity']
-     },
-     {
-       name: 'Storage',
-       description: 'Validated knowledge is embedded and stored with full audit trail.',
-       outputs: ['Knowledge Entries', 'Vector Embeddings', 'Audit Logs']
-     }
-   ];
- 
-   const pipelineDiagram = `
+
+ // Static mermaid source. MODULE SCOPE on purpose: as a const inside the
+ // component it is a fresh string every render, so naming it in the effect
+ // deps would re-run mermaid.render() on every render instead of once.
+ const pipelineDiagram = `
  %%{init: {'theme': 'dark'}}%%
  flowchart TB
      subgraph Collection["Phase 1: Collection"]
@@ -90,6 +57,44 @@
      style R fill:#065f46,stroke:#10b981
      style S fill:#065f46,stroke:#10b981
  `;
+
+ 
+ const LearningPipelineSection = () => {
+   const pipelineDiagramRef = useRef<HTMLDivElement>(null);
+   const [pipelineRendered, setPipelineRendered] = useState(false);
+ 
+   const scheduledJobs = [
+     { name: 'News Pulse', interval: 'Every 15 min', icon: Newspaper, color: 'cyan', description: 'Fetches breaking news and trending topics' },
+     { name: 'Brain Orchestrator', interval: 'Every 30 min', icon: Brain, color: 'primary', description: 'Coordinates all learning activities' },
+     { name: 'Topic Discovery', interval: 'Every 1 hour', icon: Lightbulb, color: 'amber', description: 'Identifies knowledge gaps and new topics' },
+     { name: 'Batch Validation', interval: 'Every 2 hours', icon: Shield, color: 'emerald', description: 'Validates pending knowledge entries' },
+     { name: 'Memory Consolidation', interval: 'Every 6 hours', icon: Database, color: 'blue', description: 'Consolidates and deduplicates memory' },
+     { name: 'Full Synthesis', interval: 'Daily 2 AM', icon: RefreshCw, color: 'orange', description: 'Deep synthesis via Claude Opus' },
+   ];
+ 
+   const pipelineStages = [
+     {
+       name: 'Collection',
+       description: 'News Pulse and Topic Discovery gather raw information from multiple sources.',
+       sources: ['NewsAPI', 'Perplexity Trending', 'User Conversations', 'Web Search']
+     },
+     {
+       name: 'Research',
+       description: 'Topics are queued and processed in parallel with priority scoring.',
+       features: ['Priority Queue', 'Parallel Processing', 'Depth Control', 'Source Tracking']
+     },
+     {
+       name: 'Validation',
+       description: 'Multi-model consensus ensures accuracy before storage.',
+       validators: ['Claude Opus', 'Gemini Pro', 'Perplexity']
+     },
+     {
+       name: 'Storage',
+       description: 'Validated knowledge is embedded and stored with full audit trail.',
+       outputs: ['Knowledge Entries', 'Vector Embeddings', 'Audit Logs']
+     }
+   ];
+ 
  
    useEffect(() => {
      const renderDiagram = async () => {

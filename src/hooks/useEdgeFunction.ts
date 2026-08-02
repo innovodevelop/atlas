@@ -22,6 +22,7 @@ export function useEdgeFunction<T>(
   
   // Stabilize body reference
   const bodyKey = useMemo(() => JSON.stringify(body), [body]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: callers pass fresh object literals every render; keying on the serialized value is the whole point, depending on `body` would defeat the stabilization
   const stableBody = useMemo(() => body, [bodyKey]);
 
   const fetcher = useCallback(async (): Promise<T> => {

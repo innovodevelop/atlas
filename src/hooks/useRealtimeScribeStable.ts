@@ -257,6 +257,12 @@ export const useRealtimeScribeStable = (options: UseRealtimeScribeOptions = {}) 
 
   const isListening = scribe.isConnected && isSpeaking;
 
+  /* eslint-disable react-hooks/exhaustive-deps --
+     Unmount-only cleanup. The rule wants the ref copied to a local at effect
+     SETUP time, which is precisely wrong here: these refs hold timeout ids that
+     are reassigned throughout the session, so a value captured at mount would be
+     stale (usually null) and we would leak the live timers. Reading .current at
+     cleanup time is the intended behaviour. */
   useEffect(() => {
     return () => {
       if (speechTimeoutRef.current) {
@@ -267,6 +273,7 @@ export const useRealtimeScribeStable = (options: UseRealtimeScribeOptions = {}) 
       }
     };
   }, []);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   return {
     isConnected: scribe.isConnected,

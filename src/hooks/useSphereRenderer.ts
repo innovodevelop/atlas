@@ -46,6 +46,7 @@ export function useSphereRenderer(
   options: UseSphereRendererOptions = {}
 ): SphereRenderState {
   const [state, setState] = useState<SphereRenderState>(DEFAULT_STATE);
+  const { onResize } = options;
   const configRef = useRef<AtlasSphereConfig>({ ...defaultSphereConfig, ...options.config });
   
   // Update config when options change
@@ -81,7 +82,7 @@ export function useSphereRenderer(
       
       const newState = calculateState(width, height);
       setState(newState);
-      options.onResize?.(newState);
+      onResize?.(newState);
     };
 
     const observer = new ResizeObserver(handleResize);
@@ -91,7 +92,7 @@ export function useSphereRenderer(
     handleResize();
 
     return () => observer.disconnect();
-  }, [containerRef, calculateState, options.onResize]);
+  }, [containerRef, calculateState, onResize]);
 
   return state;
 }
