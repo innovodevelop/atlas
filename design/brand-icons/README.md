@@ -20,22 +20,37 @@ and cool blue (`#b0bee8`), depth-sorted so nearer overlaps farther.
 regenerated from the padded PNG via `tauri icon`). A and B are kept for other
 graphic uses.
 
+## Sizing — read before retuning
+
+The mark is **built for the dock, not for the design canvas.** The first
+version was tuned by eye at 512px and effectively vanished at icon sizes: the
+sphere covered 59% of the tile, its bright core only 29%, and the largest
+particle was `r=3.3` in a 512 space — about **a third of a pixel** once scaled
+to a 48px dock icon. Atlas showed up as a nearly empty blue square.
+
+Current tuning: sphere **~73% of the tile**, particles `r=1.5..6.3`, opacity
+floor `0.48` (the faint outer shell is the first thing to disappear when
+downscaled).
+
+If you retune, **compare at 128 / 64 / 48 / 32 / 16px before committing.** There
+is a real trade-off: pushing further (sphere 80%, particles ×2.2) reads better
+at 16px but clumps into a mass at 128px and loses the fine shimmer.
+
 ## Regenerating
 
-`gen-particles.mjs` (Bun) generates the full-bleed 512 favicons for A/B/C
-(Fibonacci-sphere directions, orthographic projection, depth-graded size/opacity/
-colour). Tune counts/sizes at the bottom of the file.
+`gen-particles.mjs` (Bun) generates all four SVGs — the three full-bleed 512
+variants under their committed filenames, plus the padded 1024 app-icon layout
+for variant C. Fibonacci-sphere directions, orthographic projection,
+depth-graded size/opacity/colour. Tune counts/sizes/radii near the bottom.
 
 ```bash
-bun design/brand-icons/gen-particles.mjs   # writes favicon-{layered,volumetric,blend}.svg
+bun design/brand-icons/gen-particles.mjs
+bun run tauri icon design/brand-icons/atlas-appicon-C-blend-padded.svg
+cp design/brand-icons/atlas-sphere-C-blend.svg public/favicon.svg
+cp design/brand-icons/atlas-sphere-C-blend.svg ../atlas-site/public/favicon.svg
 ```
 
-To rebuild the macOS icon from variant C:
+`tauri icon` takes the **SVG directly** — no rasteriser needed, despite what an
+earlier version of this file said about `@resvg/resvg-js`.
 
-```bash
-# 1. make the padded 1024 PNG (needs @resvg/resvg-js) from the padded SVG
-# 2. bun run tauri icon <path-to-1024.png>   # regenerates src-tauri/icons/*
-```
-
-Never hand-edit `src-tauri/icons/*` — regenerate from the SVG so every size stays
-in sync.
+Never hand-edit `src-tauri/icons/*` — regenerate so every size stays in sync.
