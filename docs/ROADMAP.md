@@ -138,22 +138,34 @@ all of them or say which one you audited.
 |---|---|
 | SESv2 outbound sending | ✅ built — `atlas-mail/src/ses.ts`, vendored SigV4, `SES_REGION=eu-central-1`, sandbox behaviour handled (`c9bef50`) |
 | S3 blob helper | ✅ built — `atlas-mail/src/s3.ts` (`s3PutObject` / `s3GetObject`) (`9b4530f`) |
-| `r2_key` → `blob_key` | ✅ code done (`3333cb3` + `54e1970`) — **migration + deploy still pending** |
+| `r2_key` → `blob_key` | ✅ **shipped 2026-08-02** — migration applied to remote D1, worker deployed (version `8790b280`), `/health` 200 |
 | Bedrock live through our own signer | ✅ **verified 2026-08-02** — HTTP 200, `[bedrockAdapter] eu.anthropic.claude-sonnet-4-6`, real completion returned |
 | Updater release home (S3/CloudFront) | ❌ still GitHub releases — needs a decision, not code |
 | SES production access | ⛔ user gate — ~24h AWS request; sandbox only until then |
 
-**Immediate next action, in this order** (order matters — the reverse breaks
-attachment ingest):
+**Done 2026-08-02.** Migration applied to remote D1, then worker deployed
+(`8790b280`, `/health` 200). The migration also created `mail_send_errors`,
+which was missing remotely — so until now every SES send failure was being
+swallowed by the `catch` in `store.ts` and recorded nowhere.
 
-```
-cd atlas-mail
-wrangler d1 execute atlas-mail --remote --file migrations/0002_blob_key.sql
-bun run deploy
-```
+### ⛔ Sending is deployed but cannot authenticate
 
-The migration is backwards-compatible with the currently-deployed worker, so the
-window between the two steps is safe.
+`wrangler secret list` on atlas-mail returns **only `AUTH_JWT_SECRET`**. The
+SES path needs `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` as worker
+secrets, and they were never set. The route fails closed with
+`500 "Sending is not configured (missing AWS credentials)"` (`index.ts:245`) —
+correct behaviour, but it means outbound mail has never been able to work,
+independently of the Workers Paid question.
+
+**This needs a decision, not just a command.** The obvious move is to copy the
+AWS key pair the app already uses for Bedrock out of the Keychain and into
+Cloudflare. Do not do that without thinking: those credentials can invoke
+Bedrock, and putting them in a Worker widens their blast radius from "this Mac"
+to "anything that can read this Worker's environment".
+
+The right shape is a **separate IAM user scoped to `ses:SendEmail` on the
+verified identity only** — then a leak costs email sending, not model inference.
+That IAM user does not exist yet.
 
 ### W-SHIP in detail
 
