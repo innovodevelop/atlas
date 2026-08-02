@@ -1,5 +1,8 @@
 # Atlas Mac App — Conversion Guide
 
+> **SUPERSEDED (2026-08-02).** Kept for history only — do not act on
+> this document. Current state and open work: `docs/ROADMAP.md`.
+
 Everything code-side is done on the `mac-app-conversion` branch. This file
 covers the manual steps only you can do (accounts, keys, deploys) and how to
 verify each phase.

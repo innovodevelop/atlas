@@ -31,6 +31,39 @@ import { AccountMenu } from '@/components/atlas-ui/AccountMenu';
 
 export type AtlasExpandedKey = 'weather' | 'calendar' | 'tasks' | 'stocks' | 'email' | 'news' | 'music' | null;
 
+/**
+ * Run `commit` after `ms` — but never later than the user's next sign of life.
+ *
+ * A plain setTimeout is not safe for anything that gates interaction. WKWebView
+ * throttles timers hard when the window is not key, so a transition that
+ * disables pointer events "for 340ms" can stay disabled indefinitely if the
+ * user switches away and back. That is exactly how the dashboard ended up
+ * scrollable but completely unclickable.
+ *
+ * So we race the timer against the first pointer/key/focus/visibility event
+ * that arrives once the duration has actually elapsed (wall-clock, not timer
+ * ticks). Whichever fires first commits, once.
+ */
+function commitAfter(ms: number, commit: () => void): void {
+  const start = Date.now();
+  const WAKE = ['pointerdown', 'keydown', 'focus', 'visibilitychange'] as const;
+  let done = false;
+
+  const finish = () => {
+    if (done) return;
+    done = true;
+    window.clearTimeout(timer);
+    WAKE.forEach((e) => window.removeEventListener(e, onWake, true));
+    commit();
+  };
+  // Only rescue AFTER the animation would have finished, so an early click
+  // during the transition does not cut the motion short.
+  const onWake = () => { if (Date.now() - start >= ms) finish(); };
+
+  const timer = window.setTimeout(finish, ms);
+  WAKE.forEach((e) => window.addEventListener(e, onWake, true));
+}
+
 const AtlasDashboard = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
@@ -74,9 +107,15 @@ const AtlasDashboard = () => {
   }, [user, authLoading, navigate]);
 
   // Open a widget: fold the grid up into Atlas, then mount the focused view.
+  //
+  // commitAfter, not a bare setTimeout. Both of these transitions disable
+  // interaction while they run (`.gridB.folding` sets pointer-events:none), and
+  // WKWebView defers — occasionally drops — timers when the window is not key.
+  // A single lost timer therefore left the entire card grid permanently
+  // unclickable with no error and nothing on screen to explain it.
   const openWidget = useCallback((key: Exclude<AtlasExpandedKey, null>) => {
     setGridFolding(true);
-    window.setTimeout(() => { setExpanded(key); setGridFolding(false); }, 340);
+    commitAfter(340, () => { setExpanded(key); setGridFolding(false); });
   }, []);
 
   // Close: slide the focused view out, then bring the grid back (folds in on remount).
@@ -84,7 +123,7 @@ const AtlasDashboard = () => {
     setExpanded((cur) => {
       if (!cur) return cur;
       setViewExiting(true);
-      window.setTimeout(() => { setExpanded(null); setViewExiting(false); }, 300);
+      commitAfter(300, () => { setExpanded(null); setViewExiting(false); });
       return cur;
     });
   }, []);

@@ -1,5 +1,8 @@
 # Atlas — Strategy-Anchored Codebase Audit
 
+> **SUPERSEDED (2026-08-02).** Kept for history only — do not act on
+> this document. Current state and open work: `docs/ROADMAP.md`.
+
 **Date:** 2026-07-24 · **Commit:** `3e54e86` on `atlas-redesign` · **Method:** read-only sweep by six parallel evidence agents + one adversarial verification pass; every claim below cites `path:line`. Sibling repo `../atlas-site` included where relevant.
 
 ---

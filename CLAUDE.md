@@ -63,10 +63,18 @@ Supabase is gone. Local-first is the architecture, not a migration in progress.
   the app.
 - **Everything else local:** data-fetch (weather/stocks/news) → Rust;
   ElevenLabs → voice gateway; scheduler → local Tauri background task.
-- **Remaining cleanup (not this app's runtime):** `@supabase/supabase-js` /
-  `supabase` CLI / `postgres` deps, `tests/auth.spec.ts`, and
-  `supabase/migrations/` still reference the old stack and are tracked as
-  follow-up removals — they don't affect the shipped app.
+- **Inert leftovers (cosmetic only):** `@supabase/supabase-js` / `supabase` CLI
+  / `postgres` deps, `tests/auth.spec.ts` and `supabase/migrations/` are still
+  in the tree but sit on **no runtime path**. Other docs describe Supabase as
+  "fully excised" — both statements are true and describe the same thing:
+  excised from every code path, not yet deleted from disk.
+
+## Where the plan lives
+
+**`docs/ROADMAP.md` is the single source of truth** for what is done and what is
+outstanding. Planning state used to be spread across five disagreeing sources,
+so work was recorded as pending long after it shipped. Add phases, stages and
+open items there — not to a new doc.
 
 ## Commands (native steps are macOS-only)
 

@@ -135,8 +135,13 @@ const App = () => (
           {/* First-run consent. Reachable again from Settings so choices are revisitable. */}
           <Route path="/permissions" element={<AtlasPermissions />} />
 
-          {/* Legacy Atlas Core health dashboard (settings still live here until
-              wired into the Workshop app) */}
+          {/* Legacy Atlas Core health dashboard. NOTE: the old comment here said
+              settings "still live here until wired into the Workshop app" —
+              they were wired in long ago (AtlasSettings mounts VoiceSettings,
+              MemoryPrivacy, Personality and SoftwareUpdate directly), so most of
+              the ~38 components under components/atlas-health/ are now orphaned.
+              Unlinked from the UI; reachable only by typing the URL. See
+              docs/ROADMAP.md before reviving or deleting any of it. */}
           <Route
             path="/atlas-core-legacy"
             element={

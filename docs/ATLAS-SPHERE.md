@@ -1,5 +1,8 @@
 # Atlas Sphere 3D Visualization System
 
+> **SUPERSEDED (2026-08-02).** Kept for history only — do not act on
+> this document. Current state and open work: `docs/ROADMAP.md`.
+
 Technical documentation for the Atlas Sphere, a dynamic 3D visualization that responds to AI state and audio input.
 
 ## Overview

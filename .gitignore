@@ -33,3 +33,8 @@ tsconfig.node.tsbuildinfo
 # Local CI parity runner artifacts
 .ci-logs/
 services/voice-gateway/vad.out
+
+# Wake-word training scratch: multi-GB downloads, two nested git clones, and the
+# ACAV100M feature set — which is CC BY-NC-SA 4.0 and must never enter this repo.
+scripts/train-wakeword/work/
+scripts/train-wakeword/output/
