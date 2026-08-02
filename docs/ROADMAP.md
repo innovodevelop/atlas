@@ -125,12 +125,41 @@ landed" was wrong. Verified against the tree on 2026-08-02:
 | **W-SUPA** — finish Supabase removal | ✅ done | `6208892` (34 edge fns, client alias, 3 shim bugs) + `6b16d45` (last 3 npm deps) |
 | **W-AUTH** — audit + harden auth | ✅ mostly | login/signup wrap D1 access; `auth_attempts` pruning exists in `login.ts` |
 | **W-CI** — permanent CI fix | ✅ done | `bun run ci` → `scripts/ci/run.sh`, `scripts/hooks/pre-push`. **Its tail sat uncommitted for days** — the `RUN_LIVE_AUTH_TESTS` gating only landed in `41fcc35` |
-| **W-AWS** — complete the AWS migration | ❌ **not done** | No SES send path anywhere. Updater still points at GitHub releases, not S3/CloudFront. `r2_key` → `blob_key` never migrated (`src/types/mail.ts`) |
+| **W-AWS** — complete the AWS migration | 🟡 **mostly built, not deployed** | See the correction below — an earlier version of this row said "no SES send path anywhere", which was wrong: it searched only this repo, and the work lives in the sibling `atlas-mail` repo |
 | **W-SHIP** (Stage 2) — build + runtime verify | ❌ **not done** | Atlas Mail 6b–6d still never runtime-executed; the privacy delta is still undeployed, which was W-SHIP's final step |
 
-So the outstanding half is **W-AWS and W-SHIP**, and their open items are already
-listed above: SES sending, the updater release home, the `r2_key` migration, the
-mail runtime verification, and the privacy-policy deploy.
+### W-AWS in detail (corrected 2026-08-02)
+
+Most of it **is built** — in `atlas-mail`, a sibling repo, which is why a
+helloatlas-only grep concluded it did not exist. Atlas spans four repos; audit
+all of them or say which one you audited.
+
+| Piece | State |
+|---|---|
+| SESv2 outbound sending | ✅ built — `atlas-mail/src/ses.ts`, vendored SigV4, `SES_REGION=eu-central-1`, sandbox behaviour handled (`c9bef50`) |
+| S3 blob helper | ✅ built — `atlas-mail/src/s3.ts` (`s3PutObject` / `s3GetObject`) (`9b4530f`) |
+| `r2_key` → `blob_key` | ✅ code done (`3333cb3` + `54e1970`) — **migration + deploy still pending** |
+| Bedrock live through our own signer | ✅ **verified 2026-08-02** — HTTP 200, `[bedrockAdapter] eu.anthropic.claude-sonnet-4-6`, real completion returned |
+| Updater release home (S3/CloudFront) | ❌ still GitHub releases — needs a decision, not code |
+| SES production access | ⛔ user gate — ~24h AWS request; sandbox only until then |
+
+**Immediate next action, in this order** (order matters — the reverse breaks
+attachment ingest):
+
+```
+cd atlas-mail
+wrangler d1 execute atlas-mail --remote --file migrations/0002_blob_key.sql
+bun run deploy
+```
+
+The migration is backwards-compatible with the currently-deployed worker, so the
+window between the two steps is safe.
+
+### W-SHIP in detail
+
+Bedrock is now verified live (above), which was its first checkpoint. What
+remains is Atlas Mail 6b–6d runtime verification — still true that no `mail_*`
+Tauri command has ever executed — and the privacy-policy deploy.
 
 Worth noting *why* this went unnoticed: W-CI's work was complete on disk but
 uncommitted, so the tree looked further along than git did. Uncommitted work is
