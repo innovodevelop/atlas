@@ -1,192 +1,259 @@
 /**
- * Workstream A acceptance tests — auth hardening.
+ * Auth API tests — production auth on Cloudflare Pages Functions + D1.
  *
  * Run with: bun test tests/auth.spec.ts
  *
- * Static config-discipline tests always run. The LIVE tests (hitting a
- * deployed project from .env) only run when explicitly opted in:
- *   RUN_LIVE_AUTH_TESTS=1 bun test tests/auth.spec.ts
- * Written BEFORE the fix, so on the unhardened deploy the core live tests
- * FAIL (chat-with-memory returns 200 to anonymous callers). After hardening
- * they must pass.
+ * Targets the live endpoints at https://helloatlas.dk (override with
+ * ATLAS_AUTH_BASE):
+ *   POST /api/auth/signup    { email, password } -> { userId, email, token, entitlement }
+ *   POST /api/auth/login     { email, password } -> { userId, email, token, entitlement }
+ *   POST /api/auth/verify    Bearer or { token } -> { valid, userId, email }
+ *   GET  /api/me             Bearer              -> entitlement snapshot
+ *   POST /api/account/delete Bearer              -> account erased
  *
- * Cross-user isolation tests need two real accounts; provide them via env:
- *   TEST_USER_A_EMAIL / TEST_USER_A_PASSWORD
- *   TEST_USER_B_EMAIL / TEST_USER_B_PASSWORD
- * Those tests are skipped when the env vars are absent.
+ * Static tests (request-shape / config discipline) always run and need no
+ * network. The LIVE tests hit production and are OPT-IN:
+ *   RUN_LIVE_AUTH_TESTS=1 bun test tests/auth.spec.ts
+ * They are safe against production: the lifecycle test uses a throwaway
+ * e2e-test-<epoch>@example.com account that is always deleted (try/finally),
+ * and the suite stays far below the login throttle (10 fails / 15 min per
+ * email+IP) by spending at most ONE failed login per email.
  */
 import { describe, expect, test } from "bun:test";
-import { createClient } from "@supabase/supabase-js";
-
 import { readFileSync } from "node:fs";
 
-function readEnvFile(): Record<string, string> {
-  const out: Record<string, string> = {};
-  try {
-    const txt = readFileSync(new URL("../.env", import.meta.url), "utf8");
-    for (const line of txt.split("\n")) {
-      const m = line.match(/^([A-Z0-9_]+)="?([^"\n]*)"?$/);
-      if (m) out[m[1]] = m[2];
+const AUTH_BASE = (process.env.ATLAS_AUTH_BASE ?? "https://helloatlas.dk").replace(/\/$/, "");
+
+const ENDPOINTS = {
+  signup: "/api/auth/signup",
+  login: "/api/auth/login",
+  verify: "/api/auth/verify",
+  me: "/api/me",
+  accountDelete: "/api/account/delete",
+} as const;
+
+const api = (path: string) => `${AUTH_BASE}${path}`;
+
+// Mirrors the server-side signup validation (atlas-site functions/api/auth/signup.ts).
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const MIN_PASSWORD_LENGTH = 8;
+
+// Throwaway-account email: unique per call even within the same millisecond.
+let emailSeq = 0;
+const testEmail = () => `e2e-test-${Date.now()}-${emailSeq++}@example.com`;
+
+async function postJson(path: string, body: unknown, token?: string): Promise<Response> {
+  return fetch(api(path), {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+const readRepoFile = (rel: string) => readFileSync(new URL(`../${rel}`, import.meta.url), "utf8");
+
+// ---------------------------------------------------------------------------
+// Static tests — request shape + config discipline; no live server needed.
+// ---------------------------------------------------------------------------
+
+describe("static — endpoint + payload shape", () => {
+  test("endpoint builder produces absolute https URLs on the auth origin", () => {
+    for (const path of Object.values(ENDPOINTS)) {
+      const url = new URL(api(path));
+      expect(url.protocol).toBe("https:");
+      expect(url.origin + url.pathname).toBe(api(path)); // no query/fragment sneaking in
+      expect(url.pathname).toBe(path);
     }
-  } catch { /* .env optional; fall back to process env */ }
-  return out;
-}
-
-const fileEnv = readEnvFile();
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? fileEnv.VITE_SUPABASE_URL;
-const PUBLISHABLE_KEY =
-  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? fileEnv.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-// Live tests hit a deployed project and are OPT-IN: set RUN_LIVE_AUTH_TESTS=1
-// (plus the URL/key) to run them. Previously they ran whenever .env carried
-// VITE_SUPABASE_URL, which made them fail locally against the dead Supabase
-// project while silently skipping in CI — the inverse of useful. The static
-// config-discipline tests always run. The live tests are kept (not deleted)
-// because the URLs may point at helloatlas.dk targets later.
-const liveOptIn = process.env.RUN_LIVE_AUTH_TESTS === "1";
-const haveLiveTarget = liveOptIn && Boolean(SUPABASE_URL && PUBLISHABLE_KEY);
-
-const FN = (name: string) => `${SUPABASE_URL}/functions/v1/${name}`;
-
-/** Functions that must reject anonymous callers once hardened. */
-const USER_SCOPED_SAMPLE = [
-  "chat-with-memory",
-  "elevenlabs-tts",
-  "elevenlabs-stt",
-  "tool-gateway",
-  "semantic-search",
-  "mail-oauth-start",
-];
-
-const A_EMAIL = process.env.TEST_USER_A_EMAIL;
-const A_PASSWORD = process.env.TEST_USER_A_PASSWORD;
-const B_EMAIL = process.env.TEST_USER_B_EMAIL;
-const B_PASSWORD = process.env.TEST_USER_B_PASSWORD;
-const haveTwoUsers = Boolean(A_EMAIL && A_PASSWORD && B_EMAIL && B_PASSWORD);
-
-async function signIn(email: string, password: string) {
-  const client = createClient(SUPABASE_URL!, PUBLISHABLE_KEY!);
-  const { data, error } = await client.auth.signInWithPassword({ email, password });
-  if (error || !data.session) throw new Error(`sign-in failed for ${email}: ${error?.message}`);
-  return { client, session: data.session, userId: data.user!.id };
-}
-
-describe("A1 — anonymous callers are rejected", () => {
-  test.skipIf(!haveLiveTarget)("chat-with-memory with NO Authorization header → 401", async () => {
-    const res = await fetch(FN("chat-with-memory"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: [{ role: "user", content: "ping" }] }),
-    });
-    expect(res.status).toBe(401);
   });
 
-  test.skipIf(!haveLiveTarget)("chat-with-memory with only the publishable key as bearer → 401", async () => {
-    // The publishable key is NOT a user identity. Pre-fix the app called this way.
-    const res = await fetch(FN("chat-with-memory"), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${PUBLISHABLE_KEY}`,
-        apikey: PUBLISHABLE_KEY!,
-      },
-      body: JSON.stringify({ messages: [{ role: "user", content: "ping" }] }),
-    });
-    expect(res.status).toBe(401);
+  test("throwaway test emails pass the server's email validation and are unique", () => {
+    const a = testEmail();
+    const b = testEmail();
+    expect(a).toMatch(/^e2e-test-\d+-\d+@example\.com$/);
+    expect(EMAIL_RE.test(a)).toBe(true);
+    expect(a.length).toBeLessThanOrEqual(254); // server rejects >254
+    expect(a).not.toBe(b);
   });
 
-  for (const fn of USER_SCOPED_SAMPLE) {
-    test.skipIf(!haveLiveTarget)(`${fn} anonymous POST → 401`, async () => {
-      const res = await fetch(FN(fn), {
-        method: "POST",
-        headers: { "Content-Type": "application/json", apikey: PUBLISHABLE_KEY! },
-        body: JSON.stringify({}),
+  test("credential payload serializes to the exact shape the API expects", () => {
+    const body = JSON.parse(JSON.stringify({ email: "user@example.com", password: "hunter22" }));
+    expect(Object.keys(body).sort()).toEqual(["email", "password"]);
+    expect(typeof body.email).toBe("string");
+    expect(typeof body.password).toBe("string");
+    expect(body.password.length).toBeGreaterThanOrEqual(MIN_PASSWORD_LENGTH);
+  });
+
+  test("app auth client targets the same endpoints and default base", () => {
+    const src = readRepoFile("src/lib/authClient.ts");
+    for (const path of [ENDPOINTS.signup, ENDPOINTS.login, ENDPOINTS.me, ENDPOINTS.accountDelete]) {
+      expect(src).toContain(path);
+    }
+    expect(src).toContain("https://helloatlas.dk");
+    expect(src).not.toContain("supabase-js"); // auth must never regress to the dead stack
+  });
+
+  test("package.json carries no Supabase dependencies", () => {
+    const pkg = JSON.parse(readRepoFile("package.json")) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    const all = { ...pkg.dependencies, ...pkg.devDependencies };
+    expect(Object.keys(all).filter((d) => d === "supabase" || d.startsWith("@supabase/"))).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Live tests — hit production; opt-in via RUN_LIVE_AUTH_TESTS=1.
+// ---------------------------------------------------------------------------
+
+const live = process.env.RUN_LIVE_AUTH_TESTS === "1";
+const liveTest = test.skipIf(!live);
+const LIVE_TIMEOUT_MS = 30_000;
+
+describe("live — rejection paths (no account created)", () => {
+  liveTest(
+    "login with bogus credentials → 401 with a JSON error",
+    async () => {
+      // Unique email => its own throttle bucket; this is the ONLY failed login
+      // this suite ever burns on that bucket (limit is 10 per 15 min).
+      const res = await postJson(ENDPOINTS.login, {
+        email: testEmail(),
+        password: "definitely-not-the-password",
       });
       expect(res.status).toBe(401);
-    });
-  }
-});
-
-describe("A2 — body userId is ignored; identity comes from the JWT", () => {
-  test.skipIf(!haveTwoUsers || !haveLiveTarget)(
-    "user A sending B's userId in the body still gets A-scoped behavior",
-    async () => {
-      const a = await signIn(A_EMAIL!, A_PASSWORD!);
-      const b = await signIn(B_EMAIL!, B_PASSWORD!);
-
-      // Plant a distinctive memory as B so leakage would be observable.
-      const marker = `b-secret-${Date.now()}`;
-      await b.client.from("ai_memory").insert({
-        user_id: b.userId,
-        key: `test_marker`,
-        value: marker,
-        category: "test",
-        importance: 1,
-      });
-
-      // A calls chat-with-memory while claiming to be B in the body.
-      const res = await fetch(FN("chat-with-memory"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${a.session.access_token}`,
-          apikey: PUBLISHABLE_KEY!,
-        },
-        body: JSON.stringify({
-          messages: [{ role: "user", content: "What do you remember about me?" }],
-          userId: b.userId, // must be ignored post-fix
-        }),
-      });
-      expect(res.status).toBe(200);
-      const text = await res.text();
-      expect(text).not.toContain(marker);
-
-      // Cleanup B's marker.
-      await b.client.from("ai_memory").delete().eq("user_id", b.userId).eq("key", "test_marker");
+      const data = (await res.json()) as { error?: string };
+      expect(typeof data.error).toBe("string");
+      expect(data.error!.length).toBeGreaterThan(0);
     },
+    LIVE_TIMEOUT_MS,
   );
 
-  test.skipIf(!haveTwoUsers || !haveLiveTarget)("A's JWT cannot read B's ai_memory rows via REST", async () => {
-    const a = await signIn(A_EMAIL!, A_PASSWORD!);
-    const b = await signIn(B_EMAIL!, B_PASSWORD!);
-    const { data, error } = await a.client
-      .from("ai_memory")
-      .select("key, value")
-      .eq("user_id", b.userId);
-    // RLS must yield zero rows (empty), never B's data.
-    expect(error ?? null).toBeNull();
-    expect(data ?? []).toHaveLength(0);
-  });
+  liveTest(
+    "login with missing fields → 400",
+    async () => {
+      const res = await postJson(ENDPOINTS.login, { email: "", password: "" });
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as { error?: string }).error).toBeTruthy();
+    },
+    LIVE_TIMEOUT_MS,
+  );
+
+  liveTest(
+    "signup with an invalid email → 400",
+    async () => {
+      const res = await postJson(ENDPOINTS.signup, {
+        email: "not-an-email",
+        password: "long-enough-password",
+      });
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as { error?: string }).error).toBeTruthy();
+    },
+    LIVE_TIMEOUT_MS,
+  );
+
+  liveTest(
+    "signup with a 7-char password → 400 (8-char minimum)",
+    async () => {
+      const res = await postJson(ENDPOINTS.signup, { email: testEmail(), password: "seven77" });
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as { error?: string }).error).toBeTruthy();
+    },
+    LIVE_TIMEOUT_MS,
+  );
+
+  liveTest(
+    "verify with a garbage token → 401; with no token → 400",
+    async () => {
+      const bad = await postJson(ENDPOINTS.verify, { token: "garbage.token.value" });
+      expect(bad.status).toBe(401);
+      const missing = await postJson(ENDPOINTS.verify, {});
+      expect(missing.status).toBe(400);
+    },
+    LIVE_TIMEOUT_MS,
+  );
+
+  liveTest(
+    "/api/me without a bearer token is rejected",
+    async () => {
+      const res = await fetch(api(ENDPOINTS.me));
+      expect([400, 401]).toContain(res.status);
+    },
+    LIVE_TIMEOUT_MS,
+  );
 });
 
-describe("A3 — config.toml discipline (static)", () => {
-  test("at most 4 functions remain verify_jwt = false, each with a justification comment", async () => {
-    const toml = await Bun.file(new URL("../supabase/config.toml", import.meta.url)).text();
-    const offenders: string[] = [];
-    const undocumented: string[] = [];
-    // A justification comment precedes the [functions.X] header, so check the
-    // line above each offender's header rather than naive block-splitting.
-    const re = /\[functions\.([^\]]+)\]\nverify_jwt\s*=\s*false/g;
-    for (const m of toml.matchAll(re)) {
-      const name = m[1];
-      offenders.push(name);
-      const before = toml.slice(0, m.index);
-      const prevLine = before.split("\n").at(-2) ?? "";
-      if (!prevLine.trimStart().startsWith("#")) undocumented.push(name);
-    }
-    expect(offenders.length).toBeLessThanOrEqual(4);
-    expect(undocumented).toHaveLength(0);
-  });
+describe("live — signup → login → verify → me → delete lifecycle", () => {
+  liveTest(
+    "full lifecycle with a throwaway account (always deleted)",
+    async () => {
+      const email = testEmail();
+      const password = `e2e-Pass-${Date.now()}`;
+      // The freshest token for the account; the finally block uses it to
+      // guarantee deletion even when an assertion above it fails.
+      let token: string | null = null;
+      let deleted = false;
+      try {
+        // 1. Signup
+        const signupRes = await postJson(ENDPOINTS.signup, { email, password });
+        expect(signupRes.status).toBe(200);
+        const signup = (await signupRes.json()) as {
+          userId?: string;
+          email?: string;
+          token?: string;
+        };
+        expect(signup.userId).toBeTruthy();
+        expect(signup.email).toBe(email);
+        expect(signup.token).toBeTruthy();
+        token = signup.token!;
 
-  test.skipIf(!haveLiveTarget)("cron-target functions require the CRON_SECRET header", async () => {
-    // Anonymous call to a cron target must be rejected even though verify_jwt=false.
-    for (const fn of ["record-usage-snapshot", "atlas-daily-digest", "mail-sync"]) {
-      const res = await fetch(FN(fn), {
-        method: "POST",
-        headers: { "Content-Type": "application/json", apikey: PUBLISHABLE_KEY! },
-        body: JSON.stringify({}),
-      });
-      expect([401, 403]).toContain(res.status);
-    }
-  });
+        // 2. Login with the same credentials
+        const loginRes = await postJson(ENDPOINTS.login, { email, password });
+        expect(loginRes.status).toBe(200);
+        const login = (await loginRes.json()) as { userId?: string; token?: string };
+        expect(login.userId).toBe(signup.userId);
+        expect(login.token).toBeTruthy();
+        token = login.token!;
+
+        // 3. Verify the JWT server-side
+        const verifyRes = await postJson(ENDPOINTS.verify, {}, token);
+        expect(verifyRes.status).toBe(200);
+        const verify = (await verifyRes.json()) as { valid?: boolean; userId?: string };
+        expect(verify.valid).toBe(true);
+        expect(verify.userId).toBe(signup.userId);
+
+        // 4. /api/me returns an entitlement snapshot for the bearer
+        const meRes = await fetch(api(ENDPOINTS.me), {
+          headers: { authorization: `Bearer ${token}` },
+        });
+        expect(meRes.status).toBe(200);
+        const me = (await meRes.json()) as { plan?: string; status?: string };
+        expect(typeof me.plan).toBe("string"); // brand-new accounts land on the free tier
+
+        // 5. Delete the account (part of the assertion path, not just cleanup)
+        const delRes = await postJson(ENDPOINTS.accountDelete, {}, token);
+        expect(delRes.status).toBe(200);
+        deleted = true;
+
+        // 6. The account is really gone: same credentials now fail (single
+        //    throttle fail on this email — far below the 10-fail limit).
+        const relogin = await postJson(ENDPOINTS.login, { email, password });
+        expect(relogin.status).toBe(401);
+      } finally {
+        // Safety net: never leave the throwaway account behind. A 404 means it
+        // is already gone, which is the state we want.
+        if (token && !deleted) {
+          const res = await postJson(ENDPOINTS.accountDelete, {}, token);
+          if (!res.ok && res.status !== 404) {
+            console.error(
+              `CLEANUP FAILED: throwaway account ${email} may still exist (delete → ${res.status})`,
+            );
+          }
+        }
+      }
+    },
+    LIVE_TIMEOUT_MS,
+  );
 });
