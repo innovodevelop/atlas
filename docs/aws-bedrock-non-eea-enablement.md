@@ -57,9 +57,21 @@ aws iam create-policy-version \
 
 Things to understand before applying it:
 
-- **`global.` profiles are anchored in `us-east-1`.** The ARN region is
-  `us-east-1` even though the request may be *sent* to another region. That is
-  not a typo; a cross-region profile's ARN lives in its home region.
+- **A `global.` profile is authorised against the CALLING region, not its home
+  region.** v3 anchored the global ARN to `us-east-1` on the reasoning that a
+  cross-region profile's ARN lives in its home region. Measured on 2026-08-02,
+  that is wrong for authorisation: invoking `global.anthropic.claude-opus-5` from
+  `eu-central-1` produced
+
+  ```
+  not authorized to perform: bedrock:InvokeModel on resource:
+  arn:aws:bedrock:eu-central-1:389642461729:inference-profile/global.anthropic.claude-opus-5
+  ```
+
+  — the caller's region. Hence v4 uses a region wildcard,
+  `arn:aws:bedrock:*:389642461729:inference-profile/global.anthropic.claude-*`.
+  The same call against `us-east-1` passed the IAM check and failed on
+  entitlement instead, which is how the two gates were told apart.
 - **The `foundation-model` wildcard was already there.** v2 already grants
   `arn:aws:bedrock:*::foundation-model/anthropic.claude-*` across all regions,
   which is what a global profile needs to fan out to the underlying model. An

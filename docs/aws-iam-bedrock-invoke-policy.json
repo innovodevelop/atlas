@@ -8,7 +8,7 @@
       "Resource": [
         "arn:aws:bedrock:*::foundation-model/anthropic.claude-*",
         "arn:aws:bedrock:eu-central-1:389642461729:inference-profile/eu.anthropic.claude-*",
-        "arn:aws:bedrock:us-east-1:389642461729:inference-profile/global.anthropic.claude-*"
+        "arn:aws:bedrock:*:389642461729:inference-profile/global.anthropic.claude-*"
       ]
     },
     {
