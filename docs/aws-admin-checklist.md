@@ -11,15 +11,15 @@ updater), §8 phases C/D. Worker-side code (signer, `ses.ts`, `s3.ts`, migration
 | # | Step | Status |
 |---|------|--------|
 | 1 | SES domain identity (`helloatlas.dk`) | **done** (2026-08-02) |
-| 2 | DKIM CNAMEs in Cloudflare DNS | **BLOCKER — see docs/aws-ses-dns-records.md** |
+| 2 | DKIM CNAMEs in Cloudflare DNS | **done** (2026-08-02) |
 | 3 | MAIL-FROM (`mail.helloatlas.dk`) + its DNS records | pending |
-| 4 | Verify DKIM went green | pending |
+| 4 | Verify DKIM went green | **done** — SUCCESS, live send verified |
 | 5 | SES production-access request (day 1!) | **done** — filed, PENDING |
-| 6 | Sandbox interim: verify test recipient | pending |
-| 7 | S3 bucket: attachments (private) | pending |
-| 8 | S3 bucket: releases (private) | pending |
-| 9 | CloudFront OAC + distribution over releases | pending |
-| 10 | Releases bucket policy (OAC read) | pending |
+| 6 | Sandbox interim: verify test recipient | **n/a** — domain identity covers @helloatlas.dk |
+| 7 | S3 bucket: attachments (private) | **done** (2026-08-02) |
+| 8 | S3 bucket: releases (private) | **done** (2026-08-02) |
+| 9 | CloudFront OAC + distribution over releases | **needs admin** — see §9 one-paste |
+| 10 | Releases bucket policy (OAC read) | **needs admin** — folded into §9 |
 | 11 | IAM least-priv policy for `atlas-brain` (merge first!) | **done** — policy `atlas-mail-ses-s3` |
 | 12 | Hand creds to worker via `wrangler secret put` | **done** — key AKIAVVOEAEIQVCKJKGPO |
 
@@ -95,25 +95,41 @@ aws s3api create-bucket --bucket atlas-releases-389642461729 --region eu-central
 aws s3api put-public-access-block --bucket atlas-releases-389642461729 --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
 ```
 
-## 9. CloudFront OAC + distribution
+## 9 + 10. CloudFront OAC, distribution, and bucket policy
 
-Note the `Id` printed by the first command; note `Id` + `DomainName` from the
-second:
+**Needs an admin principal.** `atlas-brain` deliberately has no CloudFront
+permissions — `CreateDistribution` can spin up cost-bearing global
+infrastructure, which is not a standing capability worth granting an application
+key for one-time setup. Confirmed denied on 2026-08-02:
 
 ```
-aws cloudfront create-origin-access-control --origin-access-control-config Name=atlas-releases-oac,OriginAccessControlOriginType=s3,SigningBehavior=always,SigningProtocol=sigv4
+AccessDenied: not authorized to perform: cloudfront:CreateOriginAccessControl
 ```
-```
-cat > /tmp/atlas-releases-dist.json <<'EOF'
+
+Run this **in CloudShell** (it carries your console credentials). It replaces the
+earlier REPLACE_WITH_* version: it captures the OAC id and distribution id
+itself, so there is nothing to copy by hand between commands — which is where
+the old version invited a mistake.
+
+```bash
+set -euo pipefail
+BUCKET=atlas-releases-389642461729
+ACCT=389642461729
+
+OAC_ID=$(aws cloudfront create-origin-access-control \
+  --origin-access-control-config Name=atlas-releases-oac,OriginAccessControlOriginType=s3,SigningBehavior=always,SigningProtocol=sigv4 \
+  --query OriginAccessControl.Id --output text)
+echo "OAC: $OAC_ID"
+
+cat > /tmp/dist.json <<EOF
 {
-  "CallerReference": "atlas-releases-2026-07-31",
+  "CallerReference": "atlas-releases-$(date +%s)",
   "Comment": "Atlas updater release home",
   "Enabled": true,
-  "DefaultRootObject": "",
   "Origins": { "Quantity": 1, "Items": [ {
     "Id": "s3-releases",
-    "DomainName": "atlas-releases-389642461729.s3.eu-central-1.amazonaws.com",
-    "OriginAccessControlId": "REPLACE_WITH_OAC_ID",
+    "DomainName": "${BUCKET}.s3.eu-central-1.amazonaws.com",
+    "OriginAccessControlId": "${OAC_ID}",
     "S3OriginConfig": { "OriginAccessIdentity": "" }
   } ] },
   "DefaultCacheBehavior": {
@@ -126,26 +142,36 @@ cat > /tmp/atlas-releases-dist.json <<'EOF'
   "PriceClass": "PriceClass_100"
 }
 EOF
-aws cloudfront create-distribution --distribution-config file:///tmp/atlas-releases-dist.json
-```
 
-## 10. Releases bucket policy
+DIST_ID=$(aws cloudfront create-distribution --distribution-config file:///tmp/dist.json \
+  --query Distribution.Id --output text)
+DIST_DOMAIN=$(aws cloudfront get-distribution --id "$DIST_ID" \
+  --query Distribution.DomainName --output text)
+echo "Distribution: $DIST_ID"
+echo "Domain:       $DIST_DOMAIN"
 
-Letting that distribution read (replace DIST_ID):
-
-```
-cat > /tmp/atlas-releases-policy.json <<'EOF'
+cat > /tmp/bucket-policy.json <<EOF
 { "Version": "2012-10-17", "Statement": [ {
   "Sid": "AllowCloudFrontOAC",
   "Effect": "Allow",
   "Principal": { "Service": "cloudfront.amazonaws.com" },
   "Action": "s3:GetObject",
-  "Resource": "arn:aws:s3:::atlas-releases-389642461729/*",
-  "Condition": { "StringEquals": { "AWS:SourceArn": "arn:aws:cloudfront::389642461729:distribution/REPLACE_WITH_DIST_ID" } }
+  "Resource": "arn:aws:s3:::${BUCKET}/*",
+  "Condition": { "StringEquals": { "AWS:SourceArn": "arn:aws:cloudfront::${ACCT}:distribution/${DIST_ID}" } }
 } ] }
 EOF
-aws s3api put-bucket-policy --bucket atlas-releases-389642461729 --policy file:///tmp/atlas-releases-policy.json
+aws s3api put-bucket-policy --bucket "$BUCKET" --policy file:///tmp/bucket-policy.json
+echo "Bucket policy applied."
 ```
+
+`PriceClass_100` keeps edge locations to North America + Europe, which is the
+cheap option and correct for a Danish product.
+
+The distribution takes ~15 minutes to reach `Deployed`. Send the `Domain` value
+back and the updater can be pointed at it — **but that is task #11 and still an
+open decision.** The updater currently points at GitHub releases
+(`src-tauri/tauri.conf.json`), and creating this bucket does not commit you to
+switching. Nothing has moved it.
 
 ## 11. IAM — least-priv statements for `atlas-brain`
 
