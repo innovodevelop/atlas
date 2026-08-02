@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { getVoiceEndpoint } from "@/lib/voiceClient";
+import type { VoiceSettings } from "@/lib/voiceTuning";
 
 interface UseStreamingTTSOptions {
   onPlaybackStart?: () => void;
@@ -15,6 +16,8 @@ interface QueueItem {
 interface SpeakOptions {
   voiceId?: string;
   modelId?: string;
+  /** How the voice performs. Forwarded verbatim; the gateway clamps it. */
+  voiceSettings?: VoiceSettings;
 }
 
 /**
@@ -80,7 +83,12 @@ export const useStreamingTTS = (options: UseStreamingTTSOptions = {}) => {
             "Content-Type": "application/json",
             "x-sidecar-token": voice.token,
           },
-          body: JSON.stringify({ text, voiceId: speakOptions.voiceId, modelId: speakOptions.modelId }),
+          body: JSON.stringify({
+            text,
+            voiceId: speakOptions.voiceId,
+            modelId: speakOptions.modelId,
+            voiceSettings: speakOptions.voiceSettings,
+          }),
           signal,
         }
       );
@@ -194,9 +202,14 @@ export const useStreamingTTS = (options: UseStreamingTTSOptions = {}) => {
   }, [fetchAudio, drainQueue]);
 
   /** Whole-text playback (stops anything queued or playing first). */
-  const speak = useCallback(async (text: string, voiceId?: string, modelId?: string): Promise<void> => {
+  const speak = useCallback(async (
+    text: string,
+    voiceId?: string,
+    modelId?: string,
+    voiceSettings?: VoiceSettings,
+  ): Promise<void> => {
     stopPlayback();
-    enqueue(text, { voiceId, modelId });
+    enqueue(text, { voiceId, modelId, voiceSettings });
   }, [stopPlayback, enqueue]);
 
   // Cleanup on unmount

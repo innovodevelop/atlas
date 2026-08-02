@@ -30,6 +30,7 @@ const BRAIN_URL = `http://127.0.0.1:${process.env.ATLAS_BRAIN_PORT ?? "4830"}/ch
 
 import { SentenceChunker, stripForSpeech, type SentenceChunk } from "./sentence.ts";
 import type { ServerMsg, ClientMsg, AtlasState } from "./protocol.ts";
+import type { VoiceSettings } from "./voiceSettings.ts";
 
 type ChatMessage = { role: "user" | "assistant" | "system"; content: string };
 
@@ -41,6 +42,8 @@ export interface SessionConfig {
   vadAssets: VadAssets;
   voiceId?: string;
   ttsModelId?: string;
+  /** How the chosen voice performs. Clamped in voiceSettings.ts. */
+  voiceSettings?: VoiceSettings;
   languageCode?: string;
   send: (msg: ServerMsg) => void;
   sendBinary: (bytes: Uint8Array) => void;
@@ -303,7 +306,7 @@ export class VoiceSession {
       this.tts.enqueue(
         chunkIndex,
         speakText,
-        { voiceId: this.cfg.voiceId, modelId: this.cfg.ttsModelId },
+        { voiceId: this.cfg.voiceId, modelId: this.cfg.ttsModelId, voiceSettings: this.cfg.voiceSettings },
         () => {
           if (this.tFirstAudio === 0) {
             this.tFirstAudio = performance.now();

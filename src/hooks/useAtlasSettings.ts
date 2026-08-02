@@ -51,6 +51,23 @@ export interface AtlasSettings {
   // Helps in noisy environments; adds ~0.5-1s latency + credits. Default off.
   voiceIsolation: boolean;
 
+  // How the chosen voice PERFORMS. These are threaded to the voice gateway and
+  // clamped there (services/voice-gateway/src/voiceSettings.ts owns the ranges).
+  //
+  // Note there is deliberately no "pitch" or "depth" here: ElevenLabs exposes
+  // no such parameter. Timbre/deepness is a property of `voiceId` — switching
+  // to a deeper voice is the only way to get a deeper Atlas.
+  /** 0–1. Low = more variation and emotion, high = flatter and predictable. */
+  voiceStability: number;
+  /** 0–1. How closely to adhere to the original voice recording. */
+  voiceSimilarity: number;
+  /** 0–1. Expressiveness. Above 0 costs latency. */
+  voiceStyle: number;
+  /** 0.7–1.2. 1.0 is the voice's natural rate. */
+  voiceSpeed: number;
+  /** Slight clarity/presence boost; costs a little latency. */
+  voiceSpeakerBoost: boolean;
+
   // Visualization mode
   visualizationMode: 'classic' | 'nebulaFlow';
   
@@ -165,6 +182,15 @@ export const defaultAtlasSettings: AtlasSettings = {
   voiceId: 'EXAVITQu4vr4xnSDxMaL', // Sarah
   ttsModel: 'eleven_turbo_v2_5',
   voiceIsolation: false,
+  // Mirrors DEFAULT_VOICE_SETTINGS in the gateway — these are the values that
+  // shipped hard-coded, so an existing user hears no change on upgrade.
+  // NOTE: adding keys does NOT require bumping SETTINGS_VERSION; loadSettings
+  // merges defaults over the stored blob. Bumping it WIPES the user's settings.
+  voiceStability: 0.5,
+  voiceSimilarity: 0.75,
+  voiceStyle: 0.3,
+  voiceSpeed: 1.0,
+  voiceSpeakerBoost: true,
   visualizationMode: 'nebulaFlow',
   nebulaParticleMode: 'fixed', // Use manual particle count by default
   dashboardPreview: false,

@@ -17,6 +17,7 @@ import "./denoShim.ts";
 import { VoiceSession } from "./session.ts";
 import { DirectTtsProvider } from "./tts.ts";
 import type { ClientMsg } from "./protocol.ts";
+import type { VoiceSettings } from "./voiceSettings.ts";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -89,7 +90,7 @@ async function handleTts(req: Request): Promise<Response> {
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) return jsonRes({ error: "ELEVENLABS_API_KEY not configured" }, 500);
 
-  let body: { text?: string; voiceId?: string; modelId?: string };
+  let body: { text?: string; voiceId?: string; modelId?: string; voiceSettings?: VoiceSettings };
   try {
     body = await req.json();
   } catch {
@@ -108,7 +109,13 @@ async function handleTts(req: Request): Promise<Response> {
     start(sink) {
       provider
         .synthesize(
-          { text: body.text!, voiceId: body.voiceId, modelId: body.modelId, signal: controller.signal },
+          {
+            text: body.text!,
+            voiceId: body.voiceId,
+            modelId: body.modelId,
+            voiceSettings: body.voiceSettings,
+            signal: controller.signal,
+          },
           (bytes) => sink.enqueue(bytes),
         )
         .then(() => sink.close())
@@ -211,6 +218,7 @@ const server = Bun.serve<SocketData>({
           vadAssets: VAD_ASSETS,
           voiceId: msg.voiceId,
           ttsModelId: msg.ttsModelId,
+          voiceSettings: msg.voiceSettings,
           languageCode: undefined, // auto-detect; Danish benchmarked in bench/
           send: (m) => ws.send(JSON.stringify(m)),
           sendBinary: (bytes) => ws.send(bytes),

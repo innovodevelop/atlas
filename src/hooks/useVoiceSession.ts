@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getToken } from "@/lib/authClient";
 import { WakeWordDetector } from "@/lib/wakeWord";
+import type { VoiceSettings } from "@/lib/voiceTuning";
 import type { AIState } from "@/types";
 
 const DEFAULT_GATEWAY_URL =
@@ -70,6 +71,8 @@ export interface UseVoiceSessionResult {
 export function useVoiceSession(options?: {
   voiceId?: string;
   ttsModelId?: string;
+  /** How the voice performs. Forwarded verbatim; the gateway clamps it. */
+  voiceSettings?: VoiceSettings;
   onTurnEnd?: (spokenText: string, interrupted: boolean) => void;
   onFinalTranscript?: (text: string) => void;
 }): UseVoiceSessionResult {
@@ -195,6 +198,7 @@ export function useVoiceSession(options?: {
         sampleRate: 16000,
         voiceId: optionsRef.current?.voiceId,
         ttsModelId: optionsRef.current?.ttsModelId,
+        voiceSettings: optionsRef.current?.voiceSettings,
       }));
     };
 

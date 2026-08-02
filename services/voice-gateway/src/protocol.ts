@@ -9,6 +9,9 @@
  *    chunk — that mapping is what makes truncated-turn context possible.
  */
 
+import type { VoiceSettings } from "./voiceSettings.ts";
+export type { VoiceSettings };
+
 export type AtlasState = "idle" | "listening" | "thinking" | "speaking";
 
 // ---------------------------------------------------------------------------
@@ -24,6 +27,9 @@ export interface HelloMsg {
   /** Voice/model settings mirrored from useAtlasSettings. */
   voiceId?: string;
   ttsModelId?: string;
+  /** How the chosen voice performs — pace, expressiveness, consistency.
+   *  Optional: an older client that omits it gets the shipped defaults. */
+  voiceSettings?: VoiceSettings;
 }
 
 /** Wake word fired client-side — start a listening turn. */

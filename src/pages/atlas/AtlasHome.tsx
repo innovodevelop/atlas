@@ -5,6 +5,7 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import { useUnifiedChat } from '@/hooks/useUnifiedChat';
 import { useVoiceSession } from '@/hooks/useVoiceSession';
 import { useAtlasSettings } from '@/hooks/useAtlasSettings';
+import { toVoiceSettings } from '@/lib/voiceTuning';
 import { AtlasSphereLazy as AtlasSphere } from '@/components/atlas/AtlasSphereLazy';
 import { timeOfDayGreeting } from './atlasHelpers';
 
@@ -29,6 +30,7 @@ const AtlasHome = () => {
   const { audioLevel, effectiveAtlasState, handleManualActivate } = useVoiceSession({
     voiceId: atlasSettings.voiceId,
     ttsModelId: atlasSettings.ttsModel,
+    voiceSettings: toVoiceSettings(atlasSettings),
   });
 
   const send = useCallback((text?: string) => {

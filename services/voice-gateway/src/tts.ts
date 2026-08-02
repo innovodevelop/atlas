@@ -6,10 +6,15 @@
  * Bytes are forwarded to the sink AS THEY ARRIVE. Never `await res.blob()`.
  */
 
+import { toElevenLabsVoiceSettings, type VoiceSettings } from "./voiceSettings.ts";
+
 export interface TtsRequest {
   text: string;
   voiceId?: string;
   modelId?: string;
+  /** How the voice performs — pace, expressiveness, consistency. Omit for the
+   *  defaults, which are what shipped before any of this was tunable. */
+  voiceSettings?: VoiceSettings;
   signal: AbortSignal;
 }
 
@@ -39,7 +44,9 @@ export class DirectTtsProvider implements TtsProvider {
         text: req.text,
         model_id: model,
         output_format: "mp3_44100_128",
-        voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true },
+        // Clamped in voiceSettings.ts; an absent/garbage value yields the
+        // defaults rather than a failed turn.
+        voice_settings: toElevenLabsVoiceSettings(req.voiceSettings),
       }),
       signal: req.signal,
     });
@@ -77,7 +84,7 @@ export class TtsPipeline {
   enqueue(
     chunkIndex: number,
     text: string,
-    opts: { voiceId?: string; modelId?: string },
+    opts: { voiceId?: string; modelId?: string; voiceSettings?: VoiceSettings },
     onStart: () => void,
     sink: (bytes: Uint8Array) => void,
     onEnd: () => void,

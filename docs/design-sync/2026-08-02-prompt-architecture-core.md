@@ -1,131 +1,93 @@
 # Claude Design prompt — Atlas Architecture + Atlas Core
 
-Paste everything below the line into Claude Design. It is written to be
-self-contained: Claude Design has no access to this repo.
-
-Scope note: an "Atlas Control" screen appears as a dock link in older Atlas
-prototypes but was never designed or built. It is **out of scope** — do not
-design it, and do not include it in the dock.
+Written for a Claude Design session that has the repo attached and already knows
+the Workshop design system. It states intent and decisions, not background.
+Paste everything below the line.
 
 ---
 
-**Redesign two screens for Atlas — a local-first AI assistant that runs as a
-native macOS app — so they match the rest of the product.**
+**Redesign two screens so they stop looking like a different application:
+Atlas Architecture and Atlas Core.**
 
-Both screens are currently off-design: they were built early, in a dark
-Tailwind style, before the warm-light "Workshop" system existed. They look like
-a different application.
+You have the codebase. Conform both to the dashboard structure in
+`src/pages/atlas/AtlasDashboard.tsx` — band header instead of a top bar,
+back-navigation via the clickable headline plus Esc, the mandatory dock,
+`.page` rather than a fixed overlay.
 
-## Design system — match it exactly
+Two corrections to what you may be working from:
 
-Warm-light "Workshop": soft off-white paper background with ambient colour
-wash, generous whitespace, large editorial headlines, one accent colour.
-
-- **Accent: Atlas Blue `#3461f2`.** (If an older Atlas handoff names `#ff6a00`
-  orange as the only accent, that is out of date — the product deliberately
-  swapped to blue.)
-- Reference the existing **Atlas Design System** and **Atlas Dashboard
-  (Current)** screens for tokens, type scale, card treatment and elevation.
-- Icons are **Lucide only**, at 12 / 14 / 16 / 20 px.
-
-## Structural rules — both screens, non-negotiable
-
-Atlas removed its top bar; the greeting band **is** the header. Both screens
-must follow the dashboard's three-part structure:
-
-1. **Band header** — particle sphere on the left, large editorial headline with
-   a coloured accent word, serif italic subline, right-aligned metric.
-   Back-navigation is the **clickable headline** plus Esc. **No header bar, no
-   back arrow, no sticky top strip.**
-2. **Content** — card grid, `auto-fill minmax(340px, 1fr)`.
-3. **Floating dock pill**, fixed bottom centre. Mandatory on both screens.
-
-Full-page scroll, not a fixed modal overlay. Ambient wash + atmosphere canvas +
-grain behind everything.
+- The accent is **Atlas Blue `#3461f2`**, not the `#ff6a00` the handoff README
+  still names.
+- **"Atlas Control" is out of scope.** It exists only as a dock link in old
+  prototypes and was never designed or built. Don't design it, don't put it in
+  the dock.
 
 ---
 
 ## Screen 1 — Atlas Architecture
 
-**Purpose.** Explain to a curious user how Atlas actually works. The audience is
-someone who bought a private AI assistant and wants to understand what it does
-with their data — **not** an engineer reading a spec. Explain, don't specify.
+`src/pages/AtlasArchitecture.tsx` plus ~1,230 lines under
+`src/components/architecture/`. Currently a dark Tailwind marketing page with a
+sticky header and a "Built with Lovable" footer.
 
-**Content to cover:**
+**The centrepiece is the system diagram.** Today it's machine-generated Mermaid
+hard-coded to a dark theme with purple nodes — it cannot survive on a
+warm-light page and looks generated because it is. **Design it as artwork:**
+voice in, through the local core, out to the reasoning providers, and back.
 
-- **Where reasoning happens.** Chat goes to Anthropic's Claude; background work
-  runs on Amazon Bedrock in the EU. This is the honest, and slightly
-  uncomfortable, part: memories and files stay on the Mac, but the prompts
-  derived from them do leave it. The design should carry that clearly rather
-  than bury it.
-- **What stays local.** The SQLite database, semantic search over memories, the
-  wake-word detector and the voice-activity detector all run on-device.
-- **The learning pipeline** — how conversation becomes memory becomes recall.
-- **Memory architecture** — how memories are stored, embedded and retrieved.
-- **The particle sphere** — what the visual actually represents.
-- **A tech-stack summary.**
+Audience is a curious owner of a private AI assistant, not an engineer.
+Explain, don't specify. Content: where reasoning happens (chat → Anthropic;
+background → Bedrock EU), what stays on device (SQLite, semantic recall, wake
+word, VAD), the learning pipeline, memory architecture, the sphere, and a stack
+summary.
 
-**The centrepiece is a system diagram.** Today this is a machine-generated
-Mermaid flowchart hard-coded to a dark theme with purple nodes — it cannot
-survive on a warm-light page and looks generated, because it is. **Design the
-diagram as a first-class piece of visual design** in the Workshop palette: the
-flow from voice input through the local core to the reasoning providers and
-back. This single element carries the page.
-
-The current page also ends with a "Built with Lovable" footer, which is a
-leftover from scaffolding. Design whatever belongs there instead — or nothing.
+Say the uncomfortable part plainly rather than burying it: **memories and files
+stay on the Mac, but the prompts derived from them leave it.** That honesty is
+the page's reason to exist.
 
 ---
 
 ## Screen 2 — Atlas Core
 
-**Purpose.** The operational surface — what Atlas is doing, knows, and is
-working on right now.
+`src/pages/atlas/AtlasCoreScreen.tsx`. Already on `workshop.css`, so this is a
+restructure: drop `.corehead`, switch `.overlay` → `.page`, add the dock.
 
-**Structure:** hero with the particle sphere and four stat tiles, then a tab
-bar, then a panel grid.
+**Eight tabs.** Seven exist; **Memory** was specified in an earlier plan and
+never built — include it. Design each with a populated state and an empty state:
 
-**The four stat tiles** show Knowledge (item count), Research (active topics),
-Error Rate (percentage) and Health (percentage).
+- **Search** — semantic search across everything, with provenance (which
+  memory or document, and how relevant)
+- **Overview** — system state at a glance
+- **Live** — what Atlas is doing right now, as it happens
+- **Agent** — autonomous work in flight: queued, running, done, failed;
+  inspectable and cancellable
+- **Knowledge** — the knowledge base, browsable and filterable
+- **Research** — self-directed research topics; add, prioritise, stop
+- **Memory** — everything remembered about the user, by category, with removal
+  and correction *(new)*
+- **Learning** — what it's learning, on what schedule, and a master switch
 
-**Tabs.** Seven exist today: Search, Overview, Live, Agent, Knowledge,
-Research, Learning. An eighth — **Memory** — was specified in an earlier plan
-and never built. **Include it.** It is the natural home for browsing what Atlas
-remembers, and its absence is a real gap.
+**The honesty requirement.** This page currently ships fabricated data:
+invented search results ("Transformer scaling laws — 2026 review", "arXiv ·
+indexed 4 min ago · 0.94 relevance"), a fake research queue and error log, a
+static `3` on the Agent badge, and stat trends permanently reading "+12% from
+last period" and "all systems nominal" whatever the real numbers are. All of it
+is being removed and wired to real data.
 
-The Live tab carries a live-state indicator; the Agent tab carries a count
-badge.
+So **empty states are the central design problem here**, not an afterthought —
+a new user sees mostly empty panels on day one, and that should read as a system
+at rest rather than a broken one. Stat tiles need a no-trend variant for when
+there's no comparison period. Panels must read well with one item, not only
+with eight.
 
-### The honesty requirement — read this carefully
-
-This page currently shows **fabricated data**, and we are removing it. The
-overview panels contain hard-coded fake content — invented search results
-("Transformer scaling laws — 2026 review", "arXiv · indexed 4 min ago · 0.94
-relevance"), a fake research queue, a fake error log, a static "3" badge on the
-Agent tab, and stat-tile trend lines that always read "+12% from last period"
-and "all systems nominal" regardless of reality.
-
-All of it goes. Which means:
-
-- **Every panel needs a designed empty state**, and those states must look
-  deliberate rather than broken. A new user will see mostly empty panels on
-  day one, and that should feel like a system at rest — not a failure.
-- **Stat tiles need a no-trend state.** If there is no comparison period, the
-  tile shows the number without a fabricated trend arrow.
-- Design panels that read well with **one** item, not just with eight.
-
-Treat "nothing here yet" as a first-class design problem for this screen. It is
-the state most users will actually see.
+Design both ends: at rest, and fully loaded.
 
 ---
 
 ## Deliverables
 
-1. Both screens at desktop width, in the Workshop design system
-2. The Atlas Architecture **system diagram** as designed artwork
-3. A **reusable stat tile** (with and without trend) and a **reusable panel**
-   component — these two screens currently each define their own, and we want
-   one shared set
-4. The tab bar, including live-indicator and badge treatments
-5. **Every empty state**: each panel type, each stat tile, and the first-run
-   "Atlas hasn't learned anything yet" case
+Both screens; all eight Core tabs populated **and** empty; the Architecture
+system diagram as artwork; a shared stat tile (with and without trend) and a
+shared panel component — the two screens each define their own today and this is
+the moment to unify them; the tab bar with live-indicator and badge treatments;
+every empty state including first-run.

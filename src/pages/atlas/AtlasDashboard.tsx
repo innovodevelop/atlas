@@ -8,6 +8,7 @@ import { useCalendarEvents } from '@/hooks/useCalendarEvents';
 import { useUnifiedChat } from '@/hooks/useUnifiedChat';
 import { useVoiceSession } from '@/hooks/useVoiceSession';
 import { useAtlasSettings } from '@/hooks/useAtlasSettings';
+import { toVoiceSettings } from '@/lib/voiceTuning';
 import { useAgentRuns } from '@/hooks/useAgentRuns';
 import { useAtlasPresence } from '@/hooks/useAtlasPresence';
 import { presenceToWebGL, presenceLabel } from '@/components/atlas/presenceBridge';
@@ -99,6 +100,7 @@ const AtlasDashboard = () => {
   } = useVoiceSession({
     voiceId: atlasSettings.voiceId,
     ttsModelId: atlasSettings.ttsModel,
+    voiceSettings: toVoiceSettings(atlasSettings),
   });
 
   // Auth gate (same behavior as the current dashboard)
