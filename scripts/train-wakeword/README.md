@@ -22,12 +22,33 @@ startup, activates every model it finds, and automatically drops the
 - **Do NOT ship the community "hey atlas" model** (e.g. the atlas-voice /
   home-assistant community collections). It is licensed **CC BY-NC 4.0 —
   non-commercial only** and can never be bundled with Atlas.
-- **Models trained with this kit are ours to ship.** openWakeWord's automatic
-  training pipeline is Apache-2.0 and generates its own synthetic speech
-  (Piper TTS) for training data. A model we train with it is our own work
-  product: we may license and distribute it however we like, including
-  commercially inside Atlas. Ship it under the Atlas app license and credit
-  openWakeWord (Apache-2.0 tooling) in the third-party notices.
+- **Models trained with this kit as configured are NOT ours to ship.** The
+  reasoning below is half right, and the missing half is disqualifying:
+
+  - ✅ openWakeWord's training **pipeline** is Apache-2.0.
+  - ✅ The **positive** clips are synthetic Piper TTS (MIT tool; LibriTTS-R
+    checkpoint, CC BY 4.0) — genuinely our own work product.
+  - ❌ The **negative** features this script downloads —
+    `davidscripka/openwakeword_features` on Hugging Face — are
+    **CC BY-NC-SA 4.0**. NonCommercial, and ShareAlike on top.
+  - ❌ The **feature backbone** the phrase model sits on
+    (`melspectrogram.onnx` + `embedding_model.onnx`) are openWakeWord
+    pre-trained models, also **CC BY-NC-SA 4.0**. Even a phrase model trained
+    on perfectly clean data still needs those two at runtime.
+
+  So swapping the negative data alone does not fix it. Both halves have to go.
+
+- **Whether trained weights are a "derivative work" of training data is
+  unsettled law.** Do not rely on the optimistic reading. Using **CC0** data
+  (Mozilla Common Voice) removes the question rather than answering it, which
+  is why it is the preferred source below.
+
+- **The clean path (verified 2026-08-02).** Google's `speech_embedding` module
+  on Kaggle Models is **Apache 2.0** per its model card
+  (google/speech-embedding, TensorFlow1, v1) — the very model openWakeWord
+  re-implemented, and it computes its own log-mel internally, so it replaces
+  **both** backbone files with no retraining. Then train the phrase model on
+  CC0/CC-BY negatives. Details in `public/models/README.md`.
 
 ## Path A — Google Colab (recommended, free, ~1 hour per model)
 
