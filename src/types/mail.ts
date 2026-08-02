@@ -75,8 +75,13 @@ export interface WorkerMessageRow {
 }
 
 /**
- * Metadata only. r2_key is always null today (no R2 bucket) and there is no route that
- * returns attachment bytes — the UI shows name/type/size and nothing is clickable.
+ * Metadata only. blob_key is always null today (no blob store wired up) and
+ * there is no route that returns attachment bytes — the UI shows name/type/size
+ * and nothing is clickable.
+ *
+ * Named blob_key, not r2_key: the store is S3. This mirrors the worker's
+ * mail_attachments column exactly — they drifted apart once already, when the
+ * worker migrated and this type did not.
  */
 export interface WorkerAttachmentRow {
   id: string;
@@ -84,7 +89,7 @@ export interface WorkerAttachmentRow {
   filename: string | null;
   mime_type: string | null;
   size_bytes: number | null;
-  r2_key: string | null;
+  blob_key: string | null;
 }
 
 export interface WorkerThreadDetail {
