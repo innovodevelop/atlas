@@ -10,18 +10,18 @@ updater), §8 phases C/D. Worker-side code (signer, `ses.ts`, `s3.ts`, migration
 
 | # | Step | Status |
 |---|------|--------|
-| 1 | SES domain identity (`helloatlas.dk`) | pending |
-| 2 | DKIM CNAMEs in Cloudflare DNS | pending |
+| 1 | SES domain identity (`helloatlas.dk`) | **done** (2026-08-02) |
+| 2 | DKIM CNAMEs in Cloudflare DNS | **BLOCKER — see docs/aws-ses-dns-records.md** |
 | 3 | MAIL-FROM (`mail.helloatlas.dk`) + its DNS records | pending |
 | 4 | Verify DKIM went green | pending |
-| 5 | SES production-access request (day 1!) | pending |
+| 5 | SES production-access request (day 1!) | **done** — filed, PENDING |
 | 6 | Sandbox interim: verify test recipient | pending |
 | 7 | S3 bucket: attachments (private) | pending |
 | 8 | S3 bucket: releases (private) | pending |
 | 9 | CloudFront OAC + distribution over releases | pending |
 | 10 | Releases bucket policy (OAC read) | pending |
-| 11 | IAM least-priv policy for `atlas-brain` (merge first!) | pending |
-| 12 | Hand creds to worker via `wrangler secret put` | pending |
+| 11 | IAM least-priv policy for `atlas-brain` (merge first!) | **done** — policy `atlas-mail-ses-s3` |
+| 12 | Hand creds to worker via `wrangler secret put` | **done** — key AKIAVVOEAEIQVCKJKGPO |
 
 ---
 
