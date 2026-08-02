@@ -84,7 +84,11 @@ test("mapModelToBedrock: never targets a model this account cannot invoke", () =
   }
 });
 
-test("mapModelToBedrock: every default resolves to an eu. profile", () => {
+test("mapModelToBedrock: every default still resolves to an eu. profile", () => {
+  // Non-EEA profiles became PERMITTED on 2026-08-02, but no default was moved to
+  // one. That distinction is the whole point of this test surviving the change:
+  // reaching outside the EEA must stay an explicit per-tier override, so the
+  // residency posture of an ordinary install cannot drift by accident.
   for (const logical of ALL_MAPPED_IDS) {
     expect(mapModelToBedrock(logical).startsWith("eu.anthropic.")).toBe(true);
   }
@@ -99,25 +103,47 @@ test("mapModelToBedrock: claude-opus-5 is reachable only via its env override", 
   });
 });
 
-test("mapModelToBedrock: Fable 5 is unreachable without both blockers lifted", () => {
+test("mapModelToBedrock: Fable 5 is reachable via its override, never by default", () => {
   // There is no `eu.` Fable profile at all, so Fable can only be reached through
-  // a worldwide-routing `global.` id. That is a policy decision (IAM + published
-  // privacy policy), so it must take two deliberate env vars, never a default.
+  // a worldwide-routing `global.` id. Since 2026-08-02 that is permitted, so the
+  // second gate (ATLAS_BEDROCK_ALLOW_NON_EEA) is gone — but the tier still has no
+  // default, because no live InvokeModel has answered on it yet.
   expect(() => mapModelToBedrock("claude-fable-5")).toThrow(/no inference profile mapped/);
 
   withEnv({ BEDROCK_MODEL_FABLE_5: "global.anthropic.claude-fable-5" }, () => {
-    // Env override alone is not enough — the residency guard still refuses.
-    expect(() => mapModelToBedrock("claude-fable-5")).toThrow(/non-EEA/);
+    expect(mapModelToBedrock("claude-fable-5")).toBe("global.anthropic.claude-fable-5");
   });
+});
 
+test("ATLAS_BEDROCK_EEA_ONLY=1 restores EEA confinement", () => {
+  // The inverse of the flag this replaced. It is the one-line revert if the
+  // policy position changes back, and the switch an EEA-only deployment turns on
+  // — so it has to keep working even though nothing sets it today.
   withEnv(
     {
       BEDROCK_MODEL_FABLE_5: "global.anthropic.claude-fable-5",
-      ATLAS_BEDROCK_ALLOW_NON_EEA: "1",
+      ATLAS_BEDROCK_EEA_ONLY: "1",
     },
     () => {
-      expect(mapModelToBedrock("claude-fable-5")).toBe("global.anthropic.claude-fable-5");
+      expect(() => mapModelToBedrock("claude-fable-5")).toThrow(/non-EEA/);
+      // An already-resolved non-eu. id is refused on the passthrough path too,
+      // not just the tier path.
+      expect(() => mapModelToBedrock("us.anthropic.claude-opus-4-6-v1")).toThrow(/non-EEA/);
+      // eu. profiles are unaffected.
+      expect(mapModelToBedrock("claude-haiku-4-5")).toBe(
+        "eu.anthropic.claude-haiku-4-5-20251001-v1:0",
+      );
     },
+  );
+});
+
+test("a non-EEA profile passes through by default", () => {
+  // The behaviour change itself: before 2026-08-02 this threw.
+  expect(mapModelToBedrock("global.anthropic.claude-fable-5")).toBe(
+    "global.anthropic.claude-fable-5",
+  );
+  expect(mapModelToBedrock("us.anthropic.claude-opus-4-6-v1")).toBe(
+    "us.anthropic.claude-opus-4-6-v1",
   );
 });
 
@@ -134,15 +160,20 @@ test("mapModelToBedrock: an already-resolved eu. id passes through untouched", (
   expect(mapModelToBedrock("eu.anthropic.claude-sonnet-4-6")).toBe("eu.anthropic.claude-sonnet-4-6");
 });
 
-test("mapModelToBedrock: a non-EEA passthrough id is refused by default", () => {
-  // Residency is enforced in code, not only by the IAM policy — one console edit
-  // to AtlasBedrockInvoke must not be enough to route prompts out of the EEA.
-  expect(() => mapModelToBedrock("us.anthropic.claude-sonnet-5")).toThrow(/non-EEA/);
-  expect(() => mapModelToBedrock("global.anthropic.claude-haiku-4-5-20251001-v1:0"))
-    .toThrow(/non-EEA/);
+test("mapModelToBedrock: a non-EEA passthrough id is permitted, and confinable", () => {
+  // Inverted on 2026-08-02 along with the published policy. The old flag name
+  // (ATLAS_BEDROCK_ALLOW_NON_EEA) is dead and must NOT re-enable confinement —
+  // a leftover copy of it in someone's env should be inert, not load-bearing.
+  expect(mapModelToBedrock("us.anthropic.claude-sonnet-5")).toBe("us.anthropic.claude-sonnet-5");
+  expect(mapModelToBedrock("global.anthropic.claude-haiku-4-5-20251001-v1:0"))
+    .toBe("global.anthropic.claude-haiku-4-5-20251001-v1:0");
 
-  withEnv({ ATLAS_BEDROCK_ALLOW_NON_EEA: "1" }, () => {
+  withEnv({ ATLAS_BEDROCK_ALLOW_NON_EEA: "0" }, () => {
     expect(mapModelToBedrock("us.anthropic.claude-sonnet-5")).toBe("us.anthropic.claude-sonnet-5");
+  });
+
+  withEnv({ ATLAS_BEDROCK_EEA_ONLY: "1" }, () => {
+    expect(() => mapModelToBedrock("us.anthropic.claude-sonnet-5")).toThrow(/non-EEA/);
   });
 });
 
@@ -189,13 +220,11 @@ test("toBedrockRequest: thinking is stated explicitly for models that think by d
   expect(onOpus5.invokeBody.thinking).toEqual({ type: "disabled" });
 
   // Fable 5 thinks unconditionally and 400s on {type:"disabled"} — leave it off.
-  withEnv({ ATLAS_BEDROCK_ALLOW_NON_EEA: "1" }, () => {
-    const onFable = toBedrockRequest({
-      model: "global.anthropic.claude-fable-5",
-      messages: [{ role: "user", content: "hi" }],
-    });
-    expect(onFable.invokeBody.thinking).toBeUndefined();
+  const onFable = toBedrockRequest({
+    model: "global.anthropic.claude-fable-5",
+    messages: [{ role: "user", content: "hi" }],
   });
+  expect(onFable.invokeBody.thinking).toBeUndefined();
 });
 
 test("toBedrockRequest: stream=true selects the streaming endpoint", () => {

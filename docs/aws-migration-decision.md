@@ -1,5 +1,33 @@
 # Atlas → AWS migration — decision record
 
+## UPDATE 2026-08-02 — DECISION: EEA confinement withdrawn; non-EU models permitted
+
+**Reverses the residency position taken on 2026-07-28**, which is restated in several places below and should be read as superseded wherever it appears.
+
+**Why.** The EEA-only rule was costing us the frontier tier outright. Fable 5 has **no `eu.` inference profile in existence**, and Sonnet 5 / Opus 5 / Opus 4.8 have never returned a successful `InvokeModel` in `eu-central-1`. Staying EEA-confined therefore meant staying permanently a model tier below the best available — not as a temporary entitlement wait, but structurally. Capability won.
+
+**What changed, precisely:**
+
+| | Before | After |
+|---|---|---|
+| Guard | `assertEeaProfile` — threw on non-`eu.` unless `ATLAS_BEDROCK_ALLOW_NON_EEA=1` | `assertAllowedProfile` — permits non-`eu.`; `ATLAS_BEDROCK_EEA_ONLY=1` restores confinement |
+| `TIER_DEFAULT` | all `eu.` | **all `eu.` — unchanged** |
+| Rust env forwarding | `AWS_*` + `ATLAS_AI_PROVIDER` only | + five `BEDROCK_MODEL_*` overrides + `ATLAS_BEDROCK_EEA_ONLY`, from the Keychain |
+| IAM | `inference-profile/eu.anthropic.claude-*` | + `global.anthropic.claude-*` (us-east-1 ARN) + `foundation-model/anthropic.*` |
+| Privacy policy | background tier "processed inside the EEA", explicitly *not* a transfer | split withdrawn; AWS listed as a third-country transfer on an SCC basis |
+
+**Three things deliberately NOT done, each for a reason worth keeping:**
+
+1. **No default moved.** Permitting a non-EEA profile and routing to one are separate decisions; only the first was taken. An ordinary install still runs entirely on `eu.` profiles. Guarded by a test.
+2. **Fable 5 still has no `TIER_DEFAULT` entry.** Not for residency reasons any more — for the rule that binds every tier: a default may only name a profile a live `InvokeModel` has answered on. Nothing has invoked Fable yet.
+3. **The guard was inverted, not deleted.** With the `foundation-model/anthropic.*` wildcard in IAM, the policy is now a *name filter* rather than a geographic boundary, so `ATLAS_BEDROCK_EEA_ONLY=1` is the only remaining containment control. It is also the one-line revert, and the switch an enterprise/DPA-constrained deployment would turn on.
+
+**Outstanding, in order:** ① account owner applies `docs/aws-iam-bedrock-invoke-policy.json`; ② account owner requests model access in **us-east-1** (separate from eu-central-1) and does the per-model Marketplace bootstrap invoke; ③ live-invoke verification, then promote a default in a commit citing it; ④ **deploy the privacy policy — this must be live before any non-EEA profile serves a real request.**
+
+Full checklist: `docs/aws-bedrock-non-eea-enablement.md`.
+
+---
+
 ## UPDATE 2026-07-28 — DECISION: Path A now (Bedrock, credits), designed for a one-flip move to B
 
 Supersedes the "recommend B / hybrid" framing below. Reason: **we are credit-dependent now**, so inference runs on Bedrock (credit-eligible — `AmazonBedrockFoundationModels` confirmed on the FOUNDERS allowlist). The plan is built so migrating to **Claude Platform on AWS (Path B)** later is a **config flip, not a rewrite**.
@@ -21,7 +49,7 @@ Supersedes the "recommend B / hybrid" framing below. Reason: **we are credit-dep
 **Model mapping — Opus 5 / Fable 5 (2026-07-28).** Both are now *named* tiers, neither is a default:
 - **Opus 5 — residency-clean, entitlement-blocked.** `eu.anthropic.claude-opus-5` exists and matches the `eu.anthropic.claude-*` IAM resource, so it costs **zero policy change**. But it has never returned a successful `InvokeModel`, and listing ≠ entitlement (the trap that already caught sonnet-5 / opus-4-8 / opus-4-7). So the `claude-opus-5` tier key resolves to the verified `eu.anthropic.claude-opus-4-6-v1` and the new id is reachable only via `BEDROCK_MODEL_OPUS_5`. **Promote it to the default table only in a commit whose message cites a live invocation** — a wrong default is user-visible on Bedrock, since a streaming `AccessDeniedException` arrives as an in-band frame and is injected into the transcript as text.
 - **Fable 5 — residency-blocked, full stop.** There is **no `eu.` Fable profile**; the only one is `global.anthropic.claude-fable-5`, and a `global.` cross-region profile routes worldwide by definition. Bedrock has no `inference_geo` escape hatch (that is P-AWS-only, noted below) — **on Bedrock the EU guarantee IS the profile prefix.** Enabling it would require *both* widening `AtlasBedrockInvoke` to the global profile ARN **and** the underlying `arn:aws:bedrock:*::foundation-model/…` wildcard (which turns the policy from a containment mechanism into a name filter), *and* rewriting the §7 privacy delta below: the "EU win" bullet would have to be **deleted**, the §6 country cell would split ("EU for background summarisation; US/global for frontier reasoning"), and §8 would gain an AWS third-country-transfer entry on an SCC basis. Fable additionally mandates 30-day retention and is unavailable under zero-data-retention. It therefore has **no default entry at all** (mapping throws) and needs *two* deliberate env vars to reach.
-- **Residency is now enforced in code, not only in IAM.** `mapModelToBedrock` refuses any resolved id that is not `eu.` unless `ATLAS_BEDROCK_ALLOW_NON_EEA=1`. Previously IAM was the single point of failure — one console edit would have silently unlocked worldwide routing, since `BEDROCK_ID` whitelists `global.` for passthrough. Never set that flag in a shipped build.
+- **Residency is now enforced in code, not only in IAM.** `mapModelToBedrock` refuses any resolved id that is not `eu.` unless `ATLAS_BEDROCK_ALLOW_NON_EEA=1`. Previously IAM was the single point of failure — one console edit would have silently unlocked worldwide routing, since `BEDROCK_ID` whitelists `global.` for passthrough. Never set that flag in a shipped build. **↳ REVERSED 2026-08-02 — see the update at the top of this file. The flag is now `ATLAS_BEDROCK_EEA_ONLY=1` and the default is permissive.**
 - **Unknown tiers now throw at map time** instead of synthesising `eu.anthropic.${tier}`. That old fallback invented plausible-looking profile ids with no existence check — for Fable it invented a broken one.
 - **`thinking` is stated, not implied.** `toBedrockRequest` drops `thinking`/`output_config`, which means *no thinking* on Opus 4.6 but *thinking on* for Opus 5 (and unconditionally for Fable 5). With `DEFAULT_MAX_TOKENS = 4096` capping thinking + text together, that would truncate background summaries and cost materially more — so the adapter sends `thinking: {type:"disabled"}` explicitly for Opus 5, and omits it for Fable 5 (which 400s on `disabled`).
 - **Streaming needed more than expected:** Bedrock streams the AWS binary event-stream (`application/vnd.amazon.eventstream`), not `text/event-stream`. Each frame wraps a base64 Anthropic SSE event, so the adapter carries a frame decoder that buffers across reads and surfaces post-header exception frames *inside* the stream (the only way a throttling error reaches the user).

@@ -95,10 +95,12 @@ const TIER_ENV: Record<string, string> = {
  * SPECIFIC model once. Adding a new profile here therefore needs a one-time
  * bootstrap invoke by an admin — the IAM policy alone is not enough.
  *
- * All defaults are `eu.` profiles, which keeps inference inside the EEA — the
- * residency guarantee the privacy policy leans on (docs/aws-migration-decision.md
- * §7). `assertEeaProfile` below enforces that in code rather than trusting the
- * IAM policy to be the only line of defence.
+ * All defaults are still `eu.` profiles. That is now a PREFERENCE rather than a
+ * hard guarantee: as of 2026-08-02 non-EEA profiles are permitted (see
+ * `assertAllowedProfile`), so the published policy describes a split rather than
+ * EEA-confinement. Keeping every *default* on `eu.` means the residency posture
+ * only changes where a model genuinely has no EU profile — it never drifts by
+ * accident.
  */
 const TIER_DEFAULT: Record<string, string> = {
   "claude-haiku-4-5": "eu.anthropic.claude-haiku-4-5-20251001-v1:0",
@@ -115,30 +117,29 @@ const TIER_DEFAULT: Record<string, string> = {
 /**
  * Fable 5 has NO `eu.` inference profile. The only way to reach it on Bedrock is
  * `global.anthropic.claude-fable-5`, and a `global.` cross-region profile routes
- * to whichever region has capacity, WORLDWIDE — it is by definition not
- * EEA-confined, and Bedrock has no `inference_geo` escape hatch (that parameter
- * is Claude-Platform-on-AWS only). On Bedrock the EU guarantee IS the profile
- * prefix.
+ * to whichever region has capacity, WORLDWIDE. Bedrock has no `inference_geo`
+ * escape hatch (that parameter is Claude-Platform-on-AWS only), so on Bedrock the
+ * routing geography IS the profile prefix.
  *
- * So enabling Fable 5 is a POLICY decision, not a config decision. It is blocked
- * twice over, and BOTH blockers must be lifted deliberately:
+ * **Both blockers were lifted deliberately on 2026-08-02** (decision: reach the
+ * frontier tier; see docs/aws-migration-decision.md, "UPDATE 2026-08-02"):
  *
- *   1. IAM — `AtlasBedrockInvoke` grants only
- *      `inference-profile/eu.anthropic.claude-*`. Reaching Fable needs the
- *      global profile ARN (anchored in us-east-1) *and* the underlying
- *      foundation-model ARNs in every region the profile can route to — i.e. a
- *      `arn:aws:bedrock:*::foundation-model/...` wildcard. That deletes the
- *      containment property and leaves the policy as a name filter.
- *   2. PRIVACY POLICY — the planned §6 processor row commits background
- *      inference to "EU (Frankfurt/Ireland)"
- *      (docs/aws-migration-decision.md:87-88). Fable removes that slice
- *      entirely, requiring a §8 third-country-transfer entry on an SCC basis.
- *      Fable additionally mandates 30-day retention and is unavailable under
- *      zero-data-retention.
+ *   1. IAM — `AtlasBedrockInvoke` was widened to the global profile ARN plus the
+ *      underlying `arn:aws:bedrock:*::foundation-model/anthropic.*` wildcard the
+ *      global profile needs in each region it can route to. See
+ *      `docs/aws-iam-bedrock-invoke-policy.json`. The policy is now a name
+ *      filter, not a containment mechanism — that is the accepted cost.
+ *   2. PRIVACY POLICY — §4.3/§6/§7 no longer claim EEA-confinement for the
+ *      background tier; AWS is listed as a third-country transfer on an SCC
+ *      basis, and §8 discloses Fable's mandatory 30-day retention (it is
+ *      unavailable under zero-data-retention).
  *
- * Hence: no `TIER_DEFAULT` entry (mapping throws), and reaching it requires BOTH
- * `BEDROCK_MODEL_FABLE_5` and `ATLAS_BEDROCK_ALLOW_NON_EEA=1`. Never set either
- * in a shipped build.
+ * What has NOT changed: Fable still has no `TIER_DEFAULT` entry, so mapping a
+ * bare `claude-fable-5` still throws. Reaching it takes one deliberate act —
+ * setting `BEDROCK_MODEL_FABLE_5` — rather than two. That is not residency
+ * caution any more; it is the same rule every other tier obeys, that a default
+ * may only name a profile a live `InvokeModel` has answered on (see
+ * `TIER_DEFAULT` above). Promote it in a commit that cites one.
  */
 function bedrockIdForTier(tier: string): string {
   // Guard the lookup rather than passing `?? ""` to Deno.env.get: real Deno
@@ -166,26 +167,37 @@ function bedrockIdForTier(tier: string): string {
  * A value that is already a resolved Bedrock/inference-profile id. Non-`eu.`
  * prefixes are RECOGNISED here (so an explicit env override is passed through
  * verbatim rather than being re-prefixed into nonsense) but not AUTHORISED —
- * `assertEeaProfile` is the authorisation step.
+ * `assertAllowedProfile` is the authorisation step.
  */
 const BEDROCK_ID = /^(eu|us|apac|global|anthropic)\./;
 
 /**
- * A non-`eu.` profile routes OUTSIDE the EEA. Previously the argument was that
- * "the IAM policy, not this regex, is what keeps traffic in the EEA" — but that
- * made a single console edit to `AtlasBedrockInvoke` enough to silently unlock
- * worldwide routing everywhere, with zero resistance from the code. This flag
- * makes the residency commitment self-enforcing and makes any future non-EEA
- * traffic a deliberate, greppable act rather than a copy-pasted env var.
+ * A non-`eu.` profile routes OUTSIDE the EEA.
+ *
+ * Until 2026-08-02 this refused outright unless `ATLAS_BEDROCK_ALLOW_NON_EEA=1`,
+ * because the published policy committed the background tier to the EEA. That
+ * commitment was deliberately relaxed so the frontier tier (Fable 5, which has no
+ * `eu.` profile at all) is reachable, and §4.3/§6/§7 of the privacy policy were
+ * rewritten to describe a split instead. So the default flipped: non-EEA profiles
+ * are ALLOWED, and `ATLAS_BEDROCK_EEA_ONLY=1` restores containment.
+ *
+ * The inverse flag is kept rather than deleting the check, for two reasons. It is
+ * the one-line revert if the policy position changes back, and it is the switch a
+ * future EEA-only deployment (an enterprise tenant, a DPA that demands it) turns
+ * on without a code change. Deleting the guard would make that a rewrite.
+ *
+ * NOTE the asymmetry with IAM: `AtlasBedrockInvoke` is now a name filter rather
+ * than a containment mechanism, so this function is no longer a second line of
+ * defence over it — it is the only one. Setting `ATLAS_BEDROCK_EEA_ONLY=1` is
+ * therefore a real control, not belt-and-braces.
  */
-function assertEeaProfile(id: string): string {
+function assertAllowedProfile(id: string): string {
   if (id.startsWith("eu.")) return id;
-  if (Deno.env.get("ATLAS_BEDROCK_ALLOW_NON_EEA") === "1") return id;
+  if (Deno.env.get("ATLAS_BEDROCK_EEA_ONLY") !== "1") return id;
   throw new Error(
-    `[bedrock] refusing to invoke non-EEA inference profile "${id}": the privacy ` +
-      `policy commits background inference to EU (Frankfurt/Ireland). Leaving the ` +
-      `EEA requires a widened AtlasBedrockInvoke IAM resource AND a published ` +
-      `privacy-policy change; set ATLAS_BEDROCK_ALLOW_NON_EEA=1 only once both have landed.`,
+    `[bedrock] refusing to invoke non-EEA inference profile "${id}": ` +
+      `ATLAS_BEDROCK_EEA_ONLY=1 confines this deployment to the EEA, and "${id}" ` +
+      `routes outside it. Unset the flag, or map this tier to an eu. profile.`,
   );
 }
 
@@ -199,8 +211,8 @@ function assertEeaProfile(id: string): string {
  * it as unknown and collapse everything to the default tier.
  */
 export function mapModelToBedrock(model: string): string {
-  if (BEDROCK_ID.test(model)) return assertEeaProfile(model);
-  return assertEeaProfile(bedrockIdForTier(mapModelToClaude(model)));
+  if (BEDROCK_ID.test(model)) return assertAllowedProfile(model);
+  return assertAllowedProfile(bedrockIdForTier(mapModelToClaude(model)));
 }
 
 /**

@@ -155,7 +155,7 @@ fn spawn_atlas_brain(token: &str) -> SidecarSpawn {
     // stored memories) to a processor the privacy policy does not disclose.
     if let Some(k) = secrets::core_key("anthropic_api_key") { cmd.env("ANTHROPIC_API_KEY", k); }
 
-    // Amazon Bedrock (background inference on AWS Activate credits, EU-resident).
+    // Amazon Bedrock (background inference on AWS Activate credits).
     // Both halves of the AWS credential must be present or neither is injected:
     // a half-configured pair makes aiGateway fail closed with a confusing "no AI
     // key configured" instead of an obvious missing-credential error.
@@ -164,12 +164,37 @@ fn spawn_atlas_brain(token: &str) -> SidecarSpawn {
         secrets::core_key("aws_secret_access_key"),
     ) {
         cmd.env("AWS_ACCESS_KEY_ID", id).env("AWS_SECRET_ACCESS_KEY", secret);
-        // eu-central-1 is where the eu.anthropic.* inference profiles live; the
-        // `eu.` prefix is what keeps background inference inside the EEA.
+        // eu-central-1 is where the eu.anthropic.* inference profiles live, and
+        // it stays the default even now that non-EEA profiles are permitted: a
+        // `global.` profile is invoked through a regional endpoint and routes
+        // from there, so the region governs where the request ENTERS AWS, not
+        // where the model runs.
         cmd.env(
             "AWS_REGION",
             secrets::core_key("aws_region").unwrap_or_else(|| "eu-central-1".to_string()),
         );
+        // Per-tier model overrides. Without these, `BEDROCK_MODEL_*` was a
+        // dev/CI-only lever — a Finder-launched .app inherits no shell env, so a
+        // shipped build could never reach a non-default profile (which is how
+        // Fable 5 stayed unreachable regardless of what the guard allowed).
+        // Forwarding them from the Keychain makes model choice a config change.
+        for (account, var) in [
+            ("bedrock_model_haiku", "BEDROCK_MODEL_HAIKU"),
+            ("bedrock_model_sonnet", "BEDROCK_MODEL_SONNET"),
+            ("bedrock_model_opus", "BEDROCK_MODEL_OPUS"),
+            ("bedrock_model_opus_5", "BEDROCK_MODEL_OPUS_5"),
+            ("bedrock_model_fable_5", "BEDROCK_MODEL_FABLE_5"),
+        ] {
+            if let Some(v) = secrets::core_key(account) {
+                cmd.env(var, v);
+            }
+        }
+        // Opt-in EEA confinement. Absent = the shipped default, which permits
+        // non-EEA inference profiles and is what the published privacy policy
+        // (§4.3/§6/§7, 2 Aug 2026) describes.
+        if let Some(v) = secrets::core_key("atlas_bedrock_eea_only") {
+            cmd.env("ATLAS_BEDROCK_EEA_ONLY", v);
+        }
         // Switching providers stays EXPLICIT: having AWS keys in the Keychain
         // must not silently redirect inference away from Anthropic. Only the
         // stored atlas_ai_provider preference flips it.

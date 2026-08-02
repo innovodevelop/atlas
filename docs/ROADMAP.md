@@ -43,12 +43,25 @@ The app listens for **"Hey Jarvis"** (the only model that ships) while the UI an
 the atlas-site privacy policy say **"Hey Atlas"**. Either train the model
 (blocked on item 1) or correct the copy. Do not ship the mismatch.
 
-### 3. Privacy-policy delta for Bedrock
+### 3. Privacy-policy delta for Bedrock — now two deltas, one deploy
 
 `atlas-site/public/privacy.html` has an uncommitted delta stating the digest
 "now runs on AWS EU". Bedrock **is** live, so this is now overdue rather than
 premature. It must deploy with the app build that has the Bedrock provider
 active — and must be stashed around any unrelated atlas-site deploy.
+
+**Stacked on top of it (2026-08-02): the EEA-confinement withdrawal.** §2, §4.3,
+§4.7, §5, §6, §7 and §8 were rewritten to remove the "background inference is
+processed inside the EEA, and is therefore not a third-country transfer" claim,
+because non-EU inference profiles are now permitted in code. **Sequencing is
+load-bearing: this text must be live before any non-EEA profile serves a real
+request.** No default routes to one today, so nothing is currently false — the
+gap opens the moment a `BEDROCK_MODEL_*` override names a `global.` id.
+
+Withdrawing a published residency guarantee is a **material change** under §12
+("Material changes will be communicated in the app or by email"). Deploying the
+page is not sufficient on its own; the notice is owed to anyone already running
+Atlas.
 
 **Riding along with this deploy:** `atlas-site/public/favicon.svg` is also
 modified and uncommitted (the 2026-08-02 icon retune — the mark was illegible at
@@ -85,7 +98,12 @@ Exposed in a transcript. Still valid. Security item, user-only.
 - Decide the release-home repo and align the updater endpoint
 - Back up the updater private key; set CI signing secrets
 - Shrink the download (e5 model out of the sidecar binary)
-- Request Bedrock access for Opus 5 / Sonnet 5 / Opus 4.8 (a form, not IAM)
+- Request Bedrock access for Opus 5 / Sonnet 5 / Opus 4.8 / Fable 5 — now in
+  **us-east-1** for the `global.` profiles as well as eu-central-1, since access
+  does not carry between regions. Needs the widened IAM policy first
+  (`docs/aws-iam-bedrock-invoke-policy.json`) and a per-model Marketplace
+  bootstrap invoke by an admin identity. Full checklist:
+  `docs/aws-bedrock-non-eea-enablement.md`
 - Fold `atlas-snaptrade` Keychain items into a consolidated blob
 - Mastercard Open Finance integration build
 
