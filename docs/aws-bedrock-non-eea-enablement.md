@@ -90,22 +90,62 @@ Things to understand before applying it:
   Managed policies cap at **five versions**; the account was at two before this,
   so v3 fits. Past five, delete an old version first.
 
-## 2. Request model access — **account owner, AWS console**
+## 1b. STATUS 2026-08-02 — IAM is DONE and functionally verified
 
-IAM permits the call; it does not grant entitlement. Bedrock → **Model access**,
-in **`us-east-1`** for the global profiles, and request:
+v4 was applied through the IAM console (create-policy-version, set as default)
+and confirmed by measurement, not by reading the policy back:
 
-- `anthropic.claude-fable-5`
-- `anthropic.claude-opus-5`, `anthropic.claude-opus-4-8`, `anthropic.claude-sonnet-5`
+| Probe (as `atlas-brain`) | Before v4 | After v4 |
+|---|---|---|
+| `global.anthropic.claude-*` from eu-central-1 | `User ... is not authorized to perform: bedrock:InvokeModel` | `anthropic.claude-* is not available for this account` |
+| `eu.anthropic.claude-sonnet-4-6` (control) | real completion | real completion |
 
-Subscriptions are **per-model** and go through AWS Marketplace on first invoke. A
-least-privilege caller cannot complete that step — it fails with *"not authorized
-to perform the required AWS Marketplace actions"* until an identity holding
-`aws-marketplace:Subscribe` invokes **that specific model** once. So expect one
-bootstrap invoke per model from an admin identity, not just an approved form.
+The error moving from *permission* to *entitlement* is the proof. The control
+model still answering proves credentials and the signing path are untouched.
 
-Also note: **`us-east-1` model access is separate from `eu-central-1`.** Access
-granted in one region does not carry to the other.
+## 2. Model entitlement — **the remaining gate**
+
+> ⚠️ **The Bedrock "Model access" page has been RETIRED** (observed in-console
+> 2026-08-02). Earlier revisions of this document, and the roadmap task "request
+> Bedrock access", describe a form that no longer exists. Do not go looking for it.
+
+AWS's replacement text, verbatim from the retired page:
+
+> Serverless foundation models are now automatically enabled across all AWS
+> commercial regions when first invoked in your account […] Note that for
+> Anthropic models, first-time users may need to submit use case details before
+> they can access the model. For models served from AWS Marketplace, a user with
+> AWS Marketplace permissions must invoke the model once to enable it
+> account-wide for all users.
+
+So enablement is now **an invoke, not a request**, and the path is:
+
+1. Bedrock → **Model catalog** → *Claude Fable 5* → **Open in playground**.
+2. Send one message. If a use-case-details form appears, complete it — that is
+   the Anthropic gate the text above refers to.
+3. Repeat for Opus 5 / Sonnet 5 / Opus 4.8 if those tiers are wanted.
+
+Doing this from the **console** matters: it runs as the signed-in admin, which
+holds the Marketplace permissions the account-wide enablement needs.
+`atlas-brain` holds `aws-marketplace:Subscribe` and `ViewSubscriptions` and still
+gets `not available for this account`, so its Marketplace grant is **not**
+sufficient on its own — the observed failure is the Anthropic use-case gate, not
+a Marketplace-permission error (that one reads *"not authorized to perform the
+required AWS Marketplace actions"*, which we never saw).
+
+**Known automation blocker:** the Bedrock playground page wedges browser
+automation — script injection times out repeatedly and neither a screenshot nor
+an accessibility read completes. This step has to be done by hand.
+
+### A `us.` profile exists, and IAM does not cover it
+
+Opening Fable 5 from the catalog defaults the playground to
+`arn:aws:bedrock:us-east-1:389642461729:inference-profile/us.anthropic.claude-fable-5`
+— so a **US regional** profile exists alongside the global one. v4 grants `eu.`
+(eu-central-1) and `global.` (any region) but **not `us.`**. That is fine for the
+app, which invokes from eu-central-1 where a `us.` regional profile is not usable
+anyway. If a `us.` profile is ever wanted, it needs its own resource line; the
+code already permits the prefix, so IAM would be the only blocker.
 
 ## 3. Verify, then promote a default — **runnable once 1 and 2 land**
 

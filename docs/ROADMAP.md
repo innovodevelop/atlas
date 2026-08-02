@@ -98,12 +98,13 @@ Exposed in a transcript. Still valid. Security item, user-only.
 - Decide the release-home repo and align the updater endpoint
 - Back up the updater private key; set CI signing secrets
 - Shrink the download (e5 model out of the sidecar binary)
-- Request Bedrock access for Opus 5 / Sonnet 5 / Opus 4.8 / Fable 5 — now in
-  **us-east-1** for the `global.` profiles as well as eu-central-1, since access
-  does not carry between regions. Needs the widened IAM policy first
-  (`docs/aws-iam-bedrock-invoke-policy.json`) and a per-model Marketplace
-  bootstrap invoke by an admin identity. Full checklist:
-  `docs/aws-bedrock-non-eea-enablement.md`
+- Enable Fable 5 / Opus 5 / Sonnet 5 / Opus 4.8 on Bedrock. **IAM is done** (v4,
+  applied and functionally verified 2026-08-02). What remains is entitlement, and
+  **there is no longer an access-request form** — the Bedrock "Model access" page
+  has been retired. Enablement now happens by opening the model in the console
+  playground and invoking it once as an admin, completing the Anthropic use-case
+  form if prompted. The playground page wedges browser automation, so this step
+  is manual. Full detail: `docs/aws-bedrock-non-eea-enablement.md`
 - Fold `atlas-snaptrade` Keychain items into a consolidated blob
 - Mastercard Open Finance integration build
 
