@@ -213,8 +213,24 @@ export function BudgetSettingsPanel() {
                 <Zap className="h-4 w-4 text-destructive" />
                 Auto-disable Learning
               </Label>
+              {/*
+                Honest copy. This setting persists to `atlas_budget_settings`
+                and the column exists (db_schema.sql:693), but NOTHING reads it
+                to actually pause anything — verified repo-wide. Its sibling
+                `alerts_enabled` IS read (useSpendingAlerts.ts:156,
+                SpendingAlertBanner.tsx:25), which is what makes the asymmetry
+                easy to miss.
+
+                Left visible and switchable rather than deleted, because the
+                preference is worth recording and the storage is real — but the
+                copy now says what it does instead of what it implies. It must
+                not read as an active safety net; someone relying on it to cap
+                spend would be relying on nothing.
+              */}
               <p className="text-xs text-muted-foreground">
-                Automatically pause learning when budget is exceeded
+                Records your preference to pause learning when the budget is
+                exceeded. <strong>Not enforced yet</strong> — nothing currently
+                acts on it, so treat the budget alert as the live control.
               </p>
             </div>
             <Switch

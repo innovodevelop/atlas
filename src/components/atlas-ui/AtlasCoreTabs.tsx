@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Search, Database, FileText, BookOpen, Loader, Clock, Bot, Zap, CheckCircle2, AlertTriangle, Radio } from 'lucide-react';
+import { Search, Database, FileText, BookOpen, Loader, Clock, Bot, Zap, CheckCircle2, AlertTriangle, Radio, Brain } from 'lucide-react';
 import { useBrainSearch } from '@/hooks/useBrainSearch';
 import { useAtlasKnowledge } from '@/hooks/useAtlasKnowledge';
 import { useAtlasResearch } from '@/hooks/useAtlasResearch';
@@ -7,6 +7,7 @@ import { useAtlasLearning } from '@/hooks/useAtlasLearning';
 import { useAgents } from '@/hooks/useAgents';
 import { useApprovals } from '@/hooks/useApprovals';
 import { useAtlasProviderStatus } from '@/hooks/useAtlasProviderStatus';
+import { useAtlasMemory } from '@/hooks/useAtlasMemory';
 import { Empty, Panel, Row } from './primitives';
 
 // Atlas Core tab panels — Workshop design's 8-view Core, wired to real data.
@@ -163,6 +164,56 @@ function ResearchTab() {
   );
 }
 
+/**
+ * The Memory tab — the eighth tab the design plan specified and the screen
+ * never had. `docs/ROADMAP.md`: "Atlas Core: Memory tab — Specified, never
+ * built | Plan called for 8 tabs; AtlasCoreScreen.tsx has 7."
+ *
+ * Read-only by design. Forget-one and erase-all already live in
+ * Settings → Memory & Privacy with a typed confirmation; putting a second copy
+ * of a GDPR-relevant destructive control here would mean two places to keep
+ * right. Core answers "what does Atlas know"; Settings owns "make it forget".
+ */
+function MemoryTab() {
+  const { memories, byCategory, state, message } = useAtlasMemory();
+  const categories = Object.keys(byCategory).sort();
+  const recent = memories.slice(0, 8);
+
+  return (
+    <div className="coregrid">
+      <Panel icon={<Database className="i16" />} title="What Atlas remembers">
+        {categories.map((c) => (
+          <Row
+            key={c}
+            lead={<span className="flowdot"><Brain className="i16" /></span>}
+            title={<span style={{ textTransform: 'capitalize' }}>{c.replace(/_/g, ' ')}</span>}
+            meta={`${byCategory[c].length} ${byCategory[c].length === 1 ? 'memory' : 'memories'}`}
+          />
+        ))}
+        {state === 'loading' && <Empty body="Reading local memory…" />}
+        {state === 'ready' && categories.length === 0 && (
+          <Empty body="Nothing stored yet. Atlas writes a memory when something is worth keeping." status="resting" />
+        )}
+        {state === 'unavailable' && <Empty body={message ?? 'Unavailable here.'} status="stale" />}
+        {state === 'error' && <Empty body={message ?? 'Could not read memory.'} status="error" />}
+      </Panel>
+
+      <Panel icon={<FileText className="i16" />} title="Most recent">
+        {recent.map((m) => (
+          <Row
+            key={m.id}
+            lead={<span className="kbico"><FileText className="i16" /></span>}
+            title={m.key}
+            meta={`${m.category}${m.importance != null ? ` · importance ${m.importance}` : ''}`}
+          />
+        ))}
+        {state === 'ready' && recent.length === 0 && <Empty body="No memories to show." />}
+        {state !== 'ready' && <Empty body="Manage and erase memories in Settings → Memory & Privacy." />}
+      </Panel>
+    </div>
+  );
+}
+
 function LearningTab() {
   const { validationLogs, learningMetrics } = useAtlasLearning();
   const logs = (validationLogs ?? []).slice(0, 6);
@@ -202,6 +253,7 @@ export const AtlasCoreTabs = memo(({ tab }: { tab: string }) => {
     case 'knowledge': return <KnowledgeTab />;
     case 'research': return <ResearchTab />;
     case 'learning': return <LearningTab />;
+    case 'memory': return <MemoryTab />;
     default: return null;
   }
 });

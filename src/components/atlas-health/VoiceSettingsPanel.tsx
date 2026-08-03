@@ -101,20 +101,33 @@ export const VoiceSettingsPanel = () => {
       </div>
 
       <div className="grid gap-4 pl-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label htmlFor="voice-isolation">Voice isolation</Label>
-            <p className="text-xs text-muted-foreground">
-              Removes background noise and other voices before transcribing.
-              Improves accuracy in noisy places; adds ~1s and uses extra credits.
-            </p>
-          </div>
-          <Switch
-            id="voice-isolation"
-            checked={settings.voiceIsolation}
-            onCheckedChange={(checked) => setSetting('voiceIsolation', checked)}
-          />
-        </div>
+        {/*
+          The "Voice isolation" switch was removed here, deliberately.
+
+          It promised: "Removes background noise and other voices before
+          transcribing. Improves accuracy in noisy places; adds ~1s and uses
+          extra credits." None of that happened. The ONLY occurrences of
+          `voiceIsolation` in the entire repo were its type declaration
+          (useAtlasSettings.ts:52) and its default (:184) — nothing in
+          useVoiceSession.ts, services/voice-gateway/ or src-tauri/ ever read
+          it. It was a switch that stored a boolean and changed nothing, while
+          telling the user it cost them time and money.
+
+          Compare `ttsModel` in this same panel, which IS plumbed through
+          (AtlasDashboard.tsx:102 -> useVoiceSession.ts:200 ->
+          voice-gateway/src/session.ts:309). That is what a wired control looks
+          like.
+
+          To bring it back properly: ElevenLabs exposes audio isolation as its
+          own endpoint, so the gateway would need to run the captured audio
+          through that before handing it to Scribe, and `voiceIsolation` would
+          have to reach the gateway the way `ttsModel` does. Until someone does
+          that, the honest UI is no control at all.
+
+          The `voiceIsolation` key is left in useAtlasSettings for now rather
+          than removed, because that file is owned by the sphere/music track
+          this week and a stored key costs nothing. It has no reader.
+        */}
       </div>
     </div>
   );

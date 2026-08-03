@@ -6,17 +6,25 @@ import {
 } from 'lucide-react';
 import { AtlasSphereLazy as AtlasSphere } from '@/components/atlas/AtlasSphereLazy';
 import { AtlasCoreTabs } from '@/components/atlas-ui/AtlasCoreTabs';
-import { Button, Panel, Row, StatTile } from '@/components/atlas-ui/primitives';
+import { Button, Empty, Panel, Row, StatTile } from '@/components/atlas-ui/primitives';
 import { useAtlasHealth } from '@/hooks/useAtlasHealth';
+import { useAtlasKnowledge } from '@/hooks/useAtlasKnowledge';
+import { useAtlasResearch } from '@/hooks/useAtlasResearch';
+import { errorSeverityGlyph, useAtlasErrorLog } from '@/hooks/useAtlasErrorLog';
 
+// `badge: 3` was a hardcoded literal on the Agent tab — it never counted
+// anything. The Agent tab's own pending-approvals count is real
+// (`useApprovals`), so a badge belongs there or nowhere; it does not belong
+// here as a constant. Removed rather than faked.
 const TABS = [
   { key: 'search', label: 'Search', icon: Search },
   { key: 'overview', label: 'Overview', icon: Activity },
   { key: 'live', label: 'Live', icon: Radio, live: true },
-  { key: 'agent', label: 'Agent', icon: Bot, badge: 3 },
+  { key: 'agent', label: 'Agent', icon: Bot },
   { key: 'knowledge', label: 'Knowledge', icon: Brain },
   { key: 'research', label: 'Research', icon: BookOpen },
   { key: 'learning', label: 'Learning', icon: Zap },
+  { key: 'memory', label: 'Memory', icon: Database },
 ];
 
 // Atlas Atlas Core — Intelligence Center (design: Atlas — Atlas Core).
@@ -64,7 +72,6 @@ const AtlasCoreScreen = () => {
             return (
               <button key={t.key} className={`ctab ${tab === t.key ? 'on' : ''}`} onClick={() => setTab(t.key)}>
                 <Icon className="i14" />{t.label}
-                {t.badge && <span className="badge">{t.badge}</span>}
                 {t.live && <span className="live" />}
               </button>
             );
@@ -73,47 +80,89 @@ const AtlasCoreScreen = () => {
 
         {tab !== 'overview' && <AtlasCoreTabs tab={tab} />}
 
-        {tab === 'overview' && (
-        <div className="coregrid">
-          {/* The per-panel `--pc` accent hue is gone with the coloured ring it
-              drove; panels are separated by fill and space now.
-              STILL FABRICATED, and out of T1's scope: the throughput figures,
-              the four knowledge rows and the four error rows below are
-              hardcoded, and sit directly above a real "Indexed — 0 total".
-              Extracting them into typed primitives does not make them true. */}
-          <Panel title="Real-time Data Flow" icon={<Database className="i16" />}>
-            <FlowRow icon={<DownloadCloud className="i16" />} title="Ingestion" meta="1,204 docs/hr" width="82%" />
-            <FlowRow icon={<Cpu className="i16" />} title="Processing" meta="18 pipelines" width="64%" />
-            <FlowRow icon={<CheckCircle2 className="i16" />} title="Validation" meta="99.2% pass" width="99%" />
-            <FlowRow icon={<Database className="i16" />} title="Indexed" meta={`${(stats?.knowledgeCount ?? 0).toLocaleString()} total`} width="74%" />
-          </Panel>
-
-          <Panel title="Recent Knowledge" icon={<Brain className="i16" />}>
-            <KbRow title="Transformer scaling laws — 2026 review" meta="arXiv · indexed 4 min ago · 0.94 relevance" />
-            <KbRow title="EU AI Act — compliance summary" meta="Policy · indexed 22 min ago · 0.89 relevance" />
-            <KbRow title="Vector DB benchmarks Q2" meta="Engineering · indexed 1h ago · 0.86 relevance" />
-            <KbRow title="Retrieval-augmented agents survey" meta="arXiv · indexed 2h ago · 0.83 relevance" />
-          </Panel>
-
-          <Panel title="Research Queue" icon={<BookOpen className="i16" />}>
-            <QRow running title="Multimodal reasoning benchmarks" meta="running · 3 sources" pct={72} />
-            <QRow running title="On-device inference costs" meta="running · 5 sources" pct={41} />
-            <QRow title="Agent memory architectures" meta="queued · 2 sources" pct={8} />
-            <QRow title="Prompt caching strategies" meta="queued · 4 sources" pct={0} />
-          </Panel>
-
-          <Panel title="Recent Errors" icon={<AlertTriangle className="i16" />}>
-            <ErrRow sev="w" msg="Rate limit approached — provider gemini" meta="warning · 11:42:08 · auto-throttled" />
-            <ErrRow sev="i" msg="Cache miss on embedding batch #4821" meta="info · 11:38:51 · recomputed" />
-            <ErrRow sev="e" msg="Timeout fetching source (retry 2/3)" meta="error · 11:31:20 · recovered" />
-            <ErrRow sev="i" msg='Schedule "daily-digest" completed' meta="info · 06:00:04 · 3 insights" />
-          </Panel>
-        </div>
-        )}
+        {tab === 'overview' && <OverviewTab knowledgeCount={stats?.knowledgeCount ?? 0} />}
       </div>
     </div>
   );
 };
+
+/**
+ * The Overview tab.
+ *
+ * Every row here used to be invented. `docs/ROADMAP.md` flagged it as a
+ * violation of the design plan's own rule — "honest UI, not fake data" — and
+ * the 2026-08-03 audit found it was worse than that: a *regression*. The legacy
+ * `/atlas-core-legacy` screen this replaced says "Waiting for data…", while
+ * this one claimed "1,204 docs/hr" directly above a real "Indexed — 0 total",
+ * "+12% from last period" on a value of zero, and four error rows, one naming
+ * `gemini` — a provider Atlas no longer uses.
+ *
+ * Two of the four panels had a real hook available the whole time
+ * (`useAtlasKnowledge`, `useAtlasResearch`); the sibling tabs in
+ * `AtlasCoreTabs` have used them, with honest `<Empty>` states, since they were
+ * written. The error panel needed `useAtlasErrorLog`, lifted out of the legacy
+ * `ErrorLogStream` in this same pass.
+ *
+ * The throughput panel is the interesting one: there is no ingestion-rate,
+ * pipeline-count or validation-pass series anywhere in the app, and inventing a
+ * bar width is how this screen got here. So it now shows the one figure that IS
+ * real — the indexed count — and says plainly that the rest is not measured.
+ * A panel that admits it has one number beats four numbers that are fiction.
+ */
+function OverviewTab({ knowledgeCount }: { knowledgeCount: number }) {
+  const { knowledge } = useAtlasKnowledge();
+  const { topics } = useAtlasResearch();
+  const { errors, failed } = useAtlasErrorLog(4);
+
+  const recent = (knowledge ?? []).slice(0, 4);
+  const queue = (topics ?? []).filter((t) => ['queued', 'researching', 'processing'].includes(t.status)).slice(0, 4);
+
+  return (
+    <div className="coregrid">
+      <Panel title="Indexing" icon={<Database className="i16" />}>
+        <Row
+          lead={<span className="flowdot"><Database className="i16" /></span>}
+          title="Indexed"
+          meta={`${knowledgeCount.toLocaleString()} ${knowledgeCount === 1 ? 'entry' : 'entries'}`}
+        />
+        <Empty body="Ingestion rate, pipeline count and validation pass rate are not measured yet." />
+      </Panel>
+
+      <Panel title="Recent Knowledge" icon={<Brain className="i16" />}>
+        {recent.map((k) => (
+          <KbRow key={k.id} title={k.topic} meta={`${k.category} · ${(k.relevance_score ?? 0).toFixed(2)} relevance`} />
+        ))}
+        {recent.length === 0 && <Empty body="Nothing indexed yet." />}
+      </Panel>
+
+      <Panel title="Research Queue" icon={<BookOpen className="i16" />}>
+        {queue.map((t) => (
+          <QRow
+            key={t.id}
+            running={t.status !== 'queued'}
+            title={t.topic}
+            meta={`${t.status} · ${(t.sources ?? []).length} sources`}
+          />
+        ))}
+        {queue.length === 0 && <Empty body="Queue is clear." />}
+      </Panel>
+
+      <Panel title="Recent Errors" icon={<AlertTriangle className="i16" />}>
+        {(errors ?? []).map((e) => (
+          <ErrRow
+            key={e.id}
+            sev={errorSeverityGlyph(e.severity)}
+            msg={e.error_message}
+            meta={`${e.severity} · ${new Date(e.created_at).toLocaleTimeString()}${e.resolved ? ' · resolved' : ''}`}
+          />
+        ))}
+        {/* "no errors" and "could not read the log" are different states. */}
+        {errors !== null && errors.length === 0 && !failed && <Empty body="No errors logged." status="resting" />}
+        {failed && <Empty body="Could not read the error log." status="error" />}
+      </Panel>
+    </div>
+  );
+}
 
 // Every one of these was a div on a `.flowrow` / `.kbrow` / `.qrow` / `.errrow`
 // class whose only job was a 1px divider, plus a `last` prop feeding the
@@ -132,17 +181,25 @@ function FlowRow({ icon, title, meta, width }: { icon: React.ReactNode; title: s
 function KbRow({ title, meta }: { title: string; meta: string }) {
   return <Row lead={<span className="kbico"><FileText className="i16" /></span>} title={title} meta={meta} />;
 }
-function QRow({ running, title, meta, pct }: { running?: boolean; title: string; meta: string; pct: number }) {
+// `pct` is optional now, and nothing in the app passes it. The research topics
+// returned by `useAtlasResearch` carry a status (`queued` / `researching` /
+// `processing` / `completed`) and a source list — there is no percentage
+// anywhere in the schema. The old 72% / 41% / 8% / 0% bars were invented to
+// make the panel look alive. The bar renders only if a real number ever
+// arrives; until then the status text carries the meaning.
+function QRow({ running, title, meta, pct }: { running?: boolean; title: string; meta: string; pct?: number }) {
   return (
     <Row
       lead={running ? <Loader className="i16" style={{ color: 'var(--acc)' }} /> : <Clock className="i16" style={{ color: 'var(--ink3)' }} />}
       title={title}
       meta={meta}
       trail={
-        <>
-          <span className="qbar" style={{ width: 120 }}><span className="qfill" style={{ display: 'block', height: '100%', width: `${pct}%` }} /></span>
-          <span className="qpct">{pct}%</span>
-        </>
+        pct == null ? undefined : (
+          <>
+            <span className="qbar" style={{ width: 120 }}><span className="qfill" style={{ display: 'block', height: '100%', width: `${pct}%` }} /></span>
+            <span className="qpct">{pct}%</span>
+          </>
+        )
       }
     />
   );
