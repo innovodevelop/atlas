@@ -57,6 +57,7 @@ const AtlasModelLab = lazy(() => import("./pages/atlas/AtlasModelLab"));
 const AtlasSmartHome = lazy(() => import("./pages/atlas/AtlasSmartHome"));
 const AtlasHealth = lazy(() => import("./pages/atlas/AtlasHealth"));
 const AtlasBanking = lazy(() => import("./pages/atlas/AtlasBanking"));
+const AtlasBrowser = lazy(() => import("./pages/atlas/AtlasBrowser"));
 
 
 // Instant startup: dashboard data (weather, stocks, news, tasks…) is
@@ -180,6 +181,7 @@ const App = () => (
           <Route path="/smart-home" element={<AtlasSmartHome />} />
           <Route path="/health" element={<AtlasHealth />} />
           <Route path="/money" element={<AtlasBanking />} />
+          <Route path="/browser" element={<AtlasBrowser />} />
           {/* First-run consent. Genuinely revisitable now, via Settings →
               Permissions (AtlasSettings.tsx). The comment that used to sit here
               claimed that was already true; it was not — before T4 part 2 this

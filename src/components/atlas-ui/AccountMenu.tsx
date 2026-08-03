@@ -101,6 +101,7 @@ export function AccountMenu({ onClose, onOpenSettings }: Props) {
       <button className="acctitem" role="menuitem" onClick={() => go('/smart-home')}>Smart home</button>
       <button className="acctitem" role="menuitem" onClick={() => go('/health')}>Health</button>
       <button className="acctitem" role="menuitem" onClick={() => go('/money')}>Money</button>
+      <button className="acctitem" role="menuitem" onClick={() => go('/browser')}>Browser</button>
 
       {/* `/home` — the voice-first landing — was routed in App.tsx and linked
           from nowhere: a whole product surface (its own chat session, voice
