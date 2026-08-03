@@ -7,11 +7,17 @@ import { useAtlasLearning } from '@/hooks/useAtlasLearning';
 import { useAgents } from '@/hooks/useAgents';
 import { useApprovals } from '@/hooks/useApprovals';
 import { useAtlasProviderStatus } from '@/hooks/useAtlasProviderStatus';
+import { Empty, Panel, Row } from './primitives';
 
 // Atlas Core tab panels — Workshop design's 8-view Core, wired to real data.
 // Each tab was a dead button showing the same static overview; these render
 // the actual knowledge/research/learning/agent/live surfaces from existing
-// hooks. Uses the design's .cpanel/.kbrow/.qrow chrome (workshop.css).
+// hooks.
+//
+// The local `Panel` and `Empty` that used to live here are gone: they were the
+// seed of the shared primitives and are now imported from ./primitives. The
+// `hue` prop went with them — it drove a coloured panel ring that the
+// borderless rule deletes, and it was passed as a raw HSL triplet.
 
 const fmtAgo = (iso?: string | null) => {
   if (!iso) return '';
@@ -22,20 +28,12 @@ const fmtAgo = (iso?: string | null) => {
   return `${Math.floor(s / 86400)}d ago`;
 };
 
-const Panel = ({ hue, icon, title, children }: { hue: string; icon: React.ReactNode; title: string; children: React.ReactNode }) => (
-  <div className="cpanel" style={{ ['--pc' as string]: hue }}>
-    <h3 className="cph">{icon}{title}</h3>
-    {children}
-  </div>
-);
-const Empty = ({ label }: { label: string }) => <p className="kbmeta" style={{ padding: '8px 0' }}>{label}</p>;
-
 function SearchTab() {
   const { query, setQuery, resultsByType, isSearching } = useBrainSearch();
   const all = [...resultsByType.knowledge, ...resultsByType.research, ...resultsByType.finding].slice(0, 8);
   return (
     <div className="coregrid">
-      <Panel hue="25 100% 50%" icon={<Search className="i16" />} title="Search the brain">
+      <Panel icon={<Search className="i16" />} title="Search the brain">
         <input
           className="field"
           style={{ width: '100%', marginBottom: 12 }}
@@ -43,18 +41,15 @@ function SearchTab() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        {isSearching && <Empty label="Searching…" />}
-        {!isSearching && query && all.length === 0 && <Empty label="No matches yet." />}
-        {!query && <Empty label="Type to search across everything Atlas knows." />}
+        {isSearching && <Empty body="Searching…" />}
+        {!isSearching && query && all.length === 0 && <Empty body="No matches yet." />}
+        {!query && <Empty body="Type to search across everything Atlas knows." />}
       </Panel>
-      <Panel hue="227 88% 58%" icon={<FileText className="i16" />} title="Top results">
+      <Panel icon={<FileText className="i16" />} title="Top results">
         {all.map((r) => (
-          <div className="kbrow" key={r.id}>
-            <div className="kbico"><FileText className="i16" /></div>
-            <div className="f1"><p className="kbtitle">{r.title}</p><p className="kbmeta">{r.type}</p></div>
-          </div>
+          <Row key={r.id} lead={<span className="kbico"><FileText className="i16" /></span>} title={r.title} meta={r.type} />
         ))}
-        {all.length === 0 && <Empty label="Results appear here." />}
+        {all.length === 0 && <Empty body="Results appear here." />}
       </Panel>
     </div>
   );
@@ -65,23 +60,23 @@ function LiveTab() {
   const rows = providers ?? [];
   return (
     <div className="coregrid">
-      <Panel hue="25 100% 50%" icon={<Radio className="i16" />} title="Live connections">
+      <Panel icon={<Radio className="i16" />} title="Live connections">
         {rows.map((p: { provider: string; status?: string; is_available?: boolean }) => {
           const ok = p.is_available ?? p.status === 'active';
           return (
-            <div className="flowrow" key={p.provider}>
-              <div className="flownode">
-                <div className="flowdot" style={{ ['--fc' as string]: ok ? '158 45% 34%' : '9 57% 48%' }}><CheckCircle2 className="i16" /></div>
-                <div><p className="kbtitle" style={{ textTransform: 'capitalize' }}>{p.provider}</p><p className="kbmeta">{ok ? 'connected' : (p.status || 'offline')}</p></div>
-              </div>
-              <div className="flowbar"><div className="flowfill" style={{ ['--fc' as string]: ok ? '158 45% 34%' : '9 57% 48%', width: ok ? '99%' : '20%' }} /></div>
-            </div>
+            <Row
+              key={p.provider}
+              lead={<span className="flowdot" style={{ color: ok ? 'var(--grn)' : 'var(--red)' }}><CheckCircle2 className="i16" /></span>}
+              title={<span style={{ textTransform: 'capitalize' }}>{p.provider}</span>}
+              meta={ok ? 'connected' : (p.status || 'offline')}
+              trail={<span className="flowbar" style={{ width: 120 }}><span className="flowfill" style={{ display: 'block', height: '100%', background: ok ? 'var(--grn)' : 'var(--red)', width: ok ? '99%' : '20%' }} /></span>}
+            />
           );
         })}
-        {rows.length === 0 && <Empty label="No providers reporting." />}
+        {rows.length === 0 && <Empty body="No providers reporting." />}
       </Panel>
-      <Panel hue="227 88% 58%" icon={<Zap className="i16" />} title="Ambient">
-        <div className="kbrow"><div className="kbico"><Radio className="i16" /></div><div className="f1"><p className="kbtitle">Listening for "Hey Atlas"</p><p className="kbmeta">wake word · ambient</p></div></div>
+      <Panel icon={<Zap className="i16" />} title="Ambient">
+        <Row lead={<span className="kbico"><Radio className="i16" /></span>} title={'Listening for "Hey Atlas"'} meta="wake word · ambient" />
       </Panel>
     </div>
   );
@@ -93,23 +88,17 @@ function AgentTab() {
   const pending = (approvals ?? []).filter((a) => a.status === 'pending');
   return (
     <div className="coregrid">
-      <Panel hue="25 100% 50%" icon={<Bot className="i16" />} title="Agents">
+      <Panel icon={<Bot className="i16" />} title="Agents">
         {(agents ?? []).map((a) => (
-          <div className="kbrow" key={a.id}>
-            <div className="kbico"><Bot className="i16" /></div>
-            <div className="f1"><p className="kbtitle">{a.name}</p><p className="kbmeta">{a.is_active ? 'active' : 'idle'} · {a.max_steps} steps</p></div>
-          </div>
+          <Row key={a.id} lead={<span className="kbico"><Bot className="i16" /></span>} title={a.name} meta={`${a.is_active ? 'active' : 'idle'} · ${a.max_steps} steps`} />
         ))}
-        {(agents ?? []).length === 0 && <Empty label="No agents configured." />}
+        {(agents ?? []).length === 0 && <Empty body="No agents configured." />}
       </Panel>
-      <Panel hue="345 74% 55%" icon={<AlertTriangle className="i16" />} title={`Needs approval · ${pending.length}`}>
+      <Panel icon={<AlertTriangle className="i16" />} title={`Needs approval · ${pending.length}`}>
         {pending.map((a) => (
-          <div className="kbrow" key={a.id}>
-            <div className="kbico"><AlertTriangle className="i16" /></div>
-            <div className="f1"><p className="kbtitle">{a.action_summary}</p><p className="kbmeta">{a.risk_level || 'review'} · {fmtAgo(a.created_at)}</p></div>
-          </div>
+          <Row key={a.id} lead={<span className="kbico"><AlertTriangle className="i16" /></span>} title={a.action_summary} meta={`${a.risk_level || 'review'} · ${fmtAgo(a.created_at)}`} />
         ))}
-        {pending.length === 0 && <Empty label="Nothing waiting on you." />}
+        {pending.length === 0 && <Empty body="Nothing waiting on you." />}
       </Panel>
     </div>
   );
@@ -120,22 +109,25 @@ function KnowledgeTab() {
   const recent = (knowledge ?? []).slice(0, 6);
   return (
     <div className="coregrid">
-      <Panel hue="25 100% 50%" icon={<Database className="i16" />} title="Domains">
+      <Panel icon={<Database className="i16" />} title="Domains">
         {(categories ?? []).map((c: string) => {
           const n = (knowledge ?? []).filter((k) => k.category === c).length;
           return (
-            <div className="flowrow" key={c}>
-              <div className="flownode"><div className="flowdot" style={{ ['--fc' as string]: '25 100% 50%' }}><Database className="i16" /></div><div><p className="kbtitle" style={{ textTransform: 'capitalize' }}>{c}</p><p className="kbmeta">{n} entries</p></div></div>
-            </div>
+            <Row
+              key={c}
+              lead={<span className="flowdot"><Database className="i16" /></span>}
+              title={<span style={{ textTransform: 'capitalize' }}>{c}</span>}
+              meta={`${n} ${n === 1 ? 'entry' : 'entries'}`}
+            />
           );
         })}
-        {(categories ?? []).length === 0 && <Empty label="No knowledge domains yet." />}
+        {(categories ?? []).length === 0 && <Empty body="No knowledge domains yet." />}
       </Panel>
-      <Panel hue="227 88% 58%" icon={<FileText className="i16" />} title="Recently indexed">
+      <Panel icon={<FileText className="i16" />} title="Recently indexed">
         {recent.map((k) => (
-          <div className="kbrow" key={k.id}><div className="kbico"><FileText className="i16" /></div><div className="f1"><p className="kbtitle">{k.topic}</p><p className="kbmeta">{k.category} · {(k.relevance_score ?? 0).toFixed(2)} relevance</p></div></div>
+          <Row key={k.id} lead={<span className="kbico"><FileText className="i16" /></span>} title={k.topic} meta={`${k.category} · ${(k.relevance_score ?? 0).toFixed(2)} relevance`} />
         ))}
-        {recent.length === 0 && <Empty label="Nothing indexed yet." />}
+        {recent.length === 0 && <Empty body="Nothing indexed yet." />}
       </Panel>
     </div>
   );
@@ -147,23 +139,25 @@ function ResearchTab() {
   const done = (topics ?? []).filter((t) => t.status === 'completed').slice(0, 6);
   return (
     <div className="coregrid">
-      <Panel hue="25 100% 50%" icon={<BookOpen className="i16" />} title="Research queue">
+      <Panel icon={<BookOpen className="i16" />} title="Research queue">
         {queue.map((t) => {
           const running = t.status !== 'queued';
           return (
-            <div className="qrow" key={t.id}>
-              {running ? <Loader className="i16" style={{ color: 'hsl(25 100% 50%)' }} /> : <Clock className="i16" style={{ color: 'hsl(30 3% 55%)' }} />}
-              <div className="f1"><p className="kbtitle">{t.topic}</p><p className="kbmeta">{t.status} · {(t.sources ?? []).length} sources</p></div>
-            </div>
+            <Row
+              key={t.id}
+              lead={running ? <Loader className="i16" style={{ color: 'var(--acc)' }} /> : <Clock className="i16" style={{ color: 'var(--ink3)' }} />}
+              title={t.topic}
+              meta={`${t.status} · ${(t.sources ?? []).length} sources`}
+            />
           );
         })}
-        {queue.length === 0 && <Empty label="Queue is clear." />}
+        {queue.length === 0 && <Empty body="Queue is clear." />}
       </Panel>
-      <Panel hue="158 45% 34%" icon={<CheckCircle2 className="i16" />} title="Completed reports">
+      <Panel icon={<CheckCircle2 className="i16" />} title="Completed reports">
         {done.map((t) => (
-          <div className="kbrow" key={t.id}><div className="kbico"><CheckCircle2 className="i16" /></div><div className="f1"><p className="kbtitle">{t.topic}</p><p className="kbmeta">{(t.findings ?? []).length} findings</p></div></div>
+          <Row key={t.id} lead={<span className="kbico"><CheckCircle2 className="i16" /></span>} title={t.topic} meta={`${(t.findings ?? []).length} findings`} />
         ))}
-        {done.length === 0 && <Empty label="No completed reports yet." />}
+        {done.length === 0 && <Empty body="No completed reports yet." />}
       </Panel>
     </div>
   );
@@ -175,16 +169,26 @@ function LearningTab() {
   const m = learningMetrics;
   return (
     <div className="coregrid">
-      <Panel hue="25 100% 50%" icon={<Zap className="i16" />} title="Learning metrics">
-        <div className="flowrow"><div className="flownode"><div className="flowdot" style={{ ['--fc' as string]: '158 45% 34%' }}><CheckCircle2 className="i16" /></div><div><p className="kbtitle">Validation success</p><p className="kbmeta">{m.successRate}% pass</p></div></div><div className="flowbar"><div className="flowfill" style={{ ['--fc' as string]: '158 45% 34%', width: `${m.successRate}%` }} /></div></div>
-        <div className="flowrow"><div className="flownode"><div className="flowdot" style={{ ['--fc' as string]: '25 100% 50%' }}><Database className="i16" /></div><div><p className="kbtitle">Knowledge velocity</p><p className="kbmeta">{m.knowledgeVelocity}/period</p></div></div></div>
-        <div className="flowrow last"><div className="flownode"><div className="flowdot" style={{ ['--fc' as string]: '227 88% 58%' }}><BookOpen className="i16" /></div><div><p className="kbtitle">Queue depth</p><p className="kbmeta">{m.queueDepth} queued</p></div></div></div>
+      <Panel icon={<Zap className="i16" />} title="Learning metrics">
+        <Row
+          lead={<span className="flowdot" style={{ color: 'var(--grn)' }}><CheckCircle2 className="i16" /></span>}
+          title="Validation success"
+          meta={`${m.successRate}% pass`}
+          trail={<span className="flowbar" style={{ width: 120 }}><span className="flowfill" style={{ display: 'block', height: '100%', background: 'var(--grn)', width: `${m.successRate}%` }} /></span>}
+        />
+        <Row lead={<span className="flowdot"><Database className="i16" /></span>} title="Knowledge velocity" meta={`${m.knowledgeVelocity}/period`} />
+        <Row lead={<span className="flowdot"><BookOpen className="i16" /></span>} title="Queue depth" meta={`${m.queueDepth} queued`} />
       </Panel>
-      <Panel hue="227 88% 58%" icon={<CheckCircle2 className="i16" />} title="Recent validations">
+      <Panel icon={<CheckCircle2 className="i16" />} title="Recent validations">
         {logs.map((v: { id: string; verdict: string; created_at: string; grounding?: string }) => (
-          <div className="errrow" key={v.id}><span className={`errsev ${v.verdict === 'valid' ? 'sev-i' : v.verdict === 'fake' ? 'sev-e' : 'sev-w'}`} /><div className="f1"><p className="errmsg" style={{ textTransform: 'capitalize' }}>{v.verdict}{v.grounding ? ` · ${v.grounding}` : ''}</p><p className="errmeta">{fmtAgo(v.created_at)}</p></div></div>
+          <Row
+            key={v.id}
+            lead={<span className={`errsev ${v.verdict === 'valid' ? 'sev-i' : v.verdict === 'fake' ? 'sev-e' : 'sev-w'}`} />}
+            title={<span style={{ textTransform: 'capitalize' }}>{v.verdict}{v.grounding ? ` · ${v.grounding}` : ''}</span>}
+            meta={fmtAgo(v.created_at)}
+          />
         ))}
-        {logs.length === 0 && <Empty label="No validations yet." />}
+        {logs.length === 0 && <Empty body="No validations yet." />}
       </Panel>
     </div>
   );

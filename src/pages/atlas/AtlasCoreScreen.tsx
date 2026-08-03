@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Sparkles, Brain, Search, AlertTriangle, Activity, TrendingUp, TrendingDown,
+  ArrowLeft, Sparkles, Brain, Search, AlertTriangle, Activity,
   Database, DownloadCloud, Cpu, CheckCircle2, FileText, BookOpen, Loader, Clock, Radio, Bot, Zap,
 } from 'lucide-react';
 import { AtlasSphereLazy as AtlasSphere } from '@/components/atlas/AtlasSphereLazy';
 import { AtlasCoreTabs } from '@/components/atlas-ui/AtlasCoreTabs';
+import { Button, Panel, Row, StatTile } from '@/components/atlas-ui/primitives';
 import { useAtlasHealth } from '@/hooks/useAtlasHealth';
 
 const TABS = [
@@ -30,7 +31,7 @@ const AtlasCoreScreen = () => {
     <div className="overlay" data-screen-label="Atlas — Atlas Core">
       <div className="ovwash" />
       <header className="corehead">
-        <button className="backbtn" onClick={() => navigate('/')}><ArrowLeft className="i16" />Back to Dashboard</button>
+        <Button variant="text" icon={<ArrowLeft className="i16" />} onClick={() => navigate('/')}>Back to Dashboard</Button>
         <div className="fx ac gap12">
           <div><h1 className="corebrand">Atlas Core</h1><p className="coretagline">Intelligence Center</p></div>
           <Sparkles className="i20" style={{ color: 'hsl(243 82% 78%)' }} />
@@ -40,13 +41,20 @@ const AtlasCoreScreen = () => {
       <div className="corebody">
         <div className="corehero">
           <div className="coreorb"><div className="coreorbglow" />
+            {/* Still hardcoded — the 2026-07-26 audit named it and it is a data
+                wiring job, not a styling one. */}
             <AtlasSphere state="thinking" audioLevel={0} context="core" className="orbcvB" />
           </div>
           <div className="statgrid">
-            <StatCard cls="sc-p" label="Knowledge" value={(stats?.knowledgeCount ?? 0).toLocaleString()} icon={<Brain className="i20" />} trend={<span className="stattrend upB"><TrendingUp className="i12" /><span>+12% from last period</span></span>} />
-            <StatCard cls="sc-s" label="Research" value={String(stats?.activeResearch ?? 0)} icon={<Search className="i20" />} trend={<span className="stattrend" style={{ color: 'hsl(240 20% 58%)' }}>active topics</span>} />
-            <StatCard cls="sc-a" label="Error Rate" value={`${(stats?.errorRate ?? 0).toFixed(1)}%`} icon={<AlertTriangle className="i20" />} trend={<span className="stattrend upB"><TrendingDown className="i12" /><span>−2% from last period</span></span>} />
-            <StatCard cls="sc-h" label="Health" value={`${Math.round(stats?.healthScore ?? 0)}%`} icon={<Activity className="i20" />} trend={<span className="stattrend upB"><Activity className="i12" /><span>all systems nominal</span></span>} />
+            {/* `trend` is typed `{ direction, label }` now, and the two entries
+                that used it are gone: "+12% from last period" and "−2% from
+                last period" were hardcoded strings attached to real values of
+                0 and 0.0%. There is no period-over-period series behind either
+                number, so the honest render is no trend at all. */}
+            <StatTile label="Knowledge" value={(stats?.knowledgeCount ?? 0).toLocaleString()} icon={<Brain className="i20" />} />
+            <StatTile label="Research" value={String(stats?.activeResearch ?? 0)} icon={<Search className="i20" />} trend={{ direction: 'flat', label: 'active topics' }} />
+            <StatTile label="Error Rate" value={`${(stats?.errorRate ?? 0).toFixed(1)}%`} icon={<AlertTriangle className="i20" />} />
+            <StatTile label="Health" value={`${Math.round(stats?.healthScore ?? 0)}%`} icon={<Activity className="i20" />} trend={{ direction: 'flat', label: 'all systems nominal' }} />
           </div>
         </div>
 
@@ -67,37 +75,39 @@ const AtlasCoreScreen = () => {
 
         {tab === 'overview' && (
         <div className="coregrid">
-          <div className="cpanel" style={{ ['--pc' as string]: '243 75% 66%' }}>
-            <h3 className="cph"><Database className="i16" style={{ color: 'hsl(243 82% 78%)' }} />Real-time Data Flow</h3>
-            <FlowRow icon={<DownloadCloud className="i16" />} fc="200 75% 60%" title="Ingestion" meta="1,204 docs/hr" width="82%" />
-            <FlowRow icon={<Cpu className="i16" />} fc="280 68% 68%" title="Processing" meta="18 pipelines" width="64%" />
-            <FlowRow icon={<CheckCircle2 className="i16" />} fc="160 58% 56%" title="Validation" meta="99.2% pass" width="99%" />
-            <FlowRow icon={<Database className="i16" />} fc="243 75% 66%" title="Indexed" meta={`${(stats?.knowledgeCount ?? 0).toLocaleString()} total`} width="74%" last />
-          </div>
+          {/* The per-panel `--pc` accent hue is gone with the coloured ring it
+              drove; panels are separated by fill and space now.
+              STILL FABRICATED, and out of T1's scope: the throughput figures,
+              the four knowledge rows and the four error rows below are
+              hardcoded, and sit directly above a real "Indexed — 0 total".
+              Extracting them into typed primitives does not make them true. */}
+          <Panel title="Real-time Data Flow" icon={<Database className="i16" />}>
+            <FlowRow icon={<DownloadCloud className="i16" />} title="Ingestion" meta="1,204 docs/hr" width="82%" />
+            <FlowRow icon={<Cpu className="i16" />} title="Processing" meta="18 pipelines" width="64%" />
+            <FlowRow icon={<CheckCircle2 className="i16" />} title="Validation" meta="99.2% pass" width="99%" />
+            <FlowRow icon={<Database className="i16" />} title="Indexed" meta={`${(stats?.knowledgeCount ?? 0).toLocaleString()} total`} width="74%" />
+          </Panel>
 
-          <div className="cpanel" style={{ ['--pc' as string]: '280 68% 66%' }}>
-            <h3 className="cph"><Brain className="i16" style={{ color: 'hsl(280 72% 78%)' }} />Recent Knowledge</h3>
+          <Panel title="Recent Knowledge" icon={<Brain className="i16" />}>
             <KbRow title="Transformer scaling laws — 2026 review" meta="arXiv · indexed 4 min ago · 0.94 relevance" />
             <KbRow title="EU AI Act — compliance summary" meta="Policy · indexed 22 min ago · 0.89 relevance" />
             <KbRow title="Vector DB benchmarks Q2" meta="Engineering · indexed 1h ago · 0.86 relevance" />
-            <KbRow title="Retrieval-augmented agents survey" meta="arXiv · indexed 2h ago · 0.83 relevance" last />
-          </div>
+            <KbRow title="Retrieval-augmented agents survey" meta="arXiv · indexed 2h ago · 0.83 relevance" />
+          </Panel>
 
-          <div className="cpanel" style={{ ['--pc' as string]: '190 75% 58%' }}>
-            <h3 className="cph"><BookOpen className="i16" style={{ color: 'hsl(190 75% 64%)' }} />Research Queue</h3>
+          <Panel title="Research Queue" icon={<BookOpen className="i16" />}>
             <QRow running title="Multimodal reasoning benchmarks" meta="running · 3 sources" pct={72} />
             <QRow running title="On-device inference costs" meta="running · 5 sources" pct={41} />
             <QRow title="Agent memory architectures" meta="queued · 2 sources" pct={8} />
-            <QRow title="Prompt caching strategies" meta="queued · 4 sources" pct={0} last />
-          </div>
+            <QRow title="Prompt caching strategies" meta="queued · 4 sources" pct={0} />
+          </Panel>
 
-          <div className="cpanel" style={{ ['--pc' as string]: '345 74% 64%' }}>
-            <h3 className="cph"><AlertTriangle className="i16" style={{ color: 'hsl(345 80% 72%)' }} />Recent Errors</h3>
+          <Panel title="Recent Errors" icon={<AlertTriangle className="i16" />}>
             <ErrRow sev="w" msg="Rate limit approached — provider gemini" meta="warning · 11:42:08 · auto-throttled" />
             <ErrRow sev="i" msg="Cache miss on embedding batch #4821" meta="info · 11:38:51 · recomputed" />
             <ErrRow sev="e" msg="Timeout fetching source (retry 2/3)" meta="error · 11:31:20 · recovered" />
-            <ErrRow sev="i" msg='Schedule "daily-digest" completed' meta="info · 06:00:04 · 3 insights" last />
-          </div>
+            <ErrRow sev="i" msg='Schedule "daily-digest" completed' meta="info · 06:00:04 · 3 insights" />
+          </Panel>
         </div>
         )}
       </div>
@@ -105,42 +115,40 @@ const AtlasCoreScreen = () => {
   );
 };
 
-function StatCard({ cls, label, value, icon, trend }: { cls: string; label: string; value: string; icon: React.ReactNode; trend: React.ReactNode }) {
+// Every one of these was a div on a `.flowrow` / `.kbrow` / `.qrow` / `.errrow`
+// class whose only job was a 1px divider, plus a `last` prop feeding the
+// matching `.last{border:none}` rule. They are <Row> slots now, and `last` is
+// gone from all four signatures.
+function FlowRow({ icon, title, meta, width }: { icon: React.ReactNode; title: string; meta: string; width: string }) {
   return (
-    <div className={`statcard ${cls}`}>
-      <div className="fx jb" style={{ alignItems: 'flex-start' }}>
-        <div><p className="statlbl">{label}</p><p className="statval tnum">{value}</p>{trend}</div>
-        <div className="statico">{icon}</div>
-      </div>
-    </div>
+    <Row
+      lead={<span className="flowdot">{icon}</span>}
+      title={title}
+      meta={meta}
+      trail={<span className="flowbar" style={{ width: 120 }}><span className="flowfill" style={{ display: 'block', height: '100%', width }} /></span>}
+    />
   );
 }
-function FlowRow({ icon, fc, title, meta, width, last }: { icon: React.ReactNode; fc: string; title: string; meta: string; width: string; last?: boolean }) {
+function KbRow({ title, meta }: { title: string; meta: string }) {
+  return <Row lead={<span className="kbico"><FileText className="i16" /></span>} title={title} meta={meta} />;
+}
+function QRow({ running, title, meta, pct }: { running?: boolean; title: string; meta: string; pct: number }) {
   return (
-    <div className={`flowrow ${last ? 'last' : ''}`}>
-      <div className="flownode"><div className="flowdot" style={{ ['--fc' as string]: fc }}>{icon}</div><div><p className="kbtitle">{title}</p><p className="kbmeta">{meta}</p></div></div>
-      <div className="flowbar"><div className="flowfill" style={{ ['--fc' as string]: fc, width }} /></div>
-    </div>
+    <Row
+      lead={running ? <Loader className="i16" style={{ color: 'var(--acc)' }} /> : <Clock className="i16" style={{ color: 'var(--ink3)' }} />}
+      title={title}
+      meta={meta}
+      trail={
+        <>
+          <span className="qbar" style={{ width: 120 }}><span className="qfill" style={{ display: 'block', height: '100%', width: `${pct}%` }} /></span>
+          <span className="qpct">{pct}%</span>
+        </>
+      }
+    />
   );
 }
-function KbRow({ title, meta, last }: { title: string; meta: string; last?: boolean }) {
-  return (
-    <div className={`kbrow ${last ? 'last' : ''}`}><div className="kbico"><FileText className="i16" /></div><div className="f1"><p className="kbtitle">{title}</p><p className="kbmeta">{meta}</p></div></div>
-  );
-}
-function QRow({ running, title, meta, pct, last }: { running?: boolean; title: string; meta: string; pct: number; last?: boolean }) {
-  return (
-    <div className={`qrow ${last ? 'last' : ''}`}>
-      {running ? <Loader className="i16" style={{ color: 'hsl(190 75% 62%)' }} /> : <Clock className="i16" style={{ color: 'hsl(240 20% 56%)' }} />}
-      <div className="f1"><p className="kbtitle">{title}</p><p className="kbmeta">{meta}</p></div>
-      <div className="qbar"><div className="qfill" style={{ width: `${pct}%` }} /></div><span className="qpct">{pct}%</span>
-    </div>
-  );
-}
-function ErrRow({ sev, msg, meta, last }: { sev: 'e' | 'w' | 'i'; msg: string; meta: string; last?: boolean }) {
-  return (
-    <div className={`errrow ${last ? 'last' : ''}`}><span className={`errsev sev-${sev}`} /><div className="f1"><p className="errmsg">{msg}</p><p className="errmeta">{meta}</p></div></div>
-  );
+function ErrRow({ sev, msg, meta }: { sev: 'e' | 'w' | 'i'; msg: string; meta: string }) {
+  return <Row lead={<span className={`errsev sev-${sev}`} />} title={msg} meta={meta} />;
 }
 
 export default AtlasCoreScreen;

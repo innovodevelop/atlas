@@ -8,6 +8,7 @@ import { SoftwareUpdatePanel } from '@/components/atlas-health/SoftwareUpdatePan
 import { useMailIntelligence } from '@/hooks/useMailIntelligence';
 import { usePortfolio } from '@/hooks/usePortfolio';
 import { useMusicPlayer } from '@/hooks/useMusicPlayer';
+import { Button, Panel } from '@/components/atlas-ui/primitives';
 
 // Workshop-native Settings overlay. Hosts the app's real settings (voice, mail,
 // budget) behind one entry point — before this, AtlasSettingsPanel was only
@@ -18,6 +19,16 @@ import { useMusicPlayer } from '@/hooks/useMusicPlayer';
 // the latter is the consent-withdrawal control the Privacy Policy (§4.6/§5) and
 // Terms (§4) point at, so it has to be as easy to reach as connecting was
 // (GDPR Art. 7(3)).
+//
+// THE --acc TRAP, fixed here. This screen renders inside `.exp .th-cal`, where
+// `--acc` is redefined as an HSL triplet. Every `hsl(var(--acc) / .12)` inline
+// style below therefore painted the theme indigo `hsl(243 80% 72%)`, not Atlas
+// Blue — and the same expression anywhere OUTSIDE `.exp` is an invalid
+// declaration that browsers drop silently. All five are now the flat --wash
+// token via <Panel tone="wash"> / <Button>, valid in every scope and the right
+// colour. Likewise --negative (used 9x, defined 0x) and --positive (defined in
+// index.css as a bare HSL triplet, so every `color: var(--positive)` here was
+// an invalid declaration that painted nothing).
 
 export type SettingsTab = 'voice' | 'mail' | 'portfolio' | 'music' | 'budget' | 'personality' | 'memory' | 'updates';
 
@@ -53,30 +64,31 @@ export const AtlasSettings = ({ onClose, initialTab }: { onClose: () => void; in
       </header>
       <div className="ebody">
         <div className="col gap16" style={{ width: '28%', minWidth: 260 }}>
-          <div className="gpanel col" style={{ gap: 4 }}>
+          <Panel pad="sm" className="col" style={{ gap: 4 }}>
             {TABS.map((t) => {
               const Icon = t.icon;
               return (
-                <button
+                <Button
                   key={t.key}
-                  className="fx ac gap10 t14"
+                  variant="text"
+                  icon={<Icon className="i16" />}
                   onClick={() => setTab(t.key)}
+                  aria-current={tab === t.key ? 'true' : undefined}
                   style={{
-                    padding: '11px 12px', borderRadius: 12, border: 'none', cursor: 'pointer',
-                    fontFamily: 'inherit', textAlign: 'left', width: '100%',
-                    background: tab === t.key ? 'hsl(var(--acc) / .1)' : 'transparent',
-                    color: tab === t.key ? 'hsl(var(--acc))' : 'hsl(240 20% 40%)',
+                    justifyContent: 'flex-start', width: '100%', padding: '0 12px',
+                    background: tab === t.key ? 'var(--wash)' : 'transparent',
+                    color: tab === t.key ? 'var(--acc-text)' : 'var(--ink2)',
                     fontWeight: tab === t.key ? 600 : 500,
                   }}
                 >
-                  <Icon className="i16" />{t.label}
-                </button>
+                  {t.label}
+                </Button>
               );
             })}
-          </div>
+          </Panel>
         </div>
         <div className="f1 col gap16" style={{ overflowY: 'auto' }}>
-          <div className="gpanel2 f1">
+          <Panel nested fill>
             {tab === 'voice' && <VoiceSettingsPanel />}
             {tab === 'mail' && <MailSettings />}
             {tab === 'portfolio' && <PortfolioSettings />}
@@ -85,7 +97,7 @@ export const AtlasSettings = ({ onClose, initialTab }: { onClose: () => void; in
             {tab === 'personality' && <PersonalityPanel />}
             {tab === 'memory' && <MemoryPrivacyPanel />}
             {tab === 'updates' && <SoftwareUpdatePanel />}
-          </div>
+          </Panel>
         </div>
       </div>
     </div>
@@ -99,37 +111,34 @@ function MailSettings() {
   return (
     <div className="col gap16">
       <div>
-        <h3 className="t14 fw6" style={{ color: 'hsl(240 30% 20%)', marginBottom: 6 }}>Connected mailboxes</h3>
-        <p className="fs12" style={{ color: 'hsl(240 20% 50%)', lineHeight: 1.5 }}>
+        <h3 className="t14 fw6" style={{ color: 'var(--ink)', marginBottom: 6 }}>Connected mailboxes</h3>
+        <p className="fs12" style={{ color: 'var(--ink2)', lineHeight: 1.5 }}>
           Atlas scans connected mailboxes read-only and alerts you to bills, deadlines and documents. Your mailbox is never modified.
         </p>
       </div>
       {accounts.map((a) => (
-        <div className="fx ac jb gpanel" key={a.id} style={{ padding: 14 }}>
+        <Panel pad="sm" className="fx ac jb" key={a.id}>
           <div style={{ minWidth: 0 }}>
-            <p className="t14 fw6 trunc m0" style={{ color: 'hsl(240 30% 20%)' }}>{a.email_address}</p>
+            <p className="t14 fw6 trunc m0" style={{ color: 'var(--ink)' }}>{a.email_address}</p>
             <p className="fs12 m0 fx ac gap6" style={{ color: a.status === 'active' ? 'var(--positive)' : 'var(--negative)' }}>
               <Check className="i12" />{a.status === 'active' ? 'Active · read-only' : a.status}
             </p>
           </div>
           <div className="fx ac gap8">
-            <button className="xbtn fx ac jc" title="Scan now" onClick={syncNow}><RefreshCw className="i14" /></button>
-            <button className="xbtn fx ac jc" title="Disconnect" onClick={() => disconnect(a.id)}><Trash2 className="i14" /></button>
+            <Button size="icon" variant="ghost" title="Scan now" aria-label="Scan now" onClick={syncNow}><RefreshCw className="i14" /></Button>
+            <Button size="icon" variant="danger" title="Disconnect" aria-label="Disconnect mailbox" onClick={() => disconnect(a.id)}><Trash2 className="i14" /></Button>
           </div>
-        </div>
+        </Panel>
       ))}
-      <button
-        className="fx ac jc gap8 fw6"
+      <Button
+        variant="primary"
+        icon={<Plus className="i16" />}
+        loading={isConnecting}
         onClick={() => connect().catch(() => {})}
-        disabled={isConnecting}
-        style={{
-          width: '100%', padding: 12, borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit', fontSize: 14,
-          background: 'hsl(var(--acc) / .12)', border: '1px solid hsl(var(--acc) / .3)', color: 'hsl(var(--acc))',
-          opacity: isConnecting ? 0.6 : 1,
-        }}
+        style={{ width: '100%' }}
       >
-        <Plus className="i16" />{isConnecting ? 'Waiting for Google…' : isConnected ? 'Connect another mailbox' : 'Connect Gmail'}
-      </button>
+        {isConnecting ? 'Waiting for Google…' : isConnected ? 'Connect another mailbox' : 'Connect Gmail'}
+      </Button>
     </div>
   );
 }
@@ -142,52 +151,49 @@ function PortfolioSettings() {
   return (
     <div className="col gap16">
       <div>
-        <h3 className="t14 fw6" style={{ color: 'hsl(240 30% 20%)', marginBottom: 6 }}>Brokerage connection</h3>
-        <p className="fs12" style={{ color: 'hsl(240 20% 50%)', lineHeight: 1.5 }}>
+        <h3 className="t14 fw6" style={{ color: 'var(--ink)', marginBottom: 6 }}>Brokerage connection</h3>
+        <p className="fs12" style={{ color: 'var(--ink2)', lineHeight: 1.5 }}>
           Link your brokerage to sync holdings and transactions. Everything is pulled read-only and stored & analyzed locally on this Mac — never in the cloud. You sign in inside your broker's own window; Atlas never sees your brokerage password.
         </p>
       </div>
 
       {!available && (
-        <div className="gpanel fs12" style={{ padding: 14, color: 'hsl(240 20% 50%)' }}>
+        <Panel pad="sm" className="fs12" style={{ color: 'var(--ink2)' }}>
           Portfolio linking runs in the Atlas desktop app. Open Atlas on your Mac to connect a brokerage.
-        </div>
+        </Panel>
       )}
 
       {available && !hasCredentials && (
-        <div className="gpanel fs12" style={{ padding: 14, color: 'var(--negative)' }}>
+        <Panel pad="sm" className="fs12" style={{ color: 'var(--negative)' }}>
           SnapTrade credentials aren't configured. See docs/portfolio-setup.md.
-        </div>
+        </Panel>
       )}
 
       {available && hasCredentials && (
         <>
           {connected ? (
-            <div className="fx ac jb gpanel" style={{ padding: 14 }}>
+            <Panel pad="sm" className="fx ac jb">
               <div>
-                <p className="t14 fw6 m0" style={{ color: 'hsl(240 30% 20%)' }}>Brokerage linked</p>
+                <p className="t14 fw6 m0" style={{ color: 'var(--ink)' }}>Brokerage linked</p>
                 <p className="fs12 m0 fx ac gap6" style={{ color: 'var(--positive)' }}>
                   <Check className="i12" />{summary?.accounts_count ?? 0} account{(summary?.accounts_count ?? 0) === 1 ? '' : 's'} · {summary?.holdings_count ?? 0} holdings · read-only
                 </p>
               </div>
               <div className="fx ac gap8">
-                <button className="xbtn fx ac jc" title="Sync now" onClick={sync} disabled={isSyncing}><RefreshCw className="i14" /></button>
-                <button className="xbtn fx ac jc" title="Disconnect" onClick={disconnect}><Trash2 className="i14" /></button>
+                <Button size="icon" variant="ghost" title="Sync now" aria-label="Sync now" onClick={sync} loading={isSyncing}><RefreshCw className="i14" /></Button>
+                <Button size="icon" variant="danger" title="Disconnect" aria-label="Disconnect brokerage" onClick={disconnect}><Trash2 className="i14" /></Button>
               </div>
-            </div>
+            </Panel>
           ) : (
-            <button
-              className="fx ac jc gap8 fw6"
+            <Button
+              variant="primary"
+              icon={<Link2 className="i16" />}
+              loading={isConnecting}
               onClick={() => connect().catch(() => {})}
-              disabled={isConnecting}
-              style={{
-                width: '100%', padding: 12, borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit', fontSize: 14,
-                background: 'hsl(var(--acc) / .12)', border: '1px solid hsl(var(--acc) / .3)', color: 'hsl(var(--acc))',
-                opacity: isConnecting ? 0.6 : 1,
-              }}
+              style={{ width: '100%' }}
             >
-              <Link2 className="i16" />{isConnecting ? 'Opening your broker…' : 'Connect a brokerage'}
-            </button>
+              {isConnecting ? 'Opening your broker…' : 'Connect a brokerage'}
+            </Button>
           )}
           {error && <p className="fs12" style={{ color: 'var(--negative)' }}>{error}</p>}
         </>
@@ -221,85 +227,73 @@ function MusicSettings() {
   return (
     <div className="col gap16">
       <div>
-        <h3 className="t14 fw6" style={{ color: 'hsl(240 30% 20%)', marginBottom: 6 }}>Spotify connection</h3>
-        <p className="fs12" style={{ color: 'hsl(240 20% 50%)', lineHeight: 1.5 }}>
+        <h3 className="t14 fw6" style={{ color: 'var(--ink)', marginBottom: 6 }}>Spotify connection</h3>
+        <p className="fs12" style={{ color: 'var(--ink2)', lineHeight: 1.5 }}>
           Connect Spotify to play your own library through Atlas. You sign in on Spotify's own page and Atlas never sees your Spotify password — only an access token, kept in this Mac's Keychain. Playback happens on your consent, and you can withdraw it here at any time.
         </p>
       </div>
 
       {!available && (
-        <div className="gpanel fs12" style={{ padding: 14, color: 'hsl(240 20% 50%)' }}>
+        <Panel pad="sm" className="fs12" style={{ color: 'var(--ink2)' }}>
           Music runs in the Atlas desktop app. Open Atlas on your Mac to connect or disconnect Spotify.
-        </div>
+        </Panel>
       )}
 
       {available && (
         <>
           {connected ? (
             <>
-              <div className="fx ac jb gpanel" style={{ padding: 14 }}>
+              <Panel pad="sm" className="fx ac jb">
                 <div>
-                  <p className="t14 fw6 m0" style={{ color: 'hsl(240 30% 20%)' }}>Spotify connected</p>
+                  <p className="t14 fw6 m0" style={{ color: 'var(--ink)' }}>Spotify connected</p>
                   <p className="fs12 m0 fx ac gap6" style={{ color: 'var(--positive)' }}>
                     <Check className="i12" />{premium ? 'Premium account · plays inside Atlas' : 'Connected · Spotify Premium is required for playback'}
                   </p>
                 </div>
-                <button
-                  className="xbtn fx ac jc"
+                <Button
+                  size="icon"
+                  variant="danger"
                   title="Disconnect Spotify"
+                  aria-label="Disconnect Spotify"
                   onClick={() => setConfirming(true)}
                   disabled={confirming || isDisconnecting}
                 >
                   <Trash2 className="i14" />
-                </button>
-              </div>
+                </Button>
+              </Panel>
 
               {confirming && (
-                <div className="gpanel col gap10" style={{ padding: 14 }}>
-                  <p className="fs12 m0" style={{ color: 'hsl(240 20% 50%)', lineHeight: 1.5 }}>
+                <Panel pad="sm" className="col gap10">
+                  <p className="fs12 m0" style={{ color: 'var(--ink2)', lineHeight: 1.5 }}>
                     Disconnecting stops playback and deletes your Spotify token from this Mac's Keychain, so Atlas loses all access to your Spotify account. Your Spotify account, library and playlists are untouched — to also remove Atlas from the apps listed in your Spotify account settings, do that on Spotify's website. You can reconnect at any time.
                   </p>
                   <div className="fx ac gap8">
-                    <button
-                      className="fx ac jc gap8 fw6"
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      icon={<Trash2 className="i14" />}
+                      loading={isDisconnecting}
                       onClick={onDisconnect}
-                      disabled={isDisconnecting}
-                      style={{
-                        padding: '10px 14px', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13,
-                        background: 'hsl(0 70% 50% / .12)', border: '1px solid hsl(0 70% 50% / .3)', color: 'var(--negative)',
-                        opacity: isDisconnecting ? 0.6 : 1,
-                      }}
                     >
-                      <Trash2 className="i14" />{isDisconnecting ? 'Disconnecting…' : 'Disconnect Spotify'}
-                    </button>
-                    <button
-                      className="fw6"
-                      onClick={() => setConfirming(false)}
-                      disabled={isDisconnecting}
-                      style={{
-                        padding: '10px 14px', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit', fontSize: 13,
-                        background: 'transparent', border: '1px solid hsl(240 20% 80%)', color: 'hsl(240 20% 40%)',
-                      }}
-                    >
+                      {isDisconnecting ? 'Disconnecting…' : 'Disconnect Spotify'}
+                    </Button>
+                    <Button size="sm" onClick={() => setConfirming(false)} disabled={isDisconnecting}>
                       Keep connected
-                    </button>
+                    </Button>
                   </div>
-                </div>
+                </Panel>
               )}
             </>
           ) : (
-            <button
-              className="fx ac jc gap8 fw6"
+            <Button
+              variant="primary"
+              icon={<Music className="i16" />}
+              loading={isConnecting}
               onClick={() => connect().catch(() => {})}
-              disabled={isConnecting}
-              style={{
-                width: '100%', padding: 12, borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit', fontSize: 14,
-                background: 'hsl(var(--acc) / .12)', border: '1px solid hsl(var(--acc) / .3)', color: 'hsl(var(--acc))',
-                opacity: isConnecting ? 0.6 : 1,
-              }}
+              style={{ width: '100%' }}
             >
-              <Music className="i16" />{isConnecting ? 'Waiting for Spotify…' : 'Connect Spotify'}
-            </button>
+              {isConnecting ? 'Waiting for Spotify…' : 'Connect Spotify'}
+            </Button>
           )}
           {error && <p className="fs12" style={{ color: 'var(--negative)' }}>{error}</p>}
         </>

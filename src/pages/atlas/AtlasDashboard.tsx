@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Cpu, Mail, Mic, MicOff, Sparkles, Settings, Home, CornerUpLeft } from 'lucide-react';
+import { Dock, type DockItem } from '@/components/atlas-ui/primitives';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWeather } from '@/hooks/useWeather';
@@ -11,7 +12,7 @@ import { useAtlasSettings } from '@/hooks/useAtlasSettings';
 import { toVoiceSettings } from '@/lib/voiceTuning';
 import { useAgentRuns } from '@/hooks/useAgentRuns';
 import { useAtlasPresence } from '@/hooks/useAtlasPresence';
-import { presenceToWebGL, presenceLabel } from '@/components/atlas/presenceBridge';
+import { presenceToWebGL, presenceLabel, isVoiceActive } from '@/components/atlas/presenceBridge';
 import { getActiveWakePhrases } from '@/lib/wakeWord';
 import { AtlasSphereLazy as AtlasSphere } from '@/components/atlas/AtlasSphereLazy';
 import { timeOfDayGreeting } from './atlasHelpers';
@@ -183,6 +184,38 @@ const AtlasDashboard = () => {
   });
 
   const initials = (name[0] || 'A').toUpperCase();
+  // The one thing in the app allowed to be orange.
+  const voiceOn = isVoiceActive(presence);
+
+  // One dock definition, shared shape with /mail. `onClick` beats `to`, which
+  // is what lets Home mean "close the focused widget" here and "navigate" there.
+  const dockItems = useMemo<DockItem[]>(() => [
+    { id: 'home', label: 'Home', icon: <Home className="i16" />,
+      onClick: () => { if (expanded) closeWidget(); else navigate('/'); } },
+    { id: 'core', label: 'Core', icon: <Cpu className="i16" />, to: '/atlas-core' },
+    // The inbox card is a glance; supervising what Atlas does with mail needs
+    // the full three-pane route.
+    { id: 'mail', label: 'Mail', icon: <Mail className="i16" />, to: '/mail' },
+    { id: 'voice', label: 'Voice', icon: <Mic className="i16" />, kind: 'action',
+      onClick: handleManualActivate, voiceActive: voiceOn },
+    // The `muted` sphere state was specified with no way to reach it — the
+    // audit's rule was to build the control before the visual.
+    { id: 'mute', label: 'Mute', icon: <Mic className="i16" />, kind: 'toggle',
+      pressed: muted, pressedIcon: <MicOff className="i16" />, pressedLabel: 'Unmute',
+      tone: 'danger', onClick: toggleMute },
+    { id: 'settings', label: 'Settings', icon: <Settings className="i16" />, kind: 'action',
+      onClick: () => setSettingsOpen(true) },
+    { id: 'chat', label: 'New chat', icon: <Sparkles className="i16" />, kind: 'cta',
+      onClick: () => setDrawerOpen(true) },
+    { id: 'account', label: 'Account', icon: initials, kind: 'avatar',
+      onClick: () => setAcctOpen((v) => !v),
+      popover: acctOpen ? (
+        <AccountMenu
+          onClose={() => setAcctOpen(false)}
+          onOpenSettings={(tab) => { setSettingsTab(tab); setSettingsOpen(true); }}
+        />
+      ) : undefined },
+  ], [expanded, closeWidget, navigate, handleManualActivate, voiceOn, muted, toggleMute, initials, acctOpen]);
 
   return (
     <div className="page" data-screen-label="Atlas — Workshop">
@@ -213,7 +246,7 @@ const AtlasDashboard = () => {
               the header would have made an always-listening app say so
               nowhere. Still the manual-activate affordance. */}
           <button
-            className="bandlisten"
+            className={`bandlisten${voiceOn ? ' voiceon' : ''}`}
             onClick={muted ? toggleMute : handleManualActivate}
             title={muted ? 'Turn the microphone back on' : 'Speak to Atlas'}
           >
@@ -227,64 +260,10 @@ const AtlasDashboard = () => {
         </div>
       </section>
 
-      {/* Bottom dock — Workshop's fixed centered pill with hover-expanding labels */}
-      <div className="dock">
-        {/* Was two buttons, both navigating to /atlas-core. The duplicate is now
-            Home — the affordance the wordmark took with it. On the dashboard it
-            closes a focused widget; elsewhere it returns here. */}
-        <button
-          className="dockb"
-          onClick={() => { if (expanded) closeWidget(); else navigate('/'); }}
-          aria-label="Home"
-        >
-          <Home className="i16" /><span className="dockl">Home</span>
-        </button>
-        <button className="dockb" onClick={() => navigate('/atlas-core')} aria-label="Atlas Core">
-          <Cpu className="i16" /><span className="dockl">Core</span>
-        </button>
-        {/* The inbox card is a glance; supervising what Atlas does with mail
-            needs the full three-pane route. */}
-        <button className="dockb" onClick={() => navigate('/mail')} aria-label="Mail">
-          <Mail className="i16" /><span className="dockl">Mail</span>
-        </button>
-        <button className="dockb" onClick={handleManualActivate} aria-label="Voice">
-          <Mic className="i16" /><span className="dockl">Voice</span>
-        </button>
-        {/* The `muted` sphere state was specified with no way to reach it —
-            the audit's rule was to build the control before the visual. */}
-        <button
-          className="dockb"
-          onClick={toggleMute}
-          aria-label={muted ? 'Unmute microphone' : 'Mute microphone'}
-          aria-pressed={muted}
-          style={muted ? { color: '#fff', background: 'rgba(208,69,58,.28)' } : undefined}
-        >
-          {muted ? <MicOff className="i16" /> : <Mic className="i16" />}
-          <span className="dockl">{muted ? 'Unmute' : 'Mute'}</span>
-        </button>
-        <button className="dockb" onClick={() => setSettingsOpen(true)} aria-label="Settings">
-          <Settings className="i16" /><span className="dockl">Settings</span>
-        </button>
-        <button className="dockb dockcta" onClick={() => setDrawerOpen(true)} aria-label="New chat">
-          <Sparkles className="i16" /><span className="dockl">New chat</span>
-        </button>
-        {/* Was a navigate('/atlas-core') with no account surface behind it. */}
-        <div className="acctwrap">
-          <button
-            className="dockav"
-            onClick={() => setAcctOpen((v) => !v)}
-            aria-label="Account"
-            aria-haspopup="menu"
-            aria-expanded={acctOpen}
-          >{initials}</button>
-          {acctOpen && (
-            <AccountMenu
-              onClose={() => setAcctOpen(false)}
-              onOpenSettings={(tab) => { setSettingsTab(tab); setSettingsOpen(true); }}
-            />
-          )}
-        </div>
-      </div>
+      {/* Bottom dock. Icon-only at rest with `title` tooltips; only the current
+          screen carries a label (README §7). Both dock copies — here and in
+          /mail — are now the same component fed different items. */}
+      <Dock items={dockItems} current="home" />
 
       {/* Grid region: shows the widget grid, OR the focused widget — the header
           and band above stay mounted either way (design Change 1). */}

@@ -101,7 +101,19 @@ export const clearPersistedCache = () => {
 // Loading fallback for lazy routes
 const PageLoader = () => (
   <div className="min-h-screen bg-background flex items-center justify-center">
-    <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+    {/* This was the clearest live proof of the token drift: `border-primary`
+        reads --primary, which was #ff6a00, so every route transition flashed an
+        orange ring on a blue app. It is Atlas Blue now, and the spinner is a
+        masked conic gradient rather than a border — nothing in the suite draws
+        with an element border any more. */}
+    <div
+      className="w-10 h-10 rounded-full animate-spin"
+      style={{
+        background: 'conic-gradient(from 0deg, transparent 0deg, hsl(var(--primary)) 300deg)',
+        WebkitMask: 'radial-gradient(farthest-side, transparent calc(100% - 2px), #000 0)',
+        mask: 'radial-gradient(farthest-side, transparent calc(100% - 2px), #000 0)',
+      }}
+    />
   </div>
 );
 

@@ -4,47 +4,101 @@
 
 /* ARIA AI Assistant - Futuristic Glassmorphic Design System */
 
+/* ===========================================================================
+   TOKENS — READ THIS BEFORE CHANGING A COLOUR.
+
+   Atlas carries the same palette in two syntaxes, because the two consumers
+   need different things:
+
+     * THIS FILE holds bare HSL triplets (`227 88% 58%`). Tailwind's config
+       wraps every one of them as `hsl(var(--x))`, and shadcn components use
+       `hsl(var(--x) / .5)` for alpha — which only parses from a bare triplet.
+     * `src/styles/workshop.css` :root holds flat hex (`#3461f2`). The live
+       Atlas UI (dashboard, home, core, mail, settings, auth) is plain CSS and
+       uses `var(--acc)` directly, plus `rgba(52,97,242,.1)` literals.
+
+   A hex cannot be turned into a bare triplet in CSS, so the two lists cannot
+   be collapsed into one. What they CAN be is paired and adjacent, which is the
+   rule below: every triplet that has a workshop twin names it in its comment,
+   and workshop.css carries the mirror list. Change a colour in one place and
+   the review diff shows you the other.
+
+   This is not hypothetical bookkeeping. Before this pass `--primary` and
+   `--ring` were `25 100% 50%` (#ff6a00 ORANGE) with a trailing comment reading
+   "#3461f2" beside the wrong value, while `--acc` was Atlas Blue — so every
+   Tailwind `primary`/`ring` utility, including the route spinner in App.tsx,
+   flashed orange on a blue app. The pairs below are the fix.
+
+   PAIRS (this file  ->  workshop.css)
+     --background        --pg        #f9f7f4
+     --foreground        --ink       #1e1e24
+     --card / --popover  --surface   #fffdfa
+     --primary / --ring  --acc       #3461f2   (Atlas Blue — the one accent)
+     --secondary         --sk        #edebe7
+     --muted             --rz        #f1eeea
+     --muted-foreground  --ink2      #6d6a67
+     --border            --bd        #e2ded7
+     --destructive       --negative  #d0453a
+     --signal-positive   --positive  #0fae76
+     --signal-voice      --acc2      #ff6a00   (voice/listening indicator ONLY)
+
+   `--negative` and `--positive` are flat hex and live in workshop.css only:
+   their nine consumers are inline `style={{ color: 'var(--negative)' }}` in
+   TSX, which needs a colour, not a triplet. (`--positive` used to be declared
+   here as a triplet and was therefore invalid at all four of its call sites —
+   it silently painted nothing. Fixed by moving it.)
+   =========================================================================== */
+
 @layer base {
   :root {
     /* Core backgrounds — Workshop warm paper (design: Atlas Premium D) */
-    --background: 36 29% 97%;      /* #f9f7f4 page */
-    --foreground: 240 9% 13%;      /* #1e1e24 ink */
+    --background: 36 29% 97%;      /* #f9f7f4 page   — pairs with --pg */
+    --foreground: 240 9% 13%;      /* #1e1e24 ink    — pairs with --ink */
 
     /* Raised warm-white surfaces */
-    --card: 36 100% 99%;           /* #fffdfa */
+    --card: 36 100% 99%;           /* #fffdfa        — pairs with --surface */
     --card-foreground: 240 9% 13%;
 
-    --popover: 36 100% 99%;
+    --popover: 36 100% 99%;        /* #fffdfa        — pairs with --surface */
     --popover-foreground: 240 9% 13%;
 
-    /* Primary — Atlas Orange, the single accent */
-    --primary: 25 100% 50%;        /* #3461f2 */
+    /* Primary — Atlas Blue #3461f2, the one accent. NOT orange: orange is
+       --acc2 and its only job is the voice/listening indicator. */
+    --primary: 227 88% 58%;        /* #3461f2        — pairs with --acc */
     --primary-foreground: 36 100% 99%;
 
     /* Secondary — sunken paper */
-    --secondary: 40 14% 92%;       /* #edebe7 */
+    --secondary: 40 14% 92%;       /* #edebe7        — pairs with --sk */
     --secondary-foreground: 240 9% 13%;
 
     /* Muted warm tones */
-    --muted: 34 20% 93%;           /* #f1eeea */
-    --muted-foreground: 30 3% 42%; /* #6d6a67 */
+    --muted: 34 20% 93%;           /* #f1eeea        — pairs with --rz */
+    --muted-foreground: 30 3% 42%; /* #6d6a67        — pairs with --ink2 */
 
     /* Accent role = warm hover tint (design forbids a second accent hue) */
     --accent: 40 14% 92%;
     --accent-foreground: 240 9% 13%;
 
-    --destructive: 9 57% 48%;      /* #c14a35 */
+    --destructive: 4 61% 52%;      /* #d0453a        — pairs with --negative */
     --destructive-foreground: 36 100% 99%;
 
-    --border: 38 16% 86%;          /* #e2ded7 hairline */
+    --border: 38 16% 86%;          /* #e2ded7 hairline — pairs with --bd */
     --input: 36 100% 99%;
-    --ring: 25 100% 50%;
+    --ring: 227 88% 58%;           /* #3461f2        — pairs with --acc */
 
-    --radius: 1.125rem;            /* cards 18px */
+    /* shadcn scaffolding radius. This is NOT the Atlas card radius — the Atlas
+       surfaces read README §7's ten-step scale (--r-pill … --r-icon) declared
+       in workshop.css. Left at its scaffolding value because the only things
+       still reading it are the URL-only routes. */
+    --radius: 1.125rem;
 
     /* Workshop signal colors (visualizations only) */
-    --signal: 227 88% 58%;         /* #3461f2 */
-    --positive: 158 45% 34%;       /* #2f7d4f */
+    --signal: 227 88% 58%;            /* #3461f2 */
+    --signal-positive: 159 84% 37%;   /* #0fae76 — pairs with --positive */
+    /* Deliberately NOT named --acc2: that name belongs to the flat hex in
+       workshop.css, and declaring the same name in two syntaxes is the exact
+       drift this header exists to prevent. */
+    --signal-voice: 25 100% 50%;      /* #ff6a00 — pairs with --acc2 */
 
     /* Custom glassmorphic variables */
     --glass-bg: 230 25% 12%;
@@ -135,7 +189,10 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    /* Geist, not Inter: only Geist, Hanken Grotesk and Newsreader are bundled
+       in public/fonts, and the CSP (`font-src 'self' data:`) makes a remote
+       font impossible — so 'Inter' silently fell back to system-ui here. */
+    font-family: 'Geist', system-ui, -apple-system, sans-serif;
   }
 }
 

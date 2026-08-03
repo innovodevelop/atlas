@@ -36,6 +36,7 @@ import { AtlasSphereLazy as WebGLSphere } from '@/components/atlas/AtlasSphereLa
 import { presenceToWebGL } from '@/components/atlas/presenceBridge';
 import { PRESET, STATES, type SphereState } from '@/lib/atlasSphere';
 import { ATLAS_STATES, type AtlasPresenceState } from '@/hooks/useAtlasPresence';
+import { Button, Card, Panel } from '@/components/atlas-ui/primitives';
 
 interface EditorValues { count: number; dens: number; size: number; soft: number }
 
@@ -166,31 +167,26 @@ export default function AtlasSphereGallery() {
           {STATES.map((s) => {
             const reachable = (ATLAS_STATES as readonly string[]).includes(s);
             return (
-              <button
+              <Button
                 key={s}
+                size="sm"
+                variant={hero === s ? 'ink' : 'ghost'}
                 onClick={() => setHero(s)}
-                className="bandlisten"
-                style={{
-                  marginTop: 0,
-                  background: hero === s ? 'var(--ink)' : undefined,
-                  color: hero === s ? 'var(--dkf)' : reachable ? undefined : 'var(--ink3)',
-                  opacity: reachable ? 1 : 0.6,
-                }}
+                style={{ color: hero === s ? undefined : reachable ? undefined : 'var(--ink3)', opacity: reachable ? 1 : 0.6 }}
                 title={reachable ? DESCRIPTIONS[s].trigger : 'Cut — no trigger in the product'}
               >
                 <span>{s}</span>
                 {!reachable && <span style={{ fontSize: 10, letterSpacing: '.1em' }}>CUT</span>}
-              </button>
+              </Button>
             );
           })}
-          <button className="bandlisten" style={{ marginTop: 0 }} onClick={() => setDark((d) => !d)}>
-            {dark ? <Sun className="i14" /> : <Moon className="i14" />}
-            <span>{dark ? 'Light cards' : 'Dark cards'}</span>
-          </button>
+          <Button size="sm" icon={dark ? <Sun className="i14" /> : <Moon className="i14" />} onClick={() => setDark((d) => !d)}>
+            {dark ? 'Light cards' : 'Dark cards'}
+          </Button>
         </div>
 
         {/* Editor */}
-        <div className="gpanel" style={{ padding: '24px 28px', borderRadius: 30, marginBottom: 22 }}>
+        <Panel style={{ padding: '24px 28px', borderRadius: 'var(--r-editor)', marginBottom: 22 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,420px) minmax(0,1fr)', gap: 26, alignItems: 'center' }}>
             <div style={{ display: 'flex', justifyContent: 'center' }}>
               {/* True particle count here; the cards below run at 30%. */}
@@ -202,7 +198,7 @@ export default function AtlasSphereGallery() {
                 { k: 'dens', label: 'Particle density', hint: 'shell vs volume distribution', ref: densRef, min: 0.15, max: 1, step: 0.01, val: readout.dens, show: readout.dens.toFixed(2) },
                 { k: 'size', label: 'Particle size', hint: 'dot scale multiplier', ref: sizeRef, min: 0.3, max: 3, step: 0.05, val: readout.size, show: `×${readout.size.toFixed(2)}` },
               ] as const).map((row) => (
-                <div key={row.k} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 0', borderBottom: '1px solid var(--rz)' }}>
+                <div key={row.k} className="row0" style={{ gap: 14 }}>
                   <div style={{ width: 180, flexShrink: 0 }}>
                     <p style={{ margin: 0, fontSize: 13.5, fontWeight: 500 }}>{row.label}</p>
                     <p style={{ margin: '2px 0 0', fontSize: 11.5, color: 'var(--ink3)' }}>{row.hint}</p>
@@ -218,21 +214,19 @@ export default function AtlasSphereGallery() {
                   <span className="tnum" style={{ width: 78, textAlign: 'right', fontSize: 13 }}>{row.show}</span>
                 </div>
               ))}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '13px 0' }}>
+              <div className="row0" style={{ gap: 14 }}>
                 <div style={{ width: 180, flexShrink: 0 }}>
                   <p style={{ margin: 0, fontSize: 13.5, fontWeight: 500 }}>Colour softness</p>
                   <p style={{ margin: '2px 0 0', fontSize: 11.5, color: 'var(--ink3)' }}>0 hard · 10 pale haze</p>
                 </div>
-                <button className="bandlisten" style={{ marginTop: 0 }} onClick={() => bump(-1)}>−</button>
+                <Button size="sm" aria-label="Softer" onClick={() => bump(-1)}>−</Button>
                 <span className="tnum" style={{ width: 52, textAlign: 'center', fontSize: 13 }}>{readout.soft} / 10</span>
-                <button className="bandlisten" style={{ marginTop: 0 }} onClick={() => bump(1)}>+</button>
-                <button className="bandlisten" style={{ marginTop: 0, marginLeft: 'auto' }} onClick={reset}>
-                  <RotateCcw className="i14" /><span>Reset</span>
-                </button>
+                <Button size="sm" aria-label="Harder" onClick={() => bump(1)}>+</Button>
+                <Button size="sm" icon={<RotateCcw className="i14" />} style={{ marginLeft: 'auto' }} onClick={reset}>Reset</Button>
               </div>
             </div>
           </div>
-        </div>
+        </Panel>
 
         {/* Card grid — 30% of the editor's count, per the handoff, so ten spheres
             stay smooth. Measured: 104k particles across the page is 13% of the
@@ -241,15 +235,12 @@ export default function AtlasSphereGallery() {
           {STATES.map((s) => {
             const d = DESCRIPTIONS[s];
             return (
-              <button
+              <Card
                 key={s}
-                onClick={() => setHero(s)}
-                style={{
-                  textAlign: 'left', border: 'none', cursor: 'pointer', padding: 0,
-                  borderRadius: 26, overflow: 'hidden',
-                  background: dark ? 'var(--dark-card)' : 'rgba(var(--surface-rgb),.72)',
-                  opacity: d.live ? 1 : 0.66,
-                }}
+                size="s"
+                skin={dark ? 'ink' : 'glass'}
+                onOpen={() => setHero(s)}
+                style={{ textAlign: 'left', opacity: d.live ? 1 : 0.66 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0' }}>
                   <AtlasSphereCanvas px={236} state={s} dark={dark} {...ed} countScale={0.3} />
@@ -261,7 +252,7 @@ export default function AtlasSphereGallery() {
                   </p>
                   <p style={{ margin: '8px 0 0', fontSize: 13, color: dark ? 'rgba(249,247,244,.7)' : 'var(--ink2)' }}>{d.text}</p>
                 </div>
-              </button>
+              </Card>
             );
           })}
         </div>

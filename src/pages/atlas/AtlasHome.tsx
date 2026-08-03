@@ -7,6 +7,7 @@ import { useVoiceSession } from '@/hooks/useVoiceSession';
 import { useAtlasSettings } from '@/hooks/useAtlasSettings';
 import { toVoiceSettings } from '@/lib/voiceTuning';
 import { AtlasSphereLazy as AtlasSphere } from '@/components/atlas/AtlasSphereLazy';
+import { Button } from '@/components/atlas-ui/primitives';
 import { timeOfDayGreeting } from './atlasHelpers';
 
 const CHIPS = [
@@ -32,6 +33,10 @@ const AtlasHome = () => {
     ttsModelId: atlasSettings.ttsModel,
     voiceSettings: toVoiceSettings(atlasSettings),
   });
+  // The listening pill said "Listening" unconditionally, in Atlas Blue, whether
+  // or not the microphone was capturing. It now reflects the real voice state
+  // and is the only place on this screen allowed to use --acc2.
+  const voiceOn = effectiveAtlasState === 'listening' || effectiveAtlasState === 'speaking';
 
   const send = useCallback((text?: string) => {
     const v = (text ?? input).trim();
@@ -54,9 +59,14 @@ const AtlasHome = () => {
         <header className="homehead">
           <div className="fx ac gap12"><div className="mk" /><h1 className="wordB">Atlas</h1></div>
           <div className="fx ac gap10">
-            <div className="stind"><span className="stpulse" /><span className="stshimmer">Listening</span></div>
-            <button className="homebtn" onClick={() => navigate('/atlas-core')} title="Atlas Core"><Cpu className="i16" /></button>
-            <button className="homebtn" onClick={() => navigate('/')} title="Dashboard"><LayoutGrid className="i16" /></button>
+            <div className={`stind${voiceOn ? ' voiceon' : ''}`}>
+              <span className="stpulse" />
+              <span className="stshimmer">
+                {effectiveAtlasState === 'speaking' ? 'Speaking' : voiceOn ? 'Listening' : 'Ready'}
+              </span>
+            </div>
+            <Button size="icon" aria-label="Atlas Core" title="Atlas Core" onClick={() => navigate('/atlas-core')}><Cpu className="i16" /></Button>
+            <Button size="icon" aria-label="Dashboard" title="Dashboard" onClick={() => navigate('/')}><LayoutGrid className="i16" /></Button>
             <div className="avB fx ac jc">{(name[0] || 'A').toUpperCase()}</div>
           </div>
         </header>
@@ -82,9 +92,9 @@ const AtlasHome = () => {
         </div>
         <div className="chips">
           {CHIPS.map((c) => (
-            <button className="chip" key={c.label} onClick={() => send(c.q)}>{c.label}</button>
+            <Button className="chip" size="sm" variant="ghost" key={c.label} onClick={() => send(c.q)}>{c.label}</Button>
           ))}
-          <button className="chip demo" onClick={() => navigate('/atlas-core')}>Atlas Core</button>
+          <Button className="chip demo" size="sm" variant="ghost" onClick={() => navigate('/atlas-core')}>Atlas Core</Button>
         </div>
       </div></div>
     </div>

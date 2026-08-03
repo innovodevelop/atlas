@@ -138,7 +138,7 @@ const Auth = () => {
   if (loading) {
     return (
       <div className="ascene fx ac jc">
-        <Loader2 className="animate-spin" style={{ width: 28, height: 28, color: '#fffdfa' }} />
+        <Loader2 className="animate-spin" style={{ width: 28, height: 28, color: 'var(--surface)' }} />
       </div>
     );
   }

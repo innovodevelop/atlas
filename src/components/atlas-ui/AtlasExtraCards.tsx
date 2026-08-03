@@ -11,6 +11,7 @@ import { useWeather } from '@/hooks/useWeather';
 import { useMusicPlayer } from '@/hooks/useMusicPlayer';
 import { useAudioReactivity } from '@/hooks/useAudioReactivity';
 import { MusicSphere } from './MusicSphere';
+import { Card, Row } from './primitives';
 
 // ---------------------------------------------------------------------------
 // Air quality — real data. OpenWeather reports aqi 1–5; we display a US-style
@@ -43,9 +44,9 @@ export const AtlasAirQualityCard = memo(() => {
   const aqi = usAqiFromPm25(pm25);
   const city = weather.location.split(' ')[0];
   return (
-    <div className="cardB d1" style={{ cursor: 'default' }}>
-      <div className="chB"><p className="mlblB">Air quality</p><div className="icboxB fx ac jc"><Leaf className="i14" /></div></div>
-      <div className="cbB fx col" style={{ justifyContent: 'center' }}>
+    <Card size="s" delay={7}>
+      <Card.Header label="Air quality" icon={<Leaf className="i14" />} />
+      <Card.Body className="fx col" style={{ justifyContent: 'center' }}>
         <div className="fx ac gap12">
           <p className="tempB tnum" style={{ fontSize: 42, margin: 0 }}>{aqi}</p>
           <div>
@@ -53,9 +54,13 @@ export const AtlasAirQualityCard = memo(() => {
             <p className="metaB" style={{ marginTop: 2 }}>AQI · PM2.5 {pm25 < 12 ? 'low' : `${Math.round(pm25)} µg`} · {city}</p>
           </div>
         </div>
-        <div className="aqbar"><span style={{ left: `${band.pos}%`, borderColor: band.color }} /></div>
-      </div>
-    </div>
+        {/* The marker's 2px ring became a box-shadow — an element border is a
+            border even when it is carrying a value. --aq-band feeds it. */}
+        <div className="aqbar">
+          <span style={{ left: `${band.pos}%`, ['--aq-band' as string]: band.color }} />
+        </div>
+      </Card.Body>
+    </Card>
   );
 });
 AtlasAirQualityCard.displayName = 'AtlasAirQualityCard';
@@ -81,10 +86,16 @@ export const AtlasNowPlayingCard = memo(({ onOpen }: { onOpen?: () => void }) =>
   const artist = track?.artist ?? (m.connected ? '' : 'Tap to open the player');
   const ratio = track?.durationMs ? Math.min(1, (m.nowPlaying?.positionMs ?? 0) / track.durationMs) : 0;
   return (
-    <div className="cardB npcard d2" onClick={onOpen} style={{ cursor: 'pointer' }}>
-      {/* Field animation as the widget background — ~80% of the tile, 60%
-          opacity so the track info stays legible on top. */}
-      <div className="npfield"><MusicSphere form="field" reactivity={reactivity} className="npsphere" /></div>
+    <Card
+      size="s"
+      skin="accent"
+      delay={8}
+      className="npcard"
+      onOpen={onOpen}
+      /* Field animation as the widget background — ~80% of the tile, 60%
+         opacity so the track info stays legible on top. */
+      bleed={<div className="npfield"><MusicSphere form="field" reactivity={reactivity} className="npsphere" /></div>}
+    >
       <div className="npcontent">
         <div className="f1" style={{ minWidth: 0 }}>
           <p className="nplbl">Now playing</p>
@@ -101,7 +112,7 @@ export const AtlasNowPlayingCard = memo(({ onOpen }: { onOpen?: () => void }) =>
         </button>
       </div>
       <div className="npprog"><span style={{ width: `${ratio * 100}%` }} /></div>
-    </div>
+    </Card>
   );
 });
 AtlasNowPlayingCard.displayName = 'AtlasNowPlayingCard';
@@ -116,9 +127,9 @@ const RINGS = [
 ] as const;
 
 export const AtlasActivityCard = memo(() => (
-  <div className="cardB sp2 d3" style={{ cursor: 'default' }}>
-    <div className="chB"><p className="mlblB">Activity</p><div className="icboxB fx ac jc"><Flame className="i14" /></div></div>
-    <div className="cbB fx ac gap20">
+  <Card size="m" delay={9}>
+    <Card.Header label="Activity" icon={<Flame className="i14" />} />
+    <Card.Body className="fx ac gap20">
       <svg className="rings" viewBox="0 0 100 100">
         {RINGS.map((ring) => (
           <g key={ring.r}>
@@ -133,8 +144,8 @@ export const AtlasActivityCard = memo(() => (
         <div className="actrow"><span className="actk">Stand</span><span className="actv">9 / 12 hr</span></div>
         <p className="metaB" style={{ marginTop: 8 }}>On track — one short walk to close your rings.</p>
       </div>
-    </div>
-  </div>
+    </Card.Body>
+  </Card>
 ));
 AtlasActivityCard.displayName = 'AtlasActivityCard';
 
@@ -165,17 +176,14 @@ export const AtlasWorldClockCard = memo(() => {
     return () => window.clearInterval(id);
   }, []);
   return (
-    <div className="cardB d4" style={{ cursor: 'default' }}>
-      <div className="chB"><p className="mlblB">World clock</p><div className="icboxB fx ac jc"><Globe className="i14" /></div></div>
-      <div className="cbB">
-        {rows.map((r, i) => (
-          <div className={`wclk ${i === rows.length - 1 ? 'last' : ''}`} key={r.city}>
-            <div><p className="wcity m0">{r.city}</p><p className="wsub m0">{r.rel}</p></div>
-            <span className="wtime">{r.time}</span>
-          </div>
+    <Card size="s" delay={10}>
+      <Card.Header label="World clock" icon={<Globe className="i14" />} />
+      <Card.Body>
+        {rows.map((r) => (
+          <Row key={r.city} title={r.city} meta={r.rel} trail={<span className="wtime">{r.time}</span>} />
         ))}
-      </div>
-    </div>
+      </Card.Body>
+    </Card>
   );
 });
 AtlasWorldClockCard.displayName = 'AtlasWorldClockCard';

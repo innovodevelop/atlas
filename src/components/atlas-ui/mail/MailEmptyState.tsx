@@ -1,5 +1,6 @@
 import type { MailEmptyReason, MailView } from '@/types/mail';
 import { VIEW_LABELS } from './mailFormat';
+import { Empty } from '../primitives';
 
 interface MailEmptyStateProps {
   reason: MailEmptyReason;
@@ -55,15 +56,17 @@ export const MailEmptyState = ({
       break;
   }
 
+  // The reason switch above stays here on purpose. <Empty> is the presentation;
+  // the five strings and the filter_empty / view_empty distinction belong to
+  // the contract, and folding them into a shared primitive would put them
+  // somewhere nobody reading §6.6 would think to look.
   return (
-    <div className="mail-empty" role="status">
-      <p className="mail-empty-title">{title}</p>
-      <p className="mail-empty-body">{body}</p>
-      {action && (
-        <button type="button" className="mail-empty-action" onClick={action.run} disabled={syncing}>
-          {action.label}
-        </button>
-      )}
-    </div>
+    <Empty
+      className="mail-empty"
+      size="block"
+      title={title}
+      body={body}
+      action={action ? { label: action.label, onClick: action.run, disabled: syncing } : undefined}
+    />
   );
 };

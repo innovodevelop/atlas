@@ -16,6 +16,7 @@ import { useMailIntelligence } from '@/hooks/useMailIntelligence';
 import { usePortfolio, type HistoryPoint } from '@/hooks/usePortfolio';
 import type { WakeWordState, AIState } from '@/types';
 import type { AtlasExpandedKey } from '@/pages/atlas/AtlasDashboard';
+import { Button, Panel, StatTile } from './primitives';
 
 interface Props {
   which: AtlasExpandedKey;
@@ -58,7 +59,7 @@ function WeatherView({ onClose }: { onClose: () => void }) {
           <div className="gpanel f1 col">
             <div className="fx ac jb mb16">
               <div className="fx ac gap8"><MapPin className="i16 iInd" /><span className="t14" style={{ color: 'hsl(240 30% 82%)' }}>{weather.location}</span></div>
-              <button className="xbtn fx ac jc"><RefreshCw className="i14" /></button>
+              <Button size="icon" aria-label="Refresh weather"><RefreshCw className="i14" /></Button>
             </div>
             <div className="f1 col ac jc">
               <WeatherIcon icon={weather.icon} className="iInd" style={{ width: 104, height: 104 }} />
@@ -68,10 +69,10 @@ function WeatherView({ onClose }: { onClose: () => void }) {
                 <div className="efeels">Feels like {Math.round(weather.temp) - 2}°</div>
               </div>
             </div>
-            <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginTop: 22, paddingTop: 22, borderTop: '1px solid hsl(243 60% 70% / .1)' }}>
-              <div className="estat"><Droplets className="i20 iInd" style={{ margin: '0 auto 5px' }} /><div className="esval tnum">{weather.humidity}%</div><div className="eslbl">Humidity</div></div>
-              <div className="estat"><Wind className="i20 iInd" style={{ margin: '0 auto 5px' }} /><div className="esval tnum">{Math.round(weather.windSpeed)} mph</div><div className="eslbl">Wind</div></div>
-              <div className="estat"><Eye className="i20 iInd" style={{ margin: '0 auto 5px' }} /><div className="esval tnum">10 km</div><div className="eslbl">Visibility</div></div>
+            <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginTop: 22, paddingTop: 22 }}>
+              <StatTile layout="micro" icon={<Droplets className="i20 iInd" style={{ margin: '0 auto 5px' }} />} value={`${weather.humidity}%`} label="Humidity" />
+              <StatTile layout="micro" icon={<Wind className="i20 iInd" style={{ margin: '0 auto 5px' }} />} value={`${Math.round(weather.windSpeed)} mph`} label="Wind" />
+              <StatTile layout="micro" icon={<Eye className="i20 iInd" style={{ margin: '0 auto 5px' }} />} value="10 km" label="Visibility" />
             </div>
           </div>
           <div className="gpanel2 fx ac jb">
@@ -154,13 +155,13 @@ function CalendarView({ onClose }: { onClose: () => void }) {
       <div className="ebody">
         <div className="col gap16" style={{ width: '34%', minWidth: 340 }}>
           <div className="gpanel f1 col">
-            <div className="fx ac jb mb16"><div className="fx ac gap8"><CalIcon className="i16 iAcc" /><span className="t14" style={{ color: 'hsl(240 30% 82%)' }}>{dateLabel}</span></div><button className="xbtn fx ac jc"><Plus className="i14" /></button></div>
+            <div className="fx ac jb mb16"><div className="fx ac gap8"><CalIcon className="i16 iAcc" /><span className="t14" style={{ color: 'hsl(240 30% 82%)' }}>{dateLabel}</span></div><Button size="icon" aria-label="Add an event"><Plus className="i14" /></Button></div>
             <div className="f1 col ac jc"><div className="bigtemp tnum">{todayEvents.length}</div><div className="econd">events today</div>{events[nowIdx] && <div className="efeels">Next · {events[nowIdx].title}</div>}</div>
           </div>
           <div className="gpanel2 grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-            <div className="estat"><div className="esval tnum">{fmtH(bookedH)}</div><div className="eslbl">Booked</div></div>
-            <div className="estat"><div className="esval tnum">{fmtH(freeH)}</div><div className="eslbl">Free</div></div>
-            <div className="estat"><div className="esval tnum">{videoCount}</div><div className="eslbl">Video</div></div>
+            <StatTile layout="micro" value={fmtH(bookedH)} label="Booked" />
+            <StatTile layout="micro" value={fmtH(freeH)} label="Free" />
+            <StatTile layout="micro" value={videoCount} label="Video" />
           </div>
         </div>
         <div className="f1 col gap16">
@@ -168,7 +169,7 @@ function CalendarView({ onClose }: { onClose: () => void }) {
             <h3 className="t14 fw6 mb12" style={{ color: 'hsl(240 30% 82%)' }}>Schedule</h3>
             {events.length === 0 && <p className="evsB">No events scheduled.</p>}
             {events.map((e, i) => (
-              <div className={`rowB ${i === events.length - 1 ? 'last' : ''}`} key={e.id ?? i}>
+              <div className={`rowB`} key={e.id ?? i}>
                 <span className="evtimeB">{fmtEventTime(e.start_time)}</span>
                 <div className="f1" style={{ minWidth: 0 }}><p className="evtB">{e.title}</p>{e.location && <p className="evsB">{e.location}</p>}</div>
                 {i === nowIdx && <span className="nowB">Now</span>}
@@ -192,7 +193,7 @@ function CalendarView({ onClose }: { onClose: () => void }) {
             <div className="gpanel2">
               <h3 className="t14 fw6 mb12" style={{ color: 'hsl(240 30% 82%)' }}>Tomorrow</h3>
               {tomorrowEvents.map((e, i) => (
-                <div className={`rowB ${i === tomorrowEvents.length - 1 ? 'last' : ''}`} key={e.id ?? i}>
+                <div className={`rowB`} key={e.id ?? i}>
                   <span className="evtimeB">{fmtEventTime(e.start_time)}</span>
                   <div className="f1" style={{ minWidth: 0 }}><p className="evtB">{e.title}</p>{e.location && <p className="evsB">{e.location}</p>}</div>
                 </div>
@@ -230,16 +231,16 @@ function TasksView({ onClose }: { onClose: () => void }) {
             <div className="tc" style={{ marginTop: 14 }}><div className="bigtemp tnum" style={{ fontSize: 40 }}>{pct}%</div><div className="econd">{completedCount} of {tasks.length} complete</div></div>
           </div>
           <div className="gpanel2 grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-            <div className="estat"><div className="esval tnum">{highCount}</div><div className="eslbl">High</div></div>
-            <div className="estat"><div className="esval tnum">{dueTodayCount}</div><div className="eslbl">Due today</div></div>
-            <div className="estat"><div className="esval tnum" style={overdueCount ? { color: 'hsl(9 57% 48%)' } : undefined}>{overdueCount}</div><div className="eslbl">Overdue</div></div>
+            <StatTile layout="micro" value={highCount} label="High" />
+            <StatTile layout="micro" value={dueTodayCount} label="Due today" />
+            <StatTile layout="micro" value={<span style={overdueCount ? { color: 'var(--negative)' } : undefined}>{overdueCount}</span>} label="Overdue" />
           </div>
         </div>
         <div className="f1 col gap16">
           <div className="gpanel2 f1">
             <h3 className="t14 fw6 mb12" style={{ color: 'hsl(240 30% 82%)' }}>Active</h3>
             {active.map((t, i) => (
-              <div className={`rowB ${i === active.length - 1 ? 'last' : ''}`} key={t.id ?? i}>
+              <div className={`rowB`} key={t.id ?? i}>
                 <div className="ckB" />
                 <div className="f1" style={{ minWidth: 0 }}><p className="evtB">{t.title}</p>{t.due_date && <p className="evsB">Due {new Date(t.due_date).toLocaleDateString()}</p>}</div>
                 <span className={`tkpill ${pill(t.priority)}`}>{t.priority === 'high' ? 'High' : t.priority === 'low' ? 'Low' : 'Med'}</span>
@@ -250,7 +251,7 @@ function TasksView({ onClose }: { onClose: () => void }) {
             <div className="gpanel2">
               <h3 className="t14 fw6 mb12" style={{ color: 'hsl(240 30% 82%)' }}>Completed</h3>
               {done.map((t, i) => (
-                <div className={`rowB ${i === done.length - 1 ? 'last' : ''}`} key={t.id ?? i}>
+                <div className={`rowB`} key={t.id ?? i}>
                   <div className="ckB done fx ac jc"><span /></div>
                   <div className="f1" style={{ minWidth: 0 }}><p className="evtB doneB">{t.title}</p></div>
                 </div>
@@ -294,18 +295,18 @@ function PortfolioHero() {
   const { available, connected, summary, history, holdings, isSyncing, sync } = usePortfolio();
   if (!available) {
     return (
-      <div className="gpanel col" style={{ gap: 8 }}>
-        <p className="t14 fw6" style={{ color: 'hsl(240 30% 20%)' }}>Portfolio</p>
-        <p className="fs12" style={{ color: 'hsl(240 20% 50%)', lineHeight: 1.5 }}>Connect a brokerage in the desktop app to see your live portfolio value, holdings and performance here.</p>
-      </div>
+      <Panel className="col" style={{ gap: 8 }}>
+        <p className="t14 fw6" style={{ color: 'var(--ink)' }}>Portfolio</p>
+        <p className="fs12" style={{ color: 'var(--ink2)', lineHeight: 1.5 }}>Connect a brokerage in the desktop app to see your live portfolio value, holdings and performance here.</p>
+      </Panel>
     );
   }
   if (!connected) {
     return (
-      <div className="gpanel col" style={{ gap: 8 }}>
-        <p className="t14 fw6" style={{ color: 'hsl(240 30% 20%)' }}>Portfolio</p>
-        <p className="fs12" style={{ color: 'hsl(240 20% 50%)', lineHeight: 1.5 }}>No brokerage linked yet. Open <b>Settings → Portfolio</b> to connect — your holdings sync locally, priced on-device.</p>
-      </div>
+      <Panel className="col" style={{ gap: 8 }}>
+        <p className="t14 fw6" style={{ color: 'var(--ink)' }}>Portfolio</p>
+        <p className="fs12" style={{ color: 'var(--ink2)', lineHeight: 1.5 }}>No brokerage linked yet. Open <b>Settings → Portfolio</b> to connect — your holdings sync locally, priced on-device.</p>
+      </Panel>
     );
   }
   const up = (summary?.unrealized_pnl ?? 0) >= 0;
@@ -317,7 +318,7 @@ function PortfolioHero() {
           <p className="eslbl">Portfolio value</p>
           <div className="bigprice tnum">{summary ? fmtMoney(summary.total_value, summary.currency) : '—'}</div>
         </div>
-        <button className="xbtn fx ac jc" title="Sync now" onClick={sync} disabled={isSyncing}><RefreshCw className="i14" /></button>
+        <Button size="icon" title="Sync now" aria-label="Sync now" onClick={sync} loading={isSyncing}><RefreshCw className="i14" /></Button>
       </div>
       <div className={`fx ac gap4 fw6 ${up ? 'upB' : 'dnB'}`}>
         {up ? <TrendingUp className="i16" /> : <TrendingDown className="i16" />}
@@ -333,16 +334,16 @@ function PortfolioHero() {
           <path d={paths.line} className="strokeAcc" strokeWidth="1.5" fill="none" vectorEffect="non-scaling-stroke" />
         </svg>
       )}
-      <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--bd)' }}>
-        <div className="estat"><div className="esval tnum">{summary?.holdings_count ?? 0}</div><div className="eslbl">Holdings</div></div>
-        <div className="estat"><div className="esval tnum">{summary?.accounts_count ?? 0}</div><div className="eslbl">Accounts</div></div>
-        <div className="estat"><div className="esval tnum">{summary ? fmtMoney(summary.cash, summary.currency) : '—'}</div><div className="eslbl">Cash</div></div>
+      <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 20, paddingTop: 18 }}>
+        <StatTile layout="micro" value={summary?.holdings_count ?? 0} label="Holdings" />
+        <StatTile layout="micro" value={summary?.accounts_count ?? 0} label="Accounts" />
+        <StatTile layout="micro" value={summary ? fmtMoney(summary.cash, summary.currency) : '—'} label="Cash" />
       </div>
       {holdings.length > 0 && (
         <div style={{ marginTop: 16 }}>
           <h3 className="t14 fw6 mb12" style={{ color: 'hsl(240 30% 30%)' }}>Top holdings</h3>
           {holdings.slice(0, 6).map((h, i) => (
-            <div className={`rowB ${i === 5 ? 'last' : ''}`} key={h.symbol}>
+            <div className={`rowB`} key={h.symbol}>
               <span className="symB">{h.symbol}</span>
               <span className="snB f1 trunc" style={{ minWidth: 0 }}>{h.description || h.account}</span>
               <span className="prcB tnum" style={{ width: 90, textAlign: 'right' }}>{fmtMoney(h.market_value, summary?.currency)}</span>
@@ -378,9 +379,9 @@ function StocksView({ onClose }: { onClose: () => void }) {
               <div className="fx ac jb mb16"><div><div className="fx ac gap8"><span className="symB" style={{ width: 'auto', fontSize: 15 }}>{lead.symbol}</span><span className="fx ac gap8 fs12 upB"><span className="dotB on" style={{ width: 6, height: 6, background: 'hsl(160 58% 56%)', boxShadow: '0 0 8px hsl(160 58% 56% / .7)' }} />Live</span></div><span className="snB">{lead.name}</span></div></div>
               <div className="fx" style={{ alignItems: 'flex-end', gap: 12 }}><div className="bigprice tnum">{lead.price.toFixed(2)}</div><div className={`fx ac gap4 fw6 ${lead.changePercent >= 0 ? 'upB' : 'dnB'}`} style={{ marginBottom: 8 }}>{lead.changePercent >= 0 ? <TrendingUp className="i16" /> : <TrendingDown className="i16" />}<span className="tnum">{lead.change >= 0 ? '+' : ''}{lead.change.toFixed(2)} ({fmtPct(lead.changePercent)})</span></div></div>
               <svg viewBox="0 0 100 40" preserveAspectRatio="none" style={{ width: '100%', height: 120, marginTop: 16 }}><polyline points={sparklinePoints(lead.sparkline, 100, 40, 4)} className="strokeAcc" strokeWidth="1.5" vectorEffect="non-scaling-stroke" /></svg>
-              <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 18, paddingTop: 18, borderTop: '1px solid var(--bd)' }}>
+              <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 20, paddingTop: 18 }}>
                 {gridCells.map((c) => (
-                  <div className="estat" key={c.label}><div className="esval tnum">{c.value}</div><div className="eslbl">{c.label}</div></div>
+                  <StatTile layout="micro" key={c.label} value={c.value} label={c.label} />
                 ))}
               </div>
             </div>
@@ -391,7 +392,7 @@ function StocksView({ onClose }: { onClose: () => void }) {
               {indices.map((ix, i) => {
                 const up = ix.changePercent >= 0;
                 return (
-                  <div className={`rowB ${i === indices.length - 1 ? 'last' : ''}`} key={ix.label}>
+                  <div className={`rowB`} key={ix.label}>
                     <span className="snB f1">{ix.label}</span>
                     <span className="prcB tnum" style={{ width: 76, textAlign: 'right' }}>{ix.price.toLocaleString()}</span>
                     <span className={`chgB ${up ? 'upB' : 'dnB'}`}>{fmtPct(ix.changePercent)}</span>
@@ -407,7 +408,7 @@ function StocksView({ onClose }: { onClose: () => void }) {
             {stocks.map((s, i) => {
               const up = s.changePercent >= 0;
               return (
-                <div className={`rowB ${i === stocks.length - 1 ? 'last' : ''}`} key={s.symbol}>
+                <div className={`rowB`} key={s.symbol}>
                   <span className="symB">{s.symbol}</span>
                   <span className="snB f1 trunc" style={{ minWidth: 0 }}>{s.name}</span>
                   <svg width="72" height="22"><polyline points={sparklinePoints(s.sparkline)} fill="none" stroke={up ? 'hsl(160 58% 56%)' : 'hsl(350 75% 68%)'} strokeWidth="1.5" /></svg>
@@ -465,14 +466,15 @@ function EmailView({ onClose }: { onClose: () => void }) {
                 <p className="fs12 mb12" style={{ color: 'hsl(240 20% 62%)', lineHeight: 1.5 }}>
                   One-time, read-only connection. Your browser's existing Google session means it's usually a single "Allow" click — Atlas then scans automatically, sorts everything here, and alerts you to bills, deadlines and documents. Your mailbox is never modified.
                 </p>
-                <button
-                  className="fx ac jc gap8 fw6"
+                <Button
+                  variant="primary"
+                  icon={<Mail className="i16" />}
+                  loading={isConnecting}
                   onClick={() => connect().catch(() => {})}
-                  disabled={isConnecting}
-                  style={{ width: '100%', padding: 12, borderRadius: 12, background: 'hsl(var(--acc) / .16)', border: '1px solid hsl(var(--acc) / .3)', color: 'hsl(var(--acc))', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, opacity: isConnecting ? 0.6 : 1 }}
+                  style={{ width: '100%' }}
                 >
-                  <Mail className="i16" />{isConnecting ? 'Waiting for Google…' : 'Connect Gmail'}
-                </button>
+                  {isConnecting ? 'Waiting for Google…' : 'Connect Gmail'}
+                </Button>
               </>
             ) : (
               <>
@@ -484,18 +486,18 @@ function EmailView({ onClose }: { onClose: () => void }) {
                         {a.status === 'active' ? `Synced ${a.last_synced_at ? fmtEventTime(a.last_synced_at) : 'pending'}` : a.status}
                       </p>
                     </div>
-                    <button className="xbtn fx ac jc" title="Disconnect" onClick={() => disconnect(a.id)}><Archive className="i14" /></button>
+                    <Button size="icon" title="Disconnect" aria-label="Disconnect mailbox" onClick={() => disconnect(a.id)}><Archive className="i14" /></Button>
                   </div>
                 ))}
-                <button className="xbtn fx ac jc gap8" style={{ width: '100%', marginTop: 6 }} onClick={syncNow} title="Scan now">
-                  <Send className="i14" /><span className="fs12">Scan now</span>
-                </button>
+                <Button icon={<Send className="i14" />} style={{ width: '100%', marginTop: 6 }} onClick={syncNow} title="Scan now">
+                  Scan now
+                </Button>
               </>
             )}
             <div className="col gap8" style={{ marginTop: 18 }}>
               <div
                 className="fx ac jb" onClick={() => setFilter('all')}
-                style={{ padding: '10px 12px', borderRadius: 10, cursor: 'pointer', background: filter === 'all' ? 'hsl(var(--acc) / .1)' : 'transparent' }}
+                style={{ padding: '10px 12px', borderRadius: 10, cursor: 'pointer', background: filter === 'all' ? 'var(--wash)' : 'transparent' }}
               >
                 <span className="fx ac gap10 t14 fw5" style={{ color: 'hsl(240 30% 90%)' }}><Inbox className="i16 iAcc" />All scanned</span>
                 <span className="pillAcc">{messages.length}</span>
@@ -503,7 +505,7 @@ function EmailView({ onClose }: { onClose: () => void }) {
               {MAIL_CATEGORIES.map((c) => (
                 <div
                   key={c.key} className="fx ac jb" onClick={() => setFilter(c.key)}
-                  style={{ padding: '10px 12px', borderRadius: 10, cursor: 'pointer', background: filter === c.key ? 'hsl(var(--acc) / .1)' : 'transparent' }}
+                  style={{ padding: '10px 12px', borderRadius: 10, cursor: 'pointer', background: filter === c.key ? 'var(--wash)' : 'transparent' }}
                 >
                   <span className="fx ac gap10 t14" style={{ color: 'hsl(240 20% 70%)' }}><Star className="i16" style={{ color: 'hsl(240 20% 55%)' }} />{c.label}</span>
                   <span className="fs12" style={{ color: 'hsl(240 20% 55%)' }}>{counts[c.key] ?? 0}</span>
@@ -512,8 +514,8 @@ function EmailView({ onClose }: { onClose: () => void }) {
             </div>
             {isConnected && (
               <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
-                <div className="estat"><div className="esval tnum">{alerts.length}</div><div className="eslbl">Alerts</div></div>
-                <div className="estat"><div className="esval tnum">{receivedToday}</div><div className="eslbl">Today</div></div>
+                <StatTile layout="micro" value={alerts.length} label="Alerts" />
+                <StatTile layout="micro" value={receivedToday} label="Today" />
               </div>
             )}
           </div>
@@ -523,13 +525,13 @@ function EmailView({ onClose }: { onClose: () => void }) {
             <div className="gpanel2">
               <h3 className="t14 fw6 mb12" style={{ color: 'hsl(240 30% 82%)' }}>Needs your attention</h3>
               {alerts.map((a, i) => (
-                <div className={`rowB ${i === alerts.length - 1 ? 'last' : ''}`} key={a.id}>
+                <div className={`rowB`} key={a.id}>
                   <span className="pillAcc" style={{ textTransform: 'capitalize' }}>{a.alert_type}</span>
                   <div className="f1" style={{ minWidth: 0 }}>
                     <p className="evtB trunc">{a.title}</p>
                     {a.body && <p className="evsB trunc">{a.body}</p>}
                   </div>
-                  <button className="xbtn fx ac jc" title="Dismiss" onClick={() => acknowledge(a.id)}><PenLine className="i14" /></button>
+                  <Button size="icon" title="Dismiss" aria-label="Dismiss alert" onClick={() => acknowledge(a.id)}><PenLine className="i14" /></Button>
                 </div>
               ))}
             </div>
@@ -547,7 +549,7 @@ function EmailView({ onClose }: { onClose: () => void }) {
                 m.extracted?.due_date ? `due ${m.extracted.due_date}` : null,
               ].filter(Boolean).join(' · ');
               return (
-                <div className={`mailrow ${i === rows.length - 1 ? 'last' : ''}`} key={m.id}>
+                <div className={`mailrow`} key={m.id}>
                   <div className="avB2 fx ac jc">{initials(m.from_address)}</div>
                   <div className="f1" style={{ minWidth: 0 }}>
                     <div className="fx ac jb gap8">
@@ -591,7 +593,7 @@ function NewsView({ onClose }: { onClose: () => void }) {
         <div className="gpanel2 f1">
           <h3 className="t14 fw6 mb12" style={{ color: 'hsl(240 30% 82%)' }}>More stories</h3>
           {rest.map((n, i) => (
-            <div className={`rowB ${i === rest.length - 1 ? 'last' : ''}`} key={n.id ?? i}>
+            <div className={`rowB`} key={n.id ?? i}>
               <div className="f1" style={{ minWidth: 0 }}>
                 <div className="fx ac gap8 mb8"><span className="pillAcc">{n.category}</span></div>
                 <h4 className="ntB" style={{ margin: 0 }}>{n.title}</h4>

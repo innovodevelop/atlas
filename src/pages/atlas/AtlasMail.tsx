@@ -21,7 +21,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home, Cpu, Sparkles } from 'lucide-react';
+import { Home, Cpu, Mail, Sparkles, Inbox } from 'lucide-react';
+import { Dock, Empty } from '@/components/atlas-ui/primitives';
 import { useAuth } from '@/hooks/useAuth';
 import { useAtlasMail, type UseAtlasMail } from '@/hooks/useAtlasMail';
 import { MAIL_AUDIT_ACTIONS, type MailThreadStatus } from '@/types/mail';
@@ -258,13 +259,18 @@ const AtlasMail = () => {
             />
           ) : (
             <div className="mail-pane">
-              <div className="mail-empty">
-                <p className="mail-empty-title">No thread open</p>
-                <p className="mail-empty-body">
-                  Pick a thread, or press <span className="mail-kbd">j</span> and{' '}
-                  <span className="mail-kbd">k</span> to move through the list.
-                </p>
-              </div>
+              <Empty
+                className="mail-empty"
+                size="block"
+                icon={<Inbox className="i20" />}
+                title="No thread open"
+                body={
+                  <>
+                    Pick a thread, or press <span className="mail-kbd">j</span> and{' '}
+                    <span className="mail-kbd">k</span> to move through the list.
+                  </>
+                }
+              />
             </div>
           )
         }
@@ -290,17 +296,20 @@ const AtlasMail = () => {
         </>
       )}
 
-      <div className="dock">
-        <button className="dockb" onClick={() => navigate('/')} aria-label="Home">
-          <Home className="i16" /><span className="dockl">Home</span>
-        </button>
-        <button className="dockb" onClick={() => navigate('/atlas-core')} aria-label="Atlas Core">
-          <Cpu className="i16" /><span className="dockl">Core</span>
-        </button>
-        <button className="dockb dockcta" onClick={() => void mail.sync()} aria-label="Sync mail">
-          <Sparkles className="i16" /><span className="dockl">{mail.syncing ? 'Syncing…' : 'Sync'}</span>
-        </button>
-      </div>
+      {/* Same component as the dashboard's dock, different items. `current`
+          is what makes Mail the one item carrying a visible label; the sync
+          CTA is the documented exception, because its label is the only place
+          the sync reports that it is running. */}
+      <Dock
+        current="mail"
+        items={[
+          { id: 'home', label: 'Home', icon: <Home className="i16" />, to: '/' },
+          { id: 'core', label: 'Core', icon: <Cpu className="i16" />, to: '/atlas-core' },
+          { id: 'mail', label: 'Mail', icon: <Mail className="i16" />, to: '/mail' },
+          { id: 'sync', label: 'Sync', icon: <Sparkles className="i16" />, kind: 'cta',
+            busy: mail.syncing, busyLabel: 'Syncing…', onClick: () => void mail.sync() },
+        ]}
+      />
     </div>
   );
 };
