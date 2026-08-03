@@ -32,7 +32,19 @@ body{margin:0;background:hsl(240 28% 7%);color:hsl(240 30% 96%);font-family:'Gei
 .bandB{position:relative;z-index:10;display:flex;align-items:center;gap:28px;padding:36px 56px 8px;max-width:1720px;margin:0 auto;opacity:1;animation:riseB 1s cubic-bezier(.22,1,.36,1) forwards}
 .orbwrapB{width:96px;height:96px;position:relative;flex-shrink:0;cursor:pointer}
 .orbhalo{position:absolute;inset:-32%;border-radius:50%;background:radial-gradient(closest-side,rgba(52,97,242,.16),transparent 70%);filter:blur(22px);pointer-events:none}
-.orbcvB{position:relative;width:96px;height:96px;display:block}
+/* `.orbcvB` sat here (and again in the light layer at 224px). It sized the
+   WebGL sphere's WRAPPER DIV. The canvas renderer's element fills its parent
+   instead, so the size lives on `.orbwrapB` alone and this rule had nothing
+   left to size. Removing it also fixes a collision it was winning: `/home`
+   passed `orbcvB w100`, and because `.orbcvB` is declared after `.w100` its
+   224px beat the 100%, so the home orb sat at 224px inside a 460px wrapper
+   whose glow was sized for the wrapper. */
+/* What `.orbcvB` DID carry and still matters: `position:relative`. Every orb
+   wrapper in the app holds an absolutely-positioned glow (`.orbhalo`,
+   `.homeorbglow`, `.coreorbglow`) followed by the sphere. Positioned elements
+   paint after in-flow ones no matter the source order, so a static canvas
+   would sit UNDER its own glow. This is the one job that class had left. */
+.sphcv{position:relative;display:block}
 .greetB{font-family:'Hanken Grotesk','Geist',sans-serif;font-size:28px;font-weight:300;letter-spacing:-.01em;color:hsl(240 40% 97%);margin:0}
 .gsubB{font-size:14px;color:hsl(240 20% 66%);margin:8px 0 0;line-height:1.55;max-width:640px}
 .bandmetaB{margin-left:auto;text-align:right}
@@ -836,7 +848,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .nmB{font-size:12px;color:var(--ink3)}
 .ntB{font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:500;line-height:1.26;color:var(--ink);margin:6px 0 4px;letter-spacing:-.01em}
 .ntagB{font-size:12px;font-weight:600;color:var(--acc)}
-.orbcvB{width:224px;height:224px;display:block}
+/* `.orbcvB` removed here too — see the note beside `.orbwrapB` in the base layer. */
 .orbwrapB{width:224px;height:224px;flex-shrink:0;cursor:pointer}
 .prcB{font-size:14px;color:var(--ink);font-variant-numeric:tabular-nums}
 .sbjB{font-size:13px;color:var(--ink2)}
@@ -1124,7 +1136,33 @@ body{display:block;overflow-x:hidden;overflow-y:visible;max-width:none;flex:none
    appearance is reset — that's the stray blue box behind the login choices.
    Blink hides it with background:none; WebKit needs this explicitly. */
 .ascene button,.ascene input{-webkit-appearance:none;appearance:none}
-.authbgcv{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;display:block}
+/* The login backdrop. `.authbgcv` was a SECOND full-viewport canvas next to the
+   orb, running its own rAF loop and re-filling three canvas-wide radial
+   gradients every frame at DPR 2 — roughly 9.5 M pixel writes per frame to move
+   three soft shapes a few pixels a second, and it honoured
+   prefers-reduced-motion nowhere.
+
+   As CSS these are three composited layers: the drift is a transform, so it
+   never repaints, and the global prefers-reduced-motion block at the end of
+   this file stops it. `screen` is the CSS equivalent of the canvas
+   `globalCompositeOperation:'lighter'` it replaces.
+
+   The blobs are deliberately far oversized and offset — the parallax wrapper
+   translates by a couple of percent, and nothing may reveal an edge. */
+.authbg{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden;mix-blend-mode:screen}
+.authbgpar{position:absolute;inset:-6%;transition:transform .55s cubic-bezier(.22,1,.36,1);will-change:transform}
+.authblob{position:absolute;display:block;border-radius:50%;will-change:transform}
+.authblob1{width:150%;height:150%;left:-55%;top:-45%;
+  background:radial-gradient(closest-side,rgba(184,201,247,.06),rgba(184,201,247,0));
+  animation:authdriftA 23s ease-in-out infinite}
+.authblob2{width:165%;height:165%;left:15%;top:-2%;
+  background:radial-gradient(closest-side,rgba(110,144,243,.05),rgba(110,144,243,0));
+  animation:authdriftB 31s ease-in-out infinite}
+.authblob3{width:130%;height:130%;left:-35%;top:20%;
+  background:radial-gradient(closest-side,rgba(128,102,255,.03),rgba(128,102,255,0));
+  animation:authdriftA 27s ease-in-out infinite reverse}
+@keyframes authdriftA{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(6%,4%,0)}}
+@keyframes authdriftB{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(-5%,5%,0)}}
 .authorbcv{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;display:block;filter:saturate(1.05)}
 .avig{position:absolute;inset:0;z-index:2;pointer-events:none;background:radial-gradient(90% 120% at 6% 50%,rgba(14,24,78,.32),transparent 55%)}
 .ascrim{position:absolute;inset:0;z-index:3;pointer-events:none;background:linear-gradient(90deg,rgba(14,24,78,.16) 0%,transparent 30%,rgba(12,20,70,.22) 66%,rgba(10,18,64,.4) 100%)}

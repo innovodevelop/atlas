@@ -4,7 +4,7 @@ import {
   ArrowLeft, Sparkles, Brain, Search, AlertTriangle, Activity,
   Database, DownloadCloud, Cpu, CheckCircle2, FileText, BookOpen, Loader, Clock, Radio, Bot, Zap,
 } from 'lucide-react';
-import { AtlasSphereLazy as AtlasSphere } from '@/components/atlas/AtlasSphereLazy';
+import { AtlasSphereCanvas } from '@/components/atlas-ui/AtlasSphereCanvas';
 import { AtlasCoreTabs } from '@/components/atlas-ui/AtlasCoreTabs';
 import { Button, Empty, Panel, Row, StatTile } from '@/components/atlas-ui/primitives';
 import { useAtlasHealth } from '@/hooks/useAtlasHealth';
@@ -49,9 +49,22 @@ const AtlasCoreScreen = () => {
       <div className="corebody">
         <div className="corehero">
           <div className="coreorb"><div className="coreorbglow" />
-            {/* Still hardcoded — the 2026-07-26 audit named it and it is a data
-                wiring job, not a styling one. */}
-            <AtlasSphere state="thinking" audioLevel={0} context="core" className="orbcvB" />
+            {/* No longer hardcoded to `thinking`. The 2026-07-26 audit called
+                that "a small existing lie" — the sphere claimed Atlas was
+                reasoning whenever this screen was open, which is most of the
+                time it is open.
+
+                This screen has no voice session, so it cannot compute full
+                presence, and mounting one here purely to feed a sphere would
+                start a second microphone pipeline. `activeResearch` is the one
+                real signal it already holds: research topics currently running.
+                So `working` when Atlas is genuinely doing background work, and
+                `idle` when it is not. */}
+            <AtlasSphereCanvas
+              className="sphcv"
+              state={(stats?.activeResearch ?? 0) > 0 ? 'working' : 'idle'}
+              countScale={0.4}
+            />
           </div>
           <div className="statgrid">
             {/* `trend` is typed `{ direction, label }` now, and the two entries

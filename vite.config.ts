@@ -25,9 +25,13 @@ export default defineConfig(({ command }) => ({
     rollupOptions: {
       output: {
         // Keep heavyweight libraries out of the entry chunk. mermaid is only
-        // used by the lazy /atlas-architecture route; three powers the sphere.
+        // used by the lazy /atlas-architecture route.
+        //
+        // The `three` chunk is gone: three.js, @react-three/fiber, drei and
+        // postprocessing were removed with the WebGL sphere. That chunk was
+        // 1,007,799 bytes, and it was fetched by the dashboard — the app's
+        // default route — through AtlasSphereLazy.
         manualChunks: {
-          three: ["three", "@react-three/fiber", "@react-three/drei", "@react-three/postprocessing"],
           mermaid: ["mermaid"],
           recharts: ["recharts"],
         },

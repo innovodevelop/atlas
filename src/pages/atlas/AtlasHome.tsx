@@ -6,7 +6,7 @@ import { useUnifiedChat } from '@/hooks/useUnifiedChat';
 import { useVoiceSession } from '@/hooks/useVoiceSession';
 import { useAtlasSettings } from '@/hooks/useAtlasSettings';
 import { toVoiceSettings } from '@/lib/voiceTuning';
-import { AtlasSphereLazy as AtlasSphere } from '@/components/atlas/AtlasSphereLazy';
+import { AtlasSphereCanvas } from '@/components/atlas-ui/AtlasSphereCanvas';
 import { Button } from '@/components/atlas-ui/primitives';
 import { timeOfDayGreeting } from './atlasHelpers';
 
@@ -28,7 +28,7 @@ const AtlasHome = () => {
   });
   // Duplex voice via the local gateway (speech is the session's job now).
   const { settings: atlasSettings } = useAtlasSettings();
-  const { audioLevel, effectiveAtlasState, handleManualActivate } = useVoiceSession({
+  const { effectiveAtlasState, handleManualActivate } = useVoiceSession({
     voiceId: atlasSettings.voiceId,
     ttsModelId: atlasSettings.ttsModel,
     voiceSettings: toVoiceSettings(atlasSettings),
@@ -52,7 +52,23 @@ const AtlasHome = () => {
     <div className="overlay" data-screen-label="Atlas — Home / Voice">
       <div className="ovwash" />
       <div className="homeorbwrap"><div className="homeorb"><div className="homeorbglow" />
-        <AtlasSphere state={effectiveAtlasState} audioLevel={audioLevel} context="core" className="orbcvB w100" onClick={handleManualActivate} />
+        {/* `effectiveAtlasState` is AIState (idle/listening/thinking/speaking),
+            which is a strict subset of the renderer's ten, so it goes straight
+            in with no mapping.
+
+            `audioLevel` is deliberately NOT wired. It is half-synthetic —
+            useVoiceSession:161 sets it to `0.35 + 0.3*|sin(t)|` while TTS is
+            playing and only measures real RMS from the microphone
+            (useVoiceSession:337) — and the renderer's `amp` affects the FIELD
+            formation only, which this surface never enters. Feeding a sine into
+            a parameter that does nothing here would be decoration pretending to
+            be telemetry. The `speaking` state animates its own amplitude bands.
+
+            The canvas fills `.homeorb` (min(52vmin,460px)) now. It previously
+            carried `orbcvB w100`, and `.orbcvB`'s later 224px rule beat `.w100`,
+            so the orb sat at 224px inside a 460px wrapper with a glow sized for
+            the wrapper. */}
+        <AtlasSphereCanvas className="sphcv" state={effectiveAtlasState} onClick={handleManualActivate} />
       </div></div>
 
       <div className="homewrap">

@@ -13,7 +13,7 @@
  graph TB
      subgraph User["User Interface"]
          A[Voice Input / Text]
-         B[3D Sphere Visualization]
+         B[Sphere Visualization]
      end
 
      subgraph Frontend["Frontend (React)"]
@@ -136,14 +136,17 @@
        accentColor: 'amber'
      },
      {
-       title: '3D Visualization',
-       description: 'GPU-accelerated sphere that responds to AI state and audio.',
+       // Was "3D Visualization / GPU-accelerated / Custom GLSL shaders". True of
+       // the three.js sphere, which has been deleted; the shipped renderer is
+       // canvas-2D (src/lib/atlasSphere.ts).
+       title: 'Sphere Visualization',
+       description: 'Canvas-2D particle sphere that responds to Atlas presence and audio.',
        icon: Sparkles,
        features: [
-         'Custom GLSL shaders',
-         'State-aware animations',
-         'Audio reactivity',
-         'Adaptive quality scaling'
+         '264 bucketed paths per frame',
+         'Ten state-aware behaviours',
+         'Sphere/field morph',
+         'Honours prefers-reduced-motion'
        ],
        accentColor: 'primary'
      }

@@ -14,8 +14,14 @@
      { category: 'Frontend', technology: 'Vite', purpose: 'Build tool & dev server' },
      { category: 'Styling', technology: 'Tailwind CSS', purpose: 'Utility-first styling' },
      { category: 'Animation', technology: 'Framer Motion', purpose: 'Declarative animations' },
-     { category: '3D Graphics', technology: 'Three.js', purpose: 'WebGL rendering' },
-     { category: '3D Graphics', technology: 'React Three Fiber', purpose: 'React renderer for Three.js' },
+     // Three.js and React Three Fiber were removed with the WebGL sphere; the
+     // only renderer now is src/lib/atlasSphere.ts on a 2D canvas.
+     //
+     // NOTE for whoever owns this page next: several rows BELOW are also stale —
+     // Lovable Cloud, the Lovable AI Gateway and Perplexity are all gone from
+     // the product (see CLAUDE.md). They were left alone because they are not
+     // fallout from the sphere teardown.
+     { category: 'Sphere', technology: 'Canvas 2D', purpose: 'Particle sphere/field renderer, no GPU context' },
      { category: 'Backend', technology: 'Lovable Cloud', purpose: 'Database, Auth, Edge Functions' },
      { category: 'AI/LLM', technology: 'Lovable AI Gateway', purpose: 'GPT-5, Gemini Flash access' },
      { category: 'AI/LLM', technology: 'Claude Opus 4.5', purpose: 'Memory synthesis' },

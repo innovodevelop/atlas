@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { AuthSphere, type OrbState } from './AuthSphere';
+import { AuthSphere, type OrbState } from '@/components/atlas-ui/AuthSphere';
 import { useAtlasSpeech } from '@/hooks/useAtlasSpeech';
 import {
   ATLAS_PERMISSIONS,

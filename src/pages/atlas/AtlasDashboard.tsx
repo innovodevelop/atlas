@@ -12,9 +12,9 @@ import { useAtlasSettings } from '@/hooks/useAtlasSettings';
 import { toVoiceSettings } from '@/lib/voiceTuning';
 import { useAgentRuns } from '@/hooks/useAgentRuns';
 import { useAtlasPresence } from '@/hooks/useAtlasPresence';
-import { presenceToWebGL, presenceLabel, isVoiceActive } from '@/components/atlas/presenceBridge';
+import { presenceLabel, isVoiceActive } from '@/lib/presenceBridge';
 import { getActiveWakePhrases } from '@/lib/wakeWord';
-import { AtlasSphereLazy as AtlasSphere } from '@/components/atlas/AtlasSphereLazy';
+import { AtlasSphereCanvas } from '@/components/atlas-ui/AtlasSphereCanvas';
 import { timeOfDayGreeting } from './atlasHelpers';
 import { useBandNarration, type BandContent } from './useBandNarration';
 import {
@@ -29,7 +29,7 @@ import { AtmosphereCanvas } from '@/components/atlas-ui/AtmosphereCanvas';
 import { AtlasDrawer } from '@/components/atlas-ui/AtlasDrawer';
 import { AtlasExpanded } from '@/components/atlas-ui/AtlasExpanded';
 import { AtlasSettings, type SettingsTab } from './AtlasSettings';
-import { AccountMenu } from '@/components/atlas-ui/AccountMenu';
+import { useAccountDockItem } from '@/components/atlas-ui/useAccountDockItem';
 
 export type AtlasExpandedKey = 'weather' | 'calendar' | 'tasks' | 'stocks' | 'email' | 'news' | 'music' | null;
 
@@ -78,7 +78,6 @@ const AtlasDashboard = () => {
   // region swaps to the focused widget. `gridFolding` runs the staggered
   // fold-out before the focused view mounts; `viewExiting` runs the reverse.
   const [expanded, setExpanded] = useState<AtlasExpandedKey>(null);
-  const [acctOpen, setAcctOpen] = useState(false);
   // Lets the account menu deep-link straight to Memory & Privacy, which
   // owns the account-deletion flow the privacy policy points users at.
   const [settingsTab, setSettingsTab] = useState<SettingsTab | undefined>();
@@ -183,9 +182,18 @@ const AtlasDashboard = () => {
     faultAt: lastFault,
   });
 
-  const initials = (name[0] || 'A').toUpperCase();
   // The one thing in the app allowed to be orange.
   const voiceOn = isVoiceActive(presence);
+
+  // Shared with /mail. Here it opens Settings as an OVERLAY — a modal over your
+  // own desk is the right feel on the dashboard, and it is what keeps the
+  // menu's deep-link-to-a-tab behaviour. Mail, which has no overlay, passes a
+  // callback that routes to /settings instead.
+  const openSettings = useCallback(
+    (tab?: 'memory') => { setSettingsTab(tab); setSettingsOpen(true); },
+    [],
+  );
+  const accountItem = useAccountDockItem(openSettings);
 
   // One dock definition, shared shape with /mail. `onClick` beats `to`, which
   // is what lets Home mean "close the focused widget" here and "navigate" there.
@@ -207,15 +215,8 @@ const AtlasDashboard = () => {
       onClick: () => setSettingsOpen(true) },
     { id: 'chat', label: 'New chat', icon: <Sparkles className="i16" />, kind: 'cta',
       onClick: () => setDrawerOpen(true) },
-    { id: 'account', label: 'Account', icon: initials, kind: 'avatar',
-      onClick: () => setAcctOpen((v) => !v),
-      popover: acctOpen ? (
-        <AccountMenu
-          onClose={() => setAcctOpen(false)}
-          onOpenSettings={(tab) => { setSettingsTab(tab); setSettingsOpen(true); }}
-        />
-      ) : undefined },
-  ], [expanded, closeWidget, navigate, handleManualActivate, voiceOn, muted, toggleMute, initials, acctOpen]);
+    accountItem,
+  ], [expanded, closeWidget, navigate, handleManualActivate, voiceOn, muted, toggleMute, accountItem]);
 
   return (
     <div className="page" data-screen-label="Atlas — Workshop">
@@ -232,7 +233,13 @@ const AtlasDashboard = () => {
       <section className={`bandB${swapping ? ' swapping' : ''}`}>
         <div className="orbwrapB" onClick={() => setDrawerOpen(true)}>
           <div className="orbhalo" />
-          <AtlasSphere state={presenceToWebGL(presence)} audioLevel={audioLevel} context="dashboard" className="orbcvB" />
+          {/* `presence` goes straight in now. It used to run through
+              presenceToWebGL(), which folded eight states onto the six the
+              three.js sphere could draw — and collapsed `success` and `alert`
+              onto the same visual, so a failed agent run looked exactly like a
+              finished one. This renderer implements all ten natively, so the
+              lossy map is gone rather than reimplemented. */}
+          <AtlasSphereCanvas className="sphcv" state={presence} />
         </div>
         <div>
           <h2

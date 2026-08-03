@@ -1,0 +1,332 @@
+/* ==========================================================================
+   Atlas Model Lab — the /model-lab route's stylesheet.
+
+   Owned by src/pages/atlas/AtlasModelLab.tsx and imported from it. Every rule
+   is prefixed `ml-` except the four scoped overrides at the bottom, which
+   re-pad the shared <Panel> and <StatTile> inside this surface only.
+
+   BORDERLESS (README §1.1). Separation is fill and space:
+     page  --pg      the route background
+     card  --surface the model cards, lanes and panels (one step LIGHTER)
+     well  --rz/--sk the recessed stage, the id chips, the slider-less readouts
+     emphasis        --wash, a blue-tinted FILL — never an outline
+     hover           --sk, a background shift — never a border colour
+   The handoff's own file breaks this rule once: the model card's hover is
+   `inset 0 0 0 1px #3461f2`. That is a blue outline by another name, so the
+   hover here is the paper-scale shift §1.1 mandates and the SELECTED state is
+   the wash fill.
+
+   THE ONE PLACE STROKES SURVIVE is `.ml-mini-*` — the routing diagram on each
+   card. §1.1 exempts "illustration strokes… drawings, not element borders", and
+   this drawing is the only thing that shows the shape of a substitution before
+   you read a word of it.
+
+   TOKENS come from workshop.css (README §7 wins over the Design System file).
+   No raw hex below except inside rgba() tints of a token colour, where the
+   token itself cannot carry the alpha.
+   ========================================================================== */
+
+/* --- Route shell --------------------------------------------------------- */
+
+.ml-page { position: relative; overflow-x: hidden; }
+
+/* The handoff's page wash: a warm haze at the top that fades by 44%. */
+.ml-wash {
+  position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: linear-gradient(180deg, rgba(226, 222, 215, .7), rgba(249, 247, 244, 0) 44%);
+}
+
+@keyframes ml-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+/* --- Band header --------------------------------------------------------- */
+
+.ml-band {
+  position: relative; z-index: 10;
+  display: flex; align-items: flex-end; gap: 24px; flex-wrap: wrap;
+  max-width: 1680px; margin: 0 auto; padding: 44px 28px 14px;
+  animation: ml-rise .8s var(--ease-spring) both;
+}
+.ml-band-text { min-width: 0; }
+
+.ml-eyebrow {
+  margin: 0;
+  font-size: 10.5px; font-weight: 600; letter-spacing: .15em; text-transform: uppercase;
+  color: var(--neutral-text);
+}
+
+.ml-title {
+  margin: 8px 0 0;
+  font-family: 'Hanken Grotesk', 'Geist', sans-serif;
+  font-size: clamp(26px, 3.4vw, 34px); font-weight: 600; letter-spacing: -.035em; line-height: 1;
+}
+/* The headline is the back control. `border:none` is explicit, per §1.1 — a UA
+   default button border here would put a rectangle around the page title. */
+.ml-titlebtn {
+  border: none; background: none; padding: 0; margin: 0;
+  font: inherit; letter-spacing: inherit; color: var(--ink);
+  text-align: left; cursor: pointer; transition: color .2s;
+}
+.ml-titlebtn:hover { color: var(--acc-text); }
+
+.ml-sub {
+  margin: 14px 0 0; max-width: 640px;
+  font-size: 15px; line-height: 1.55; color: var(--ink2);
+}
+
+.ml-tabs { display: flex; align-items: center; gap: 5px; margin-left: auto; flex-wrap: wrap; }
+.ml-tab {
+  border: none; height: 32px; padding: 0 15px; border-radius: var(--r-pill);
+  background: rgba(var(--surface-rgb), .85); color: var(--ink);
+  font: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer;
+  transition: background .2s, color .2s;
+}
+.ml-tab:hover { background: var(--sk); }
+.ml-tab-on, .ml-tab-on:hover { background: var(--ink); color: var(--dkf); }
+
+/* --- Main ---------------------------------------------------------------- */
+
+.ml-main {
+  position: relative; z-index: 10;
+  max-width: 1680px; margin: 0 auto;
+  /* 128px of bottom clearance: the wiring pass mounts the dock over the page. */
+  padding: 14px 28px 128px;
+  animation: ml-rise .7s var(--ease-spring) both;
+}
+
+/* --- The wall ------------------------------------------------------------ */
+
+.ml-wall {
+  display: grid; gap: 14px;
+  /* The handoff's 196px minimum assumes a card with no text in it. These cards
+     carry inference-profile ids, which are long and must not ellipsis away. */
+  grid-template-columns: repeat(auto-fill, minmax(236px, 1fr));
+}
+
+.ml-card {
+  display: flex; flex-direction: column; padding: 12px;
+  border-radius: var(--r-msg);
+  background: rgba(var(--surface-rgb), .72);
+  backdrop-filter: blur(12px) saturate(1.06);
+  -webkit-backdrop-filter: blur(12px) saturate(1.06);
+  box-shadow: 0 1px 2px rgba(30, 30, 36, .05), 0 12px 32px -20px rgba(30, 30, 36, .24);
+  cursor: pointer;
+  transition: background .22s, box-shadow .28s, transform .28s;
+}
+.ml-card:hover { background: var(--sk); transform: translateY(-2px); }
+.ml-card:focus-visible { outline: none; box-shadow: var(--focus); }
+.ml-card-on { background: var(--wash); }
+
+.ml-stage {
+  position: relative; height: 150px; border-radius: 14px; overflow: hidden;
+  /* Recessed one step below the card it sits in — the handoff's stage, in tokens. */
+  background: radial-gradient(120% 90% at 50% 10%, var(--surface), var(--sk) 78%);
+}
+.ml-kind {
+  position: absolute; left: 10px; top: 9px; z-index: 1;
+  font-size: 9px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink3);
+}
+
+.ml-card-name {
+  margin: 11px 0 0;
+  font-size: 13px; font-weight: 600; letter-spacing: -.015em; color: var(--ink);
+}
+.ml-card-meta { margin: 6px 0 0; min-width: 0; }
+.ml-card-none { font-size: 12px; color: var(--ink3); }
+.ml-card-foot { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
+.ml-wall-notes { display: flex; flex-direction: column; gap: 6px; margin-top: 20px; }
+
+/* --- The card diagram (illustration strokes — see the header note) -------- */
+
+.ml-mini { width: 100%; height: 100%; display: block; }
+.ml-mini-lbl {
+  font-family: 'Geist', system-ui, sans-serif; font-size: 8px;
+  letter-spacing: .14em; fill: var(--ink3);
+}
+.ml-mini-line { fill: none; stroke: var(--ink3); stroke-width: 1.6; stroke-linecap: round; }
+.ml-mini-line-dash { stroke-dasharray: 3 4; }
+.ml-mini-line-div { stroke: var(--acc); }
+.ml-mini-dot-ok { fill: var(--acc); }
+.ml-mini-ring-denied { fill: none; stroke: var(--red); stroke-width: 1.6; }
+.ml-mini-slash { stroke: var(--red); stroke-width: 1.6; stroke-linecap: round; }
+.ml-mini-ring-open { fill: none; stroke: var(--ink3); stroke-width: 1.6; stroke-dasharray: 2.5 3; }
+
+/* --- Detail: the handoff's editor split ---------------------------------- */
+
+.ml-split { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; }
+.ml-split-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.ml-aside { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+.ml-stage-hero {
+  display: flex; flex-direction: column; gap: 20px;
+  min-height: 320px; padding: 24px; border-radius: var(--r-card);
+  background: radial-gradient(120% 90% at 50% 8%, var(--surface), var(--sk) 82%);
+}
+.ml-stage-tag { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.ml-stage-sub { font-size: 12.5px; color: var(--ink2); }
+
+/* Call site -> gateway -> lanes. */
+.ml-flow { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.ml-flow-col { flex: 1 1 190px; min-width: 0; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.ml-flow-lanes { flex: 1.5 1 280px; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.ml-flow-arrow { color: var(--ink3); margin-top: 26px; flex-shrink: 0; }
+.ml-flow-none { margin: 0; font-size: 12px; line-height: 1.55; color: var(--ink2); }
+
+.ml-lane {
+  display: flex; flex-direction: column; gap: 8px; align-items: flex-start;
+  padding: 14px 16px; border-radius: var(--r-msg);
+  background: rgba(var(--surface-rgb), .8);
+  transition: background .22s;
+}
+/* Emphasis is the tinted fill, not a ring. */
+.ml-lane-on { background: var(--wash); }
+.ml-lane-head { display: flex; align-items: center; gap: 10px; width: 100%; }
+.ml-lane-head .ml-sec { margin: 0; }
+.ml-lane-swap { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.ml-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+
+/* --- Compare -------------------------------------------------------------- */
+
+.ml-compare { display: flex; flex-direction: column; gap: 16px; max-width: 1180px; }
+.ml-picks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.ml-pick { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ml-pick-row { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* Wide content scrolls in its own box; the page never scrolls sideways. */
+.ml-cmp-scroll { overflow-x: auto; }
+.ml-cmp { min-width: 760px; display: flex; flex-direction: column; }
+.ml-cmp-head, .ml-cmp-row {
+  display: grid; grid-template-columns: 220px minmax(0, 1fr) minmax(0, 1fr); gap: 16px;
+  align-items: baseline; padding: 13px 14px; border-radius: var(--r-row);
+}
+.ml-cmp-head { padding-bottom: 6px; }
+.ml-cmp-title {
+  font-family: 'Hanken Grotesk', 'Geist', sans-serif;
+  font-size: 17px; font-weight: 600; letter-spacing: -.02em; color: var(--ink);
+}
+.ml-cmp-k { font-size: 12px; color: var(--ink2); }
+.ml-cmp-v { font-size: 13.5px; color: var(--ink); overflow-wrap: anywhere; }
+/* A difference is a fill, and the fill is the only difference marker — no rule,
+   no left border, no colour-coded text. */
+.ml-cmp-row-diff { background: var(--wash); }
+.ml-cmp-row-diff .ml-cmp-k, .ml-cmp-row-diff .ml-cmp-v { color: var(--acc-text); }
+
+/* --- Providers ------------------------------------------------------------ */
+
+.ml-providers { display: flex; flex-direction: column; gap: 12px; max-width: 980px; }
+.ml-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.ml-dot-ok { background: var(--grn); }
+.ml-dot-warn { background: var(--amber); }
+.ml-dot-off { background: var(--red); }
+.ml-dot-accent { background: var(--acc); }
+.ml-dot-neutral { background: var(--ink3); }
+.ml-trail { font-size: 12px; color: var(--ink2); }
+
+/* --- Shared bits ---------------------------------------------------------- */
+
+.ml-sec {
+  margin: 0 0 2px;
+  font-size: 10.5px; font-weight: 600; letter-spacing: .15em; text-transform: uppercase;
+  color: var(--neutral-text);
+}
+
+.ml-panel-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.ml-panel-head .ml-sec { flex: 1; margin: 0; }
+.ml-panel-ico { color: var(--ink3); }
+
+/* Identifiers. A recessed chip, because a card on a panel goes lighter and a
+   well goes darker — an id is a well. */
+.ml-id, .ml-inline-id {
+  display: inline-block; max-width: 100%; overflow-wrap: anywhere;
+  padding: 3px 8px; border-radius: 8px;
+  background: var(--rz); color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+  font-size: 11.5px; line-height: 1.5;
+}
+/* An id that is named but cannot be invoked. Never the only signal — every use
+   sits beside a worded state ("AccessDenied", "no profile mapped"). */
+.ml-id-struck { text-decoration: line-through; color: var(--ink2); }
+
+.ml-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 22px; padding: 0 10px; border-radius: var(--r-pill);
+  font-size: 11.5px; font-weight: 600; white-space: nowrap;
+}
+.ml-pill-ok { color: var(--grn-text); background: rgba(15, 174, 118, .12); }
+.ml-pill-warn { color: var(--amber-text); background: rgba(224, 122, 31, .13); }
+.ml-pill-off { color: var(--red-text); background: rgba(208, 69, 58, .1); }
+.ml-pill-accent { color: var(--acc-text); background: var(--wash); }
+.ml-pill-neutral { color: var(--neutral-text); background: var(--rz); }
+
+/* Spec rows. No divider — padding carries the rhythm (§1.1). The negative
+   inline margin lets the diff fill bleed to the panel's padding edge. */
+.ml-kv {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 14px;
+  padding: 11px 12px; margin: 0 -12px; border-radius: var(--r-rail);
+}
+.ml-kv-diff { background: var(--wash); }
+.ml-kv-k { flex-shrink: 0; font-size: 12.5px; color: var(--ink2); }
+.ml-kv-diff .ml-kv-k { color: var(--acc-text); }
+.ml-kv-v { min-width: 0; text-align: right; font-size: 13px; color: var(--ink); overflow-wrap: anywhere; }
+
+.ml-note {
+  display: flex; align-items: flex-start; gap: 8px;
+  margin: 10px 0 0; font-size: 12px; line-height: 1.6; color: var(--ink2);
+}
+.ml-note svg { margin-top: 3px; color: var(--ink3); }
+.ml-note strong { color: var(--ink); font-weight: 600; }
+
+/* --- Footer (provenance) -------------------------------------------------- */
+
+.ml-foot { margin-top: 28px; max-width: 760px; }
+.ml-foot-lead { margin: 0; font-size: 12px; line-height: 1.6; color: var(--ink2); }
+.ml-foot-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ml-foot-list li {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+  font-size: 12px; color: var(--ink2);
+}
+
+/* --- Scoped primitive overrides ------------------------------------------
+   The shared <Panel> ships the dashboard's 24px/20px geometry; the handoff's
+   control cards are 18px on a 22px radius. Scoped to this surface so no other
+   route moves, and expressed here rather than by hand-writing padding at 20
+   call sites (the exact thing <Panel pad> exists to stop).
+   ------------------------------------------------------------------------- */
+
+.ml-aside .gpanel,
+.ml-providers .gpanel,
+.ml-compare .gpanel { padding: 18px; border-radius: 22px; }
+
+/* <StatTile layout="micro"> is a bare centred stat; the handoff's 4-up puts
+   each one on its own card. */
+.ml-facts .estat {
+  padding: 18px 12px; border-radius: var(--r-rules);
+  background: rgba(var(--surface-rgb), .72);
+  backdrop-filter: blur(12px) saturate(1.06);
+  -webkit-backdrop-filter: blur(12px) saturate(1.06);
+}
+.ml-facts .esval { font-size: 16px; letter-spacing: -.01em; }
+.ml-facts .eslbl { margin-top: 6px; font-size: 11.5px; line-height: 1.4; }
+
+/* --- Responsive ----------------------------------------------------------- */
+
+@media (max-width: 1180px) {
+  .ml-split { grid-template-columns: minmax(0, 1fr); }
+  .ml-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  .ml-band { padding: 32px 16px 12px; }
+  .ml-main { padding: 12px 16px 128px; }
+  .ml-tabs { margin-left: 0; }
+  .ml-picks { grid-template-columns: minmax(0, 1fr); }
+  /* Stacked flow: the arrows point down, so they are rotated rather than
+     dropped — losing them would lose the direction of the routing. */
+  .ml-flow { flex-direction: column; }
+  .ml-flow-arrow { margin: 0 0 0 6px; transform: rotate(90deg); }
+}
+@media (max-width: 560px) {
+  .ml-facts { grid-template-columns: minmax(0, 1fr); }
+  .ml-kv { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .ml-kv-v { text-align: left; }
+}

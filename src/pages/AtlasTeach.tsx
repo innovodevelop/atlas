@@ -8,7 +8,7 @@ import { localClient as supabase } from '@/integrations/local/localClient';
 import { getToken } from '@/lib/authClient';
 import { getBrainEndpoint } from '@/lib/brainClient';
 import { useToast } from '@/hooks/use-toast';
-import { AtlasSphere } from '@/components/atlas';
+import { AtlasSphereCanvas } from '@/components/atlas-ui/AtlasSphereCanvas';
 
 interface Memory {
   id: string;
@@ -664,11 +664,12 @@ const AtlasTeach = () => {
 
         {/* Atlas Sphere */}
         <div className="relative w-[400px] h-[400px] mb-8">
-          <AtlasSphere
-            state={atlasState}
-            audioLevel={isPlaying ? audioLevel : (isListening && listeningMode === 'active' ? 0.3 : 0)}
-            context="teach"
-          />
+          {/* Teach's own state union is dormant|listening|thinking|speaking.
+              Three map straight through; `dormant` here means "connected but
+              waiting for the wake word", which is the renderer's `idle`, not
+              its `muted` (the mic is on). The audioLevel prop is gone with the
+              three.js renderer — see the note in AtlasHome. */}
+          <AtlasSphereCanvas state={atlasState === 'dormant' ? 'idle' : atlasState} />
         </div>
 
         {/* Audio level ring */}

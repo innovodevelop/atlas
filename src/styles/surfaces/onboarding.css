@@ -1,0 +1,356 @@
+/* ==========================================================================
+   Atlas Onboarding — surface stylesheet.
+
+   Values from `Atlas Onboarding.dc.html` (handoff v2), expressed in the app's
+   own tokens rather than the design's inline hexes. Three deliberate
+   substitutions, each noted at its rule:
+
+     1. The granted tile fill is `--wash` + `--acc-text`, not the design's
+        `#e8862e` / `#2a4fd0`. See CapabilityTile.tsx.
+     2. The speaking caret is ink, not the design's `#e8862e`. `--acc2` (the
+        only warm accent this project has) is reserved for the voice/listening
+        indicator, and a warm caret here would read as that indicator on a
+        screen where the microphone is not even granted yet.
+     3. The orb does not fly around on fixed coordinates. It sits in the band
+        like every other Atlas surface's orb and *resizes* between stages —
+        which is the design's travel, done with the app's one motion curve.
+
+   Everything animated here is covered by the global prefers-reduced-motion
+   block at the end of workshop.css; nothing in this file opts out of it.
+   ========================================================================== */
+
+/* --- page chrome ---------------------------------------------------------- */
+
+/* A second, softer bloom under the band. The design's background is a warm top
+   wash plus two blurred discs; `.auro` (workshop.css) already provides the
+   wash, so this is only the disc the app was missing. Decorative, never
+   interactive, always behind the z-index:10 band. */
+.onb-bloom {
+  position: fixed;
+  z-index: 0;
+  bottom: -260px;
+  left: -220px;
+  width: 760px;
+  height: 640px;
+  border-radius: 50%;
+  filter: blur(70px);
+  pointer-events: none;
+  background: radial-gradient(closest-side, rgba(52, 97, 242, .12), transparent 74%);
+}
+
+/* --- band ----------------------------------------------------------------- */
+
+.onb-bandtext { min-width: 0 }
+
+/* The orb's stage travel. The renderer re-reads clientWidth every frame, so a
+   plain CSS transition on the wrapper carries the sphere between sizes with no
+   remount and no JS tween. */
+.onb-orbwrap {
+  position: relative;
+  flex-shrink: 0;
+  width: 96px;
+  height: 96px;
+  transition: width .85s var(--ease-spring), height .85s var(--ease-spring);
+}
+.onb-band-intro .onb-orbwrap { width: 168px; height: 168px }
+.onb-orb { position: relative; display: block; width: 100%; height: 100% }
+.onb-halo {
+  position: absolute;
+  inset: -32%;
+  border-radius: 50%;
+  filter: blur(22px);
+  pointer-events: none;
+  background: radial-gradient(closest-side, rgba(52, 97, 242, .16), transparent 70%);
+}
+
+/* The back affordance: a real <button> wearing the headline's type, so the
+   heading stays a heading and the control stays keyboard-reachable. `border`
+   is declared, not omitted — README §1.1. */
+.onb-back {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Reserved height so the layout does not jolt as words arrive one by one. */
+.onb-spoken { min-height: 52px; max-width: 56ch }
+
+/* The screen-reader mirror of the spoken line. Visually hidden, never
+   display:none — a display:none live region is not announced at all. */
+.onb-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+/* Ink, not amber — see the file header. */
+.onb-caret {
+  display: inline-block;
+  width: 2px;
+  height: .9em;
+  margin-left: 1px;
+  vertical-align: -2px;
+  border-radius: 1px;
+  background: var(--ink);
+  animation: acblink 1.1s steps(1) infinite;
+}
+
+/* --- stage ---------------------------------------------------------------- */
+
+.onb-stage {
+  position: relative;
+  z-index: 10;
+  max-width: 1680px;
+  margin: 0 auto;
+  padding: 10px 28px 84px;
+  animation: rise .8s var(--ease-spring) both;
+}
+.onb-stage-intro {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 20px;
+  padding-top: 20px;
+}
+.onb-introsub { margin: 0; font-size: 13px; color: var(--neutral) }
+
+/* Stage dots. The current step is a 20px pill, the rest 7px discs — the
+   design's own shape, on the app's ink tiers. */
+.onb-steps { display: flex; gap: 8px; margin: 0 0 22px; padding: 0; list-style: none }
+.onb-step {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--r-pill);
+  background: var(--ink3);
+  transition: width .4s var(--ease-spring), background .4s;
+}
+.onb-step-done { background: var(--ink2) }
+.onb-step-on { width: 20px; background: var(--ink) }
+
+/* --- notices -------------------------------------------------------------- */
+
+.onb-notices { display: flex; flex-direction: column; gap: 10px; margin: 0 0 16px }
+.onb-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 13px 16px;
+  border-radius: var(--r-row);
+  background: var(--rz);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink2);
+  text-wrap: pretty;
+}
+/* The destructive tint from README §7 — a fill, like every other emphasis. */
+.onb-notice-warn { background: #f7e6e4; color: var(--red-text) }
+.onb-notice > svg { flex-shrink: 0; margin-top: 2px }
+
+/* --- permissions ---------------------------------------------------------- */
+
+.onb-permpanel {
+  /* A shade of --wash for hover. The token set has a hover fill for neutral
+     surfaces (--sk) and one for destructive (#f7e6e4) but none for the blue
+     emphasis fill, and reusing --sk on hover would drop the emphasis exactly
+     when the pointer is on it. Declared here so it is scoped to this surface
+     and one edit away from becoming a token. */
+  --onb-wash-hover: #e4ebfd;
+  border-radius: var(--r-pane);
+  padding: 22px;
+}
+.onb-group {
+  margin: 20px 2px 9px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--ink3);
+}
+.onb-group:first-child { margin-top: 2px }
+.onb-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 8px;
+}
+
+.onb-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  padding: 14px 16px;
+  /* Explicit, not omitted — WKWebView draws its own control chrome otherwise. */
+  border: none;
+  border-radius: var(--r-row);
+  background: var(--surface);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background .3s, color .3s;
+}
+.onb-tile:hover:not(:disabled) { background: var(--sk) }
+.onb-tile:disabled { cursor: default }
+
+.onb-tile-head { display: flex; align-items: center; gap: 9px; width: 100% }
+.onb-tile-dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink3);
+  transition: background .3s;
+}
+.onb-tile-ico { display: flex; align-items: center; color: var(--ink3); transition: color .3s }
+.onb-tile-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  color: var(--ink2);
+  transition: color .3s;
+}
+.onb-tile-tag {
+  margin-left: auto;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--ink3);
+  transition: color .3s;
+}
+.onb-tile-why { font-size: 11.5px; line-height: 1.45; color: var(--ink2); text-wrap: pretty }
+
+/* Granted: the blue-tinted emphasis FILL, never an outline (README §1.1). Every
+   text role sits at full opacity on it — #2f4bbd on #eef2fe is ~7.5:1. */
+.onb-tile-on,
+.onb-tile-asking { background: var(--wash) }
+.onb-tile-on:hover:not(:disabled),
+.onb-tile-asking:hover:not(:disabled) { background: var(--onb-wash-hover) }
+.onb-tile-on .onb-tile-name,
+.onb-tile-asking .onb-tile-name,
+.onb-tile-on .onb-tile-why,
+.onb-tile-asking .onb-tile-why,
+.onb-tile-on .onb-tile-tag,
+.onb-tile-asking .onb-tile-tag { color: var(--acc-text) }
+.onb-tile-on .onb-tile-dot,
+.onb-tile-asking .onb-tile-dot { background: var(--acc) }
+.onb-tile-on .onb-tile-ico,
+.onb-tile-asking .onb-tile-ico { color: var(--acc) }
+.onb-tile-asking .onb-tile-dot { animation: pls 1.4s ease-in-out infinite }
+
+/* Refused by macOS. Deliberately not styled as "off": the user asked for this
+   one and the system said no, which is a different fact with a different fix. */
+.onb-tile-denied .onb-tile-dot { background: var(--red) }
+.onb-tile-denied .onb-tile-tag { color: var(--red-text) }
+.onb-tile-denied .onb-tile-ico { color: var(--red) }
+
+.onb-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 4px;
+}
+.onb-grant { font-size: 12.5px; color: var(--ink2) }
+.onb-foot-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-left: auto }
+.onb-fine { margin: 16px 2px 0; font-size: 11.5px; letter-spacing: .02em; color: var(--ink3) }
+
+/* --- welcome bento -------------------------------------------------------- */
+
+.onb-bento {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+.onb-span-2 { grid-column: span 2 }
+.onb-span-3 { grid-column: span 3 }
+.onb-span-6 { grid-column: span 6 }
+@media (max-width: 1100px) { .onb-span-2, .onb-span-3 { grid-column: span 3 } }
+@media (max-width: 760px) { .onb-span-2, .onb-span-3, .onb-span-6 { grid-column: span 6 } }
+
+.onb-feat {
+  display: flex;
+  flex-direction: column;
+  min-height: 138px;
+  padding: 16px 18px;
+  border-radius: var(--r-rules);
+  background: var(--surface);
+  animation: rise .6s var(--ease-spring) both;
+  transition: transform .25s var(--ease-spring);
+}
+.onb-feat:hover { transform: translateY(-2px) }
+/* Paper scale: a feature whose capability is off recedes to the panel step
+   rather than announcing itself with a colour. */
+.onb-feat-off { background: var(--rz) }
+.onb-feat-denied { background: #f7e6e4 }
+.onb-feat-on { background: var(--wash) }
+
+.onb-feat-head { display: flex; align-items: center; gap: 8px }
+.onb-feat-ico { display: flex; color: var(--ink3) }
+.onb-feat-on .onb-feat-ico { color: var(--acc) }
+.onb-feat-denied .onb-feat-ico { color: var(--red-text) }
+.onb-feat-name {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: var(--ink2);
+}
+.onb-feat-on .onb-feat-name { color: var(--acc-text) }
+.onb-feat-denied .onb-feat-name { color: var(--red-text) }
+.onb-feat-state {
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--ink3);
+  font-variant-numeric: tabular-nums;
+}
+.onb-feat-on .onb-feat-state { color: var(--acc-text) }
+.onb-feat-denied .onb-feat-state { color: var(--red-text) }
+.onb-feat-claim {
+  margin: 9px 0 0;
+  font-family: 'Hanken Grotesk', 'Geist', sans-serif;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -.02em;
+  line-height: 1.16;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+.onb-span-2 .onb-feat-claim { font-size: 15px }
+.onb-feat-note {
+  margin: auto 0 0;
+  padding-top: 12px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink2);
+  text-wrap: pretty;
+}
+.onb-feat-on .onb-feat-note { color: var(--acc-text) }
+.onb-feat-denied .onb-feat-note { color: var(--red-text) }
+
+.onb-welcomefoot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 24px;
+}
+.onb-summary { font-size: 12.5px; color: var(--ink2) }
+.onb-emptywrap { margin-bottom: 14px }

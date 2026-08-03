@@ -30,7 +30,11 @@ import { OnboardingGate } from "./components/OnboardingGate";
 // Statically imported (not lazy): this is the first screen a new user sees, so
 // it must not depend on a runtime chunk fetch that could fail in the webview.
 import AtlasPermissions from "./pages/AtlasPermissions";
-const AtlasDemo = lazy(() => import("./pages/AtlasDemo"));
+// `/atlas-demo` used to be lazy-loaded here. It was a 1133-line particle
+// tuning lab for the three.js sphere — the largest page in the repo, linked
+// from nowhere, and the only importer of src/components/atlas-demo/. Both are
+// deleted with the renderer they tuned. The tuning surface that survives is
+// /atlas-sphere, which drives the renderer the app actually uses.
 // Both are reachable from the account menu (dock avatar → "Teach Atlas" /
 // "How Atlas works"). Before T4 part 3 they were routes with no link anywhere.
 const AtlasTeach = lazy(() => import("./pages/AtlasTeach"));
@@ -197,16 +201,7 @@ const App = () => (
               </Suspense>
             }
           />
-          
-          <Route
-            path="/atlas-demo"
-            element={
-              <Suspense fallback={<PageLoader />}>
-                <AtlasDemo />
-              </Suspense>
-            } 
-          />
-          
+
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

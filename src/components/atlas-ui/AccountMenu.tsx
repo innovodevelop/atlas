@@ -16,7 +16,7 @@ import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   LogOut, Settings as SettingsIcon, ShieldX, BadgeCheck,
-  GraduationCap, Network, Orbit,
+  GraduationCap, Network, Orbit, Mic,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -84,6 +84,16 @@ export function AccountMenu({ onClose, onOpenSettings }: Props) {
 
       <button className="acctitem" role="menuitem" onClick={() => go('/atlas-architecture')}>
         <Network className="i16" /><span>How Atlas works</span>
+      </button>
+
+      {/* `/home` — the voice-first landing — was routed in App.tsx and linked
+          from nowhere: a whole product surface (its own chat session, voice
+          session and sphere) that no user could reach without typing the URL.
+          Exactly the regression the two items above record being fixed; this
+          one was missed. It lands here rather than in the dock for the same
+          reason they did — the dock is full and this is not a daily surface. */}
+      <button className="acctitem" role="menuitem" onClick={() => go('/home')}>
+        <Mic className="i16" /><span>Voice home</span>
       </button>
 
       {/* The sphere gallery is a design/QA tool, not a product screen, so it is

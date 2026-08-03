@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
-import { AuthSphere, type OrbState } from './AuthSphere';
+import { AuthSphere, type OrbState } from '@/components/atlas-ui/AuthSphere';
 import { readOnboarding } from '@/lib/atlasPermissions';
 
 // Split conversational login (design "Atlas Login C1 - Split"): flat #3461f2

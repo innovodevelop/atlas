@@ -23,6 +23,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Home, Cpu, Mail, Sparkles, Inbox } from 'lucide-react';
 import { Dock, Empty } from '@/components/atlas-ui/primitives';
+import { useAccountDockItem } from '@/components/atlas-ui/useAccountDockItem';
 import { useAuth } from '@/hooks/useAuth';
 import { useAtlasMail, type UseAtlasMail } from '@/hooks/useAtlasMail';
 import { MAIL_AUDIT_ACTIONS, type MailThreadStatus } from '@/types/mail';
@@ -54,6 +55,15 @@ const AtlasMail = () => {
   const [rulesOpen, setRulesOpen] = useState(false);
   const [snoozeOpen, setSnoozeOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  // Mail has no Settings overlay of its own, so the account menu routes to
+  // `/settings` — the addressable copy of the same component. Closing it
+  // navigates back, which lands you here again.
+  const openSettings = useCallback(
+    (tab?: 'memory') => navigate(tab ? `/settings?tab=${tab}` : '/settings'),
+    [navigate],
+  );
+  const accountItem = useAccountDockItem(openSettings);
 
   useEffect(() => {
     if (!authLoading && !user) navigate('/auth');
@@ -299,7 +309,12 @@ const AtlasMail = () => {
       {/* Same component as the dashboard's dock, different items. `current`
           is what makes Mail the one item carrying a visible label; the sync
           CTA is the documented exception, because its label is the only place
-          the sync reports that it is running. */}
+          the sync reports that it is running.
+
+          The account chip is shared, not re-declared: it carries the app's only
+          sign-out, plan badge and privacy/delete-account entry, and this dock
+          shipped without it — so a user sitting in Mail had to go back to the
+          dashboard to sign out. It goes LAST; `<Dock>` asserts that in DEV. */}
       <Dock
         current="mail"
         items={[
@@ -308,6 +323,7 @@ const AtlasMail = () => {
           { id: 'mail', label: 'Mail', icon: <Mail className="i16" />, to: '/mail' },
           { id: 'sync', label: 'Sync', icon: <Sparkles className="i16" />, kind: 'cta',
             busy: mail.syncing, busyLabel: 'Syncing…', onClick: () => void mail.sync() },
+          accountItem,
         ]}
       />
     </div>

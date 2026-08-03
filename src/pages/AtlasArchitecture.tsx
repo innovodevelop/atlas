@@ -3,7 +3,7 @@
  import { Link } from 'react-router-dom';
  import { ArrowLeft, Network, Brain, Layers, GraduationCap, Sparkles, Zap } from 'lucide-react';
  import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
- import { AtlasSphere } from '@/components/atlas';
+ import { AtlasSphereCanvas } from '@/components/atlas-ui/AtlasSphereCanvas';
  import ArchitectureOverview from '@/components/architecture/ArchitectureOverview';
  import AIProvidersSection from '@/components/architecture/AIProvidersSection';
  import MemoryArchitectureSection from '@/components/architecture/MemoryArchitectureSection';
@@ -60,7 +60,10 @@
          >
            <div className="flex items-center justify-center mb-6">
              <div className="w-32 h-32">
-               <AtlasSphere state="passive" audioLevel={0} context="mini" />
+               {/* Reference art on a documentation page — there is no live
+                   presence to read here, so "idle" is the honest resting state.
+                   128 px, so the cloud runs at a third of the tuned count. */}
+               <AtlasSphereCanvas state="idle" countScale={0.35} />
              </div>
            </div>
            <h2 className="text-3xl font-bold mb-4">
@@ -68,7 +71,7 @@
            </h2>
            <p className="text-muted-foreground max-w-2xl mx-auto">
              A comprehensive guide to how Atlas works—from multi-model AI orchestration and 
-             persistent memory systems to continuous learning and real-time 3D visualization.
+             persistent memory systems to continuous learning and the live sphere.
            </p>
          </motion.div>
  

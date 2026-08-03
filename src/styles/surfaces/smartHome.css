@@ -1,0 +1,425 @@
+/* ==========================================================================
+   Atlas Smart Home — the /smart-home route's stylesheet.
+   Design: `Atlas Smart Home.dc.html` (design_handoff_atlas_suite_v2).
+
+   Everything here references workshop.css tokens, never a raw token hex, so
+   this surface follows the app's accent and any future theme work for free.
+   The only literals are the design's eight CATEGORY hues (see below), which
+   are not tokens and are not accent — they are categorical data colours.
+
+   BORDERLESS (README §1.1). Separation is fill and space. Three places where
+   the design file specifies a stroke and this file does not:
+
+   1. Every card in the design carries `inset 0 0 0 1px rgba(255,253,250,.9)`.
+      That is a 1px ring. Dropped — `.cardB` already separates by fill and a
+      whisper shadow, and the design's own README supersedes its inline styles.
+   2. The room heading in the devices view ends in a `1px` rule that runs to
+      the right edge. Dropped: divider rules are gone, and the heading's own
+      space carries it.
+   3. The `split` card puts a 1px vertical rule between its two halves.
+      Dropped for the same reason; the 14px gap and the second half's colour
+      already separate them.
+
+   Illustration strokes DO stay, per §1.1: the padlock shackle on a lock device
+   is drawn with inset box-shadows, and the lamp's glow is a box-shadow. Those
+   are drawings, not element borders.
+
+   RADII come from the role scale: cards --r-card (via .cardB), panels
+   --r-editor (via .cpanel), stages and tiles --r-row, rails --r-rail,
+   every pill --r-pill.
+   ========================================================================== */
+
+/* --- Page + wash --------------------------------------------------------- */
+
+/* The design's three-layer warm wash (washA/B/C at `dark:false`). Static —
+   no transform animation on a blurred full-bleed layer, which is the same
+   trap README §5 documents for the music player's cover wash. */
+.sh-page{position:relative;overflow-x:hidden}
+.sh-wash{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.sh-wash-a{position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(255,231,200,.7),rgba(249,247,244,0) 42%)}
+.sh-wash-b{position:absolute;top:-260px;right:-170px;width:800px;height:800px;
+  border-radius:50%;filter:blur(64px);
+  background:radial-gradient(closest-side,rgba(255,158,64,.3),transparent 74%)}
+.sh-wash-c{position:absolute;top:-160px;left:-200px;width:700px;height:560px;
+  border-radius:50%;filter:blur(64px);
+  background:radial-gradient(closest-side,rgba(122,140,255,.2),transparent 74%)}
+
+/* --- Category hues -------------------------------------------------------
+   The design gives each of eight categories an accent. Two of them ARE
+   tokens already (`water` #2f4bbd is --acc-text, `net` #3461f2 is --acc);
+   the other six are not, and they are not "the accent" either — they are
+   categorical colours, the same job a series colour does in a chart. They
+   live here, scoped to this surface, and never leak into interactive chrome:
+   emphasis on this page is still the blue --wash fill.
+
+   Each category declares a FILL and a TEXT tone. The design uses one hex for
+   both, but several of them (#c98a2b on paper is ~3.0:1) fail as text at
+   12.5px, so text takes the darker partner — the app's own token where one
+   exists, a darkened version of the design hue where none does.          */
+.sh-w[data-cat="light"]   {--sh-fill:#c98a2b;--sh-text:var(--amber-text)}
+.sh-w[data-cat="climate"] {--sh-fill:#2f7d5e;--sh-text:var(--grn-text)}
+.sh-w[data-cat="security"]{--sh-fill:#c2483d;--sh-text:var(--red-text)}
+.sh-w[data-cat="energy"]  {--sh-fill:#8b6f3f;--sh-text:#6b5430}
+.sh-w[data-cat="media"]   {--sh-fill:#a33f66;--sh-text:#83294c}
+.sh-w[data-cat="water"]   {--sh-fill:var(--acc);--sh-text:var(--acc-text)}
+.sh-w[data-cat="care"]    {--sh-fill:#5b3ce0;--sh-text:#4a2cc4}
+.sh-w[data-cat="net"]     {--sh-fill:var(--acc);--sh-text:var(--acc-text)}
+
+/* --- Chrome under the band ---------------------------------------------- */
+
+.sh-chrome{position:relative;z-index:10;max-width:1680px;margin:0 auto;
+  padding:6px 28px 0;display:flex;flex-direction:column;gap:14px}
+.sh-views{display:flex;flex-wrap:wrap;gap:6px}
+
+/* The sample-data treatment. A tinted fill, not an outline (§1.1), on the
+   emphasis wash so it reads as chrome the app is telling you about rather
+   than a warning about your house. */
+.sh-notice{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;
+  padding:16px 20px;border-radius:var(--r-rules);background:var(--wash)}
+.sh-notice-ico{display:flex;align-items:center;justify-content:center;
+  width:34px;height:34px;flex-shrink:0;border-radius:var(--r-icon);
+  background:rgba(52,97,242,.12);color:var(--acc-text)}
+.sh-notice-body{flex:1;min-width:220px}
+.sh-notice-title{margin:0;font-size:13px;font-weight:600;letter-spacing:-.01em;
+  color:var(--acc-text)}
+.sh-notice-text{margin:5px 0 0;font-size:12.5px;line-height:1.5;
+  color:var(--acc-text);opacity:.86;text-wrap:pretty;max-width:78ch}
+.sh-notice-act{flex-shrink:0;display:flex;align-items:center;gap:8px}
+
+/* The house line + scene pills, the design's hero block. */
+.sh-hero{display:flex;flex-direction:column;gap:12px;padding:18px 20px;
+  border-radius:var(--r-rules);background:var(--surface)}
+.sh-hero-lbl{margin:0;font-size:11px;font-weight:600;letter-spacing:.15em;
+  text-transform:uppercase;color:var(--neutral-text)}
+.sh-hero-scenes{display:flex;flex-wrap:wrap;gap:7px}
+
+/* --- The 12-column widget grid -------------------------------------------
+   The design's grid is `repeat(12,1fr)` on 126px rows with `min-width:1400px`,
+   which forces the page to scroll sideways. The app's pages never scroll
+   horizontally, so the column count steps down instead and the spans clamp
+   with it. Row height and gap are the design's.                          */
+.sh-grid{position:relative;z-index:10;display:grid;
+  grid-template-columns:repeat(12,minmax(0,1fr));grid-auto-rows:126px;
+  grid-auto-flow:row dense;gap:14px;max-width:1680px;margin:0 auto;
+  padding:14px 28px 128px;
+  opacity:1;animation:shRise .75s var(--ease-spring) forwards}
+@keyframes shRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+.sh-c3{grid-column:span 3}
+.sh-c6{grid-column:span 6}
+.sh-c12{grid-column:span 12}
+.sh-r1{grid-row:span 1}
+.sh-r2{grid-row:span 2}
+
+@media (max-width:1180px){
+  .sh-grid{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .sh-c12{grid-column:span 6}
+}
+@media (max-width:780px){
+  .sh-grid{grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:auto}
+  .sh-c3,.sh-c6,.sh-c12{grid-column:span 3}
+  .sh-r2{grid-row:span 1}
+}
+
+/* --- Widget card internals ------------------------------------------------
+   The card shell is <Card> (.cardB). Only the bodies are here.           */
+.sh-w .chB{padding:16px 18px 0;align-items:baseline}
+.sh-w .cbB{padding:10px 18px 16px;display:flex;flex-direction:column;min-height:0}
+.sh-kicker{font-size:11.5px;color:var(--ink3);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;min-width:0;margin-left:auto}
+
+.sh-bottom{margin-top:auto}
+.sh-bigrow{display:flex;align-items:flex-end;gap:10px;min-width:0;overflow:hidden}
+.sh-big{font-family:'Hanken Grotesk','Geist',sans-serif;font-weight:500;
+  letter-spacing:-.035em;line-height:1.08;color:var(--ink);white-space:nowrap}
+.sh-r1 .sh-big{font-size:30px}
+.sh-r2 .sh-big{font-size:40px}
+.sh-c6.sh-r2 .sh-big{font-size:52px}
+.sh-delta{padding-bottom:5px;font-size:12.5px;font-weight:500;color:var(--sh-text);
+  white-space:nowrap}
+.sh-cap{margin:7px 0 0;font-size:12.5px;line-height:1.4;color:var(--ink2);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* `rows` — the divider is gone; 9px of padding carries the rhythm (§1.1). */
+.sh-list{display:flex;flex-direction:column;min-height:0;overflow:hidden;margin-top:8px}
+.sh-list-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;
+  align-items:baseline;padding:9px 0}
+.sh-list-label{font-size:13px;color:var(--ink);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.sh-list-value{font-size:12px;color:var(--ink2);font-variant-numeric:tabular-nums}
+
+/* `toggle` */
+.sh-togrow{display:flex;align-items:center;gap:12px;margin-top:auto}
+.sh-togtext{min-width:0;flex:1}
+.sh-mid{margin:0;font-family:'Hanken Grotesk','Geist',sans-serif;font-size:17px;
+  font-weight:600;letter-spacing:-.02em;color:var(--ink);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.sh-r2 .sh-mid{font-size:24px}
+
+/* The switch. `border:none` is explicit, not merely absent (§1.1) — this is a
+   <button>, and WKWebView draws its own chrome otherwise. */
+.sh-switch{border:none;width:46px;height:27px;padding:3px;flex-shrink:0;
+  border-radius:var(--r-pill);background:#ddd8d0;cursor:pointer;
+  display:flex;align-items:center;justify-content:flex-start;
+  transition:background .28s var(--ease-spring)}
+.sh-switch[aria-checked="true"]{background:var(--acc);justify-content:flex-end}
+.sh-switch:disabled{cursor:default;opacity:.5}
+.sh-switch-knob{width:21px;height:21px;border-radius:50%;background:var(--surface);
+  box-shadow:0 2px 6px -2px rgba(30,30,36,.6)}
+.sh-switch-sm{width:46px;height:26px}
+.sh-switch-sm .sh-switch-knob{width:20px;height:20px}
+
+/* `progress` */
+.sh-progline{display:flex;align-items:baseline;gap:9px;margin-bottom:11px}
+.sh-track{height:5px;border-radius:var(--r-pill);background:var(--bd-soft);overflow:hidden}
+.sh-fill{display:block;height:100%;border-radius:var(--r-pill);background:var(--sh-fill)}
+
+/* `bars` — an illustration, so the shape is the design's exactly. */
+.sh-bars{display:flex;align-items:flex-end;gap:3px;height:34px;margin-top:auto}
+.sh-r2 .sh-bars{height:68px}
+/* The design's `tall` bar height is 68px, sized for a 3-column card. At six
+   columns and two rows the chart is twice as wide and the same height reads as
+   a strip in an empty box, so it takes the design's `huge` step instead. */
+.sh-c6.sh-r2 .sh-bars{height:118px}
+.sh-c6 .sh-bars{gap:5px}
+.sh-bar{flex:1;border-radius:2px;background:rgba(30,30,36,.1)}
+.sh-bar-last{background:var(--sh-fill)}
+.sh-barfoot{display:flex;justify-content:space-between;align-items:baseline;margin-top:9px}
+.sh-barfoot-cap{font-size:11.5px;color:var(--ink2);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.sh-barfoot-val{font-size:13px;font-weight:600;color:var(--ink);flex-shrink:0;
+  font-variant-numeric:tabular-nums}
+
+/* `split` — two halves, separated by space instead of the design's 1px rule. */
+.sh-split{margin-top:auto;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:20px;align-items:center}
+.sh-split-val{margin:0;font-family:'Hanken Grotesk','Geist',sans-serif;font-size:17px;
+  font-weight:500;letter-spacing:-.03em;line-height:1;color:var(--ink);
+  font-variant-numeric:tabular-nums}
+.sh-split-val2{color:var(--sh-text)}
+.sh-split-cap{margin:6px 0 0;font-size:11.5px;color:var(--ink2);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.sh-r2 .sh-split-val{font-size:24px}
+
+/* `text` */
+.sh-text{margin:11px 0 0;font-size:13px;line-height:1.5;letter-spacing:-.012em;
+  color:var(--ink);text-wrap:pretty;overflow:hidden}
+.sh-r2 .sh-text{font-size:15.5px}
+.sh-text-foot{margin:auto 0 0;padding-top:10px;font-size:11.5px;color:var(--ink3);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* --- Rooms + devices ----------------------------------------------------- */
+
+.sh-rooms{position:relative;z-index:10;max-width:1680px;margin:0 auto;
+  padding:14px 28px 128px;display:flex;flex-direction:column;gap:26px;
+  opacity:1;animation:shRise .75s var(--ease-spring) forwards}
+.sh-room-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding:0 4px}
+.sh-room-name{margin:0;font-family:'Hanken Grotesk','Geist',sans-serif;font-size:20px;
+  font-weight:600;letter-spacing:-.03em;color:var(--ink)}
+.sh-room-meta{font-size:11.5px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.sh-room-status{display:inline-flex;align-items:center;gap:7px;height:24px;padding:0 11px;
+  border-radius:var(--r-pill);font-size:11.5px;background:var(--sk);color:var(--ink2)}
+.sh-room-status[data-tone="warn"]{background:rgba(224,122,31,.12);color:var(--amber-text)}
+.sh-room-status[data-tone="error"]{background:rgba(208,69,58,.1);color:var(--red-text)}
+
+.sh-devgrid{display:grid;gap:14px;margin-top:12px;
+  grid-template-columns:repeat(auto-fill,minmax(258px,1fr))}
+.sh-dev .cbB{padding:14px 16px 16px;display:flex;flex-direction:column;gap:0}
+
+/* The device stage.
+   The design fills this with a canvas from `atlas-models.js`, which README §8
+   lists under "do not port" — and there is no device-model renderer in the app.
+   So the stage is a recessed well with the device's glyph, tinted by its own
+   value. It is an interface illustration, not a photoreal claim about the
+   hardware in the room. */
+.sh-stage{position:relative;height:208px;border-radius:var(--r-row);overflow:hidden;
+  background:var(--pg);display:flex;align-items:center;justify-content:center}
+.sh-stage-halo{position:absolute;width:150px;height:150px;border-radius:50%;
+  filter:blur(26px);transition:opacity .3s ease,background .3s ease}
+.sh-stage-glyph{position:relative;width:58px;height:58px;color:var(--ink3);
+  transition:color .3s ease}
+.sh-stage[data-on="true"] .sh-stage-glyph{color:var(--ink)}
+
+.sh-dev-head{display:flex;align-items:center;gap:9px;margin-top:13px}
+.sh-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:#ddd8d0}
+.sh-dot[data-on="true"]{background:var(--grn)}
+.sh-dev-name{margin:0;flex:1;min-width:0;font-size:13px;font-weight:600;
+  letter-spacing:-.015em;color:var(--ink);overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.sh-dev-read{font-size:12px;color:var(--ink2);flex-shrink:0;
+  font-variant-numeric:tabular-nums}
+.sh-dev-state{margin:5px 0 0;font-size:11.5px;color:var(--ink2);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+
+/* The three affordances the design draws below the name. Illustration strokes. */
+.sh-affor{display:flex;align-items:center;gap:9px;margin-top:11px;min-height:30px}
+.sh-affor-lbl{font-size:11.5px;color:var(--ink2)}
+.sh-lamp{width:22px;height:22px;border-radius:50%;flex-shrink:0;
+  transition:background .25s ease,box-shadow .25s ease}
+.sh-lock{position:relative;width:22px;height:22px;flex-shrink:0;border-radius:7px;
+  display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px}
+.sh-lock-shackle{position:absolute;width:11px;height:11px;border-radius:6px 6px 0 0;
+  transform-origin:bottom left;
+  transition:top .3s var(--ease-spring),left .3s var(--ease-spring),
+    transform .3s var(--ease-spring)}
+.sh-lock-body{width:12px;height:10px;border-radius:3px}
+.sh-power{position:relative;width:22px;height:22px;flex-shrink:0;border-radius:50%;
+  display:flex;align-items:center;justify-content:center}
+.sh-power-ring{width:11px;height:11px;border-radius:50%}
+.sh-power-stem{position:absolute;top:4px;left:50%;transform:translateX(-50%);
+  width:2px;height:7px;border-radius:1px}
+
+/* --- Controls ------------------------------------------------------------ */
+
+.sh-ctrl{margin-top:11px;padding-top:11px;min-height:36px;display:flex;
+  align-items:center;gap:9px;width:100%}
+
+/* The slider is a real <input type=range>, made invisible over a drawn track,
+   so pointer AND keyboard both work. `border:none` explicitly (§1.1) and
+   `appearance:none` for the same reason the .ascene reset exists. */
+.sh-slider{position:relative;display:block;flex:1;min-width:0;height:26px}
+.sh-slider-track{position:absolute;left:0;right:0;top:10px;height:6px;
+  border-radius:var(--r-pill);background:var(--bd-soft);overflow:hidden}
+.sh-slider-fill{display:block;height:100%;border-radius:var(--r-pill);
+  background:var(--acc);transition:width .12s linear}
+.sh-slider-fill[data-warm="true"]{background:linear-gradient(90deg,#f2c98a,#ffb765)}
+.sh-slider-thumb{position:absolute;top:4px;width:18px;height:18px;border-radius:50%;
+  background:var(--surface);pointer-events:none;transition:left .12s linear;
+  box-shadow:0 2px 8px -2px rgba(30,30,36,.55)}
+.sh-slider input{border:none;-webkit-appearance:none;appearance:none;
+  position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;
+  background:transparent;opacity:0;cursor:pointer}
+
+.sh-stepper{display:flex;align-items:center;gap:9px;width:100%}
+.sh-stepper-val{flex:1;text-align:center;font-family:'Hanken Grotesk','Geist',sans-serif;
+  font-size:17px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+
+.sh-seg{display:flex;gap:3px;padding:3px;width:100%;border-radius:var(--r-pill);
+  background:var(--bd-soft)}
+.sh-seg-btn{border:none;flex:1;height:26px;border-radius:var(--r-pill);cursor:pointer;
+  font:inherit;font-size:11.5px;font-weight:500;background:transparent;color:var(--ink2);
+  transition:background .2s,color .2s}
+.sh-seg-btn:hover{background:var(--sk)}
+.sh-seg-btn[aria-pressed="true"]{background:var(--ink);color:var(--dkf)}
+
+.sh-swatches{display:flex;gap:6px;margin-left:11px;flex-shrink:0}
+.sh-swatch{border:none;width:17px;height:17px;border-radius:50%;padding:0;cursor:pointer;
+  box-shadow:0 0 0 2px transparent;transition:box-shadow .2s}
+.sh-swatch[aria-pressed="true"]{box-shadow:0 0 0 2px var(--acc)}
+
+.sh-statuspill{display:inline-flex;align-items:center;gap:8px;height:28px;padding:0 12px;
+  border-radius:var(--r-pill);background:var(--bd-soft);color:var(--ink2);font-size:11.5px}
+
+/* --- Recently operated ---------------------------------------------------
+   The design reveals these controls on hover. Hover-only disclosure has no
+   keyboard or touch equivalent, so the controls are always visible here and
+   the strip is a little taller instead.                                  */
+.sh-recent{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(272px,1fr))}
+.sh-recent-item{display:flex;gap:12px;padding:12px;border-radius:var(--r-row);
+  background:var(--surface)}
+.sh-recent-stage{position:relative;width:84px;height:96px;flex-shrink:0;
+  border-radius:var(--r-rail);overflow:hidden;background:var(--pg);
+  display:flex;align-items:center;justify-content:center}
+.sh-recent-stage .sh-stage-glyph{width:30px;height:30px}
+.sh-recent-body{flex:1;min-width:0}
+.sh-recent-when{margin:6px 0 0;font-size:10.5px;color:var(--ink3);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+
+/* --- Setup --------------------------------------------------------------- */
+
+.sh-setup{position:relative;z-index:10;display:grid;gap:16px;max-width:1680px;
+  margin:0 auto;padding:14px 28px 128px;
+  grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);
+  opacity:1;animation:shRise .75s var(--ease-spring) forwards}
+@media (max-width:1080px){.sh-setup{grid-template-columns:minmax(0,1fr)}}
+.sh-col{display:flex;flex-direction:column;gap:16px}
+
+.sh-scan{display:inline-flex;align-items:center;gap:7px;height:26px;padding:0 11px;
+  border-radius:var(--r-pill);background:var(--sk);color:var(--ink2);
+  font-size:11.5px;font-weight:500}
+.sh-scan-dot{width:6px;height:6px;border-radius:50%;background:var(--neutral)}
+
+/* A recessed well inside a panel goes DARKER, not lighter (§1.1). */
+.sh-field{display:flex;align-items:center;gap:10px;height:46px;padding:0 8px 0 18px;
+  border-radius:var(--r-pill);background:var(--pg)}
+.sh-field input{flex:1;min-width:0;border:none;outline:none;background:transparent;
+  font:inherit;font-size:14px;color:var(--ink)}
+.sh-field input::placeholder{color:var(--ink3)}
+.sh-field input:disabled{cursor:not-allowed}
+.sh-field-kbd{font-size:11px;letter-spacing:.04em;color:var(--ink3)}
+
+.sh-filters{display:flex;flex-wrap:wrap;gap:6px}
+.sh-disc-row{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:13px;
+  align-items:center;padding:13px 0}
+.sh-disc-tile{display:flex;align-items:center;justify-content:center;width:38px;height:38px;
+  border-radius:var(--r-rail);background:var(--surface);color:var(--neutral-text);
+  font-family:'Hanken Grotesk','Geist',sans-serif;font-size:13px;font-weight:700}
+.sh-disc-name{margin:0;font-size:13.5px;font-weight:500;letter-spacing:-.01em;
+  color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sh-disc-meta{margin:3px 0 0;font-size:11.5px;color:var(--ink2);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+
+.sh-roomtiles{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(228px,1fr))}
+.sh-roomtile{padding:14px 15px;border-radius:var(--r-row);background:var(--surface)}
+.sh-roomtile-head{display:flex;align-items:baseline;gap:8px}
+.sh-roomtile-name{margin:0;font-size:13px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+.sh-roomtile-count{margin-left:auto;font-size:11.5px;color:var(--ink2);
+  font-variant-numeric:tabular-nums}
+.sh-roomtile-list{margin:6px 0 0;font-size:11.5px;line-height:1.45;color:var(--ink2)}
+.sh-roomtile-foot{display:flex;align-items:center;gap:7px;margin-top:10px}
+.sh-roomtile-status{font-size:11px;color:var(--ink3)}
+
+/* The ink panel.
+   NOT <Panel tone="ink">: `.panelDk` is declared at workshop.css:587 and the
+   light-layer `.gpanel` alias at :903 re-declares `background` at equal
+   specificity, so the later rule wins and the ink tone never paints. This
+   sheet loads after workshop.css, so a local class is the reliable fix.
+   Flagged in the report rather than patched in a shared file. */
+/* Geometry too: `.gpanel` (the untitled base) is radius 20 / padding 24, and
+   the sibling titled panels in this column are `.cpanel` at --r-editor / 26.
+   Matching them here keeps the two panels in one column the same shape. */
+.sh-ink{background:var(--dark-card);color:var(--dkf);
+  border-radius:var(--r-editor);padding:26px}
+.sh-ink .cph{color:var(--dkf)}
+/* README §7: on ink, labels and captions under 18px never go below .62. */
+.sh-ink-lbl{margin:0;font-size:11px;font-weight:600;letter-spacing:.15em;
+  text-transform:uppercase;color:rgba(249,247,244,.62)}
+.sh-ink-h{margin:10px 0 0;font-family:'Hanken Grotesk','Geist',sans-serif;font-size:23px;
+  font-weight:600;letter-spacing:-.03em;color:var(--dkf)}
+.sh-ink-p{margin:8px 0 0;font-size:13px;line-height:1.5;color:rgba(249,247,244,.78)}
+.sh-ink-tile{display:flex;align-items:center;gap:10px;margin-top:16px;padding:13px 15px;
+  border-radius:var(--r-row);background:rgba(249,247,244,.08)}
+.sh-ink-tile-t{margin:0;font-size:13px;font-weight:500;color:var(--dkf)}
+.sh-ink-tile-s{margin:3px 0 0;font-size:11.5px;color:rgba(249,247,244,.62)}
+.sh-live-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--grn);
+  animation:shPulse 2s ease-in-out infinite}
+@keyframes shPulse{0%,100%{opacity:1}50%{opacity:.4}}
+.sh-bridge-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;
+  align-items:center;padding:12px 0}
+.sh-bridge-name{margin:0;font-size:13px;font-weight:500;color:var(--dkf);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.sh-bridge-meta{margin:3px 0 0;font-size:11.5px;color:rgba(249,247,244,.62);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sh-bridge-state{font-size:11.5px;font-weight:500;color:var(--grn)}
+.sh-bridge-state[data-linked="false"]{color:rgba(249,247,244,.62)}
+.sh-ink .aempty,.sh-ink .aempty-body{color:rgba(249,247,244,.62)}
+
+.sh-perm-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;
+  align-items:center;padding:13px 0}
+.sh-perm-name{margin:0;font-size:13px;font-weight:500;letter-spacing:-.01em;color:var(--ink)}
+.sh-perm-note{margin:3px 0 0;font-size:11.5px;line-height:1.45;color:var(--ink2)}
+.sh-panel-note{margin:0 0 8px;font-size:12px;line-height:1.5;color:var(--ink2)}
+
+/* --- Motion --------------------------------------------------------------
+   workshop.css carries the app-wide reduced-motion block, but this file is
+   imported by the page module and therefore lands AFTER it in the bundle, so
+   the block's `!important` rules cannot reach anything declared above. This
+   is the same repeat the mail stylesheet needs; without it the surface would
+   be the one place in the app that ignores the preference.               */
+@media (prefers-reduced-motion:reduce){
+  .sh-grid,.sh-rooms,.sh-setup{animation:none}
+  .sh-live-dot{animation:none}
+  .sh-switch,.sh-slider-fill,.sh-slider-thumb,.sh-lock-shackle,
+  .sh-lamp,.sh-stage-glyph,.sh-stage-halo,.sh-seg-btn,.sh-swatch{transition:none}
+}

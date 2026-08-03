@@ -1,0 +1,352 @@
+/* ==========================================================================
+   Atlas Widget Sheet — `/widget-sheet` (src/pages/atlas/AtlasWidgetSheet.tsx)
+
+   Everything here is prefixed `.wsh-` and scoped under `.wsheet`, so this file
+   can only ever affect this surface.
+
+   Borderless throughout (README §1.1). There is not one `border:` declaration
+   in this file that separates two things — separation is the paper scale
+   (page #f9f7f4 → panel #f1eeea → card #fffdfa) and space. Emphasis is the
+   blue-tinted fill `--wash`; hover shifts background. The only strokes are
+   drawings: the progress track and the span diagram's cells, which are
+   illustrations of a grid, not element chrome.
+
+   The design file this was built from predates the orange→blue swap: it uses
+   `--acc:#ff6a00` throughout and paints attention states with an orange
+   hairline. Both are superseded. Accent is Atlas Blue `#3461f2`, `--acc2`
+   belongs to the voice indicator alone, and "attention" is a wash fill.
+   ========================================================================== */
+
+.wsheet .wsh-of { color: var(--ink3); font-size: 26px; }
+/* `.gsubB` caps at 540px for a greeting; this subline carries the widget's
+   question and the Esc hint, and reads better with room. Scoped, so the
+   dashboard's band is untouched. */
+.wsheet .gsubB { max-width: 720px; }
+
+.wsh-kbd {
+  display: inline-block; padding: 1px 6px; border-radius: 6px;
+  background: var(--sk); color: var(--ink2);
+  font-family: ui-monospace, Menlo, monospace; font-size: 12px;
+}
+
+/* --- shell ------------------------------------------------------------- */
+
+.wsh-main {
+  position: relative; z-index: 10;
+  display: grid; grid-template-columns: 268px minmax(0, 1fr); gap: 20px;
+  max-width: 1680px; margin: 0 auto; padding: 20px 28px 96px;
+  animation: rise .8s var(--ease-spring) both;
+}
+@media (max-width: 1020px) { .wsh-main { grid-template-columns: minmax(0, 1fr); } }
+
+/* --- rail -------------------------------------------------------------- */
+
+.wsh-rail {
+  align-self: start; position: sticky; top: 20px;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 18px 14px; border-radius: var(--r-pane); background: var(--rz);
+}
+@media (max-width: 1020px) { .wsh-rail { position: static; } }
+
+.wsh-rail-head,
+.wsh-sub {
+  margin: 0 0 10px; padding: 0 8px;
+  font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink2);
+}
+
+.wsh-rail-item {
+  display: flex; align-items: center; gap: 11px;
+  width: 100%; padding: 11px 10px; border: none; border-radius: var(--r-row);
+  background: transparent; color: var(--ink);
+  font: inherit; text-align: left; cursor: pointer;
+  transition: background .18s var(--ease-spring), color .18s;
+}
+.wsh-rail-item:hover { background: var(--sk); }
+/* Selection is a fill, never an outline. */
+.wsh-rail-item.on { background: var(--wash); color: var(--acc-text); }
+
+.wsh-rail-ico {
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; flex-shrink: 0;
+  border-radius: var(--r-icon); background: var(--surface); color: var(--ink2);
+}
+.wsh-rail-item.on .wsh-rail-ico { background: var(--acc); color: #fff; }
+
+.wsh-rail-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.wsh-rail-name { font-size: 14px; font-weight: 500; }
+.wsh-rail-cat { font-size: 11.5px; color: var(--ink2); margin-top: 1px; }
+.wsh-rail-item.on .wsh-rail-cat { color: var(--acc-text); opacity: .72; }
+
+.wsh-rail-foot {
+  margin: 14px 8px 2px; font-size: 11.5px; line-height: 1.5; color: var(--ink3);
+  text-wrap: pretty;
+}
+
+/* Availability dot. Five states, five meanings — never four. */
+.wsh-avail { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: var(--ink3); }
+.wsh-avail-ok { background: var(--grn); }
+.wsh-avail-missing { background: var(--red); }
+.wsh-avail-unknown { background: var(--neutral); }
+.wsh-avail-nokey { background: var(--acc); }
+.wsh-avail-none { background: var(--amber); }
+
+/* --- sheet body -------------------------------------------------------- */
+
+.wsh-body { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.wsheet .wsh-panel { min-width: 0; }
+
+.wsh-answers {
+  font-family: 'Hanken Grotesk', 'Geist', sans-serif;
+  font-size: clamp(20px, 2vw, 26px); font-weight: 500; letter-spacing: -.02em;
+  line-height: 1.25; color: var(--ink); margin: 0 0 12px; max-width: 40ch;
+  text-wrap: pretty;
+}
+.wsh-purpose { font-size: 14.5px; line-height: 1.6; color: var(--ink2); margin: 0; max-width: 68ch; text-wrap: pretty; }
+.wsh-lede { font-size: 13.5px; line-height: 1.6; color: var(--ink2); margin: 0 0 18px; max-width: 74ch; text-wrap: pretty; }
+.wsh-lede strong { font-weight: 600; color: var(--ink); }
+
+.wsh-stats {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 10px;
+  margin: 20px 0 4px; padding: 16px 10px; border-radius: var(--r-row);
+  /* Recessed: a step DOWN the paper scale inside the panel. */
+  background: var(--pg);
+}
+
+/* Key/value spec lines. Values wrap, so this is a <dl>, not a <Row>. */
+.wsh-def { margin: 18px 0 0; display: grid; grid-template-columns: 116px minmax(0, 1fr); gap: 4px 18px; }
+.wsh-def dt { font-size: 12.5px; font-weight: 600; color: var(--ink2); padding: 6px 0; }
+.wsh-def dd { margin: 0; padding: 6px 0; font-size: 13.5px; line-height: 1.55; color: var(--ink); min-width: 0; text-wrap: pretty; }
+.wsh-def-wide { grid-template-columns: 148px minmax(0, 1fr); margin-top: 0; }
+@media (max-width: 640px) {
+  .wsh-def, .wsh-def-wide { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .wsh-def dt { padding-bottom: 0; }
+}
+
+.wsh-code {
+  font-family: ui-monospace, Menlo, monospace; font-size: 12.5px;
+  color: var(--acc-text); background: var(--wash);
+  padding: 2px 7px; border-radius: 7px;
+  overflow-wrap: anywhere;
+}
+
+.wsh-notes { margin: 10px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.wsh-notes li {
+  position: relative; padding: 13px 0 13px 20px;
+  font-size: 13.5px; line-height: 1.6; color: var(--ink2); text-wrap: pretty;
+}
+.wsh-notes li::before {
+  content: ''; position: absolute; left: 3px; top: 21px;
+  width: 6px; height: 6px; border-radius: 50%; background: var(--ink3);
+}
+
+/* --- availability bar -------------------------------------------------- */
+
+.wsh-avail-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 13px 16px; border-radius: var(--r-row);
+  font-size: 13.5px; font-weight: 500;
+  background: var(--sk); color: var(--ink2);
+}
+/* Compound selectors, because the single-class rules above paint a 7px DOT and
+   would otherwise hand the bar a solid --neutral fill under --ink2 text. */
+.wsh-avail-bar.wsh-avail-ok { background: rgba(15, 174, 118, .1); color: var(--grn-text); }
+.wsh-avail-bar.wsh-avail-missing { background: rgba(208, 69, 58, .1); color: var(--red-text); }
+.wsh-avail-bar.wsh-avail-nokey { background: var(--wash); color: var(--acc-text); }
+.wsh-avail-bar.wsh-avail-unknown,
+.wsh-avail-bar.wsh-avail-none { background: var(--sk); color: var(--ink2); }
+.wsh-avail-bar .wsh-code { background: rgba(255, 253, 250, .6); color: inherit; }
+
+/* --- sizes ------------------------------------------------------------- */
+
+.wsh-sizes { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.wsh-size {
+  display: flex; align-items: flex-start; gap: 16px;
+  padding: 15px 14px; border-radius: var(--r-row);
+  transition: background .18s var(--ease-spring);
+}
+.wsh-size.on { background: var(--wash); }
+.wsh-size.off { opacity: .74; }
+
+/* A 2 × 2 slice of the dashboard grid. A drawing of a layout, not chrome. */
+.wsh-span {
+  display: grid; grid-template-columns: repeat(2, 20px); grid-template-rows: repeat(2, 15px);
+  gap: 3px; flex-shrink: 0; margin-top: 3px;
+}
+.wsh-span-cell { border-radius: 4px; background: var(--sk); }
+.wsh-size.on .wsh-span-cell { background: rgba(52, 97, 242, .14); }
+.wsh-span-cell.fill { background: var(--ink3); }
+.wsh-size.on .wsh-span-cell.fill { background: var(--acc); }
+
+.wsh-size-main { display: flex; flex-direction: column; min-width: 0; }
+.wsh-size-name { display: flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 500; color: var(--ink); }
+.wsh-size.on .wsh-size-name { color: var(--acc-text); }
+.wsh-size-meta { font-size: 12px; color: var(--ink2); margin-top: 3px; }
+.wsh-size.on .wsh-size-meta { color: var(--acc-text); opacity: .78; }
+.wsh-size-note { font-size: 12.5px; line-height: 1.55; color: var(--ink2); margin-top: 7px; max-width: 62ch; text-wrap: pretty; }
+
+.wsh-tag {
+  font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: var(--r-pill);
+  background: var(--acc); color: #fff;
+}
+
+/* --- states ------------------------------------------------------------ */
+
+.wsh-states {
+  display: grid; gap: 18px;
+  /* min() so a 300px floor cannot push the page into a horizontal scroll on a
+     narrow window. */
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+}
+.wsh-state { margin: 0; display: flex; flex-direction: column; min-width: 0; }
+
+.wsh-state-head { display: flex; align-items: center; gap: 9px; margin-bottom: 5px; }
+.wsh-state-name {
+  font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink);
+}
+.wsh-ship {
+  margin-left: auto; flex-shrink: 0;
+  font-size: 10px; font-weight: 600; letter-spacing: .04em;
+  padding: 3px 9px; border-radius: var(--r-pill);
+  background: var(--sk); color: var(--ink2);
+}
+.wsh-ship-built { background: rgba(15, 174, 118, .12); color: var(--grn-text); }
+.wsh-ship-partial { background: rgba(224, 122, 31, .13); color: var(--amber-text); }
+.wsh-ship-absent { background: rgba(208, 69, 58, .1); color: var(--red-text); }
+.wsh-ship-na { background: var(--sk); color: var(--neutral-text); }
+
+.wsh-state-trigger { font-size: 12.5px; line-height: 1.5; color: var(--ink2); margin: 0 0 11px; min-height: 38px; text-wrap: pretty; }
+.wsh-state-ship { font-size: 12px; line-height: 1.55; color: var(--ink2); margin: 11px 2px 0; text-wrap: pretty; }
+
+/* A state the widget does not define. Recessed, because it is a hole. */
+.wsh-undefined {
+  display: flex; align-items: center; min-height: 176px;
+  padding: 22px; border-radius: var(--r-card); background: var(--pg);
+}
+.wsh-undefined .aempty-inline { font-size: 12.5px; line-height: 1.55; }
+
+/* --- the preview card -------------------------------------------------- */
+
+/* The real <Card> surface, at preview scale. Only geometry is adjusted; the
+   fill, radius and elevation are the shipped card's own. */
+.wsheet .wsh-card { min-height: 200px; animation: none; cursor: default; }
+.wsheet .wsh-card:hover { transform: none; }
+.wsheet .wsh-card .chB { padding: 16px 18px 0; }
+.wsheet .wsh-card .cbB { padding: 12px 18px 18px; }
+.wsheet .wsh-card .mlblB { font-size: 11px; letter-spacing: .12em; }
+.wsheet .wsh-card .icboxB { width: 26px; height: 26px; border-radius: 9px; }
+
+/* Attention. The design used an orange hairline; borderless + the reserved
+   --acc2 make that impossible, so emphasis is the blue wash fill and a filled
+   icon well — a change in weight, nothing else, exactly as specified. */
+.wsheet .wsh-card.wsh-hot { background: var(--wash); }
+.wsheet .wsh-card.wsh-hot .icboxB { background: var(--acc); color: #fff; }
+.wsheet .wsh-card.wsh-hot .mlblB { color: var(--acc-text); }
+
+.wsheet .wsh-dimmed { opacity: .55; }
+
+.wsh-alert {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 11px; padding: 8px 11px; border-radius: 11px;
+  font-size: 11.5px; font-weight: 500; line-height: 1.4;
+  background: var(--wash); color: var(--acc-text);
+}
+.wsh-alert-error { background: rgba(208, 69, 58, .09); color: var(--red-text); }
+
+.wsh-foot { margin: 11px 0 0; font-size: 11px; color: var(--ink3); }
+.wsh-note { margin: 10px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--ink3); }
+
+/* skeleton */
+.wsh-skel { display: flex; flex-direction: column; gap: 9px; padding-top: 4px; }
+.wsh-skb {
+  display: block; border-radius: 6px;
+  background: linear-gradient(90deg, var(--sk) 25%, var(--pg) 50%, var(--sk) 75%);
+  background-size: 200% 100%;
+  animation: wshShimmer 1.5s linear infinite;
+}
+@keyframes wshShimmer { from { background-position: 200% 0 } to { background-position: -200% 0 } }
+
+/* metric */
+.wsh-metric-line { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+.wsh-metric-v { font-size: 34px; font-weight: 500; line-height: 1; color: var(--ink); margin: 0; }
+.wsh-metric-aside { font-size: 11.5px; color: var(--ink2); padding-bottom: 3px; }
+.wsh-metric-cap { margin: 6px 0 0; font-size: 12px; color: var(--ink2); line-height: 1.4; }
+.wsh-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
+.wsh-chip {
+  font-size: 11px; padding: 4px 9px; border-radius: var(--r-pill);
+  background: var(--sk); color: var(--ink2);
+}
+.wsheet .wsh-card.wsh-hot .wsh-chip { background: rgba(255, 253, 250, .66); }
+
+/* rows inside a preview — the <Row> primitive, at preview scale */
+.wsh-rows { display: flex; flex-direction: column; }
+.wsheet .wsh-rows .row0 { padding: 9px 0; gap: 10px; }
+.wsheet .wsh-rows .row0-title { font-size: 12.5px; font-weight: 400; }
+.wsheet .wsh-rows .row0-meta { font-size: 11px; }
+.wsheet .wsh-rows .row0-lead { font-size: 11.5px; }
+.wsheet .wsh-rows .wsh-row-alert .row0-title { color: var(--red-text); font-weight: 600; }
+.wsheet .wsh-rows .wsh-row-done .row0-title { color: var(--ink3); text-decoration: line-through; }
+
+.wsh-lead { display: inline-flex; align-items: center; gap: 8px; }
+.wsh-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--acc); flex-shrink: 0; }
+.wsh-box { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 50%; background: var(--sk); }
+.wsh-box-done { background: var(--grn); color: #fff; }
+.wsh-av {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--sk); color: var(--ink2); font-size: 9.5px; font-weight: 600;
+}
+
+.wsh-trail { font-size: 12px; color: var(--ink); }
+.wsh-trail-muted { color: var(--ink2); font-size: 11px; }
+.wsh-trail-pill {
+  font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: var(--r-pill);
+  background: var(--sk); color: var(--ink2);
+}
+/* An action label, not a control — the sheet never draws a button that lies. */
+.wsh-trail-action {
+  font-size: 10.5px; font-weight: 600; padding: 4px 10px; border-radius: var(--r-pill);
+  background: var(--acc); color: #fff;
+}
+.wsh-delta { font-size: 11px; font-weight: 600; }
+.wsh-delta-up { color: var(--grn-text); }
+.wsh-delta-down { color: var(--red-text); }
+
+/* progress — the track is an illustration stroke, so it stays */
+.wsh-prog { display: flex; align-items: center; gap: 10px; margin: 4px 0 10px; }
+.wsh-prog-track { flex: 1; height: 5px; border-radius: var(--r-pill); background: var(--sk); overflow: hidden; }
+.wsh-prog-fill { display: block; height: 100%; border-radius: var(--r-pill); background: var(--acc); }
+.wsh-prog-lbl { font-size: 11px; color: var(--ink2); flex-shrink: 0; }
+
+/* editorial stack */
+.wsh-stack { display: flex; flex-direction: column; }
+.wsh-story { padding: 9px 0; }
+.wsh-kicker { font-size: 9.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--acc-text); }
+.wsh-kicker-brk { background: var(--red); color: #fff; padding: 2px 8px; border-radius: var(--r-pill); }
+.wsh-head { font-family: 'Hanken Grotesk', 'Geist', sans-serif; font-size: 13.5px; font-weight: 500; line-height: 1.35; letter-spacing: -.01em; color: var(--ink); margin: 5px 0 4px; }
+.wsh-head-brk { font-weight: 600; }
+.wsh-src { font-size: 11px; color: var(--ink3); }
+
+/* empty state inside a preview — the <Empty> primitive, at preview scale */
+.wsh-empty { display: flex; flex-direction: column; align-items: center; }
+.wsheet .wsh-empty .aempty-block { padding: 14px 8px; background: transparent; }
+.wsheet .wsh-empty .aempty-ico { width: 38px; height: 38px; background: var(--sk); }
+.wsheet .wsh-empty .aempty-title { font-size: 15px; margin: 12px 0 5px; }
+.wsheet .wsh-empty .aempty-body { font-size: 11.5px; line-height: 1.5; max-width: 30ch; }
+.wsh-ghost {
+  margin-top: 12px; font-size: 11px; font-weight: 600;
+  padding: 6px 13px; border-radius: var(--r-pill);
+  background: var(--wash); color: var(--acc-text);
+}
+
+/* --------------------------------------------------------------------------
+   prefers-reduced-motion. workshop.css already flattens durations app-wide;
+   the shimmer is the one thing that must be switched off rather than sped up,
+   because an "instant" infinite loop still repaints forever.
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .wsh-skb { animation: none; background: var(--sk); }
+  .wsh-main { animation: none; }
+}

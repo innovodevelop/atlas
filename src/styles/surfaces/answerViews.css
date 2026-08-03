@@ -1,0 +1,506 @@
+/* ==========================================================================
+   Atlas — Answer views (/answer-views)
+   Bespoke CSS for `src/pages/atlas/AtlasAnswerViews.tsx`.
+   Values from `Atlas Answer Views.dc.html`; tokens and the radius scale from
+   README §7, which wins wherever the two disagree.
+
+   BORDERLESS (README §1.1). Nothing here declares a border for separation.
+   Cards sit one step LIGHTER than the page (--surface on --pg), recessed wells
+   go darker (--pg inside --surface), emphasis is the blue FILL --wash, and
+   hover shifts background to --sk. Every button and input sets `border:none`
+   explicitly, because deleting the declaration lets WKWebView draw its own.
+
+   Two deliberate departures from the reference file, both to obey README §7:
+     - the glass skin's `inset 0 0 0 1px rgba(255,253,250,.9)` ring is dropped;
+       the card is separated by fill alone.
+     - the ink skin paints --dark-card (#1b1b21), not the reference's #1e1e24,
+       and its muted text never falls below rgba(249,247,244,.62).
+   ========================================================================== */
+
+.av-page {
+  --av-max: 1640px;
+  --av-pad: 28px;
+  padding-bottom: 96px;
+}
+
+/* --- wash ---------------------------------------------------------------
+   The design's two background layers: a top-down accent gradient and one
+   blurred blob behind the band. Static — nothing here animates, so nothing
+   here re-rasters a blur per frame. */
+.av-wash {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 720px;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(52, 97, 242, .10), rgba(249, 247, 244, 0) 46%);
+}
+.av-wash::after {
+  content: '';
+  position: absolute;
+  top: -280px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1100px;
+  height: 700px;
+  border-radius: 50%;
+  filter: blur(72px);
+  background: radial-gradient(closest-side, rgba(52, 97, 242, .13), transparent 74%);
+}
+
+/* --- band ----------------------------------------------------------------
+   These ride on the app's own band chrome (.bandB / .greetB / .gsubB), so the
+   overrides are written with the band class in front of them: one class each
+   would tie with the Workshop rule and leave the result depending on which
+   stylesheet the bundler happened to emit first. */
+.bandB.av-band {
+  max-width: var(--av-max);
+  padding: 40px var(--av-pad) 10px;
+  align-items: flex-start;
+  gap: 26px;
+}
+.av-band-main { min-width: 0; flex: 1; }
+
+.av-ask-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 9px;
+  margin: 0 0 12px;
+  padding: 6px 14px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--neutral-text);
+  font-size: 12.5px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.av-ask-chip-k {
+  font-size: 10.5px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink3);
+  flex-shrink: 0;
+}
+
+.av-band .av-headline {
+  font-size: clamp(30px, 3.6vw, 48px);
+  letter-spacing: -.034em;
+  line-height: 1.04;
+  text-wrap: pretty;
+}
+.av-band .av-subline {
+  font-size: 15.5px;
+  line-height: 1.5;
+  max-width: 70ch;
+  margin: 12px 0 0;
+  text-wrap: pretty;
+}
+
+.av-band-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.av-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 7px 14px;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--ink2);
+  font-size: 12px;
+}
+.av-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--neutral);
+}
+/* Only a running turn pulses — a resting screen with a blinking dot reads as
+   activity that is not happening. */
+.av-status--live .av-status-dot { background: var(--acc); animation: pls 1.6s ease-in-out infinite; }
+
+.av-recipe {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--ink3);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.av-dials { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.av-dial {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 13px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .2s var(--ease-spring), color .2s var(--ease-spring);
+}
+.av-dial:hover { background: var(--sk); }
+.av-dial--on { background: var(--wash); color: var(--acc-text); }
+.av-dial--on:hover { background: var(--wash); }
+.av-dial-k {
+  font-size: 10.5px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink3);
+}
+.av-dial--on .av-dial-k { color: var(--acc); }
+
+/* --- ask row ------------------------------------------------------------- */
+.av-askrow {
+  position: relative;
+  z-index: 10;
+  max-width: var(--av-max);
+  margin: 0 auto;
+  padding: 10px var(--av-pad) 0;
+}
+.av-ask-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 22px;
+  border-radius: var(--r-editor);
+  background: var(--surface);
+}
+.av-ask-input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 15px;
+  color: var(--ink);
+}
+.av-ask-input::placeholder { color: var(--ink3); }
+.av-ask-input:disabled { color: var(--ink3); cursor: default; }
+
+.av-specimens { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.av-specimen {
+  height: 32px;
+  padding: 0 14px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--ink2);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .2s var(--ease-spring), color .2s var(--ease-spring);
+}
+.av-specimen:hover { background: var(--sk); color: var(--ink); }
+.av-specimen--on { background: var(--wash); color: var(--acc-text); }
+
+/* --- body ---------------------------------------------------------------- */
+.av-body {
+  position: relative;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 20px;
+  align-items: start;
+  max-width: var(--av-max);
+  margin: 0 auto;
+  padding: 18px var(--av-pad) 0;
+}
+.av-main { min-width: 0; }
+.av-rail { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+@media (max-width: 1180px) {
+  .av-body { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* --- the composed grid --------------------------------------------------- */
+.av-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  /* The reference pins rows at 124px because its cards hold fixed-size widget
+     readouts. These hold the model's own sentences, so the row is a floor and
+     not a ceiling — a card that grew past 124px would otherwise clip the
+     answer, which is the one thing this surface must never do. */
+  grid-auto-rows: minmax(124px, auto);
+  grid-auto-flow: row dense;
+  gap: 14px;
+}
+.av-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 18px;
+  /* README §7's scale: the draft radius for a tile, the card radius once it is
+     wide. The reference file's 22/24 sit between the named steps. */
+  border-radius: var(--r-draft);
+  background: var(--surface);
+  animation: av-in .5s var(--ease-spring) both;
+}
+.av-card--wide { padding: 22px; border-radius: var(--r-card); }
+
+.av-card-head { display: flex; align-items: center; gap: 9px; flex-shrink: 0; }
+.av-card-label {
+  margin: 0;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--neutral-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.av-card-tag {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 10px;
+  letter-spacing: .12em;
+  color: var(--neutral);
+}
+.av-card-body {
+  flex: 1;
+  min-width: 0;
+  margin-top: 12px;
+}
+
+/* Ink skin — the design's second card style, on the README's dark card. */
+.av-card--ink { background: var(--dark-card); color: var(--dkf); }
+.av-card--ink .av-card-label,
+.av-card--ink .av-card-tag { color: rgba(249, 247, 244, .62); }
+.av-card--ink .av-prose,
+.av-card--ink .av-said,
+.av-card--ink .av-list-text,
+.av-card--ink .av-pair-value { color: rgba(249, 247, 244, .78); }
+.av-card--ink .av-pair-label,
+.av-card--ink .av-list-mark { color: rgba(249, 247, 244, .62); }
+.av-card--ink .av-block-heading { color: var(--dkf); }
+.av-card--ink .av-code-wrap,
+.av-card--ink .av-table-wrap { background: rgba(249, 247, 244, .07); }
+.av-card--ink .av-code,
+.av-card--ink .av-table { color: rgba(249, 247, 244, .78); }
+.av-card--ink .av-table th { color: rgba(249, 247, 244, .62); }
+.av-card--ink .av-link { color: var(--acch); }
+.av-card--ink .av-inline-code { background: rgba(249, 247, 244, .1); color: var(--dkf); }
+
+/* --- block bodies -------------------------------------------------------- */
+.av-block-heading {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -.02em;
+  color: var(--ink);
+}
+.av-prose {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.62;
+  color: var(--body);
+  text-wrap: pretty;
+}
+.av-said {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.5;
+  letter-spacing: -.015em;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+.av-strong { font-weight: 600; color: inherit; }
+.av-inline-code {
+  padding: 1px 6px;
+  border-radius: 7px;
+  background: var(--rz);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .92em;
+}
+/* A link is a button here: inside the desktop webview an <a> would navigate the
+   app away from itself, so every source opens in the user's browser instead. */
+.av-link {
+  border: none;
+  padding: 0;
+  background: none;
+  font: inherit;
+  color: var(--acc-text);
+  cursor: pointer;
+  text-align: left;
+}
+.av-link:hover { color: var(--acch); }
+
+.av-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 11px; }
+.av-list-item { display: flex; align-items: baseline; gap: 10px; }
+.av-list-mark {
+  flex-shrink: 0;
+  width: 14px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink3);
+}
+/* An unordered list has no number, so the marker slot draws the dot instead. */
+.av-list-mark:empty::before {
+  content: '';
+  display: block;
+  width: 6px;
+  height: 6px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--acc);
+  opacity: .8;
+}
+.av-list-text { flex: 1; min-width: 0; font-size: 13.5px; line-height: 1.5; color: var(--body); }
+
+.av-pairs { margin: 0; display: flex; flex-direction: column; gap: 12px; }
+.av-pair { display: flex; align-items: baseline; gap: 12px; }
+.av-pair-label { margin: 0; flex: 1; min-width: 0; font-size: 13px; color: var(--ink2); }
+.av-pair-value { margin: 0; flex-shrink: 0; font-size: 13px; font-weight: 500; color: var(--ink); text-align: right; }
+
+.av-code-wrap {
+  border-radius: var(--r-row);
+  background: var(--pg);
+  overflow: auto;
+}
+.av-code {
+  margin: 0;
+  padding: 14px 16px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--body);
+  white-space: pre;
+}
+
+.av-table-wrap { border-radius: var(--r-row); background: var(--pg); overflow-x: auto; }
+.av-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.av-table th,
+.av-table td { padding: 11px 14px; text-align: left; }
+.av-table th {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--neutral-text);
+  white-space: nowrap;
+}
+.av-table td { color: var(--body); }
+/* Zebra fill rather than rules — the borderless equivalent of a table border. */
+.av-table tbody tr:nth-child(odd) { background: var(--surface); }
+
+/* --- reading view -------------------------------------------------------- */
+.av-reading {
+  max-width: 74ch;
+  padding: 34px 38px 40px;
+  border-radius: var(--r-editor);
+  background: var(--surface);
+  animation: av-in .5s var(--ease-spring) both;
+}
+.av-reading-block + .av-reading-block { margin-top: 18px; }
+.av-reading-block--heading { margin-top: 30px; }
+.av-reading-block--quote {
+  padding: 18px 22px;
+  border-radius: var(--r-msg);
+  background: var(--wash);
+}
+.av-reading-block--quote .av-said { font-size: 17px; color: var(--acc-text); }
+.av-reading .av-code-wrap,
+.av-reading .av-table-wrap { background: var(--pg); }
+
+.av-reading--ink {
+  background: var(--dark-card);
+  color: var(--dkf);
+}
+.av-reading--ink .av-prose,
+.av-reading--ink .av-list-text,
+.av-reading--ink .av-pair-value { color: rgba(249, 247, 244, .78); }
+.av-reading--ink .av-block-heading,
+.av-reading--ink .av-said { color: var(--dkf); }
+.av-reading--ink .av-pair-label { color: rgba(249, 247, 244, .62); }
+.av-reading--ink .av-code-wrap,
+.av-reading--ink .av-table-wrap { background: rgba(249, 247, 244, .07); }
+.av-reading--ink .av-code,
+.av-reading--ink .av-table td { color: rgba(249, 247, 244, .78); }
+.av-reading--ink .av-table th { color: rgba(249, 247, 244, .62); }
+.av-reading--ink .av-table tbody tr:nth-child(odd) { background: rgba(249, 247, 244, .05); }
+.av-reading--ink .av-reading-block--quote { background: rgba(249, 247, 244, .07); }
+.av-reading--ink .av-reading-block--quote .av-said { color: var(--dkf); }
+.av-reading--ink .av-link { color: var(--acch); }
+.av-reading--ink .av-inline-code { background: rgba(249, 247, 244, .1); color: var(--dkf); }
+
+/* --- sources ------------------------------------------------------------- */
+.av-source {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'domain ico' 'title ico' 'via ico';
+  align-items: center;
+  gap: 2px 10px;
+  width: 100%;
+  padding: 14px 12px;
+  border: none;
+  border-radius: var(--r-row);
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background .18s var(--ease-spring);
+}
+.av-source:hover { background: var(--sk); }
+.av-source-domain { grid-area: domain; font-size: 13px; font-weight: 500; color: var(--ink); }
+.av-source-title { grid-area: title; font-size: 12px; color: var(--ink2); }
+.av-source-via {
+  grid-area: via;
+  margin-top: 4px;
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink3);
+}
+.av-source-ico { grid-area: ico; color: var(--ink3); }
+
+/* --- pending ------------------------------------------------------------- */
+.av-pending {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 34px 38px 40px;
+  border-radius: var(--r-editor);
+  background: var(--surface);
+}
+.av-pending-bar {
+  height: 12px;
+  border-radius: var(--r-pill);
+  background: var(--rz);
+  animation: av-breathe 1.8s ease-in-out infinite;
+}
+.av-pending-bar:nth-child(2) { width: 84%; animation-delay: .18s; }
+.av-pending-bar:nth-child(3) { width: 62%; animation-delay: .36s; }
+.av-pending-text { margin: 8px 0 0; font-size: 12.5px; color: var(--ink3); }
+
+@keyframes av-in {
+  from { opacity: 0; transform: translateY(16px) scale(.985); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes av-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .45; }
+}
+
+/* The global reduce-motion reset in workshop.css already collapses every
+   animation above; this keeps the pending bars legible rather than frozen
+   mid-fade once it does. */
+@media (prefers-reduced-motion: reduce) {
+  .av-pending-bar { opacity: .7; }
+}
