@@ -24,8 +24,9 @@ export function useToolCalls(limit = 20) {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchToolCalls = useCallback(async () => {
-    if (!user) return;
-    
+    // See useAgents: signed out is a finished, empty load — not a pending one.
+    if (!user) { setIsLoading(false); return; }
+
     try {
       const { data, error } = await supabase
         .from('tool_calls')

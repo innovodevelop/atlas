@@ -20,16 +20,25 @@ const AtlasCoreScreen = lazy(() => import("./pages/atlas/AtlasCoreScreen"));
 // Mail is a full route, not the dashboard's `expanded === 'email'` overlay —
 // the overlay stays as the glanceable card, this is the supervision surface.
 const AtlasMail = lazy(() => import("./pages/atlas/AtlasMail"));
+// Settings was overlay-only (rendered inside AtlasDashboard behind
+// `settingsOpen`), so nothing could link to it and it was unreachable from any
+// other screen. It is a route AS WELL now — the dock button and the account
+// menu still open the overlay. See AtlasSettingsRoute for why both.
+const AtlasSettingsRoute = lazy(() => import("./pages/atlas/AtlasSettingsRoute"));
 const Auth = lazy(() => import("./pages/Auth"));
 import { OnboardingGate } from "./components/OnboardingGate";
 // Statically imported (not lazy): this is the first screen a new user sees, so
 // it must not depend on a runtime chunk fetch that could fail in the webview.
 import AtlasPermissions from "./pages/AtlasPermissions";
 const AtlasDemo = lazy(() => import("./pages/AtlasDemo"));
-const AtlasCore = lazy(() => import("./pages/AtlasCore"));
+// Both are reachable from the account menu (dock avatar → "Teach Atlas" /
+// "How Atlas works"). Before T4 part 3 they were routes with no link anywhere.
 const AtlasTeach = lazy(() => import("./pages/AtlasTeach"));
 const AtlasArchitecture = lazy(() => import("./pages/AtlasArchitecture"));
-// Internal QA surface for the sphere — a design tool, not on the dock.
+// Internal QA surface for the sphere — a design tool, not a product screen, so
+// it is deliberately NOT on the dock. It is linked from the account menu in DEV
+// builds only, which is where it gets used; in a shipped build it stays
+// URL-only on purpose.
 const AtlasSphereGallery = lazy(() => import("./pages/AtlasSphereGallery"));
 
 // Instant startup: dashboard data (weather, stocks, news, tasks…) is
@@ -144,24 +153,26 @@ const App = () => (
           <Route path="/atlas-core" element={<AtlasCoreScreen />} />
           <Route path="/mail" element={<AtlasMail />} />
           <Route path="/auth" element={<Auth />} />
-          {/* First-run consent. Reachable again from Settings so choices are revisitable. */}
+          <Route path="/settings" element={<AtlasSettingsRoute />} />
+          {/* First-run consent. Genuinely revisitable now, via Settings →
+              Permissions (AtlasSettings.tsx). The comment that used to sit here
+              claimed that was already true; it was not — before T4 part 2 this
+              route was referenced only by OnboardingGate and Auth, which made
+              AtlasPermissions' own "you can change it later" a broken promise. */}
           <Route path="/permissions" element={<AtlasPermissions />} />
 
-          {/* Legacy Atlas Core health dashboard. NOTE: the old comment here said
-              settings "still live here until wired into the Workshop app" —
-              they were wired in long ago (AtlasSettings mounts VoiceSettings,
-              MemoryPrivacy, Personality and SoftwareUpdate directly), so most of
-              the ~38 components under components/atlas-health/ are now orphaned.
-              Unlinked from the UI; reachable only by typing the URL. See
-              docs/ROADMAP.md before reviving or deleting any of it. */}
-          <Route
-            path="/atlas-core-legacy"
-            element={
-              <Suspense fallback={<PageLoader />}>
-                <AtlasCore />
-            </Suspense>
-            }
-          />
+          {/* `/atlas-core-legacy` used to sit here, pointing at pages/AtlasCore
+              and the 34-file src/components/atlas-health tree behind it. Both
+              are deleted (T4 part 3). Nothing linked to the route; the panels
+              worth keeping were absorbed first — Agent CRUD, schedules, tool
+              calls and the run timeline into Atlas Core's Agent tab, usage and
+              cost into Settings → Budget, the memory tab and the error log into
+              Atlas Core. The five settings panels that were always live still
+              live in atlas-health/ and are mounted from AtlasSettings.
+              An older comment here sent readers to docs/ROADMAP.md "before
+              reviving or deleting any of it"; that cross-reference resolved to
+              nothing — the roadmap's one do-not-clean-up rule is about
+              supabase/functions/_shared, not this tree. */}
           <Route
             path="/atlas-sphere"
             element={

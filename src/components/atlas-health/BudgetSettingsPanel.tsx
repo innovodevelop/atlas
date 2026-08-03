@@ -21,6 +21,7 @@ export function BudgetSettingsPanel() {
     weeklySpending,
     dailyBudgetUsedPct,
     weeklyBudgetUsedPct,
+    hasSpendData,
   } = useSpendingAlerts();
   
   const { settings, updateSettings, lovableAIEnabled } = useAtlasProviderStatus();
@@ -79,23 +80,39 @@ export function BudgetSettingsPanel() {
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Current Spending Summary */}
-        <div className="grid grid-cols-2 gap-4">
+        {/* Current spending. These used to read a fabricated estimate
+            (successful_calls × a literal 500 tokens × a hardcoded price table
+            for providers Atlas does not call). They now read the recorded spend
+            log — and when there is no log, they say so rather than printing a
+            confident $0.00 that looks like a measurement. */}
+        {hasSpendData ? (
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-3 rounded-lg bg-muted/50">
+              <p className="text-xs text-muted-foreground mb-1">Daily Usage</p>
+              <p className="text-lg font-semibold">${dailySpending.toFixed(2)}</p>
+              <p className="text-xs text-muted-foreground">
+                of ${budgetSettings.daily_budget_usd.toFixed(2)} ({dailyBudgetUsedPct.toFixed(0)}%)
+              </p>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/50">
+              <p className="text-xs text-muted-foreground mb-1">Weekly Usage</p>
+              <p className="text-lg font-semibold">${weeklySpending.toFixed(2)}</p>
+              <p className="text-xs text-muted-foreground">
+                of ${budgetSettings.weekly_budget_usd.toFixed(2)} ({weeklyBudgetUsedPct.toFixed(0)}%)
+              </p>
+            </div>
+          </div>
+        ) : (
           <div className="p-3 rounded-lg bg-muted/50">
-            <p className="text-xs text-muted-foreground mb-1">Daily Usage</p>
-            <p className="text-lg font-semibold">${dailySpending.toFixed(2)}</p>
+            <p className="text-xs text-muted-foreground mb-1">Current usage</p>
+            <p className="text-sm">Not measured</p>
             <p className="text-xs text-muted-foreground">
-              of ${budgetSettings.daily_budget_usd.toFixed(2)} ({dailyBudgetUsedPct.toFixed(0)}%)
+              Atlas keeps no per-day spend log yet, so it cannot say how much of your
+              ${budgetSettings.daily_budget_usd.toFixed(2)} daily limit is used. The limits below are still
+              recorded — they are simply not enforced against a measured figure.
             </p>
           </div>
-          <div className="p-3 rounded-lg bg-muted/50">
-            <p className="text-xs text-muted-foreground mb-1">Weekly Usage</p>
-            <p className="text-lg font-semibold">${weeklySpending.toFixed(2)}</p>
-            <p className="text-xs text-muted-foreground">
-              of ${budgetSettings.weekly_budget_usd.toFixed(2)} ({weeklyBudgetUsedPct.toFixed(0)}%)
-            </p>
-          </div>
-        </div>
+        )}
 
         <Separator />
 

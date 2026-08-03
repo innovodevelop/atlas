@@ -33,10 +33,21 @@ export interface AgentFormData {
   is_active?: boolean;
 }
 
+// The Claude tiers Atlas actually routes to. These used to be `openai/gpt-5`
+// and `google/gemini-2.5-flash` — the gateway's *logical* ids, which do still
+// resolve (`mapModelToClaude`, supabase/functions/_shared/claudeAdapter.ts:28-35
+// maps every one of them onto a Claude tier) but which name models this build
+// never calls. Since `mapModelToClaude` passes `claude-*` through unchanged
+// (`:40`), stating the tier directly is both honest and identical in effect:
+// gpt-5 → opus-4-8, gemini-2.5-flash → sonnet-5, exactly as below.
+//
+// NOTE the SQL default in src-tauri/src/db_schema.sql:327 still carries the old
+// logical ids. Harmless — every insert here sets the column explicitly — but it
+// wants a migration the next time that file is touched.
 const DEFAULT_MODELS = {
-  planner: 'openai/gpt-5',
-  worker: 'google/gemini-2.5-flash',
-  reasoner: 'openai/gpt-5',
+  planner: 'claude-opus-4-8',
+  worker: 'claude-sonnet-5',
+  reasoner: 'claude-opus-4-8',
 };
 
 const AVAILABLE_TOOLS = [
@@ -62,8 +73,12 @@ export function useAgents() {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchAgents = useCallback(async () => {
-    if (!user) return;
-    
+    // Signed out (and browser dev, which has no local DB) is a FINISHED load
+    // with nothing in it, not a load in progress. Returning early without
+    // clearing the flag pinned every consumer on "Loading agents…" forever —
+    // which is how an honest empty state becomes unreachable.
+    if (!user) { setIsLoading(false); return; }
+
     try {
       const { data, error } = await supabase
         .from('agents')

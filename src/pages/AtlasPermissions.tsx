@@ -5,6 +5,7 @@ import { AuthSphere, type OrbState } from './AuthSphere';
 import { useAtlasSpeech } from '@/hooks/useAtlasSpeech';
 import {
   ATLAS_PERMISSIONS,
+  readOnboarding,
   requestPermission,
   writeOnboarding,
   type PermissionId,
@@ -22,6 +23,7 @@ type Stage = 'intro' | 'choosing' | 'asking' | 'done';
 
 const LINES = {
   intro: 'Before we start — here is what I would like access to, and why.',
+  revisit: 'Here is what you allowed me. Change anything you like.',
   choosing: 'Switch off anything you would rather I did not have. You can change it later.',
   asking: 'Thank you. macOS will ask you to confirm a couple of these.',
   done: 'That is everything. Let me show you around.',
@@ -35,18 +37,29 @@ const AtlasPermissions = () => {
   const [asking, setAsking] = useState<PermissionId | null>(null);
   const [granted, setGranted] = useState<Partial<Record<PermissionId, boolean>>>({});
 
-  const [choices, setChoices] = useState<Record<PermissionId, boolean>>(
-    () =>
-      Object.fromEntries(ATLAS_PERMISSIONS.map((p) => [p.id, p.defaultOn])) as Record<
-        PermissionId,
-        boolean
-      >,
-  );
+  // The stored consent record, read ONCE on mount. Settings → Permissions makes
+  // this screen a revisit surface, so it has to open on the answers the user
+  // actually gave. Seeding from `defaultOn` regardless — as it did while the
+  // screen was first-run-only and the bug was unreachable — showed the wrong
+  // state and then wrote it back on Continue, silently revoking (for example)
+  // a proactive-digest consent that Settings had just rendered as "Allowed".
+  const [record] = useState(() => readOnboarding());
+  const revisiting = record !== null;
+
+  const [choices, setChoices] = useState<Record<PermissionId, boolean>>(() => {
+    const stored = record?.choices;
+    return Object.fromEntries(
+      ATLAS_PERMISSIONS.map((p) => [
+        p.id,
+        typeof stored?.[p.id] === 'boolean' ? stored[p.id] : p.defaultOn,
+      ]),
+    ) as Record<PermissionId, boolean>;
+  });
 
   // Atlas opens the conversation, then hands over to the list.
   useEffect(() => {
     setOrb('speaking');
-    speech.speak(LINES.intro);
+    speech.speak(revisiting ? LINES.revisit : LINES.intro);
     const t = window.setTimeout(() => setStage('choosing'), 1500);
     return () => window.clearTimeout(t);
     // speech is stable (useCallback); intentionally run once on mount.
@@ -91,11 +104,17 @@ const AtlasPermissions = () => {
     window.setTimeout(() => navigate('/'), 2200);
   }, [choices, navigate, speech]);
 
+  // First run: "Not now" is an answer — decline everything and record it, so
+  // the onboarding gate does not ask again. On a REVISIT it is a cancel: the
+  // user came here from Settings to look, and writing all-false would wipe the
+  // consents they already gave without them choosing anything.
   const skip = () => {
-    const none = Object.fromEntries(
-      ATLAS_PERMISSIONS.map((p) => [p.id, false]),
-    ) as Record<PermissionId, boolean>;
-    writeOnboarding(none);
+    if (!revisiting) {
+      const none = Object.fromEntries(
+        ATLAS_PERMISSIONS.map((p) => [p.id, false]),
+      ) as Record<PermissionId, boolean>;
+      writeOnboarding(none);
+    }
     navigate('/');
   };
 
@@ -163,12 +182,14 @@ const AtlasPermissions = () => {
             {stage === 'choosing' && (
               <div className="afoot">
                 <button className="aenter" onClick={finish}>
-                  {selectedCount > 0
-                    ? `Continue with ${selectedCount} selected →`
-                    : 'Continue without any →'}
+                  {revisiting
+                    ? `Save ${selectedCount} selected →`
+                    : selectedCount > 0
+                      ? `Continue with ${selectedCount} selected →`
+                      : 'Continue without any →'}
                 </button>
                 <button type="button" className="aswap" onClick={skip}>
-                  Not now
+                  {revisiting ? 'Cancel' : 'Not now'}
                 </button>
               </div>
             )}

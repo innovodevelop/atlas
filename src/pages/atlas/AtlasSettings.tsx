@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Minimize2, Mic, Mail, Wallet, LineChart, Plus, Check, RefreshCw, Trash2, Link2, Brain, Sparkles, Download, Music } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Minimize2, Mic, Mail, Wallet, LineChart, Plus, Check, RefreshCw, Trash2, Link2, Brain, Sparkles, Download, Music, ShieldCheck } from 'lucide-react';
 import { VoiceSettingsPanel } from '@/components/atlas-health/VoiceSettingsPanel';
-import { BudgetSettingsPanel } from '@/components/atlas-health/BudgetSettingsPanel';
 import { MemoryPrivacyPanel } from '@/components/atlas-health/MemoryPrivacyPanel';
 import { PersonalityPanel } from '@/components/atlas-health/PersonalityPanel';
 import { SoftwareUpdatePanel } from '@/components/atlas-health/SoftwareUpdatePanel';
+import { AtlasBudgetTab } from '@/components/atlas-ui/AtlasBudgetTab';
 import { useMailIntelligence } from '@/hooks/useMailIntelligence';
 import { usePortfolio } from '@/hooks/usePortfolio';
 import { useMusicPlayer } from '@/hooks/useMusicPlayer';
-import { Button, Panel } from '@/components/atlas-ui/primitives';
+import { ATLAS_PERMISSIONS, readOnboarding } from '@/lib/atlasPermissions';
+import { Button, Panel, Row } from '@/components/atlas-ui/primitives';
 
 // Workshop-native Settings overlay. Hosts the app's real settings (voice, mail,
 // budget) behind one entry point — before this, AtlasSettingsPanel was only
@@ -30,7 +32,9 @@ import { Button, Panel } from '@/components/atlas-ui/primitives';
 // index.css as a bare HSL triplet, so every `color: var(--positive)` here was
 // an invalid declaration that painted nothing).
 
-export type SettingsTab = 'voice' | 'mail' | 'portfolio' | 'music' | 'budget' | 'personality' | 'memory' | 'updates';
+export type SettingsTab =
+  | 'voice' | 'mail' | 'portfolio' | 'music' | 'budget'
+  | 'personality' | 'memory' | 'permissions' | 'updates';
 
 const TABS: { key: SettingsTab; label: string; icon: typeof Mic }[] = [
   { key: 'voice', label: 'Voice', icon: Mic },
@@ -40,10 +44,27 @@ const TABS: { key: SettingsTab; label: string; icon: typeof Mic }[] = [
   { key: 'budget', label: 'Budget & AI', icon: Wallet },
   { key: 'personality', label: 'Personality', icon: Sparkles },
   { key: 'memory', label: 'Memory & Privacy', icon: Brain },
+  // T4 part 2. `App.tsx` claimed permissions were "reachable again from
+  // Settings so choices are revisitable" and `AtlasPermissions.tsx` tells the
+  // user "you can change it later" — both were false: `/permissions` was
+  // referenced only by the route, the onboarding gate and the auth screen, and
+  // Settings had no entry. This tab is what makes those two sentences true.
+  { key: 'permissions', label: 'Permissions', icon: ShieldCheck },
   { key: 'updates', label: 'Software Update', icon: Download },
 ];
 
-export const AtlasSettings = ({ onClose, initialTab }: { onClose: () => void; initialTab?: SettingsTab }) => {
+/**
+ * How this instance was opened. It exists for exactly one reason: the overlay
+ * closes with `setState`, the route closes with `navigate(-1)`, and code that
+ * wants to LEAVE Settings for another screen has to treat those differently.
+ * See `PermissionsSettings` — doing `onClose(); navigate(…)` on the route path
+ * queues a history traversal that pops straight back over the push.
+ */
+export type SettingsMode = 'overlay' | 'route';
+
+export const AtlasSettings = ({
+  onClose, initialTab, mode = 'overlay',
+}: { onClose: () => void; initialTab?: SettingsTab; mode?: SettingsMode }) => {
   const [tab, setTab] = useState<SettingsTab>(initialTab ?? 'voice');
 
   useEffect(() => {
@@ -93,9 +114,10 @@ export const AtlasSettings = ({ onClose, initialTab }: { onClose: () => void; in
             {tab === 'mail' && <MailSettings />}
             {tab === 'portfolio' && <PortfolioSettings />}
             {tab === 'music' && <MusicSettings />}
-            {tab === 'budget' && <BudgetSettingsPanel />}
+            {tab === 'budget' && <AtlasBudgetTab />}
             {tab === 'personality' && <PersonalityPanel />}
             {tab === 'memory' && <MemoryPrivacyPanel />}
+            {tab === 'permissions' && <PermissionsSettings onClose={onClose} mode={mode} />}
             {tab === 'updates' && <SoftwareUpdatePanel />}
           </Panel>
         </div>
@@ -103,6 +125,83 @@ export const AtlasSettings = ({ onClose, initialTab }: { onClose: () => void; in
     </div>
   );
 };
+
+/**
+ * Permissions — the revisit path the app promised and never built.
+ *
+ * `AtlasPermissions.tsx:25` says "You can change it later." Until now there was
+ * no later: `/permissions` was reachable from the onboarding gate, the auth
+ * screen and the URL bar, and from nowhere a signed-in user would look.
+ *
+ * Deliberately a SUMMARY plus a link, not a second set of switches. The consent
+ * screen owns the choices, the copy explaining each one, and the code that
+ * actually asks macOS (`requestPermission`). A duplicate switch here would be a
+ * second thing to keep truthful, and the one that drifts is the one users see.
+ * What it does add is the current answer — a consent record you cannot read is
+ * not much of a consent record.
+ */
+function PermissionsSettings({ onClose, mode }: { onClose: () => void; mode: SettingsMode }) {
+  const navigate = useNavigate();
+  const record = readOnboarding();
+
+  // ONE navigation, never two. On the overlay path Settings is rendered inside
+  // the dashboard, so it has to be dismissed before the consent screen appears
+  // — `onClose` there is a `setState`, which composes fine with a push. On the
+  // ROUTE path `onClose` is `navigate(-1)`; a history traversal is queued, not
+  // synchronous, so `onClose(); navigate('/permissions')` pushed /permissions
+  // and then let the pending go(-1) pop straight back over it — the user landed
+  // on whatever preceded Settings. Navigating away IS closing here, so the
+  // route path simply navigates.
+  const review = () => {
+    if (mode === 'route') { navigate('/permissions'); return; }
+    onClose();
+    navigate('/permissions');
+  };
+
+  return (
+    <div className="col gap16">
+      <div>
+        <h3 className="t14 fw6" style={{ color: 'var(--ink)', marginBottom: 6 }}>What Atlas may do</h3>
+        <p className="fs12" style={{ color: 'var(--ink2)', lineHeight: 1.5 }}>
+          These are the answers you gave when Atlas first started. Reviewing them reopens that same screen — nothing changes until you choose it there, and switching one back on re-asks macOS.
+        </p>
+      </div>
+
+      <Panel pad="sm">
+        {ATLAS_PERMISSIONS.map((p) => {
+          const on = record?.choices?.[p.id];
+          return (
+            <Row
+              key={p.id}
+              title={p.title}
+              meta={on ? p.blurb : p.withoutIt}
+              trail={
+                <span className="fs12" style={{ color: on ? 'var(--positive)' : 'var(--ink3)' }}>
+                  {record ? (on ? 'Allowed' : 'Off') : 'Not answered'}
+                </span>
+              }
+            />
+          );
+        })}
+      </Panel>
+
+      {record && (
+        <p className="fs12 m0" style={{ color: 'var(--ink3)' }}>
+          Answered {new Date(record.completedAt).toLocaleDateString()}.
+        </p>
+      )}
+
+      <Button
+        variant="primary"
+        icon={<ShieldCheck className="i16" />}
+        onClick={review}
+        style={{ width: '100%' }}
+      >
+        Review permissions
+      </Button>
+    </div>
+  );
+}
 
 // Compact mail-accounts management (connect / status / disconnect), reusing the
 // same read-only Gmail flow the Mail card uses.

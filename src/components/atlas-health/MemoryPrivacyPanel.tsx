@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Brain, RefreshCw, ShieldAlert, Trash2, UserX } from 'lucide-react';
+import { Brain, RefreshCw, ShieldAlert, Sparkles, Trash2, UserX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -94,6 +94,7 @@ export function MemoryPrivacyPanel() {
   const [accountConfirmText, setAccountConfirmText] = useState('');
   const [alsoEraseLocal, setAlsoEraseLocal] = useState(false);
   const [isClosingAccount, setIsClosingAccount] = useState(false);
+  const [isTidying, setIsTidying] = useState(false);
   const { toast } = useToast();
 
   const load = useCallback(async () => {
@@ -121,6 +122,47 @@ export function MemoryPrivacyPanel() {
     }
     setMemories((prev) => prev.filter((x) => x.id !== m.id));
     toast({ title: 'Forgotten', description: `"${m.key}" removed (${data?.vectors ?? 0} vectors cleaned up).` });
+  };
+
+  // Memory maintenance — /memory/maintenance, which consolidates duplicate keys
+  // and prunes stale low-importance memories.
+  //
+  // WHY IT IS HERE. Its only trigger was `MemoryDashboardPanel` in the deleted
+  // `/atlas-core-legacy` tree, and nothing replaced it: no scheduler calls it
+  // (src-tauri/src/scheduler.rs ticks only /proactive/cycle) and the read-only
+  // Memory tab in Core hits /memory/list. That left duplicates and stale rows
+  // accumulating forever on a long-running install, degrading recall, with no
+  // path — automated or manual — to fix it.
+  //
+  // `operation: 'consolidate+prune'` is NOT passed: the route's "full" mode also
+  // asks the model for communication-style insights, i.e. it WRITES new memories
+  // and spends budget. A button labelled "tidy up" must not do that, so this
+  // runs the two deterministic passes and nothing else.
+  const tidyMemories = async () => {
+    setIsTidying(true);
+    const consolidate = await brainPost('/memory/maintenance', { operation: 'consolidate' });
+    if (consolidate.error) {
+      setIsTidying(false);
+      toast({ title: 'Tidy-up failed', description: consolidate.error.message, variant: 'destructive' });
+      return;
+    }
+    const prune = await brainPost('/memory/maintenance', { operation: 'prune' });
+    setIsTidying(false);
+    if (prune.error) {
+      toast({ title: 'Tidy-up partly failed', description: prune.error.message, variant: 'destructive' });
+      await load();
+      return;
+    }
+    const merged = consolidate.data?.consolidated ?? 0;
+    const pruned = prune.data?.pruned ?? 0;
+    await load();
+    toast({
+      title: merged + pruned === 0 ? 'Nothing to tidy' : 'Memory tidied',
+      description:
+        merged + pruned === 0
+          ? 'No duplicate keys and nothing old and unimportant enough to prune.'
+          : `${merged} duplicate ${merged === 1 ? 'memory' : 'memories'} merged, ${pruned} stale ${pruned === 1 ? 'one' : 'ones'} pruned.`,
+    });
   };
 
   const eraseAll = async () => {
@@ -217,10 +259,23 @@ export function MemoryPrivacyPanel() {
             account below.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={load} disabled={isLoading}>
-          <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />Refresh
-        </Button>
+        <div className="fx ac gap8">
+          <Button variant="outline" size="sm" onClick={tidyMemories} disabled={isTidying || isLoading}>
+            <Sparkles className={`w-4 h-4 mr-2 ${isTidying ? 'animate-pulse' : ''}`} />
+            {isTidying ? 'Tidying…' : 'Tidy up'}
+          </Button>
+          <Button variant="outline" size="sm" onClick={load} disabled={isLoading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />Refresh
+          </Button>
+        </div>
       </div>
+
+      <p className="fs12 m0" style={{ color: 'hsl(240 20% 50%)', lineHeight: 1.5 }}>
+        <strong>Tidy up</strong> merges memories Atlas saved twice under the same name (keeping the
+        newest) and prunes ones that are over 90 days old, were mentioned once and scored low
+        importance. It never contacts a model and never writes anything new — but it does delete
+        rows, and it cannot be undone.
+      </p>
 
       {loadError && (
         <div className="gpanel fs12" style={{ padding: 14, color: 'var(--negative)' }}>{loadError}</div>

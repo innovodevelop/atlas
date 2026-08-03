@@ -41,8 +41,9 @@ export function useAgentRuns(limit = 10) {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchRuns = useCallback(async () => {
-    if (!user) return;
-    
+    // See useAgents: signed out is a finished, empty load — not a pending one.
+    if (!user) { setIsLoading(false); return; }
+
     try {
       // The local shim has no relational embeds (`agent:agents(name)` would be
       // silently dropped) — resolve agent names with a second tiny query.

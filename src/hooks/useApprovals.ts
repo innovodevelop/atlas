@@ -23,8 +23,13 @@ export function useApprovals() {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchApprovals = useCallback(async () => {
-    if (!user) return;
-    
+    // Signed out is a resolved state, not a pending one. Returning before the
+    // `finally` left `isLoading` true forever, so any consumer that gated on it
+    // sat on a spinner instead of reaching its empty state. Same bug shape as
+    // the one fixed in useAgents/useSchedules/useToolCalls/useAgentRuns.
+    if (!user) { setApprovals([]); setPendingCount(0); setIsLoading(false); return; }
+
+
     try {
       const { data, error } = await supabase
         .from('approvals')

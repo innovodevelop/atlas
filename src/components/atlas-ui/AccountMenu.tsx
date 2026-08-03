@@ -13,7 +13,11 @@
  * which owns the typed confirmation and the opt-in local erase.
  */
 import { useEffect, useRef } from 'react';
-import { LogOut, Settings as SettingsIcon, ShieldX, BadgeCheck } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import {
+  LogOut, Settings as SettingsIcon, ShieldX, BadgeCheck,
+  GraduationCap, Network, Orbit,
+} from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 interface Props {
@@ -25,6 +29,9 @@ interface Props {
 export function AccountMenu({ onClose, onOpenSettings }: Props) {
   const { user, entitlement, signOut } = useAuth();
   const ref = useRef<HTMLDivElement | null>(null);
+  const navigate = useNavigate();
+
+  const go = (path: string) => { onClose(); navigate(path); };
 
   // Dismiss on outside click or Escape — a menu you cannot close without
   // picking something is a trap, and one of the items signs you out.
@@ -64,6 +71,29 @@ export function AccountMenu({ onClose, onOpenSettings }: Props) {
       <button className="acctitem" role="menuitem" onClick={() => { onClose(); onOpenSettings('memory'); }}>
         <ShieldX className="i16" /><span>Privacy &amp; delete account</span>
       </button>
+
+      <div className="acctsep" />
+
+      {/* /atlas-teach and /atlas-architecture were routed but linked from
+          nowhere — you could only reach them by typing the URL. The dock is
+          full (eight items) and neither is a daily surface, so they land here
+          rather than crowding it. */}
+      <button className="acctitem" role="menuitem" onClick={() => go('/atlas-teach')}>
+        <GraduationCap className="i16" /><span>Teach Atlas</span>
+      </button>
+
+      <button className="acctitem" role="menuitem" onClick={() => go('/atlas-architecture')}>
+        <Network className="i16" /><span>How Atlas works</span>
+      </button>
+
+      {/* The sphere gallery is a design/QA tool, not a product screen, so it is
+          exposed in development builds only. In a shipped build it stays
+          URL-only by choice — see App.tsx. */}
+      {import.meta.env.DEV && (
+        <button className="acctitem" role="menuitem" onClick={() => go('/atlas-sphere')}>
+          <Orbit className="i16" /><span>Sphere gallery (dev)</span>
+        </button>
+      )}
 
       <div className="acctsep" />
 
