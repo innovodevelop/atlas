@@ -86,6 +86,22 @@ export function AccountMenu({ onClose, onOpenSettings }: Props) {
         <Network className="i16" /><span>How Atlas works</span>
       </button>
 
+      {/* The T3 surfaces. Menu, not dock — four of them (Smart home, Health,
+          Money, Widget sheet) run on clearly-labelled sample data because no
+          adapter exists yet, and a surface with nothing behind it should not
+          take a primary slot. They move to the dock the day real data lands.
+          Routed AND linked together: `/atlas-teach` and `/atlas-architecture`
+          above were routed-but-unreachable for weeks, which is the exact
+          regression this menu exists to prevent. */}
+      <button className="acctitem" role="menuitem" onClick={() => go('/onboarding')}>Onboarding</button>
+      <button className="acctitem" role="menuitem" onClick={() => go('/widgets')}>Widget catalog</button>
+      <button className="acctitem" role="menuitem" onClick={() => go('/widget-sheet')}>Widget sheet</button>
+      <button className="acctitem" role="menuitem" onClick={() => go('/answer-views')}>Answer views</button>
+      <button className="acctitem" role="menuitem" onClick={() => go('/model-lab')}>Model lab</button>
+      <button className="acctitem" role="menuitem" onClick={() => go('/smart-home')}>Smart home</button>
+      <button className="acctitem" role="menuitem" onClick={() => go('/health')}>Health</button>
+      <button className="acctitem" role="menuitem" onClick={() => go('/money')}>Money</button>
+
       {/* `/home` — the voice-first landing — was routed in App.tsx and linked
           from nowhere: a whole product surface (its own chat session, voice
           session and sphere) that no user could reach without typing the URL.

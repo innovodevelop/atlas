@@ -44,6 +44,20 @@ const AtlasArchitecture = lazy(() => import("./pages/AtlasArchitecture"));
 // builds only, which is where it gets used; in a shipped build it stays
 // URL-only on purpose.
 const AtlasSphereGallery = lazy(() => import("./pages/AtlasSphereGallery"));
+// T3 surfaces. Built in parallel, wired here in one pass — each page owns its
+// own route, mock module and stylesheet, and exports a `surface` descriptor
+// naming the path and where it belongs. All eight are account-menu entries
+// rather than dock items: a surface with no live data source has not earned a
+// primary slot, and the dock stays the set of places you actually live.
+const AtlasOnboarding = lazy(() => import("./pages/atlas/AtlasOnboarding"));
+const AtlasWidgetCatalog = lazy(() => import("./pages/atlas/AtlasWidgetCatalog"));
+const AtlasWidgetSheet = lazy(() => import("./pages/atlas/AtlasWidgetSheet"));
+const AtlasAnswerViews = lazy(() => import("./pages/atlas/AtlasAnswerViews"));
+const AtlasModelLab = lazy(() => import("./pages/atlas/AtlasModelLab"));
+const AtlasSmartHome = lazy(() => import("./pages/atlas/AtlasSmartHome"));
+const AtlasHealth = lazy(() => import("./pages/atlas/AtlasHealth"));
+const AtlasBanking = lazy(() => import("./pages/atlas/AtlasBanking"));
+
 
 // Instant startup: dashboard data (weather, stocks, news, tasks…) is
 // persisted to disk-backed localStorage, so the app paints with last-known
@@ -158,6 +172,14 @@ const App = () => (
           <Route path="/mail" element={<AtlasMail />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/settings" element={<AtlasSettingsRoute />} />
+          <Route path="/onboarding" element={<AtlasOnboarding />} />
+          <Route path="/widgets" element={<AtlasWidgetCatalog />} />
+          <Route path="/widget-sheet" element={<AtlasWidgetSheet />} />
+          <Route path="/answer-views" element={<AtlasAnswerViews />} />
+          <Route path="/model-lab" element={<AtlasModelLab />} />
+          <Route path="/smart-home" element={<AtlasSmartHome />} />
+          <Route path="/health" element={<AtlasHealth />} />
+          <Route path="/money" element={<AtlasBanking />} />
           {/* First-run consent. Genuinely revisitable now, via Settings →
               Permissions (AtlasSettings.tsx). The comment that used to sit here
               claimed that was already true; it was not — before T4 part 2 this
