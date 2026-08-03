@@ -619,7 +619,45 @@ function motionQuery(): MediaQueryList | null {
 
 const reduceMotion = (): boolean => !!motionQuery()?.matches;
 
+/**
+ * The subtree of the one opaque full-screen overlay currently on top, or null.
+ *
+ * `visible()` is a viewport-intersection test and nothing more — it has no way
+ * to know that another element is painted over a canvas. That is fine for every
+ * surface in the app except a full-bleed opaque sheet: the music player is
+ * `position:fixed; inset:0; z-index:80` on `#14151c`, portalled to `<body>`, so
+ * the dashboard's header orb underneath it stayed mounted, stayed inside the
+ * viewport, and kept painting its 26 000 particles at ~38fps for nobody — on
+ * top of the player's own 14 000.
+ *
+ * Implemented as "only this subtree paints" rather than a rectangle test on
+ * purpose: an overlay knows it is opaque and full-bleed, and a geometric guess
+ * about occlusion would be wrong the first time something translucent used it.
+ */
+let occludeRoot: HTMLElement | null = null;
+
+/**
+ * Declare `root` an opaque, full-viewport overlay: until the returned function
+ * is called, only canvases inside it paint.
+ *
+ * Nested calls stack — the innermost overlay wins and restores the previous one
+ * on release, so two surfaces overlapping cannot leave the loop permanently
+ * suppressed. Releasing out of order is tolerated (the newer claim stands).
+ */
+export function occludeAllExcept(root: HTMLElement | null): () => void {
+  const prev = occludeRoot;
+  occludeRoot = root;
+  // A canvas that was suppressed while hidden holds a stale frame, so give
+  // everything one paint when the overlay goes away.
+  return () => {
+    if (occludeRoot !== root) return;
+    occludeRoot = prev;
+    if (entries.length) { if (reduceMotion()) paintOnce(); else start(); }
+  };
+}
+
 function visible(el: HTMLCanvasElement): boolean {
+  if (occludeRoot && !occludeRoot.contains(el)) return false;
   const r = el.getBoundingClientRect();
   // A display:none element reports an all-zero rect, so this covers it too.
   // Horizontal is checked as well — the original only tested vertically, so a

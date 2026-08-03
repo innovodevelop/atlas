@@ -974,7 +974,7 @@ body{display:block;overflow-x:hidden;overflow-y:visible;max-width:none;flex:none
 /* Focused view — in-flow, replaces the grid; header + band remain above. */
 @keyframes focusIn{from{opacity:0;transform:translateY(30px) scale(.985)}to{opacity:1;transform:none}}
 @keyframes focusOut{to{opacity:0;transform:translateY(30px) scale(.985)}}
-/* opacity:1 base + forwards — same WKWebView rule as .awd/.mpfull. */
+/* opacity:1 base + forwards — same WKWebView rule as .awd and .mp2. */
 .focusview{position:relative;z-index:5;max-width:1200px;margin:0 auto;padding:0 28px 128px;opacity:1;animation:focusIn .5s cubic-bezier(.22,1,.36,1) forwards}
 /* An EXIT animation legitimately ends at opacity:0, so it keeps `forwards` —
    but the element is on its way out either way, so refuse pointer events now.
@@ -1056,74 +1056,24 @@ body{display:block;overflow-x:hidden;overflow-y:visible;max-width:none;flex:none
 
 
 /* ===================================================================
-   Step 5 — Atlas Sphere music player (design Change 4)
-   Compact tile (flat orange, mini reactive sphere) → full-screen player
-   with the sphere hero, waveform seek and flat (shadowless) transport.
+   Step 5 — Atlas music player
+
+   NOTHING IS LEFT HERE. All three presentations live in
+   src/styles/surfaces/music.css under the `mp2` prefix:
+
+     .mp2   full-screen player     .mp2s  sleeve variant
+     .mp2c  compact widget (the dashboard's Now-Playing tile)
+
+   Two blocks were deleted rather than kept "just in case", because a
+   stale skin that half-applies is worse than a missing one:
+   • the v4.4 takeover (.mpfull / .mphead / .mpdock / .mpbtn …), gone
+     with the component it dressed;
+   • the flat-accent compact tile (.npcard / .npfield / .npeq …) whose
+     `@keyframes npeqb` equaliser bounced to a fixed 0.9s rhythm
+     regardless of the audio. The tile that replaced it draws the real
+     librespot envelope and only when Atlas is the one decoding.
+   No class name is shared between the old and new sets.
    =================================================================== */
-
-/* --- Compact tile --- */
-.npcard{position:relative;background:var(--acc);color:#fff;overflow:hidden;padding:18px 20px}
-.npcard::after{content:'';position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(130% 100% at 16% -12%,rgba(255,255,255,.22),transparent 58%)}
-/* Field animation as the widget background: ~80% of the tile, centered, 60%
-   opacity so the track info on top stays legible. */
-.npfield{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:80%;height:80%;opacity:.6;z-index:0;pointer-events:none}
-.npsphere{width:100%;height:100%;display:block}
-.npcontent{position:relative;z-index:2;display:flex;align-items:center;gap:14px;width:100%}
-.nplbl{font-size:9.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.7);margin:0 0 3px;position:relative;z-index:1}
-.nptitle{font-family:'Hanken Grotesk','Geist',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em;margin:0;position:relative;z-index:1;color:#fff}
-.npsub{font-size:12px;color:rgba(255,255,255,.82);margin:2px 0 0;position:relative;z-index:1}
-.npeq{display:flex;align-items:flex-end;gap:2.5px;height:20px;flex-shrink:0;position:relative;z-index:1}
-.npeq span{width:3px;height:30%;background:rgba(255,255,255,.9);border-radius:2px}
-.npeq.on span{animation:npeqb .9s ease-in-out infinite}
-.npeq.on span:nth-child(2){animation-delay:.15s}
-.npeq.on span:nth-child(3){animation-delay:.30s}
-.npeq.on span:nth-child(4){animation-delay:.10s}
-.npeq.on span:nth-child(5){animation-delay:.25s}
-@keyframes npeqb{0%,100%{height:25%}50%{height:95%}}
-.npplay{width:42px;height:42px;flex-shrink:0;cursor:pointer;border-radius:50%;background:#fff;color:var(--acc);display:flex;align-items:center;justify-content:center;position:relative;z-index:1;transition:transform .18s}
-.npplay:hover{transform:scale(1.08)}
-.npprog{position:absolute;left:20px;right:20px;bottom:10px;height:3px;background:rgba(255,255,255,.24);border-radius:9999px;z-index:1;overflow:hidden}
-.npprog span{display:block;height:100%;background:#fff;border-radius:9999px;box-shadow:0 0 8px rgba(255,255,255,.7)}
-
-/* --- Full-screen player --- */
-/* Full-screen takeover: the Field fills the background, title centred top,
-   transport flat at the bottom. */
-/* opacity:1 base + forwards (not both) — the WKWebView rule, see .awd below.
-   THIS ONE BITES HARDEST: .mpfull is fixed inset:0 at z-index:80 and portalled
-   to <body>, so when `both` pinned it at opacity:0 (entrance never ran) the
-   result was an invisible full-screen sheet that swallowed every click while
-   the page still scrolled underneath — "nothing is clickable". */
-.mpfull{position:fixed;inset:0;z-index:80;background:var(--acc);color:#fff;overflow:hidden;opacity:1;animation:mpIn .4s cubic-bezier(.22,1,.36,1) forwards}
-@keyframes mpIn{from{opacity:0}to{opacity:1}}
-.mpbg{position:absolute;inset:0;z-index:0;pointer-events:none}
-.mpbgsphere{width:100%;height:100%;display:block}
-.mptopglow{position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(120% 70% at 50% -10%,rgba(255,255,255,.16),transparent 55%)}
-.mpbottomfade{position:absolute;left:0;right:0;bottom:0;height:42%;z-index:1;pointer-events:none;background:linear-gradient(to bottom,transparent,var(--acc) 84%)}
-.mpminiglow{position:absolute;top:8vh;left:5vw;width:170px;height:170px;z-index:1;pointer-events:none;border-radius:50%;background:radial-gradient(closest-side,rgba(255,255,255,.5),transparent 72%);filter:blur(26px);opacity:.3;animation:mpbreathe 5s ease-in-out infinite}
-@keyframes mpbreathe{0%,100%{transform:scale(1);opacity:.26}50%{transform:scale(1.12);opacity:.36}}
-.mpcollapse{position:absolute;top:24px;right:26px;z-index:5;width:44px;height:44px;cursor:pointer;border-radius:50%;background:rgba(255,255,255,.16);color:#fff;display:flex;align-items:center;justify-content:center;transition:background .18s}
-.mpcollapse:hover{background:rgba(255,255,255,.28)}
-.mphead{position:absolute;top:7vh;left:50%;transform:translateX(-50%);z-index:3;text-align:center;width:min(900px,82%)}
-.mpeyebrow{font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.72);margin:0}
-.mptitle{font-family:'Hanken Grotesk',sans-serif;font-size:clamp(28px,4vw,52px);font-weight:600;letter-spacing:-.03em;margin:12px 0 0;line-height:1.02;color:#fff}
-.mpartist{color:rgba(255,255,255,.72);font-weight:500}
-.mpalbum{font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.56);margin:8px 0 0}
-.mpdock{position:absolute;left:50%;bottom:5vh;transform:translateX(-50%);z-index:3;width:min(680px,88%);display:flex;flex-direction:column;align-items:center;gap:14px}
-.mpseek{width:100%}
-.mpwave{width:100%;height:60px;cursor:pointer;display:block}
-.mptimes{display:flex;align-items:center;justify-content:space-between;font-size:11.5px;font-variant-numeric:tabular-nums;color:rgba(255,255,255,.8);font-family:ui-monospace,Menlo,monospace;margin-top:6px}
-.mptransport{display:flex;align-items:center;justify-content:center;gap:24px;margin-top:6px}
-/* Flat (shadowless) translucent transport buttons. */
-.mpbtn{width:48px;height:48px;cursor:pointer;border-radius:50%;background:transparent;color:rgba(255,255,255,.85);display:flex;align-items:center;justify-content:center;transition:color .18s,background .18s,transform .18s}
-.mpbtn:hover{color:#fff;background:rgba(255,255,255,.14)}
-.mpbtn.liked{color:#fff}
-.mpplay{width:78px;height:78px;background:#fff;color:var(--acc)}
-.mpplay:hover{background:#fff;transform:scale(1.05)}
-.mpconnect{display:flex;flex-direction:column;align-items:center;gap:10px}
-.mpconnectbtn{display:inline-flex;align-items:center;gap:8px;cursor:pointer;border-radius:9999px;background:#fff;color:var(--acc);font-family:inherit;font-size:14px;font-weight:600;padding:12px 22px;transition:transform .18s}
-.mpconnectbtn:disabled{opacity:.6;cursor:default}
-.mpconnectbtn:hover:not(:disabled){transform:scale(1.03)}
-.mpnote{text-align:center;color:rgba(255,255,255,.85);font-size:14px;margin:0;max-width:360px;line-height:1.5}
 
 /* ===================================================================
    Step 6 — split conversational login (design "Atlas Login C1 - Split")
@@ -1330,8 +1280,10 @@ body{display:block;overflow-x:hidden;overflow-y:visible;max-width:none;flex:none
 
 /* --- <Card> skins --------------------------------------------------
    The Widget Catalog draws every card two ways, Glass on light and Ink
-   on dark, plus the flat-accent music tile the app already ships as
-   .npcard. The base is .cardB; these are the two variants.          */
+   on dark, plus a flat-accent variant. The base is .cardB; these are
+   the three variants. `accent` no longer dresses the music tile — that
+   is `.cardB.mp2c` in surfaces/music.css, coloured from the artwork —
+   but it stays because the catalog names it.                        */
 .cardInk{background:var(--dark-card);color:var(--dkf)}
 .cardInk .mlblB,.cardInk .lbl0{color:rgba(249,247,244,.62)}
 .cardInk .metaB,.cardInk .mtx{color:rgba(249,247,244,.55)}

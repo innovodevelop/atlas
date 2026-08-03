@@ -1,16 +1,14 @@
 /**
  * The four supplementary dashboard cards from "Atlas Dashboard (Current)":
  * Air quality (real, OpenWeather air-pollution via get-weather), Now playing
- * (demo until a Spotify integration exists), Activity rings (demo until a
+ * (real — the Music Player v2 compact widget), Activity rings (demo until a
  * Health source exists), World clock (real, Intl timezones). Markup mirrors
  * the design file; CSS for all classes already ships in workshop.css.
  */
 import { memo, useEffect, useState } from 'react';
-import { Leaf, Flame, Globe, Play, Pause } from 'lucide-react';
+import { Leaf, Flame, Globe } from 'lucide-react';
 import { useWeather } from '@/hooks/useWeather';
-import { useMusicPlayer } from '@/hooks/useMusicPlayer';
-import { useAudioReactivity } from '@/hooks/useAudioReactivity';
-import { MusicSphere } from './MusicSphere';
+import { MusicPlayerCompact } from './music/MusicPlayerCompact';
 import { Card, Row } from './primitives';
 
 // ---------------------------------------------------------------------------
@@ -66,55 +64,19 @@ export const AtlasAirQualityCard = memo(() => {
 AtlasAirQualityCard.displayName = 'AtlasAirQualityCard';
 
 // ---------------------------------------------------------------------------
-// Now playing — the Atlas Sphere music player's compact tile (design Change 4).
-// Flat-orange card: a mini reactive sphere, live equalizer, animated progress
-// and play/pause. The whole tile opens the full-screen player; the play button
-// stops propagation so it doesn't also open it.
+// Now playing — the Music Player v2 compact widget (design §8).
+//
+// The tile used to be a flat `--acc` card with a CSS-keyframe equaliser, a
+// fixed white particle tone and a progress bar fed by the pull-only
+// `positionMs`. It is now the third presentation of the real player: the
+// artwork drives every colour, the equaliser is the librespot envelope, and
+// the progress hairline is interpolated from the engine's own anchor. All of
+// that lives in `music/MusicPlayerCompact.tsx`, shared with the full player
+// and the sleeve, so this file no longer owns any music behaviour.
 
-const EqBars = ({ playing }: { playing: boolean }) => (
-  <span className={`npeq${playing ? ' on' : ''}`} aria-hidden="true">
-    <span /><span /><span /><span /><span />
-  </span>
-);
-
-export const AtlasNowPlayingCard = memo(({ onOpen }: { onOpen?: () => void }) => {
-  const m = useMusicPlayer();
-  const isPlaying = m.nowPlaying?.isPlaying ?? false;
-  const reactivity = useAudioReactivity(m.levelRef, isPlaying);
-  const track = m.nowPlaying?.track ?? null;
-  const title = track?.title ?? (m.connected ? 'Nothing playing' : 'Atlas Music');
-  const artist = track?.artist ?? (m.connected ? '' : 'Tap to open the player');
-  const ratio = track?.durationMs ? Math.min(1, (m.nowPlaying?.positionMs ?? 0) / track.durationMs) : 0;
-  return (
-    <Card
-      size="s"
-      skin="accent"
-      delay={8}
-      className="npcard"
-      onOpen={onOpen}
-      /* Field animation as the widget background — ~80% of the tile, 60%
-         opacity so the track info stays legible on top. */
-      bleed={<div className="npfield"><MusicSphere form="field" reactivity={reactivity} className="npsphere" /></div>}
-    >
-      <div className="npcontent">
-        <div className="f1" style={{ minWidth: 0 }}>
-          <p className="nplbl">Now playing</p>
-          <p className="nptitle trunc">{title}</p>
-          <p className="npsub trunc">{artist}</p>
-        </div>
-        <EqBars playing={isPlaying} />
-        <button
-          className="npplay"
-          aria-label={isPlaying ? 'Pause' : 'Play'}
-          onClick={(e) => { e.stopPropagation(); if (isPlaying) m.pause(); else m.play(); }}
-        >
-          {isPlaying ? <Pause className="i16" /> : <Play className="i16" />}
-        </button>
-      </div>
-      <div className="npprog"><span style={{ width: `${ratio * 100}%` }} /></div>
-    </Card>
-  );
-});
+export const AtlasNowPlayingCard = memo(({ onOpen }: { onOpen?: () => void }) => (
+  <MusicPlayerCompact onOpen={onOpen} />
+));
 AtlasNowPlayingCard.displayName = 'AtlasNowPlayingCard';
 
 // ---------------------------------------------------------------------------

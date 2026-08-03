@@ -235,6 +235,32 @@ describe('atlasSphere — the five audited defects', () => {
     expect(S.mountedCount()).toBe(1);
   });
 
+  test('a canvas under an opaque full-screen overlay stops painting', async () => {
+    // `visible()` is a viewport test with no occlusion sense, so the dashboard
+    // header orb — 26 000 particles, on-screen by geometry — kept painting
+    // under the music player's opaque fixed sheet for as long as it was open.
+    const S = await load();
+    const under = fakeCanvas() as unknown as HTMLCanvasElement;
+    const over = fakeCanvas() as unknown as HTMLCanvasElement;
+    S.mount(under, { state: 'idle' });
+    S.mount(over, { state: 'listening' });
+
+    paintTick();
+    const both = clearRects;
+    expect(both).toBe(2);                 // baseline: two canvases, two clears
+
+    const overlay = { contains: (el: unknown) => el === over } as unknown as HTMLElement;
+    const release = S.occludeAllExcept(overlay);
+    clearRects = 0;
+    paintTick();
+    expect(clearRects).toBe(1);           // only the overlay's own canvas
+
+    release();
+    clearRects = 0;
+    paintTick();
+    expect(clearRects).toBe(2);           // and everything comes back
+  });
+
   test('the ten states are the documented contract', async () => {
     const S = await load();
     expect(S.STATES).toEqual([

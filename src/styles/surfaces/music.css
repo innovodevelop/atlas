@@ -1,0 +1,480 @@
+/* ===================================================================
+   Atlas Music Player v2 — the full-screen player.
+   Design handoff `design_handoff_atlas_suite_v2`, README §5 +
+   `Atlas Music Player v2.dc.html`. Values are the handoff's; the
+   deviations are commented where they occur.
+
+   Class prefix is `mp2` throughout. The old `.mp*` block in
+   workshop.css belonged to the v4.4 takeover this replaces and is
+   gone; nothing here reuses those names, so a stale stylesheet
+   cannot half-apply.
+
+   THE ONE PERFORMANCE RULE ON THIS SURFACE: both wash layers are
+   static. They carry `translateZ(0)` for a compositor layer and a
+   fixed transform, and nothing animates them. Animating a transform
+   on a 96px-blurred full-bleed image re-rasters the blur every frame
+   and drops the surface to ~15fps — the handoff still ships the
+   `@keyframes mpwash` fossil of the version that did, referenced by
+   nothing. The beat lives on `.mp2glow`'s OPACITY alone, which is an
+   unfiltered gradient and therefore compositor-only.
+   =================================================================== */
+
+/* opacity:1 base + `forwards` (never `both`) — the WKWebView rule
+   workshop.css documents for the old .mpfull. This element is
+   position:fixed at z-index 80 and portalled to <body>, so an
+   entrance animation that never runs pins it at opacity 0 and leaves
+   an invisible sheet swallowing every click on the page. */
+.mp2 {
+  position: fixed; inset: 0; z-index: 80; overflow: hidden;
+  background: #14151c; color: #fffdfa;
+  display: flex; flex-direction: column;
+  font-family: 'Geist', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  opacity: 1; animation: mp2in .4s cubic-bezier(.22, 1, .36, 1) forwards;
+}
+@keyframes mp2in { from { opacity: 0 } to { opacity: 1 } }
+@keyframes mp2rise { from { opacity: 0; transform: translateY(18px) } to { opacity: 1; transform: none } }
+@keyframes mp2spin { to { transform: rotate(360deg) } }
+
+/* WKWebView draws native control chrome unless appearance is reset. */
+.mp2 button, .mp2 input { -webkit-appearance: none; appearance: none; border: none }
+
+/* --- layer stack, back to front ------------------------------------ */
+
+.mp2layers { position: absolute; inset: 0; z-index: 0; overflow: hidden }
+
+.mp2wash1 {
+  position: absolute; left: -30%; top: -30%; width: 160%; height: 160%;
+  object-fit: cover; filter: blur(96px) saturate(1.75); opacity: .96;
+  transform: scale(1.08) translateZ(0);
+}
+/* Same image, same src — the 180° rotation is the only difference, and
+   it is what stops the two blurs reading as one. */
+.mp2wash2 {
+  position: absolute; left: -40%; top: -40%; width: 180%; height: 180%;
+  object-fit: cover; filter: blur(130px) saturate(1.5); opacity: .42;
+  transform: rotate(180deg) scale(1.06) translateZ(0);
+}
+/* Repainted from the palette on the first signature change; this is the
+   pre-palette state, not a fallback. */
+.mp2tint { position: absolute; inset: 0; background: rgba(12, 12, 18, .34) }
+/* Static and NOT palette-derived, despite README §5 listing it among the
+   artwork layers — the .dc.html gives it no ref and never repaints it. */
+.mp2vig {
+  position: absolute; inset: 0;
+  background: radial-gradient(96% 78% at 50% 44%, transparent 26%, rgba(6, 6, 10, .5));
+}
+/* The only animated layer on the surface. Unfiltered, no blend mode, no
+   transform — opacity only. */
+.mp2glow {
+  position: absolute; inset: 0; pointer-events: none; opacity: 0;
+  background: radial-gradient(52% 44% at 50% 46%,
+    rgba(255, 253, 250, .2), rgba(255, 253, 250, .05) 46%, transparent 72%);
+}
+.mp2hero { position: absolute; inset: 0; z-index: 1 }
+.mp2scrim {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 56%;
+  z-index: 2; pointer-events: none;
+  background: linear-gradient(to bottom, transparent, rgba(10, 11, 16, .86) 82%);
+}
+
+/* --- header --------------------------------------------------------- */
+
+.mp2head {
+  position: relative; z-index: 3; display: flex; align-items: center;
+  gap: 14px; padding: 34px 40px 0;
+  animation: mp2rise .9s cubic-bezier(.22, 1, .36, 1) both;
+}
+.mp2chip {
+  display: inline-flex; align-items: center; gap: 9px; height: 32px;
+  padding: 0 15px; border-radius: 9999px; background: rgba(255, 253, 250, .14);
+  backdrop-filter: blur(12px); font-size: 11.5px; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: rgba(255, 253, 250, .9); white-space: nowrap; flex-shrink: 0;
+}
+/* Spotify's brand green. A source mark, not a palette value — and
+   emphatically not --acc2, which belongs to the voice indicator alone. */
+.mp2chipdot { width: 7px; height: 7px; border-radius: 50%; background: #1ed760; flex-shrink: 0 }
+.mp2chipdot.off { background: rgba(255, 253, 250, .38) }
+.mp2status {
+  font-size: 11.5px; font-weight: 600; letter-spacing: .14em;
+  text-transform: uppercase; color: rgba(255, 253, 250, .62);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mp2headr { margin-left: auto; display: flex; align-items: center; gap: 16px; flex-shrink: 0 }
+.mp2formation {
+  font-size: 11.5px; font-weight: 600; letter-spacing: .14em;
+  text-transform: uppercase; color: rgba(255, 253, 250, .72);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.mp2switch {
+  display: flex; gap: 3px; padding: 3px; border-radius: 9999px;
+  background: rgba(255, 253, 250, .12); backdrop-filter: blur(12px);
+}
+.mp2switch button {
+  cursor: pointer; height: 26px; padding: 0 13px; border-radius: 9999px;
+  background: transparent; font: inherit; font-size: 10.5px; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: rgba(255, 253, 250, .72); transition: background .2s, color .2s;
+}
+.mp2switch button.on { background: rgba(255, 253, 250, .94); color: #14151c }
+/* The app needs a way back; the prototype had no shell around it. */
+.mp2close {
+  cursor: pointer; width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(255, 253, 250, .14); color: #fffdfa;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .18s;
+}
+.mp2close:hover { background: rgba(255, 253, 250, .26) }
+
+/* --- cover card ----------------------------------------------------- */
+
+.mp2coverwrap {
+  position: absolute; top: 96px; right: 40px; z-index: 4;
+  display: flex; justify-content: flex-end;
+  animation: mp2rise 1s .18s cubic-bezier(.22, 1, .36, 1) both;
+}
+.mp2cover { position: relative; padding: 0; cursor: pointer; display: block; width: 96px; height: 96px }
+.mp2cover:disabled { cursor: default }
+/* Near-invisible shadow: -32px spread means it reads as depth, not as a drop. */
+.mp2cover-sleeve {
+  border-radius: 22px; overflow: hidden; background: rgba(255, 253, 250, .1);
+  box-shadow: 0 16px 40px -32px rgba(0, 0, 0, .55);
+  transition: width .52s cubic-bezier(.22, 1, .36, 1),
+              height .52s cubic-bezier(.22, 1, .36, 1), border-radius .52s;
+}
+.mp2cover-vinyl {
+  background: transparent;
+  transition: width .55s cubic-bezier(.22, 1, .36, 1),
+              height .55s cubic-bezier(.22, 1, .36, 1);
+}
+.mp2coverimg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block }
+/* An inset highlight, not a border — the borderless system allows the
+   former as a material cue and forbids the latter as a separator. */
+.mp2coversheen {
+  position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .34);
+}
+.mp2discwrap {
+  position: absolute; top: 50%; left: 0; width: 88%; height: 88%; z-index: 0;
+  display: block; transform: translate(-13%, -50%);
+  transition: transform .58s cubic-bezier(.22, 1, .36, 1);
+}
+.mp2disc {
+  display: block; width: 100%; height: 100%; border-radius: 50%;
+  box-shadow: 0 14px 34px -28px rgba(0, 0, 0, .5);
+  background:
+    repeating-radial-gradient(circle at 50% 50%, rgba(255, 253, 250, .055) 0 1px, transparent 1px 5px),
+    radial-gradient(circle at 50% 50%, #efe7dc 0 5.5%, #141419 6% 15%, #22212a 15% 100%);
+}
+.mp2arttile {
+  position: relative; z-index: 1; display: block; width: 100%; height: 100%;
+  border-radius: 12px; overflow: hidden; background: rgba(255, 253, 250, .1);
+  box-shadow: 0 16px 40px -32px rgba(0, 0, 0, .55);
+  transition: border-radius .52s;
+}
+
+/* --- footer --------------------------------------------------------- */
+
+.mp2spacer { position: relative; z-index: 3; flex: 1; min-height: 0 }
+.mp2foot {
+  position: relative; z-index: 3; padding: 0 40px 40px;
+  display: flex; flex-direction: column; gap: 26px;
+  animation: mp2rise 1s .1s cubic-bezier(.22, 1, .36, 1) both;
+}
+.mp2metarow { display: flex; align-items: flex-end; gap: 24px }
+.mp2text { min-width: 0; flex: 1 }
+.mp2eyebrow {
+  margin: 0 0 10px; font-size: 11px; font-weight: 700; letter-spacing: .2em;
+  text-transform: uppercase; color: rgba(255, 253, 250, .66);
+}
+.mp2title {
+  margin: 0; font-family: 'Hanken Grotesk', 'Geist', sans-serif;
+  font-size: clamp(30px, 3.6vw, 50px); font-weight: 600;
+  letter-spacing: -.035em; line-height: 1; text-wrap: pretty;
+}
+.mp2sub { margin: 10px 0 0; font-size: 16px; color: rgba(255, 253, 250, .82) }
+.mp2sub em { font-style: normal; color: rgba(255, 253, 250, .62) }
+.mp2acts { display: flex; align-items: center; gap: 10px; flex-shrink: 0 }
+.mp2act {
+  width: 46px; height: 46px; cursor: pointer; border-radius: 50%;
+  background: rgba(255, 253, 250, .14); color: rgba(255, 253, 250, .9);
+  display: flex; align-items: center; justify-content: center;
+  transition: background .18s, color .18s, transform .18s;
+}
+.mp2act:hover:not(:disabled) { background: rgba(255, 253, 250, .24); transform: scale(1.06) }
+.mp2act:disabled { cursor: default; opacity: .4 }
+
+.mp2wave { width: 100%; height: 62px; display: block; cursor: default }
+.mp2wave.live { cursor: pointer }
+.mp2times {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 11.5px; font-variant-numeric: tabular-nums;
+  color: rgba(255, 253, 250, .8); font-family: ui-monospace, Menlo, monospace;
+  margin-top: 8px;
+}
+
+.mp2transport { display: flex; align-items: center; justify-content: center; gap: 24px }
+.mp2tbtn {
+  cursor: pointer; border-radius: 50%; background: transparent;
+  display: flex; align-items: center; justify-content: center;
+}
+.mp2tbtn:disabled { cursor: default; opacity: .36 }
+.mp2tsm {
+  width: 46px; height: 46px; color: rgba(255, 253, 250, .82);
+  transition: color .18s, background .18s;
+}
+.mp2tsm:hover:not(:disabled) { color: #fff; background: rgba(255, 253, 250, .16) }
+.mp2tmd {
+  width: 54px; height: 54px; color: #fffdfa;
+  transition: transform .18s, background .18s;
+}
+.mp2tmd:hover:not(:disabled) { background: rgba(255, 253, 250, .16); transform: scale(1.05) }
+/* `color` is repainted from the palette: hex(toward(mid, black, .62)). */
+.mp2tplay {
+  width: 84px; height: 84px; background: #fffdfa; color: #14151c;
+  box-shadow: 0 22px 50px -20px rgba(0, 0, 0, .7);
+  transition: transform .22s cubic-bezier(.22, 1, .36, 1);
+}
+.mp2tplay:hover:not(:disabled) { transform: scale(1.06) }
+.mp2tplay:disabled { opacity: .5 }
+
+/* Volume — a real control (music_volume → librespot's SoftMixer), so it
+   gets a real slider rather than the handoff's decorative button. */
+.mp2vol { position: relative; display: flex; align-items: center }
+.mp2volpop {
+  position: absolute; bottom: 58px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px; padding: 11px 15px;
+  border-radius: 9999px; background: rgba(20, 21, 28, .88);
+  backdrop-filter: blur(18px); box-shadow: 0 22px 50px -28px rgba(0, 0, 0, .9);
+}
+.mp2volrange {
+  width: 132px; height: 6px; border-radius: 9999px;
+  background: rgba(255, 253, 250, .24); cursor: pointer;
+}
+.mp2volrange::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; border-radius: 50%; background: #fffdfa; cursor: pointer;
+}
+.mp2volval {
+  font-size: 11px; font-variant-numeric: tabular-nums; width: 34px;
+  text-align: right; color: rgba(255, 253, 250, .7);
+  font-family: ui-monospace, Menlo, monospace;
+}
+
+/* --- degraded states ------------------------------------------------ */
+/* The shared <Empty> primitive is built for the paper scale; on a dark
+   immersive surface its `--surface` card would read as a hole. Restated
+   as a translucent fill — still a fill, never an outline. */
+.mp2gate { display: flex; justify-content: center }
+.mp2 .aempty.aempty-block { background: rgba(255, 253, 250, .07); backdrop-filter: blur(18px); max-width: 560px; width: 100% }
+.mp2 .aempty-block .aempty-ico { background: rgba(255, 253, 250, .12); color: #fffdfa }
+.mp2 .aempty .aempty-title { color: #fffdfa }
+.mp2 .aempty .aempty-body { color: rgba(255, 253, 250, .74) }
+.mp2 .aempty.aempty-inline { color: rgba(255, 253, 250, .66); justify-content: flex-start }
+.mp2 .abtn.abtn-primary { background: #fffdfa; color: #14151c }
+.mp2 .abtn.abtn-primary:hover:not(:disabled) { background: #fff; color: #14151c }
+.mp2note { margin: 0; text-align: center; font-size: 13px; line-height: 1.5; color: rgba(255, 253, 250, .7) }
+.mp2note.bad { color: #f0a79c }
+
+/* --- narrow windows -------------------------------------------------- */
+@media (max-width: 860px) {
+  .mp2head { padding: 24px 22px 0; gap: 10px }
+  .mp2status { display: none }
+  .mp2foot { padding: 0 22px 28px; gap: 20px }
+  .mp2coverwrap { right: 22px }
+  .mp2transport { gap: 14px }
+}
+@media (max-width: 640px) {
+  .mp2formation { display: none }
+  .mp2metarow { flex-direction: column; align-items: flex-start; gap: 16px }
+}
+
+/* ===================================================================
+   Sleeve variant — design handoff §7, "Secondary · sleeve player".
+
+   The same player laid out horizontally. `MusicPlayerFull` shows this
+   instead of the full layout on a window too short for it, so on this
+   surface `.mp2` is nothing but a dark sheet with the sleeve centred
+   in it — no wash stack, no vignette, no beat glow. The sleeve brings
+   its own single wash and its own scrim.
+   =================================================================== */
+
+.mp2short { align-items: center; justify-content: center; padding: 24px; overflow: auto }
+
+.mp2s {
+  position: relative; width: 100%; max-width: 880px;
+  border-radius: 36px; overflow: hidden;
+  background: #14151c; color: #fffdfa;
+  box-shadow: 0 40px 90px -50px rgba(30, 30, 36, .9);
+  font-family: 'Geist', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  /* `forwards`, never `both`, and an opacity:1 base — the rule at the top of
+     this file. On the short-window path this card IS the whole player, so an
+     entrance WKWebView declines to run would leave a dark empty sheet. */
+  opacity: 1; animation: mp2rise .9s cubic-bezier(.22, 1, .36, 1) forwards;
+}
+.mp2s button { -webkit-appearance: none; appearance: none; border: none }
+/* Static, like every wash on this surface. `blur(58px)` is the value
+   `paintChrome` settles on — the .dc.html markup's 70px is a
+   pre-palette state that lasts a frame, so we start where it lands. */
+.mp2swash {
+  position: absolute; left: -25%; top: -45%; width: 150%; height: 190%;
+  object-fit: cover; filter: blur(58px) saturate(1.7); opacity: .95;
+  transform: translateZ(0);
+}
+.mp2scv { position: absolute; inset: 0 }
+.mp2sscrim {
+  position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, rgba(10, 11, 16, .82), rgba(10, 11, 16, .12) 62%);
+}
+.mp2sclose {
+  position: absolute; top: 18px; right: 18px; z-index: 3;
+  width: 32px; height: 32px; cursor: pointer; border-radius: 50%;
+  background: rgba(255, 253, 250, .14); color: #fffdfa;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .18s;
+}
+.mp2sclose:hover { background: rgba(255, 253, 250, .26) }
+
+.mp2sbody { position: relative; z-index: 2; display: flex; align-items: center; gap: 30px; padding: 30px }
+.mp2sart {
+  position: relative; display: block; width: 196px; height: 196px; flex-shrink: 0;
+  border-radius: 28px; overflow: hidden; background: rgba(255, 253, 250, .1);
+  box-shadow: 0 34px 64px -28px rgba(0, 0, 0, .9);
+}
+.mp2sart img { width: 100%; height: 100%; object-fit: cover; display: block }
+.mp2stext { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px }
+.mp2seyebrow {
+  margin: 0 0 8px; font-size: 10.5px; font-weight: 700; letter-spacing: .2em;
+  text-transform: uppercase; color: rgba(255, 253, 250, .66);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mp2stitle {
+  margin: 0; font-family: 'Hanken Grotesk', 'Geist', sans-serif;
+  font-size: 32px; font-weight: 600; letter-spacing: -.03em; line-height: 1.04;
+  text-wrap: pretty;
+}
+.mp2sartist { margin: 7px 0 0; font-size: 14px; color: rgba(255, 253, 250, .8) }
+
+.mp2sprog {
+  display: flex; align-items: center; gap: 14px;
+  font-size: 11.5px; font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, Menlo, monospace;
+}
+.mp2sprog > span:first-child { color: rgba(255, 253, 250, .78) }
+.mp2sprog > span:last-child { color: rgba(255, 253, 250, .62) }
+.mp2sbar {
+  flex: 1; height: 6px; border-radius: 9999px;
+  background: rgba(255, 253, 250, .22); overflow: hidden; cursor: default;
+}
+.mp2sbar.live { cursor: pointer }
+.mp2sbar span { display: block; height: 100%; width: 0; background: #fffdfa; border-radius: 9999px }
+
+.mp2strans { display: flex; align-items: center; gap: 12px }
+.mp2stbtn {
+  width: 44px; height: 44px; cursor: pointer; border-radius: 50%;
+  background: rgba(255, 253, 250, .14); color: #fffdfa;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .18s;
+}
+.mp2stbtn:hover:not(:disabled) { background: rgba(255, 253, 250, .26) }
+.mp2stbtn:disabled { cursor: default; opacity: .36 }
+/* `color` is repainted from the palette: hex(toward(mid, black, .62)). */
+.mp2stplay {
+  width: 58px; height: 58px; background: #fffdfa; color: #14151c;
+  transition: transform .2s cubic-bezier(.22, 1, .36, 1);
+}
+.mp2stplay:hover:not(:disabled) { background: #fffdfa; transform: scale(1.06) }
+.mp2stplay:disabled { opacity: .5 }
+.mp2sformation {
+  margin-left: 6px; font-size: 11px; font-weight: 600; letter-spacing: .14em;
+  text-transform: uppercase; color: rgba(255, 253, 250, .62);
+}
+.mp2sblock { display: flex; align-items: center; gap: 14px; flex-wrap: wrap }
+.mp2sblock .mp2note { text-align: left }
+.mp2s .abtn.abtn-primary { background: #fffdfa; color: #14151c }
+.mp2s .abtn.abtn-primary:hover:not(:disabled) { background: #fff; color: #14151c }
+
+/* The sleeve is horizontal by design; below ~720px it has to stack or
+   the 196px artwork leaves the text column two words wide. */
+@media (max-width: 720px) {
+  .mp2sbody { flex-direction: column; align-items: flex-start; gap: 20px; padding: 22px }
+  .mp2sart { width: 128px; height: 128px; border-radius: 22px }
+  .mp2stitle { font-size: 26px }
+  .mp2stext { width: 100% }
+}
+
+/* ===================================================================
+   Compact widget — design handoff §8. The dashboard's Now-Playing tile.
+
+   Built on the shared <Card>, so the grid span, the entry stagger, the
+   hover lift and the keyboard affordance are the primitive's. Only the
+   skin is ours, and it is the one tile whose colour comes from the
+   record rather than from the paper scale.
+
+   Selectors are `.cardB.mp2c …` rather than `.mp2c …` on purpose: this
+   file is imported by a component and workshop.css globally, so their
+   relative order in the bundle is an implementation detail of the
+   import graph. Two classes beat `.cardInk` whichever way it resolves.
+   =================================================================== */
+
+.cardB.mp2c {
+  position: relative; background: #14151c; color: #fffdfa; padding: 0;
+  /* Opaque fill — the inherited backdrop blur would composite a layer
+     nothing can be seen through. */
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+  /* Radius stays var(--r-card) (26px), not the standalone widget's 30:
+     it sits in a grid with nine other tiles and matching them wins. */
+}
+.cardB.mp2c button { -webkit-appearance: none; appearance: none; border: none }
+.mp2cwash {
+  position: absolute; left: -30%; top: -90%; width: 160%; height: 280%;
+  object-fit: cover; filter: blur(44px) saturate(1.7); opacity: .95;
+  transform: translateZ(0);
+}
+/* The one presentation that dims the particle layer. */
+.mp2ccv { position: absolute; inset: 0; opacity: .85 }
+.mp2cscrim {
+  position: absolute; inset: 0;
+  background: linear-gradient(100deg, rgba(10, 11, 16, .8), rgba(10, 11, 16, .2));
+}
+.mp2cbody {
+  position: relative; z-index: 2; flex: 1; min-height: 0;
+  display: flex; align-items: center; gap: 14px; padding: 16px 18px 22px;
+}
+.mp2cart {
+  position: relative; display: block; width: 58px; height: 58px; flex-shrink: 0;
+  border-radius: 18px; overflow: hidden; background: rgba(255, 253, 250, .12);
+  box-shadow: 0 16px 30px -14px rgba(0, 0, 0, .8);
+}
+.mp2cart img { width: 100%; height: 100%; object-fit: cover; display: block }
+.mp2ctext { flex: 1; min-width: 0; display: flex; flex-direction: column }
+.mp2ceyebrow {
+  margin: 0 0 3px; font-size: 9.5px; font-weight: 700; letter-spacing: .16em;
+  text-transform: uppercase; color: rgba(255, 253, 250, .66);
+}
+.mp2ctitle {
+  font-family: 'Hanken Grotesk', 'Geist', sans-serif; font-size: 17px;
+  font-weight: 600; letter-spacing: -.02em; color: #fffdfa;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mp2csub {
+  margin: 2px 0 0; font-size: 12px; color: rgba(255, 253, 250, .8);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mp2ceq { width: 38px; height: 26px; flex-shrink: 0; display: block }
+.mp2cplay {
+  width: 48px; height: 48px; flex-shrink: 0; cursor: pointer; border-radius: 50%;
+  background: #fffdfa; color: #14151c;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .2s cubic-bezier(.22, 1, .36, 1);
+}
+.mp2cplay:hover:not(:disabled) { transform: scale(1.08) }
+.mp2cplay:disabled { cursor: default; opacity: .5 }
+.mp2cprog {
+  position: absolute; z-index: 2; left: 18px; right: 18px; bottom: 10px;
+  height: 3px; background: rgba(255, 253, 250, .26);
+  border-radius: 9999px; overflow: hidden;
+}
+.mp2cprog span { display: block; height: 100%; width: 0; background: #fffdfa; border-radius: 9999px }
