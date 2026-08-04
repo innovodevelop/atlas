@@ -370,7 +370,12 @@ const DESIGNED: DesignedWidget[] = [
   { id: 'countdown', name: 'Countdown', category: 'time', designShape: 'big', built: false, needs: 'A user-set target date. Nothing stores one.' },
 
   // --- weather
-  { id: 'forecast', name: 'Forecast', category: 'weather', designShape: 'bars', built: false, needs: 'A multi-day series. get-weather returns current conditions only.' },
+  // The data is ALREADY THERE. `datafetch.rs:127` groups the OpenWeather
+  // response into a real 7-day series and returns it as `daily` (:153), and
+  // `useWeather.ts:18` types it. An earlier draft of this file claimed
+  // get-weather returns current conditions only — checked, and it was wrong.
+  // What is missing is the `bars` renderer and a card, nothing upstream.
+  { id: 'forecast', name: 'Forecast', category: 'weather', designShape: 'bars', built: false, needs: 'Nothing upstream — get-weather already returns a 7-day `daily` series and useWeather types it. Needs the bars renderer and a card.' },
   { id: 'precipitation', name: 'Precipitation', category: 'weather', designShape: 'big', built: false, needs: 'Minute-level radar. OpenWeather’s current plan does not include it.' },
   { id: 'daylight', name: 'Daylight', category: 'weather', designShape: 'split', built: false, needs: 'Sunrise/sunset. Present in the get-weather payload but not surfaced.' },
 
@@ -400,7 +405,11 @@ const DESIGNED: DesignedWidget[] = [
 
   // --- comms
   { id: 'messages', name: 'Messages', category: 'comms', designShape: 'people', built: false, needs: 'A chat integration. Atlas reads mail only.' },
-  { id: 'drafts', name: 'Atlas drafts', category: 'comms', designShape: 'progress', built: false, needs: 'Draft counts exist in mail_alerts; no widget surfaces them.' },
+  // Not mail_alerts — that is 'bill' | 'deadline' | 'important' | 'document',
+  // with no draft type (useMailIntelligence.ts:34). A draft is a THREAD STATE
+  // ('drafting', mail.rs:502), not a counted collection, so there is no number
+  // to put on a progress card without first defining one.
+  { id: 'drafts', name: 'Atlas drafts', category: 'comms', designShape: 'progress', built: false, needs: 'A draft is a thread state (“drafting”), not a counted set — awaiting-approval has no count to show yet.' },
   { id: 'call', name: 'Call', category: 'comms', designShape: 'big', built: false, needs: 'Conferencing details on calendar events. The local calendar stores none.' },
 
   // --- health
