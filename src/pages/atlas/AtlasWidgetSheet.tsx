@@ -31,7 +31,7 @@
  * proposals belong in a roadmap, not in a specification.
  */
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Database, Info, Layers, Settings2, ShieldCheck, Sparkles, WifiOff,
 } from 'lucide-react';
@@ -173,9 +173,14 @@ const AtlasWidgetSheet = () => {
               </button>
             );
           })}
+          {/* The sheet documents what is BUILT, one widget at a time. The
+              official widget set — all 51 of them — is the catalog's job, and
+              saying so here keeps two surfaces from each reading as the
+              authoritative list of Atlas's widgets. */}
           <p className="wsh-rail-foot">
-            The ten cards the dashboard renders. The design file’s six proposed
-            widgets are not here — none of them exists in the app.
+            The ten cards the dashboard renders, in detail. The official widget
+            set is larger: see the <Link to="/widgets">widget catalog</Link>,
+            which lists all 51 and marks which are built.
           </p>
         </nav>
 

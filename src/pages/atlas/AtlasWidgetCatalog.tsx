@@ -5,25 +5,30 @@ import { Empty } from '@/components/atlas-ui/primitives';
 import { WidgetPreview } from '@/components/atlas-ui/widgetCatalog/WidgetPreview';
 import { useCatalogWidgets } from '@/components/atlas-ui/widgetCatalog/useCatalogWidgets';
 import {
-  CATEGORY_LABEL, SIZES, SIZE_LABEL, SKINS, STATES, WIDGETS,
-  type CatalogCategory, type CatalogSkin, type CatalogState,
+  APP_ONLY_COUNT, BUILDS, BUILT_COUNT, CATEGORY_LABEL, DESIGNED_COUNT,
+  OFFICIAL_COUNT, SIZES, SIZE_LABEL, SKINS, STATES, WIDGETS,
+  type CatalogBuild, type CatalogCategory, type CatalogSkin, type CatalogState,
 } from '@/components/atlas-ui/widgetCatalog/registry';
 import '@/styles/surfaces/widgetCatalog.css';
 
 /**
  * Atlas — Widget catalog (`/widgets`).
  *
- * The widget system, shown as itself: every widget the app actually ships, at
- * every size `<Card>` can express, in both drawings, in every state it can
- * reach. The design reference is `Atlas Widget Catalog.dc.html`.
+ * The widget system, shown as itself. `Atlas Widget Catalog.dc.html` is the
+ * AUTHORITATIVE definition of that system — 51 widgets across ten categories —
+ * so this surface lists all 51. Ten are built and read live data; 41 are
+ * designed and not built, and each says which.
  *
- * WHAT THIS IS NOT. The reference catalogs fifty widgets — flights, invoices,
- * packing lists, security, podcasts — with hand-written values for each. Forty
- * of those have no component and no data source here. Shipping them as preview
- * cards would put fifty fabricated widgets on screen in the same week T4 spent
- * deleting fabricated rows out of Atlas Core. So the catalog covers the ten
- * that exist, and every value in it is read live from the same hook the
- * dashboard card reads.
+ * The earlier cut listed only the ten shipped widgets. That avoided fabricating
+ * 41 widgets, but at the cost of a catalog that omitted 80% of the system it
+ * claimed to catalogue — so nothing in the app recorded what Atlas's widget set
+ * actually is. Reversed on the user's call, 2026-08-04.
+ *
+ * FABRICATION IS PREVENTED BY THE TYPE, NOT BY OMISSION. `WidgetSpec` is a
+ * discriminated union; a `built: false` entry has no value fields, so it cannot
+ * reach the populated renderer. The design file's hand-written preview values
+ * are deliberately not copied in — an unbuilt card shows its designed shape and
+ * the concrete reason it does not exist, and no numbers at all.
  *
  * WHAT IT ADDS over a static spec: `status`. Three of the ten widgets sit on
  * hooks that quietly substitute built-in sample data when the call fails
@@ -41,6 +46,7 @@ const AtlasWidgetCatalog = () => {
   const [skin, setSkin] = useState<CatalogSkin>('both');
   const [state, setState] = useState<CatalogState>('live');
   const [cat, setCat] = useState<CatalogCategory | 'all'>('all');
+  const [build, setBuild] = useState<CatalogBuild>('all');
 
   const data = useCatalogWidgets();
 
@@ -57,17 +63,24 @@ const AtlasWidgetCatalog = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, [back]);
 
-  // Only categories that contain a real widget get a chip. An empty "Travel"
-  // filter would be an invitation to fill it.
+  // Every catalog category gets a chip now, because every category is real —
+  // they come from the official set, not from what happens to be built. The
+  // count reflects the current Built/Designed filter so a chip never promises
+  // more than the grid will show.
+  const pool = useMemo(
+    () => (build === 'all' ? WIDGETS : WIDGETS.filter((w) => (build === 'built') === w.built)),
+    [build],
+  );
+
   const categories = useMemo(() => {
     const counts = new Map<CatalogCategory, number>();
-    for (const w of WIDGETS) counts.set(w.category, (counts.get(w.category) ?? 0) + 1);
+    for (const w of pool) counts.set(w.category, (counts.get(w.category) ?? 0) + 1);
     return [...counts.entries()].map(([id, n]) => ({ id, label: CATEGORY_LABEL[id], n }));
-  }, []);
+  }, [pool]);
 
   const visible = useMemo(
-    () => (cat === 'all' ? WIDGETS : WIDGETS.filter((w) => w.category === cat)),
-    [cat],
+    () => (cat === 'all' ? pool : pool.filter((w) => w.category === cat)),
+    [cat, pool],
   );
 
   const skins = useMemo<CardSkin[]>(
@@ -100,9 +113,7 @@ const AtlasWidgetCatalog = () => {
             The widget system, <span className="accw">size by size, state by state.</span>
           </h1>
           <p className="gsubB">
-            {WIDGETS.length} widgets ship on the dashboard. This is every one of them, at every
-            size the card primitive can express, in both drawings — bound to the same hooks the
-            dashboard reads, so no number here is invented.
+            {`The official catalog defines ${OFFICIAL_COUNT} widgets. ${BUILT_COUNT - APP_ONLY_COUNT} of them ship today, at every size the card primitive can express, in both drawings — bound to the same hooks the dashboard reads, so no number here is invented. The other ${DESIGNED_COUNT} are designed and not built: they show their shape and what they are waiting on, and no values at all. Atlas also ships ${APP_ONLY_COUNT} widget the catalog does not list, so there are ${WIDGETS.length} cards here in total.`}
           </p>
           <p className="wcat-esc">
             Click the headline or press <span className="wcat-kbd">Esc</span> to go back.
@@ -130,6 +141,24 @@ const AtlasWidgetCatalog = () => {
               >
                 {z.label}
                 <span className="wcat-dim tnum">{z.dim}</span>
+              </button>
+            ))}
+          </div>
+
+          <span className="wcat-glabel">Set</span>
+          <div className="wcat-chips">
+            {BUILDS.map((b) => (
+              <button
+                key={b.id}
+                type="button"
+                className={`wcat-chip${build === b.id ? ' on' : ''}`}
+                aria-pressed={build === b.id}
+                onClick={() => { setBuild(b.id); setCat('all'); }}
+              >
+                {b.label}
+                <span className="wcat-dim tnum">
+                  {b.id === 'all' ? WIDGETS.length : b.id === 'built' ? BUILT_COUNT : DESIGNED_COUNT}
+                </span>
               </button>
             ))}
           </div>
@@ -172,7 +201,7 @@ const AtlasWidgetCatalog = () => {
               aria-pressed={cat === 'all'}
               onClick={() => setCat('all')}
             >
-              All<span className="wcat-dim tnum">{WIDGETS.length}</span>
+              All<span className="wcat-dim tnum">{pool.length}</span>
             </button>
             {categories.map((c) => (
               <button
@@ -195,6 +224,8 @@ const AtlasWidgetCatalog = () => {
           implements four; Hero is left out rather than aliased onto XL, because per-widget spans
           need a registry the dashboard does not have.
           {state === 'live' && ' “Live” is the real state of each source right now — force the others to review their drawings.'}
+          {' '}State applies to the {BUILT_COUNT} built widgets only: a designed widget has no
+          source to be live, empty or missing.
         </p>
       </div>
 
@@ -217,8 +248,14 @@ const AtlasWidgetCatalog = () => {
           <Empty
             size="section"
             title="Nothing in this category"
-            body="No shipped widget carries this label. The filter is honest — the category is simply empty."
-            action={{ label: 'Show all widgets', onClick: () => setCat('all') }}
+            body={
+              build === 'built'
+                ? 'No widget in this category is built yet — switch the set to Designed to see what the catalog specifies for it.'
+                : build === 'designed'
+                  ? 'Every widget in this category is already built.'
+                  : 'No widget carries this label.'
+            }
+            action={{ label: 'Show all widgets', onClick: () => { setCat('all'); setBuild('all'); } }}
           />
         </div>
       )}

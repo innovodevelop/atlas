@@ -2,8 +2,8 @@ import { memo } from 'react';
 import type { CardSize, CardSkin } from '@/components/atlas-ui/primitives';
 import { Card, Empty, Row } from '@/components/atlas-ui/primitives';
 import {
-  SIZE_LABEL, isTall,
-  type CatalogState, type WidgetSpec,
+  SHAPE_LABEL, SIZE_LABEL, isBuilt, isTall,
+  type BuiltWidget, type CatalogState, type DesignedWidget, type WidgetSpec,
 } from './registry';
 import type { CatalogStatus, WidgetData } from './useCatalogWidgets';
 
@@ -48,7 +48,7 @@ const STATUS_TONE: Record<Rendered, 'ok' | 'warn' | 'idle'> = {
 /** Placeholder silhouette for an empty tall cell — a drawing, never a value. */
 const GHOST = [34, 58, 22, 72, 44];
 
-function resolve(state: CatalogState, spec: WidgetSpec, data: WidgetData): Rendered {
+function resolve(state: CatalogState, spec: BuiltWidget, data: WidgetData): Rendered {
   if (state === 'empty') return 'empty';
   if (state === 'nosource') return spec.noSource ? 'nosource' : 'immutable';
   return data.status;
@@ -65,6 +65,14 @@ interface WidgetPreviewProps {
 }
 
 export const WidgetPreview = memo(({ spec, data, size, skin, state, delay }: WidgetPreviewProps) => {
+  // The union splits here, and this is the whole safety argument for the
+  // catalog listing widgets that do not exist: a `built: false` spec carries no
+  // value fields at all, so it cannot reach `PopulatedFace` — not by accident,
+  // not by a later edit. There is nothing to render as if it were data.
+  if (!isBuilt(spec)) {
+    return <DesignedPreview spec={spec} size={size} skin={skin} delay={delay} />;
+  }
+
   const rendered = resolve(state, spec, data);
   const tall = isTall(size);
 
@@ -118,6 +126,65 @@ export const WidgetPreview = memo(({ spec, data, size, skin, state, delay }: Wid
   );
 });
 WidgetPreview.displayName = 'WidgetPreview';
+
+// ---------------------------------------------------------------------------
+
+/**
+ * A widget the official catalog defines and Atlas does not implement.
+ *
+ * It is the app's real card chrome — same `<Card>`, same header, same skin — so
+ * it sits honestly beside the built ones at the same size. What it never has is
+ * a face: no figure, no rows, no bar. The design file ships hand-written values
+ * for all 51 widgets (`'24 min'`, `'TP1338'`, `'8/14'`); copying those in would
+ * put 41 fabricated widgets on screen in the same app that spent T4 deleting
+ * fabricated rows out of Atlas Core.
+ *
+ * So the card shows what is TRUE about an unbuilt widget: the shape the design
+ * draws it as, and the concrete reason it does not exist yet.
+ */
+function DesignedPreview({
+  spec, size, skin, delay,
+}: { spec: DesignedWidget; size: CardSize; skin: CardSkin; delay: number }) {
+  const tall = isTall(size);
+
+  return (
+    <Card
+      size={size}
+      skin={skin}
+      delay={delay}
+      className={`wcat-cell wcat-${size} wcat-designed`}
+      role="group"
+      aria-label={`${spec.name}, ${SIZE_LABEL[size]}, designed, not built`}
+    >
+      <Card.Header
+        label={spec.name}
+        action={
+          <span className="wcat-status wcat-idle" title="Defined by the catalog; not implemented">
+            <span className="wcat-dot" aria-hidden />
+            Designed
+          </span>
+        }
+      />
+      <Card.Body className="wcat-body">
+        <div className="wcat-fill">
+          <Empty
+            size="inline"
+            status="stale"
+            title="Not built yet."
+            body={tall ? spec.needs : undefined}
+          />
+        </div>
+
+        {tall && (
+          <div className="wcat-foot">
+            <span className="wcat-foota trunc">{SHAPE_LABEL[spec.designShape]}</span>
+            <span className="wcat-footb">No source</span>
+          </div>
+        )}
+      </Card.Body>
+    </Card>
+  );
+}
 
 // ---------------------------------------------------------------------------
 
@@ -179,7 +246,7 @@ function PopulatedFace({
  */
 function BlankFace({
   spec, data, rendered, tall,
-}: { spec: WidgetSpec; data: WidgetData; rendered: Rendered; tall: boolean }) {
+}: { spec: BuiltWidget; data: WidgetData; rendered: Rendered; tall: boolean }) {
   // `live` reaches here only when the source answered with nothing, which is
   // the plain empty state. `fallback` reaches here when the substituted sample
   // has no field for this widget — that is an absent source, not an empty one.

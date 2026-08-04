@@ -136,6 +136,18 @@
 .wcat-cell { min-width: 0 }
 .wcat-cell .mlblB { font-size: 12.5px; color: var(--ink) }
 
+/* A designed-not-built widget. It keeps the real card chrome — same size, same
+   skin — because it IS the same card, just without an implementation. It reads
+   quieter than a built one so the grid separates at a glance without a border:
+   the whole surface is borderless, so the signal is fill and ink, never a ring.
+   Deliberately NOT dashed or outlined for the same reason. */
+.wcat-designed { opacity: .72 }
+.wcat-designed .mlblB { color: var(--ink2) }
+.wcat-designed:hover, .wcat-designed:focus-within { opacity: 1 }
+@media (prefers-reduced-motion: no-preference) {
+  .wcat-designed { transition: opacity .18s ease }
+}
+
 /* 126px is not much: the one-row sizes get the tighter of the design's two
    padding steps, the two-row sizes the looser one. */
 .wcat-s .chB, .wcat-m .chB { padding: 14px 18px 0 }
