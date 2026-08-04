@@ -151,14 +151,33 @@
   }
 
   .dark {
-    /* Same as root - Atlas is a dark-first design */
+    /* UNREACHABLE TODAY, AND THE COMMENT THAT WAS HERE WAS FALSE.
+       It read "Same as root - Atlas is a dark-first design". Neither half is
+       true: Atlas is warm paper (`:root` above), and these values are not the
+       root values — they are the old pre-paper palette.
+
+       Nothing applies this class. `tailwind.config.ts` sets
+       `darkMode: ["class"]`, `index.html` ships `<html lang="en">` with no
+       `dark`, and no code adds one at runtime (verified repo-wide). So this
+       block is inert.
+
+       It is kept rather than deleted as the starting point for a future dark
+       theme, but note it is NOT a drop-in: the surfaces here are dark, while
+       every workshop.css token it would sit beside is paper.
+
+       `--primary` / `--ring` were `243 75% 58%` — a violet, not Atlas Blue.
+       That is the same failure `:root` had (a comment asserting one colour
+       over a value that is another), so it would have quietly reverted the
+       orange->blue fix the moment dark mode was switched on. Now pinned to
+       #3461f2 like root, because "one accent" is a product rule, not a
+       per-theme choice. */
     --background: 240 28% 7%;
     --foreground: 240 30% 96%;
     --card: 240 33% 12%;
     --card-foreground: 240 30% 96%;
     --popover: 240 33% 11%;
     --popover-foreground: 240 30% 96%;
-    --primary: 243 75% 58%;
+    --primary: 227 88% 58%;        /* #3461f2 — pinned to root, see above */
     --primary-foreground: 0 0% 100%;
     --secondary: 258 60% 45%;
     --secondary-foreground: 240 30% 96%;
@@ -170,7 +189,7 @@
     --destructive-foreground: 240 40% 98%;
     --border: 243 30% 22%;
     --input: 240 33% 14%;
-    --ring: 243 75% 62%;
+    --ring: 227 88% 58%;           /* #3461f2 — pinned to root, see above */
     --sidebar-background: 230 25% 8%;
     --sidebar-foreground: 210 40% 98%;
     --sidebar-primary: 195 100% 50%;

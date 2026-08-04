@@ -4,7 +4,7 @@
   "name": "Atlas premium polish (5) / design_handoff_atlas_suite_v2",
   "sha256": "d03a0610e8ff1b603ba3d072fe47ab6b8b71147054d221941488db41d1d1ca75",
   "syncedAt": "2026-08-03T20:06:00+02:00",
-  "note": "Suite v2: borderless system-wide (fill+space, #eef2fe wash), sphere v3 morph/field merged into src/lib/atlasSphere.ts (three.js RETIRED), 9 new surfaces (Onboarding/WidgetCatalog/WidgetSheet/AnswerViews/ModelLab + mock-labelled SmartHome/Health/Money/Browser), T4 admin absorb+delete. Audit: docs/design-sync/2026-08-03-audit-atlas-suite-v2.md. OUTSTANDING vs bundle: Music Player v2 (old player still live), Permission Lab dropped by user decision.",
+  "note": "Suite v2: borderless system-wide (fill+space, #eef2fe wash), sphere v3 morph/field merged into src/lib/atlasSphere.ts (three.js RETIRED), 9 new surfaces (Onboarding/WidgetCatalog/WidgetSheet/AnswerViews/ModelLab + mock-labelled SmartHome/Health/Money/Browser), T4 admin absorb+delete, Music Player v2 (full/sleeve/compact on the shared renderer, MusicSphere.tsx deleted). Audit: docs/design-sync/2026-08-03-audit-atlas-suite-v2.md. Bundle fully implemented; Permission Lab dropped by user decision. NOT runtime-verified: the beat-driven morph needs `music:level`, which only fires under librespot in a packaged build.",
   "files": [
     "README.md",
     "PROMPT.md",
