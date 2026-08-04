@@ -289,7 +289,13 @@ const BUILT: BuiltWidget[] = [
     built: true,
     shape: 'progress',
     ships: 's',
-    shipsSkin: 'accent',
+    // `ink`, not `accent`. Music v2 (33ca831) rebuilt this card as
+    // `MusicPlayerCompact`, which sets `skin="ink"`; this registry predates that
+    // and still claimed `accent`. Nothing rendered the field, so the catalog
+    // carried a false fact about a shipped widget for as long as nobody looked.
+    // The footer prints it now — see WidgetPreview — so the next drift is
+    // visible instead of silent. `accent` is consequently used by nothing.
+    shipsSkin: 'ink',
     binding: 'useMusicPlayer · music_status',
     sourceKind: 'remote',
     empty: {

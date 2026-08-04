@@ -118,7 +118,12 @@ export const WidgetPreview = memo(({ spec, data, size, skin, state, delay }: Wid
         {tall && (
           <div className="wcat-foot">
             <span className="wcat-foota trunc">{spec.binding}</span>
-            <span className="wcat-footb">Ships at {SIZE_LABEL[spec.ships]}</span>
+            {/* Size AND skin. `shipsSkin` was recorded but never rendered, so
+                it drifted unnoticed when Music v2 moved Now playing from accent
+                to ink. A fact nothing displays is a fact nothing checks. */}
+            <span className="wcat-footb">
+              Ships at {SIZE_LABEL[spec.ships]} · {spec.shipsSkin}
+            </span>
           </div>
         )}
       </Card.Body>
