@@ -92,13 +92,13 @@ Exposed in a transcript. Still valid. Security item, user-only.
 
 | Item | State | Notes |
 |---|---|---|
-| **three.js vs canvas sphere** | Decision not taken | Both renderers still ship (~1 MB of three.js). The single largest un-taken decision. `docs/design-sync/2026-07-26-audit-sphere-mail-header.md` P0-1 |
+| ~~**three.js vs canvas sphere**~~ | **RESOLVED** (suite v2, `aaced86`) | Canvas won. All four renderers collapsed onto `src/lib/atlasSphere.ts`; `three`, `@types/three` and the three `@react-three/*` packages are out of `package.json`, and `MusicSphere.tsx` — the last fork — went in `33ca831` |
 | **Mail Stage 6e** — Gmail/Outlook/IMAP connectors | Not started | The last mail stage. `src/integrations/local/localClient.ts:424` stub is correct until then |
-| **Mail 6b–6d runtime verification** | Built, never run | No `mail_*` Tauri command has executed once |
+| **Mail 6b–6d runtime verification** | Built, never run — **now buildable** | No `mail_*` Tauri command has executed once. A packaged 0.2.0 with the suite-v2 UI is installed at `/Applications/Atlas.app` (2026-08-04), so this is finally testable; it has not been tested |
 | **Mail sending** | Blocked | Needs Workers Paid; forwarding destination unverified |
-| **Atlas Core: Memory tab** | Specified, never built | Plan called for 8 tabs; `AtlasCoreScreen.tsx` has 7 |
-| **Atlas Core: fabricated data** | Violates own rule | `AtlasCoreScreen.tsx:88-107` hardcodes results, queue and error log; the Agent tab badge is a static `3`. The design plan's rule is "honest UI, not fake data" |
-| **Atlas Teach** | Orphaned | `src/pages/AtlasTeach.tsx` (858 lines) is routed at `/atlas-teach` but linked from nowhere, and is pure Tailwind — it does not match the design system |
+| ~~**Atlas Core: Memory tab**~~ | **DONE** (`28abe9f`) | 8th tab, on `useAtlasMemory` lifted out of the legacy tree. Read-only by design — the destructive controls stay in Settings |
+| ~~**Atlas Core: fabricated data**~~ | **DONE** (`28abe9f`) | All four invented panels replaced with real hooks + `<Empty>`; the static `badge: 3` and the two fake trends are gone. The throughput panel now shows the one real figure and says plainly that ingestion rate, pipeline count and validation pass rate are not measured |
+| **Atlas Teach** | Half-fixed | No longer orphaned — `AccountMenu.tsx:81` links it (suite v2 T4). Still 858 lines of pure Tailwind that does not match the design system |
 | **No manual "add a memory"** | Gap | The *only* way a memory is created is the model choosing to call `memory_store`. There is also no correction/feedback mechanism |
 | **Portfolio hero** | Blocked | No holdings data source until Mastercard Open Finance lands |
 | **Home floating memory cards** | Not built | Low priority |
