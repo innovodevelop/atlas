@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<style>
+button,input,textarea,select{border:none}@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Hanken+Grotesk:wght@500;600;700&display=swap');
+html,body{margin:0;padding:0;background:#f9f7f4}
+a{color:#3461f2;text-decoration:none}a:hover{color:#5b7cff}
+*{box-sizing:border-box}
+@keyframes sph-rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+</style>
+<script src="https://unpkg.com/lucide@0.462.0/dist/umd/lucide.min.js"></script>
+<script src="atlas-sphere.js"></script>
+<script src="atlas-transition.js"></script>
+</helmet>
+<div ref="{{ rootRef }}" style="position:relative;min-height:100vh;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased">
+<div style="position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none">
+<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(214,224,255,.55),rgba(249,247,244,0) 46%)"></div>
+<div style="position:absolute;top:-260px;right:-160px;width:780px;height:780px;border-radius:50%;filter:blur(64px);background:radial-gradient(closest-side,rgba(255,166,77,.3),transparent 74%)"></div>
+<div style="position:absolute;top:-180px;left:-200px;width:720px;height:560px;border-radius:50%;filter:blur(64px);background:radial-gradient(closest-side,rgba(122,140,255,.22),transparent 74%)"></div>
+<div style="position:absolute;inset:0;opacity:.4;mix-blend-mode:multiply;background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E&quot;)"></div>
+</div>
+
+<section style="position:relative;z-index:10;display:flex;align-items:center;gap:30px;max-width:1680px;margin:0 auto;padding:34px 28px 14px;animation:sph-rise .8s cubic-bezier(.22,1,.36,1) both">
+<div style="width:224px;height:224px;flex-shrink:0"><canvas data-state="{{ heroState }}" data-size="hero" ref="{{ cvRef }}" style="width:224px;height:224px;display:block"></canvas></div>
+<div>
+<h1 style="margin:0;font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.03em;font-size:clamp(32px,4.2vw,58px);font-weight:500;line-height:1">The sphere, <span style="color:#3461f2">every state.</span></h1>
+<p style="margin:14px 0 0;font-size:16px;line-height:1.5;max-width:600px;color:#6d6a67">One particle system, ten behaviours. Click any card to drive the header sphere and the editor stage, then read the motion recipe underneath it.</p>
+</div>
+<div style="margin-left:auto;text-align:right">
+<div style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.03em;font-size:50px;font-weight:500;line-height:1;font-variant-numeric:tabular-nums">{{ stateCount }}</div>
+<div style="margin-top:6px;font-size:13px;color:#6d6a67">states · now showing {{ heroLabel }}</div>
+</div>
+</section>
+
+<div style="position:relative;z-index:10;display:flex;align-items:center;gap:14px;max-width:1680px;margin:8px 28px 0;padding:10px 20px;border-radius:9999px;background:rgba(255,253,250,.5);backdrop-filter:blur(14px) saturate(1.08);box-shadow:inset 0 0 0 1px rgba(255,253,250,.7),0 12px 32px -30px rgba(30,30,36,.5)">
+<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+<sc-for list="{{ chips }}" as="c" hint-placeholder-count="10">
+<button data-state="{{ c.id }}" onClick="{{ pickState }}" style="border:none;display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:9999px;cursor:pointer;font-size:13px;font-weight:500;letter-spacing:-.01em;background:{{ c.bg }};color:{{ c.fg }}" style-hover="background:#edebe7"><span style="width:7px;height:7px;border-radius:50%;background:{{ c.dot }}"></span>{{ c.label }}</button>
+</sc-for>
+</div>
+<div style="margin-left:auto;display:flex;align-items:center;gap:10px">
+<button onClick="{{ toggleGrid }}" style="border:none;display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 14px;border-radius:9999px;background:rgba(255,253,250,.9);color:#1e1e24;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#edebe7"><i data-lucide="{{ gridIcon }}" style="width:15px;height:15px"></i>{{ gridLabel }}</button>
+<button onClick="{{ toggleDark }}" style="display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 14px;border-radius:9999px;border:0;cursor:pointer;background:#1e1e24;color:#f9f7f4;font-size:13px;font-weight:500" style-hover="background:#33312f"><i data-lucide="{{ darkIcon }}" style="width:15px;height:15px"></i>{{ darkLabel }}</button>
+</div>
+</div>
+
+<section data-screen-label="Editor" style="position:relative;z-index:10;display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:26px;align-items:center;max-width:1680px;margin:20px auto 0;padding:24px 28px;border-radius:30px;background:{{ edBg }};box-shadow:inset 0 0 0 1px {{ edBd }},0 24px 52px -46px rgba(30,30,36,.6)">
+<div style="display:flex;align-items:center;justify-content:center;height:420px;border-radius:24px;background:{{ edStage }}">
+<canvas data-state="{{ heroState }}" data-size="edit" ref="{{ cvRef }}" style="width:400px;height:400px;display:block"></canvas>
+</div>
+<div>
+<header style="display:flex;align-items:baseline;gap:12px;margin-bottom:4px">
+<h2 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:24px;font-weight:600;letter-spacing:-.03em;color:{{ edFg }}">Sphere editor</h2>
+<span style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:{{ edMut }}">editing {{ heroLabel }}</span>
+<button onClick="{{ resetEd }}" style="border:none;margin-left:auto;display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 12px;border-radius:9999px;background:transparent;color:{{ edFg }};font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:#edebe7"><i data-lucide="rotate-ccw" style="width:13px;height:13px"></i>Reset</button>
+</header>
+<sc-for list="{{ sliders }}" as="s" hint-placeholder-count="3">
+<div style="display:flex;align-items:center;gap:16px;padding:13px 0">
+<div style="width:180px;flex-shrink:0">
+<p style="margin:0;font-size:13.5px;font-weight:500;letter-spacing:-.01em;color:{{ s.fg }}">{{ s.label }}</p>
+<p style="margin:3px 0 0;font-size:11.5px;line-height:1.4;color:{{ s.mut }}">{{ s.hint }}</p>
+</div>
+<input type="range" min="{{ s.min }}" max="{{ s.max }}" step="{{ s.step }}" ref="{{ slRef }}" data-key="{{ s.key }}" data-init="{{ s.value }}" onInput="{{ onSlide }}" onChange="{{ onSlide }}" style="border:none;flex:1;min-width:0;accent-color:#3461f2;cursor:pointer"/>
+<span style="width:78px;text-align:right;font-size:13px;font-variant-numeric:tabular-nums;color:{{ s.fg }}">{{ s.display }}</span>
+</div>
+</sc-for>
+<div style="display:flex;align-items:center;gap:16px;padding:14px 0 2px">
+<div style="width:180px;flex-shrink:0">
+<p style="margin:0;font-size:13.5px;font-weight:500;letter-spacing:-.01em;color:{{ edFg }}">Colour softness</p>
+<p style="margin:3px 0 0;font-size:11.5px;line-height:1.4;color:{{ edMut }}">Flattens the three shades toward paper</p>
+</div>
+<div style="display:flex;align-items:center;gap:8px">
+<button data-dir="-1" onClick="{{ bumpSoft }}" style="border:none;width:34px;height:34px;border-radius:9999px;background:transparent;color:{{ edFg }};font-size:17px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="background:#edebe7"><i data-lucide="minus" style="width:15px;height:15px"></i></button>
+<div style="display:flex;gap:4px;align-items:center">
+<sc-for list="{{ softPips }}" as="p" hint-placeholder-count="10">
+<span style="width:9px;height:22px;border-radius:4px;background:{{ p.bg }}"></span>
+</sc-for>
+</div>
+<button data-dir="1" onClick="{{ bumpSoft }}" style="border:none;width:34px;height:34px;border-radius:9999px;background:transparent;color:{{ edFg }};font-size:17px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="background:#edebe7"><i data-lucide="plus" style="width:15px;height:15px"></i></button>
+</div>
+<span style="margin-left:auto;font-size:13px;font-variant-numeric:tabular-nums;color:{{ edFg }}">{{ softLabel }}</span>
+</div>
+<div style="display:flex;align-items:center;gap:9px;margin-top:16px;padding-top:15px">
+<input placeholder="Name this look" ref="{{ nameRef }}" style="border:none;flex:1;min-width:0;height:34px;padding:0 14px;border-radius:9999px;background:transparent;outline:0;font-size:13px;color:{{ edFg }}"/>
+<button onClick="{{ savePreset }}" style="display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 16px;border-radius:9999px;border:0;cursor:pointer;background:#3461f2;color:#fff;font-size:13px;font-weight:500" style-hover="background:#5b7cff"><i data-lucide="bookmark" style="width:14px;height:14px"></i>Save preset</button>
+<span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:{{ edMut }}"><i data-lucide="check" style="width:12px;height:12px"></i>{{ savedNote }}</span>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:11px">
+<sc-for list="{{ presetList }}" as="p" hint-placeholder-count="0">
+<span data-name="{{ p.name }}" onClick="{{ loadPreset }}" title="{{ p.meta }}" style="display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 6px 0 13px;border-radius:9999px;cursor:pointer;font-size:12.5px;font-weight:500;color:{{ edFg }}" style-hover="">{{ p.name }}<button data-name="{{ p.name }}" onClick="{{ delPreset }}" title="Delete" style="width:20px;height:20px;border-radius:50%;border:0;background:transparent;color:{{ edMut }};cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="color:#d0453a"><i data-lucide="x" style="width:12px;height:12px"></i></button></span>
+</sc-for>
+</div>
+<p style="margin:14px 0 0;font-size:12px;line-height:1.5;color:{{ edMut }}">Cards render at 30% of this count to keep the page smooth — the editor stage shows the real value. Settings and presets persist in this browser.</p>
+</div>
+</section>
+
+<main style="position:relative;z-index:10;display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:16px;max-width:1680px;margin:0 auto;padding:20px 28px 128px">
+<sc-for list="{{ cards }}" as="s" hint-placeholder-count="10">
+<article data-screen-label="{{ s.label }}" data-state="{{ s.id }}" onClick="{{ pickState }}" style="display:flex;flex-direction:column;padding:20px;border-radius:26px;cursor:pointer;background:{{ s.cardBg }};box-shadow:inset 0 0 0 1px {{ s.cardBd }},0 20px 44px -40px rgba(30,30,36,.6)">
+<header style="display:flex;align-items:baseline;gap:10px">
+<span style="width:8px;height:8px;border-radius:50%;background:{{ s.dot }};transform:translateY(-2px)"></span>
+<h2 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:18px;font-weight:600;letter-spacing:-.025em;color:{{ s.tFg }}">{{ s.label }}</h2>
+<span style="margin-left:auto;font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:{{ s.mFg }}">{{ s.trigger }}</span>
+</header>
+<div style="position:relative;margin:6px 0 0;display:flex;align-items:center;justify-content:center;height:236px">
+<canvas data-state="{{ s.id }}" data-size="card" ref="{{ cvRef }}" style="width:236px;height:236px;display:block"></canvas>
+</div>
+<p style="margin:2px 0 0;font-size:13px;line-height:1.55;color:{{ s.bFg }};text-wrap:pretty">{{ s.desc }}</p>
+<p style="margin:10px 0 0;font-size:11.5px;line-height:1.5;font-variant-numeric:tabular-nums;color:{{ s.mFg }}">{{ s.recipe }}</p>
+</article>
+</sc-for>
+</main>
+
+<nav style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:92;display:flex;align-items:center;gap:3px;padding:5px;border-radius:9999px;background:#22222b;box-shadow:inset 0 0 0 1px rgba(247,245,242,.16),0 20px 46px -18px rgba(0,0,0,.6)">
+<a href="Atlas Dashboard (Current).dc.html" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 11px;border-radius:9999px;color:rgba(249,247,244,.8);font-size:13px;font-weight:500;text-decoration:none" style-hover="color:#fff;background:rgba(249,247,244,.12)"><i data-lucide="layout-grid" style="width:16px;height:16px"></i>Dashboard</a>
+<a href="Atlas Mail.dc.html" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 11px;border-radius:9999px;color:rgba(249,247,244,.8);font-size:13px;font-weight:500;text-decoration:none" style-hover="color:#fff;background:rgba(249,247,244,.12)"><i data-lucide="mail" style="width:16px;height:16px"></i>Mail</a>
+<span style="display:flex;align-items:center;gap:7px;height:32px;padding:0 11px;border-radius:9999px;background:rgba(249,247,244,.14);color:#fff;font-size:13px;font-weight:500"><i data-lucide="orbit" style="width:16px;height:16px"></i>Sphere</span>
+<a href="Atlas Background Lab.dc.html" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:9999px;background:#3461f2;color:#fff;font-size:13px;font-weight:500;text-decoration:none" style-hover="background:#5b7cff"><i data-lucide="flask-conical" style="width:16px;height:16px"></i>Background lab</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1512,&quot;height&quot;:980},&quot;darkCards&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Look&quot},&quot;particleBoost&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:1,&quot;min&quot;:0.5,&quot;max&quot;:2,&quot;step&quot;:0.1,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Look&quot}}">
+class Component extends DCLogic {
+  STATES = [
+    { id:'idle', label:'Idle', dot:'#8ea2e8', trigger:'default', desc:'At rest. Slow single-axis spin with a shallow breath so the sphere never looks frozen, and no colour shift.', recipe:'spin 0.0016 · breathe 3% · cobalt 36→110' },
+    { id:'listening', label:'Listening', dot:'#3461f2', trigger:'wake word', desc:'Concentric pressure waves travel from the core outward, so the surface reads as receptive rather than busy.', recipe:'spin 0.0026 · radial wave 8Hz · gain 1.18' },
+    { id:'thinking', label:'Thinking', dot:'#6d4bff', trigger:'query sent', desc:'The field twists around the vertical axis at different rates by latitude, shearing into a slow braid.', recipe:'shear ±0.9rad · spin 0.004 · violet drift' },
+    { id:'speaking', label:'Speaking', dot:'#0fae76', trigger:'response', desc:'Amplitude bands push particles along the axis of the voice, tightest at the equator, so the sphere pulses in time.', recipe:'8 bands · amp 0.22 · spin 0.003' },
+    { id:'working', label:'Working', dot:'#e07a1f', trigger:'task running', desc:'Particles migrate off the shell into a spinning torus — an obvious “I am doing something” tell that never blocks the UI.', recipe:'torus mix 0.72 · spin 0.006' },
+    { id:'success', label:'Success', dot:'#0fae76', trigger:'task done', desc:'Particles peel off the shell and wave outward in staggered pulses, fading as they go — release rather than a drawn ring.', recipe:'shed 48% · travel 1.05R · stagger 1.85' },
+    { id:'alert', label:'Needs you', dot:'#d0453a', trigger:'escalation', desc:'A tight double pulse with a small horizontal jitter. Warm red, but never strobing — it asks, it does not shout.', recipe:'double pulse 1.2s · jitter 1.5px' },
+    { id:'muted', label:'Muted', dot:'#b6b1aa', trigger:'mic off', desc:'Desaturated and drawn inward, spin nearly stopped. Reads as present-but-off rather than broken.', recipe:'radius ×0.82 · sat 0 · spin 0.0006' },
+    { id:'waking', label:'Waking', dot:'#5b7cff', trigger:'app open', desc:'Particles fly in from beyond the frame and land on the shell in a staggered order — the sphere assembling itself.', recipe:'form 0→1 in 1.6s · stagger 0.5' },
+    { id:'dissolving', label:'Dissolving', dot:'#8b8681', trigger:'session end', desc:'The inverse: the shell loses cohesion outward and fades, leaving the layout without a hard cut.', recipe:'scatter 1.9× · fade 1.4s' }
+  ];
+  state = { hero:'listening', dense:true, dark:false, ed:null };
+  canvases = [];
+  componentDidMount() { this.icons(); this.start(); }
+  componentDidUpdate() { this.icons(); }
+  componentWillUnmount() { cancelAnimationFrame(this._raf); clearInterval(this._guard); this._alive = 0; }
+  icons() { if (window.lucide && window.lucide.createIcons) { try { window.lucide.createIcons(); } catch (e) {} } }
+  DEF = (window.AtlasSphere && window.AtlasSphere.PRESET) ? Object.assign({}, window.AtlasSphere.PRESET) : { count:26000, dens:0.7, size:0.6, soft:0 };
+  EKEY = 'atlas.sphere.editor.v1';
+  PKEY = 'atlas.sphere.presets.v1';
+  ed() {
+    if (this._ed) return this._ed;
+    let v = null;
+    try { const raw = localStorage.getItem(this.EKEY); if (raw) v = JSON.parse(raw); } catch (e) {}
+    const d = this.DEF;
+    this._ed = v && typeof v === 'object' ? { count: +v.count || d.count, dens: +v.dens || d.dens, size: +v.size || d.size, soft: v.soft == null ? d.soft : +v.soft } : Object.assign({}, d);
+    return this._ed;
+  }
+  presets() {
+    if (this._presets) return this._presets;
+    let v = null;
+    try { const raw = localStorage.getItem(this.PKEY); if (raw) v = JSON.parse(raw); } catch (e) {}
+    this._presets = Array.isArray(v) ? v : [];
+    return this._presets;
+  }
+  writePresets(list) { this._presets = list; try { localStorage.setItem(this.PKEY, JSON.stringify(list)); } catch (e) {} }
+  commit(ed) {
+    this._ed = ed;
+    clearTimeout(this._saveT);
+    this._saveT = setTimeout(() => { try { localStorage.setItem(this.EKEY, JSON.stringify(this._ed)); } catch (e) {} this.setState({ saved: Date.now() }); }, 260);
+    this.setState({ ed });
+  }
+  pushInputs(ed) { if (this.root) this.root.querySelectorAll('input[data-key]').forEach(el => { el.value = ed[el.dataset.key]; }); }
+  cloud(n, dens) {
+    this._clouds = this._clouds || new Map();
+    const key = n + '|' + dens.toFixed(2);
+    const hit = this._clouds.get(key);
+    if (hit) return hit;
+    if (this._clouds.size > 6) this._clouds.clear();
+    const P = [];
+    for (let i = 0; i < n; i++) {
+      const th = Math.random()*6.2832, ph = Math.acos(2*Math.random() - 1), r = Math.pow(Math.random(), dens);
+      P.push({ x: r*Math.sin(ph)*Math.cos(th), y: r*Math.sin(ph)*Math.sin(th), z: r*Math.cos(ph), rn: Math.random(), th, ph, r,
+        ox: (Math.random() - 0.5)*4.2, oy: (Math.random() - 0.5)*4.2, oz: (Math.random() - 0.5)*4.2 });
+    }
+    this._clouds.set(key, P);
+    return P;
+  }
+  start() {
+    if (this._alive || window.AtlasSphere) return; this._alive = 1;
+    const loop = (t) => {
+      this._raf = requestAnimationFrame(loop);
+      this._lastT = performance.now();
+      if (t - (this._prevT || 0) < 26) return;
+      this._prevT = t;
+      for (const c of this.canvases) { if (!c.el.isConnected) continue; const r = c.el.getBoundingClientRect(); if (r.bottom < 0 || r.top > innerHeight) continue; this.paint(c, t); }
+    };
+    this._loop = loop;
+    this._raf = requestAnimationFrame(loop);
+    this._guard = setInterval(() => { const now = performance.now(); if (now - (this._lastT || 0) > 260) this._loop(now); }, 120);
+  }
+  paint(c, t) {
+    const el = c.el, dpr = Math.min(1.5, devicePixelRatio || 1), cw = el.clientWidth, ch = el.clientHeight;
+    if (!cw || !ch) return;
+    if (el.width !== Math.round(cw*dpr)) { el.width = Math.round(cw*dpr); el.height = Math.round(ch*dpr); }
+    const ctx = c.ctx, S = el.width, R = S*0.44, cx = S/2, cy = S/2;
+    const st = el.dataset.state, hero = el.dataset.size === 'hero';
+    const boost = +this.props.particleBoost || 1;
+    const E = this.ed(), big = el.dataset.size !== 'card';
+    const pts = this.cloud(Math.round(E.count*(big ? 1 : 0.3)*boost), E.dens);
+    const T = t*0.001, dark = this.state.dark || !!this.props.darkCards;
+    ctx.clearRect(0, 0, S, S);
+    let spin = 0.0016, gain = 1, sat = 1, tint = null, jx = 0, radial = 0.82;
+    if (st === 'listening') spin = 0.0026;
+    else if (st === 'thinking') spin = 0.004;
+    else if (st === 'speaking') spin = 0.003;
+    else if (st === 'working') spin = 0.006;
+    else if (st === 'muted') { spin = 0.0006; radial = 0.68; sat = 0; }
+    else if (st === 'alert') jx = Math.sin(T*15)*Math.max(0, Math.sin(T*2.6))*1.6*dpr;
+    if (st === 'success') tint = [30, 176, 128];
+    else if (st === 'alert') tint = [208, 69, 58];
+    else if (st === 'working') tint = [224, 122, 31];
+    else if (st === 'thinking') tint = [109, 75, 255];
+    else if (st === 'speaking') tint = [22, 168, 122];
+    const rot = t*spin;
+    const ca = Math.cos(rot), sa = Math.sin(rot);
+    const breathe = 1 + Math.sin(T*0.6)*0.03;
+    const form = st === 'waking' ? (T*0.625) % 1.6/1.6 : 1;
+    const wake = st === 'waking' ? Math.min(1, ((T*0.55) % 1.9)/1.3) : 1;
+    const diss = st === 'dissolving' ? ((T*0.6) % 1.9)/1.9 : 0;
+
+    const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, R*1.25);
+    const gc = tint || [52, 97, 242];
+    glow.addColorStop(0, 'rgba(' + gc[0] + ',' + gc[1] + ',' + gc[2] + ',' + (dark ? 0.15 : 0.07) + ')');
+    glow.addColorStop(1, 'rgba(' + gc[0] + ',' + gc[1] + ',' + gc[2] + ',0)');
+    ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(cx, cy, R*1.25, 0, 6.2832); ctx.fill();
+    const sof = Math.max(0, Math.min(1, E.soft/10)), szSoft = 1 + sof*0.75, aSoft = 1 - sof*0.42;
+    const NB = 8, NA = 11, NS = 3;
+    const paths = this._paths || (this._paths = []);
+    for (let i = 0; i < NB*NS*NA; i++) paths[i] = null;
+    for (const p of pts) {
+      let x = p.x, y = p.y, z = p.z, aMul = 1, szMul = 1, dscale = 1;
+      const wob = (1 + Math.sin(T + p.rn*8)*0.06)*breathe;
+      x *= wob; y *= wob; z *= wob;
+      if (st === 'listening') { const d0 = Math.sqrt(x*x + y*y + z*z) || 1e-4, w = Math.sin(d0*8 - T*8)*0.09, k = 1 + w; x *= k; y *= k; z *= k; aMul = 1.18 + w*2; }
+      else if (st === 'thinking') { const sh = y*0.9 + Math.sin(T*1.3)*0.2, cs = Math.cos(sh), ss = Math.sin(sh), nx = x*cs - z*ss; z = x*ss + z*cs; x = nx; }
+      else if (st === 'speaking') { const band = Math.floor((y + 1)*4), amp = 0.22*Math.abs(Math.sin(T*6 + band*1.3))*(1 - Math.abs(y)*0.4); const k = 1 + amp; x *= k; z *= k; aMul = 0.9 + amp*2.2; }
+      else if (st === 'working') { const mix = 0.72, rr = Math.sqrt(x*x + z*z) || 1e-4, tr = 0.78 + (rr - 0.78)*0.28; const kx = (x/rr)*tr, kz = (z/rr)*tr; x = x + (kx - x)*mix; z = z + (kz - z)*mix; y *= 1 - mix*0.72; }
+      else if (st === 'alert') { const pulse = 1 + 0.1*Math.max(0, Math.sin(T*5.2))*Math.max(0, Math.sin(T*2.6)); x *= pulse; y *= pulse; z *= pulse; }
+      else if (st === 'success') {
+        if (p.rn > 0.52) {
+          const q = ((T*0.62 + p.rn*1.85) % 1), e = 1 - (1 - q)*(1 - q);
+          const k = 1 + e*1.05; x *= k; y *= k; z *= k; dscale = k;
+          aMul = (1 - q)*(1 - q)*1.6; szMul = 1 - 0.4*e;
+        } else { const k = 0.94 + 0.06*Math.sin(T*3.1); x *= k; y *= k; z *= k; }
+      }
+      else if (st === 'waking') { const q = Math.min(1, Math.max(0, (wake - p.rn*0.5)/0.5)), e = q*q*(3 - 2*q); x = p.ox + (x - p.ox)*e; y = p.oy + (y - p.oy)*e; z = p.oz + (z - p.oz)*e; aMul = e*e; szMul = 0.5 + 0.5*e; }
+      else if (st === 'dissolving') { const q = Math.min(1, Math.max(0, (diss - p.rn*0.35)/0.65)), e = q*q; const k = 1 + e*0.9; x *= k; y *= k; z *= k; aMul = (1 - e)*(1 - e); }
+      const X = x*ca + z*sa, Z = -x*sa + z*ca;
+      const depth = (Z + 1)/2, dd = Math.sqrt(X*X + y*y + Z*Z)/dscale;
+      let a = Math.max(0, 1 - Math.max(0, (dd - 0.42)/0.5))*(0.4 + depth*0.6)*aMul*aSoft;
+      if (dark) a *= 1.25;
+      if (a <= 0.014) continue;
+      if (a > 1) a = 1;
+      const db = depth < 0 ? 0 : (depth > 0.999 ? NB - 1 : (depth*NB)|0);
+      let ab = (a*NA)|0; if (ab >= NA) ab = NA - 1;
+      const sb = p.rn < 0.34 ? 0 : (p.rn < 0.72 ? 1 : 2);
+      const key = (db*NS + sb)*NA + ab;
+      let pt = paths[key];
+      if (!pt) { pt = paths[key] = new Path2D(); }
+      const sz = (0.6 + p.rn*1.05)*(0.5 + depth*0.7)*(S/360)*szMul*E.size*szSoft;
+      const px = cx + X*R*(radial/0.82) + jx, py = cy + y*R*(radial/0.82);
+      pt.rect(px - sz, py - sz, sz*2, sz*2);
+    }
+    const bs = tint || [52, 97, 242];
+    const sp = 1 - sof*0.92;
+    const paper = dark ? [58, 60, 74] : [249, 247, 244];
+    const lift = (c, i, f) => { const v = c + (paper[i] - c)*sof*0.62*f; return v < 0 ? 0 : (v > 255 ? 255 : v); };
+    const SH = [
+      [lift(bs[0]*(1 - 0.48*sp), 0, 0.8), lift(bs[1]*(1 - 0.5*sp), 1, 0.8), lift(bs[2]*(1 - 0.38*sp), 2, 0.8)],
+      [lift(bs[0], 0, 1), lift(bs[1], 1, 1), lift(bs[2], 2, 1)],
+      [lift(bs[0] + (255 - bs[0])*0.46*sp, 0, 1.15), lift(bs[1] + (255 - bs[1])*0.42*sp, 1, 1.15), lift(bs[2] + (255 - bs[2])*0.3*sp, 2, 1.15)]
+    ];
+    for (let db = 0; db < NB; db++) {
+      const depth = (db + 0.5)/NB, f = 0.46 + depth*0.72;
+      for (let sb = 0; sb < NS; sb++) {
+        const s3 = SH[sb];
+        let cr = s3[0]*f, cg2 = s3[1]*f, cb = s3[2]*f;
+        if (cr > 255) cr = 255; if (cg2 > 255) cg2 = 255; if (cb > 255) cb = 255;
+        if (!sat) { const l = cr*0.3 + cg2*0.5 + cb*0.2; cr = cg2 = cb = l; }
+        if (dark) { cr = Math.min(255, cr + 62); cg2 = Math.min(255, cg2 + 54); cb = Math.min(255, cb + 36); }
+        const head = 'rgba(' + (cr|0) + ',' + (cg2|0) + ',' + (cb|0) + ',';
+        for (let ab = 0; ab < NA; ab++) {
+          const pt = paths[(db*NS + sb)*NA + ab];
+          if (!pt) continue;
+          ctx.fillStyle = head + ((ab + 0.6)/NA).toFixed(3) + ')';
+          ctx.fill(pt);
+        }
+      }
+    }
+  }
+  renderVals() {
+    const S = Object.assign({}, this.state, { ed: this.ed() }), hero = this.STATES.find(s => s.id === S.hero) || this.STATES[0], dark = S.dark || !!this.props.darkCards;
+    return {
+      rootRef: (el) => { if (el) { this.root = el; this.start(); } },
+      cvRef: (el) => {
+        if (!el || el.__reg || !window.AtlasSphere) return;
+        el.__reg = 1;
+        const card = el.dataset.size === 'card';
+        window.AtlasSphere.mount(el, () => {
+          const E = this.ed();
+          return { state: card ? el.dataset.state : (this.state.hero || 'listening'), dark: this.state.dark || !!this.props.darkCards,
+            count: Math.round(E.count*(+this.props.particleBoost || 1)), dens: E.dens, size: E.size, soft: E.soft, countScale: card ? 0.3 : 1 };
+        });
+      },
+      heroState: hero.id, heroLabel: hero.label.toLowerCase(), stateCount: String(this.STATES.length),
+      chips: this.STATES.map(s => { const on = s.id === hero.id; return { id:s.id, label:s.label, dot:s.dot, bg: on ? '#1e1e24' : 'rgba(249,247,244,.8)', fg: on ? '#f9f7f4' : '#1e1e24', bd: on ? '#1e1e24' : '#e6e2db' }; }),
+      cards: this.STATES.filter((s, i) => S.dense || i < 4).map(s => Object.assign({}, s, {
+        cardBg: dark ? '#1b1b21' : 'rgba(255,253,250,.72)',
+        cardBd: dark ? 'rgba(249,247,244,.1)' : 'rgba(255,253,250,.9)',
+        tFg: dark ? '#f9f7f4' : '#1e1e24', bFg: dark ? 'rgba(249,247,244,.72)' : '#6d6a67', mFg: dark ? 'rgba(249,247,244,.45)' : '#b6b1aa'
+      })),
+      edBg: dark ? '#1b1b21' : 'rgba(255,253,250,.72)',
+      edBd: dark ? 'rgba(249,247,244,.1)' : 'rgba(255,253,250,.9)',
+      edStage: dark ? 'rgba(249,247,244,.04)' : 'rgba(249,247,244,.6)',
+      edFg: dark ? '#f9f7f4' : '#1e1e24', edMut: dark ? 'rgba(249,247,244,.5)' : '#b6b1aa',
+      edLine: dark ? 'rgba(249,247,244,.18)' : '#e2ded7',
+      sliders: [
+        { key:'count', label:'Particle amount', hint:'Points in the cloud', min:1500, max:36000, step:500, value:S.ed.count, display:(S.ed.count/1000).toFixed(1) + 'k' },
+        { key:'dens', label:'Particle density', hint:'Lower packs more toward the core', min:0.15, max:1, step:0.01, value:S.ed.dens, display:S.ed.dens.toFixed(2) },
+        { key:'size', label:'Particle size', hint:'Multiplier on dot radius', min:0.3, max:3, step:0.05, value:S.ed.size, display:'×' + S.ed.size.toFixed(2) }
+      ].map(s => Object.assign(s, { fg: dark ? '#f9f7f4' : '#1e1e24', mut: dark ? 'rgba(249,247,244,.5)' : '#b6b1aa', line: dark ? 'rgba(249,247,244,.1)' : '#f1eeea' })),
+      softPips: Array.from({ length: 10 }, (_, i) => ({ bg: i < S.ed.soft ? '#3461f2' : (dark ? 'rgba(249,247,244,.14)' : '#e6e2db') })),
+      softLabel: S.ed.soft + ' / 10',
+      slRef: (el) => { if (!el || el.__init) return; el.__init = 1; el.value = el.dataset.init; },
+      onSlide: (e) => { const k = e.target.dataset.key, v = +e.target.value; this.commit(Object.assign({}, this.ed(), { [k]: k === 'count' ? Math.round(v) : v })); },
+      nameRef: (el) => { this._nameEl = el; },
+      savePreset: () => {
+        const el = this._nameEl, nm = (el && el.value.trim()) || ('Preset ' + (this.presets().length + 1));
+        const list = this.presets().filter(p => p.name !== nm).concat([{ name: nm, ed: Object.assign({}, this.ed()) }]).slice(-8);
+        this.writePresets(list);
+        if (el) el.value = '';
+        this.setState({ saved: Date.now() });
+      },
+      loadPreset: (e) => { const nm = e.currentTarget.dataset.name, p = this.presets().find(x => x.name === nm); if (!p) return; const ed = Object.assign({}, this.DEF, p.ed); this.pushInputs(ed); this.commit(ed); },
+      delPreset: (e) => { e.stopPropagation(); const nm = e.currentTarget.dataset.name; this.writePresets(this.presets().filter(x => x.name !== nm)); this.setState({ saved: Date.now() }); },
+      presetList: this.presets().slice().reverse().map(p => ({ name: p.name, meta: (p.ed.count/1000).toFixed(1) + 'k · ×' + (+p.ed.size).toFixed(2) + ' · soft ' + p.ed.soft })),
+      savedNote: this.state.saved ? 'Saved to this browser' : 'Changes save automatically',
+      bumpSoft: (e) => { const d = +e.currentTarget.dataset.dir; this.commit(Object.assign({}, this.ed(), { soft: Math.max(0, Math.min(10, this.ed().soft + d)) })); },
+      resetEd: () => { const ed = Object.assign({}, this.DEF); this.pushInputs(ed); this.commit(ed); },
+      gridLabel: S.dense ? 'All ten' : 'Core four', gridIcon: S.dense ? 'grid-3x3' : 'rows-3',
+      darkLabel: dark ? 'Light cards' : 'Dark cards', darkIcon: dark ? 'sun' : 'moon',
+      pickState: (e) => this.setState({ hero: e.currentTarget.dataset.state }),
+      toggleGrid: () => this.setState({ dense: !S.dense }),
+      toggleDark: () => this.setState({ dark: !S.dark })
+    };
+  }
+}
+</script>
+</body>
+</html>

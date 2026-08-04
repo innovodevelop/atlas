@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="atlas-sphere.js"></script>
+<style>
+button,input,textarea,select{border:none}
+body{margin:0;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#3461f2;text-decoration:none}a:hover{color:#5b7cff}
+@keyframes rise{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pls{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes drift1{from{transform:translate(0,0) scale(1)}to{transform:translate(-48px,28px) scale(1.07)}}
+@keyframes drift2{from{transform:translate(0,0)}to{transform:translate(42px,-20px)}}
+@keyframes shim{from{background-position:210% 0}to{background-position:-110% 0}}
+@keyframes grow{from{width:0}}
+</style>
+</helmet>
+
+<div style="min-height:100vh;position:relative;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;overflow-x:hidden" data-screen-label="Atlas — Core">
+
+<div style="position:fixed;inset:0;z-index:1;pointer-events:none;overflow:hidden">
+  <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(216,227,251,.72),rgba(249,247,244,0) 44%)"></div>
+  <div style="position:absolute;top:-340px;right:-220px;width:900px;height:900px;border-radius:50%;filter:blur(64px);background:radial-gradient(closest-side,rgba(120,152,243,.34),transparent 74%);animation:drift1 20s ease-in-out infinite alternate"></div>
+  <div style="position:absolute;top:-140px;left:-260px;width:800px;height:580px;border-radius:50%;filter:blur(64px);background:radial-gradient(closest-side,rgba(198,212,249,.44),transparent 72%);animation:drift2 28s ease-in-out infinite alternate"></div>
+</div>
+<div style="position:fixed;inset:0;pointer-events:none;z-index:2;opacity:.4;mix-blend-mode:multiply;background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E&quot;)"></div>
+
+<section style="position:relative;z-index:10;display:flex;align-items:center;gap:30px;max-width:1500px;margin:0 auto;padding:40px 28px 10px;animation:rise .8s cubic-bezier(.22,1,.36,1) both">
+  <div style="width:156px;height:156px;flex-shrink:0">
+    <canvas ref="{{ orbRef }}" style="width:156px;height:156px;display:block"></canvas>
+  </div>
+  <div style="min-width:0">
+    <h1 onClick="{{ goBack }}" title="Back to dashboard" style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.03em;font-size:clamp(30px,3.8vw,52px);font-weight:500;line-height:1;margin:0;color:#1e1e24;cursor:pointer" style-hover="opacity:.72">Atlas <span style="color:#3461f2">Core.</span></h1>
+    <p style="font-size:16px;color:#6d6a67;margin:13px 0 0;max-width:520px;line-height:1.5;text-wrap:pretty">{{ heroSub }}</p>
+    <button onClick="{{ goBack }}" style="border:none;display:inline-flex;align-items:center;gap:8px;margin-top:13px;padding:7px 14px 7px 11px;border-radius:9999px;background:#fffdfa;color:#6d6a67;font:inherit;font-size:13px;cursor:pointer" style-hover="color:#1e1e24;background:#edebe7">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path></svg>
+      <span>Back to dashboard</span>
+      <span style="padding:2px 7px;font-size:11px;background:#edebe7;border-radius:6px;color:#8b8681">Esc</span>
+    </button>
+  </div>
+  <div style="margin-left:auto;flex-shrink:0;text-align:right">
+    <p style="font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#b6b1aa;margin:0 0 8px">Preview</p>
+    <div style="display:inline-flex;gap:3px;padding:4px;border-radius:9999px;background:#f1eeea">
+      <button onClick="{{ setFull }}" style="padding:7px 15px;border-radius:9999px;border:none;font:inherit;font-size:13px;font-weight:500;cursor:pointer;background:{{ fullBg }};color:{{ fullFg }}">In use</button>
+      <button onClick="{{ setEmpty }}" style="padding:7px 15px;border-radius:9999px;border:none;font:inherit;font-size:13px;font-weight:500;cursor:pointer;background:{{ emptyBg }};color:{{ emptyFg }}">Day one</button>
+    </div>
+    <p style="font-size:12.5px;color:#6d6a67;margin:10px 0 0;max-width:200px;margin-left:auto;text-wrap:pretty">Every panel is designed at rest and fully loaded.</p>
+  </div>
+</section>
+
+<main style="position:relative;z-index:10;max-width:1500px;margin:0 auto;padding:22px 28px 150px">
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px">
+
+    <div style="border-radius:20px;padding:20px;background:#f1eeea;display:flex;align-items:flex-start;justify-content:space-between;gap:14px">
+      <div style="min-width:0">
+        <p style="font-size:12.5px;color:#6d6a67;margin:0">Remembered about you</p>
+        <p style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.02em;font-size:32px;font-weight:500;margin:8px 0 0;font-variant-numeric:tabular-nums">{{ stMem }}</p>
+        <div style="display:flex;align-items:center;gap:5px;font-size:12.5px;margin-top:8px;color:{{ stMemTone }}">
+          <sc-if value="{{ stMemArrow }}" hint-placeholder-val="{{ true }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 17 7-7 4 4 5-6"></path><path d="M16 8h4v4"></path></svg></sc-if>
+          <span>{{ stMemSub }}</span>
+        </div>
+      </div>
+      <div style="width:42px;height:42px;flex-shrink:0;border-radius:12px;background:#edebe7;color:#1e1e24;display:flex;align-items:center;justify-content:center"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><ellipse cx="12" cy="5" rx="8" ry="3"></ellipse><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"></path><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"></path></svg></div>
+    </div>
+
+    <div style="border-radius:20px;padding:20px;background:#f1eeea;display:flex;align-items:flex-start;justify-content:space-between;gap:14px">
+      <div style="min-width:0">
+        <p style="font-size:12.5px;color:#6d6a67;margin:0">Documents indexed</p>
+        <p style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.02em;font-size:32px;font-weight:500;margin:8px 0 0;font-variant-numeric:tabular-nums">{{ stDoc }}</p>
+        <div style="display:flex;align-items:center;gap:5px;font-size:12.5px;margin-top:8px;color:{{ stDocTone }}"><span>{{ stDocSub }}</span></div>
+      </div>
+      <div style="width:42px;height:42px;flex-shrink:0;border-radius:12px;background:#edebe7;color:#1e1e24;display:flex;align-items:center;justify-content:center"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"></path><path d="M14 2v5h5"></path></svg></div>
+    </div>
+
+    <div style="border-radius:20px;padding:20px;background:#f1eeea;display:flex;align-items:flex-start;justify-content:space-between;gap:14px">
+      <div style="min-width:0">
+        <p style="font-size:12.5px;color:#6d6a67;margin:0">Jobs run today</p>
+        <p style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.02em;font-size:32px;font-weight:500;margin:8px 0 0;font-variant-numeric:tabular-nums">{{ stJob }}</p>
+        <div style="display:flex;align-items:center;gap:5px;font-size:12.5px;margin-top:8px;color:{{ stJobTone }}"><span>{{ stJobSub }}</span></div>
+      </div>
+      <div style="width:42px;height:42px;flex-shrink:0;border-radius:12px;background:#edebe7;color:#1e1e24;display:flex;align-items:center;justify-content:center"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="8" width="18" height="12" rx="3"></rect><circle cx="8.6" cy="14" r="1.1" fill="currentColor" stroke="none"></circle><circle cx="15.4" cy="14" r="1.1" fill="currentColor" stroke="none"></circle><path d="M12 8V4M9.5 4h5" stroke-linecap="round"></path></svg></div>
+    </div>
+
+    <div style="border-radius:20px;padding:20px;background:#f1eeea;display:flex;align-items:flex-start;justify-content:space-between;gap:14px">
+      <div style="min-width:0">
+        <p style="font-size:12.5px;color:#6d6a67;margin:0">Failures, last 24h</p>
+        <p style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.02em;font-size:32px;font-weight:500;margin:8px 0 0;font-variant-numeric:tabular-nums">{{ stErr }}</p>
+        <div style="display:flex;align-items:center;gap:5px;font-size:12.5px;margin-top:8px;color:{{ stErrTone }}"><span>{{ stErrSub }}</span></div>
+      </div>
+      <div style="width:42px;height:42px;flex-shrink:0;border-radius:12px;background:#edebe7;color:#1e1e24;display:flex;align-items:center;justify-content:center"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 2.6 20h18.8z"></path><path d="M12 10v4.5M12 17.4h.01"></path></svg></div>
+    </div>
+
+  </div>
+
+  <div style="display:flex;gap:4px;padding:5px;margin:22px 0;border-radius:9999px;background:#f1eeea;overflow-x:auto">
+    <button onClick="{{ goSearch }}" style="display:flex;align-items:center;gap:7px;padding:9px 15px;border-radius:9999px;border:none;font:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;position:relative;background:{{ bgSearch }};color:{{ fgSearch }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.6-3.6"></path></svg>Search</button>
+    <button onClick="{{ goOverview }}" style="display:flex;align-items:center;gap:7px;padding:9px 15px;border-radius:9999px;border:none;font:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;position:relative;background:{{ bgOverview }};color:{{ fgOverview }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>Overview</button>
+    <button onClick="{{ goLive }}" style="display:flex;align-items:center;gap:7px;padding:9px 15px;border-radius:9999px;border:none;font:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;position:relative;background:{{ bgLive }};color:{{ fgLive }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="2"></circle><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 16.2a6 6 0 0 0 0-8.4" stroke-linecap="round"></path></svg>Live<span style="width:6px;height:6px;border-radius:50%;background:#d0453a;animation:pls 1.5s ease-in-out infinite;margin-left:1px"></span></button>
+    <button onClick="{{ goAgent }}" style="display:flex;align-items:center;gap:7px;padding:9px 15px;border-radius:9999px;border:none;font:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;position:relative;background:{{ bgAgent }};color:{{ fgAgent }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="8" width="18" height="12" rx="3"></rect><circle cx="8.6" cy="14" r="1.1" fill="currentColor" stroke="none"></circle><circle cx="15.4" cy="14" r="1.1" fill="currentColor" stroke="none"></circle><path d="M12 8V4" stroke-linecap="round"></path></svg>Agent<sc-if value="{{ hasRuns }}" hint-placeholder-val="{{ true }}"><span style="min-width:18px;height:18px;padding:0 5px;border-radius:9999px;background:#3461f2;color:#fff;font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums">{{ runCount }}</span></sc-if></button>
+    <button onClick="{{ goKnowledge }}" style="display:flex;align-items:center;gap:7px;padding:9px 15px;border-radius:9999px;border:none;font:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;position:relative;background:{{ bgKnowledge }};color:{{ fgKnowledge }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 0 4 22z"></path></svg>Knowledge</button>
+    <button onClick="{{ goResearch }}" style="display:flex;align-items:center;gap:7px;padding:9px 15px;border-radius:9999px;border:none;font:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;position:relative;background:{{ bgResearch }};color:{{ fgResearch }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6"></circle><path d="m19 19-3.2-3.2M11 8v6M8 11h6"></path></svg>Research</button>
+    <button onClick="{{ goMemory }}" style="display:flex;align-items:center;gap:7px;padding:9px 15px;border-radius:9999px;border:none;font:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;position:relative;background:{{ bgMemory }};color:{{ fgMemory }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"></path></svg>Memory</button>
+    <button onClick="{{ goLearning }}" style="display:flex;align-items:center;gap:7px;padding:9px 15px;border-radius:9999px;border:none;font:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;position:relative;background:{{ bgLearning }};color:{{ fgLearning }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"></path></svg>Learning</button>
+  </div>
+
+  <sc-if value="{{ isSearch }}" hint-placeholder-val="{{ false }}">
+  <div>
+    <div style="display:flex;align-items:center;gap:12px;padding:14px 20px;border-radius:9999px;background:#fffdfa;box-shadow:0 12px 32px -26px rgba(30,30,36,.4)">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#b6b1aa" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.6-3.6"></path></svg>
+      <input value="{{ q }}" onChange="{{ setQ }}" placeholder="Ask across everything Atlas has — memories, documents, conversations" style="flex:1;min-width:0;border:none;outline:none;background:transparent;font:inherit;font-size:16px;color:#1e1e24">
+      <span style="font-size:12px;color:#b6b1aa;white-space:nowrap">Searched on this Mac</span>
+    </div>
+
+    <sc-if value="{{ full }}" hint-placeholder-val="{{ true }}">
+    <div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin:22px 2px 12px">
+        <p style="font-size:13.5px;color:#6d6a67;margin:0">7 matches · sorted by how closely they fit, not by date</p>
+        <p style="font-size:13px;color:#b6b1aa;margin:0;font-variant-numeric:tabular-nums">0.34s</p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <sc-for list="{{ results }}" as="r" hint-placeholder-count="4">
+          <div style="display:flex;gap:18px;padding:20px 22px;border-radius:20px;background:#fffdfa;cursor:pointer" style-hover="background:#edebe7">
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+                <span style="font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:9999px;background:{{ r.chipBg }};color:{{ r.chipFg }}">{{ r.kind }}</span>
+                <p style="font-size:15.5px;font-weight:600;letter-spacing:-.01em;margin:0">{{ r.title }}</p>
+              </div>
+              <p style="font-size:14px;line-height:1.6;color:#33312f;margin:10px 0 0;text-wrap:pretty">{{ r.snippet }}</p>
+              <p style="font-size:12.5px;color:#8b8681;margin:9px 0 0">{{ r.where }}</p>
+            </div>
+            <div style="width:112px;flex-shrink:0;text-align:right">
+              <p style="font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#b6b1aa;margin:0">Fit</p>
+              <p style="font-family:'Hanken Grotesk','Geist',sans-serif;font-size:22px;font-weight:500;margin:5px 0 0;font-variant-numeric:tabular-nums;letter-spacing:-.02em">{{ r.score }}</p>
+              <div style="height:5px;border-radius:9999px;background:#edebe7;overflow:hidden;margin-top:8px"><div style="height:100%;border-radius:9999px;background:#3461f2;width:{{ r.pct }}"></div></div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+      <p style="font-size:13px;color:#6d6a67;margin:16px 2px 0">Nothing here was sent anywhere to produce these results.</p>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+    <div style="margin-top:16px;border-radius:36px;background:#f1eeea;padding:64px 40px;text-align:center">
+      <div style="width:52px;height:52px;margin:0 auto;border-radius:16px;background:#fffdfa;display:flex;align-items:center;justify-content:center;color:#b6b1aa"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.6-3.6"></path></svg></div>
+      <h3 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.02em;font-size:22px;font-weight:500;margin:20px 0 8px">There's nothing to search yet</h3>
+      <p style="font-size:14.5px;line-height:1.6;color:#6d6a67;margin:0 auto;max-width:440px;text-wrap:pretty">Search covers what Atlas has learned and what you've given it. Both start empty. Talk to it, or add a document, and this fills itself.</p>
+      <div style="display:flex;gap:9px;justify-content:center;flex-wrap:wrap;margin-top:24px">
+        <a href="Atlas%20Teach.dc.html" style="display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 18px;border-radius:9999px;background:#3461f2;color:#fff;font-size:14px;font-weight:500" style-hover="background:#5b7cff">Teach it something</a>
+        <button onClick="{{ goKnowledge }}" style="border:none;height:38px;padding:0 18px;border-radius:9999px;background:#fffdfa;color:#33312f;font:inherit;font-size:14px;font-weight:500;cursor:pointer" style-hover="background:#edebe7">Add a document</button>
+      </div>
+    </div>
+    </sc-if>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isOverview }}" hint-placeholder-val="{{ true }}">
+  <div>
+    <sc-if value="{{ full }}" hint-placeholder-val="{{ true }}">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(430px,1fr));gap:18px">
+
+      <div style="border-radius:36px;background:#f1eeea;padding:26px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px">
+          <h3 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.01em;font-size:18px;font-weight:500;margin:0">Right now</h3>
+          <span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:#6d6a67"><span style="width:7px;height:7px;border-radius:50%;background:#0fae76;animation:pls 2s ease-in-out infinite"></span>Listening</span>
+        </div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:18px 0"><span style="font-size:14px;color:#6d6a67">Last heard from you</span><span style="font-size:14px;font-weight:500">6 minutes ago</span></div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:18px 0"><span style="font-size:14px;color:#6d6a67">Running in the background</span><span style="font-size:14px;font-weight:500">Weekly digest</span></div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:18px 0"><span style="font-size:14px;color:#6d6a67">Microphone</span><span style="font-size:14px;font-weight:500;color:#0a7a53">On</span></div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:18px 0"><span style="font-size:14px;color:#6d6a67">Awake since</span><span style="font-size:14px;font-weight:500;font-variant-numeric:tabular-nums">06:12 this morning</span></div>
+      </div>
+
+      <div style="border-radius:36px;background:#f1eeea;padding:26px">
+        <h3 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.01em;font-size:18px;font-weight:500;margin:0 0 6px">Where the thinking happened</h3>
+        <p style="font-size:13.5px;color:#6d6a67;margin:0 0 18px;text-wrap:pretty">Today, in full. Each of these is one request that left this Mac.</p>
+        <div style="display:flex;align-items:center;gap:16px;padding:19px 0">
+          <div style="flex:1;min-width:0"><p style="font-size:15px;font-weight:600;margin:0">Anthropic</p><p style="font-size:12.5px;color:#6d6a67;margin:3px 0 0">Everything you heard back</p></div>
+          <div style="width:180px;flex-shrink:0"><div style="height:6px;border-radius:9999px;background:#edebe7;overflow:hidden"><div style="height:100%;width:84%;border-radius:9999px;background:#3461f2;animation:grow 1s cubic-bezier(.22,1,.36,1) both"></div></div></div>
+          <span style="font-size:14px;font-weight:500;width:36px;text-align:right;font-variant-numeric:tabular-nums">41</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px;padding:19px 0">
+          <div style="flex:1;min-width:0"><p style="font-size:15px;font-weight:600;margin:0">AWS Bedrock, EU</p><p style="font-size:12.5px;color:#6d6a67;margin:3px 0 0">Overnight work, while you slept</p></div>
+          <div style="width:180px;flex-shrink:0"><div style="height:6px;border-radius:9999px;background:#edebe7;overflow:hidden"><div style="height:100%;width:16%;border-radius:9999px;background:#3950e6;animation:grow 1s cubic-bezier(.22,1,.36,1) both"></div></div></div>
+          <span style="font-size:14px;font-weight:500;width:36px;text-align:right;font-variant-numeric:tabular-nums">8</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px;padding:19px 0">
+          <div style="flex:1;min-width:0"><p style="font-size:15px;font-weight:600;margin:0">Answered without asking anyone</p><p style="font-size:12.5px;color:#6d6a67;margin:3px 0 0">Recall, search, timers, device control</p></div>
+          <div style="width:180px;flex-shrink:0"><div style="height:6px;border-radius:9999px;background:#edebe7;overflow:hidden"><div style="height:100%;width:56%;border-radius:9999px;background:#0fae76;animation:grow 1s cubic-bezier(.22,1,.36,1) both"></div></div></div>
+          <span style="font-size:14px;font-weight:500;width:36px;text-align:right;font-variant-numeric:tabular-nums">27</span>
+        </div>
+      </div>
+
+      <div style="border-radius:36px;background:#f1eeea;padding:26px">
+        <h3 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.01em;font-size:18px;font-weight:500;margin:0 0 18px">What's on this Mac</h3>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:18px 0"><span style="font-size:14px;color:#6d6a67">Memory file</span><span style="font-size:14px;font-weight:500;font-variant-numeric:tabular-nums">4.2 MB</span></div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:18px 0"><span style="font-size:14px;color:#6d6a67">Documents</span><span style="font-size:14px;font-weight:500;font-variant-numeric:tabular-nums">318 MB</span></div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:18px 0"><span style="font-size:14px;color:#6d6a67">Search index</span><span style="font-size:14px;font-weight:500;font-variant-numeric:tabular-nums">86 MB</span></div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:18px 0"><span style="font-size:14px;color:#6d6a67">Conversations kept</span><span style="font-size:14px;font-weight:500;font-variant-numeric:tabular-nums">Last 90 days</span></div>
+        <a href="Atlas%20Architecture%20v2.dc.html" style="display:inline-block;font-size:13.5px;font-weight:500;margin-top:16px">Where all of this lives →</a>
+      </div>
+
+      <div style="border-radius:36px;background:#f1eeea;padding:26px">
+        <h3 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.01em;font-size:18px;font-weight:500;margin:0 0 18px">Today</h3>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:18px 0"><span style="font-size:14px;color:#6d6a67">Times you spoke to it</span><span style="font-size:14px;font-weight:500;font-variant-numeric:tabular-nums">23</span></div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:18px 0"><span style="font-size:14px;color:#6d6a67">New things remembered</span><span style="font-size:14px;font-weight:500;font-variant-numeric:tabular-nums">4</span></div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:18px 0"><span style="font-size:14px;color:#6d6a67">Corrections you made</span><span style="font-size:14px;font-weight:500;font-variant-numeric:tabular-nums">1</span></div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:18px 0"><span style="font-size:14px;color:#6d6a67">Jobs that failed</span><span style="font-size:14px;font-weight:500;color:#a3352c;font-variant-numeric:tabular-nums">1</span></div>
+      </div>
+
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(430px,1fr));gap:18px">
+      <div style="border-radius:36px;background:#f1eeea;padding:32px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px">
+          <h3 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.01em;font-size:20px;font-weight:500;margin:0">Everything is working</h3>
+          <span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:#6d6a67"><span style="width:7px;height:7px;border-radius:50%;background:#0fae76;animation:pls 2s ease-in-out infinite"></span>Listening</span>
+        </div>
+        <p style="font-size:14.5px;line-height:1.6;color:#6d6a67;margin:0 0 22px;text-wrap:pretty">Atlas has been awake for six minutes and hasn't been asked anything yet. Empty panels here mean a system at rest, not a broken one.</p>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:18px 0"><span style="font-size:14px;color:#6d6a67">Microphone</span><span style="font-size:14px;font-weight:500;color:#0a7a53">On</span></div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:18px 0"><span style="font-size:14px;color:#6d6a67">Memory file</span><span style="font-size:14px;font-weight:500">Created, empty</span></div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:18px 0"><span style="font-size:14px;color:#6d6a67">Connection to Anthropic</span><span style="font-size:14px;font-weight:500;color:#0a7a53">Good</span></div>
+      </div>
+      <div style="border-radius:36px;background:#f1eeea;padding:32px">
+        <h3 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.01em;font-size:20px;font-weight:500;margin:0 0 8px">Three things that fill this page</h3>
+        <p style="font-size:14.5px;line-height:1.6;color:#6d6a67;margin:0 0 20px;text-wrap:pretty">None of them are required. Atlas works from the first sentence.</p>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;gap:14px;padding:15px 17px;border-radius:18px;background:#fffdfa">
+            <span style="width:24px;height:24px;flex-shrink:0;border-radius:9999px;background:#e2ded7"></span>
+            <div style="flex:1;min-width:0"><p style="font-size:14.5px;font-weight:600;margin:0">Say something to it</p><p style="font-size:12.5px;color:#6d6a67;margin:2px 0 0">Memory, Live and Search all start here</p></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;padding:15px 17px;border-radius:18px;background:#fffdfa">
+            <span style="width:24px;height:24px;flex-shrink:0;border-radius:9999px;background:#e2ded7"></span>
+            <div style="flex:1;min-width:0"><p style="font-size:14.5px;font-weight:600;margin:0">Give it a document</p><p style="font-size:12.5px;color:#6d6a67;margin:2px 0 0">A CV is the fastest way to be understood</p></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;padding:15px 17px;border-radius:18px;background:#fffdfa">
+            <span style="width:24px;height:24px;flex-shrink:0;border-radius:9999px;background:#e2ded7"></span>
+            <div style="flex:1;min-width:0"><p style="font-size:14.5px;font-weight:600;margin:0">Decide about overnight work</p><p style="font-size:12.5px;color:#6d6a67;margin:2px 0 0">Off until you turn it on</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isLive }}" hint-placeholder-val="{{ false }}">
+  <div style="border-radius:36px;background:#f1eeea;padding:26px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:20px">
+      <div>
+        <h3 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.01em;font-size:18px;font-weight:500;margin:0">As it happens</h3>
+        <p style="font-size:13.5px;color:#6d6a67;margin:5px 0 0">Every step Atlas takes, in the order it takes them.</p>
+      </div>
+      <span style="display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:9999px;background:#fffdfa;font-size:12.5px;color:#6d6a67"><span style="width:7px;height:7px;border-radius:50%;background:#0fae76;animation:pls 1.6s ease-in-out infinite"></span>Connected</span>
+    </div>
+
+    <sc-if value="{{ full }}" hint-placeholder-val="{{ true }}">
+    <div>
+      <div style="display:flex;gap:16px;padding:18px 20px;border-radius:20px;background:#eef2fe;margin-bottom:14px">
+        <span style="font-size:12.5px;color:#8b8681;width:64px;flex-shrink:0;font-variant-numeric:tabular-nums;padding-top:2px">11:42:07</span>
+        <div style="flex:1;min-width:0">
+          <p style="font-size:15px;font-weight:600;margin:0;color:#2f4bbd">Thinking about what you just asked</p>
+          <p style="font-size:13px;color:#6d6a67;margin:5px 0 0">Sent 1 question and 3 memories to Anthropic · 2.1s so far</p>
+          <div style="height:4px;border-radius:9999px;background:#edebe7;overflow:hidden;margin-top:12px"><div style="height:100%;width:100%;background:linear-gradient(100deg,#edebe7 20%,#3461f2 46%,#8aa2f7 54%,#3461f2 62%,#edebe7 82%);background-size:220% 100%;animation:shim 1.6s linear infinite"></div></div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column">
+        <sc-for list="{{ events }}" as="e" hint-placeholder-count="7">
+          <div style="display:flex;gap:16px;padding:16px 20px">
+            <span style="font-size:12.5px;color:#8b8681;width:64px;flex-shrink:0;font-variant-numeric:tabular-nums">{{ e.time }}</span>
+            <span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:6px;background:{{ e.dot }}"></span>
+            <div style="flex:1;min-width:0">
+              <p style="font-size:14.5px;margin:0;color:#1e1e24">{{ e.text }}</p>
+              <p style="font-size:12.5px;color:#8b8681;margin:3px 0 0">{{ e.meta }}</p>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+    <div style="padding:70px 40px;text-align:center;border-radius:28px;background:#fffdfa">
+      <div style="width:58px;height:58px;margin:0 auto;border-radius:50%;background:#f1eeea;display:flex;align-items:center;justify-content:center"><span style="width:9px;height:9px;border-radius:50%;background:#0fae76;animation:pls 2.4s ease-in-out infinite"></span></div>
+      <h3 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.02em;font-size:22px;font-weight:500;margin:20px 0 8px">Nothing is happening</h3>
+      <p style="font-size:14.5px;line-height:1.6;color:#6d6a67;margin:0 auto;max-width:420px;text-wrap:pretty">Atlas is awake and listening for its name. The moment it hears anything, does anything, or sends anything, it appears here — with a timestamp.</p>
+    </div>
+    </sc-if>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isAgent }}" hint-placeholder-val="{{ false }}">
+  <div>
+    <sc-if value="{{ full }}" hint-placeholder-val="{{ true }}">
+    <div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+        <span style="display:inline-flex;align-items:center;gap:8px;padding:8px 15px;border-radius:9999px;background:rgba(52,97,242,.1);color:#2f4bbd;font-size:13px;font-weight:500"><span style="width:7px;height:7px;border-radius:50%;background:#3461f2;animation:pls 1.6s ease-in-out infinite"></span>1 running</span>
+        <span style="display:inline-flex;align-items:center;gap:8px;padding:8px 15px;border-radius:9999px;background:#f1eeea;color:#55524f;font-size:13px;font-weight:500">2 queued</span>
+        <span style="display:inline-flex;align-items:center;gap:8px;padding:8px 15px;border-radius:9999px;background:#f1eeea;color:#0a7a53;font-size:13px;font-weight:500">5 finished today</span>
+        <span style="display:inline-flex;align-items:center;gap:8px;padding:8px 15px;border-radius:9999px;background:#f1eeea;color:#a3352c;font-size:13px;font-weight:500">1 failed</span>
+      </div>
+
+      <div style="border-radius:30px;background:#eef2fe;padding:24px;margin-bottom:14px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
+          <div style="min-width:0">
+            <div style="display:flex;align-items:center;gap:10px"><span style="width:7px;height:7px;border-radius:50%;background:#3461f2;animation:pls 1.6s ease-in-out infinite"></span><p style="font-size:17px;font-weight:600;letter-spacing:-.01em;margin:0">Weekly digest</p></div>
+            <p style="font-size:13.5px;color:#6d6a67;margin:8px 0 0">Started 11:38 · you asked for this every Sunday · running on Bedrock, EU</p>
+          </div>
+          <button style="border:none;height:36px;padding:0 16px;border-radius:9999px;background:#fffdfa;color:#a3352c;font:inherit;font-size:13.5px;font-weight:500;cursor:pointer;flex-shrink:0" style-hover="background:#f7e6e4">Stop this job</button>
+        </div>
+        <div style="margin-top:20px;padding-top:18px;display:flex;flex-direction:column;gap:2px">
+          <div style="display:flex;align-items:center;gap:12px;padding:9px 0"><span style="width:18px;height:18px;flex-shrink:0;border-radius:50%;background:#0fae76;color:#fff;display:flex;align-items:center;justify-content:center"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12 5 5L20 6"></path></svg></span><span style="font-size:14px;flex:1">Gathered this week's conversations</span><span style="font-size:12.5px;color:#8b8681;font-variant-numeric:tabular-nums">1.2s</span></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:9px 0"><span style="width:18px;height:18px;flex-shrink:0;border-radius:50%;background:#0fae76;color:#fff;display:flex;align-items:center;justify-content:center"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12 5 5L20 6"></path></svg></span><span style="font-size:14px;flex:1">Picked out what mattered</span><span style="font-size:12.5px;color:#8b8681;font-variant-numeric:tabular-nums">14s</span></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:9px 0"><span style="width:18px;height:18px;flex-shrink:0;border-radius:50%;background:#3461f2;animation:pls 1.4s ease-in-out infinite"></span><span style="font-size:14px;flex:1;font-weight:500;color:#2f4bbd">Writing the summary</span><span style="font-size:12.5px;color:#8b8681">in progress</span></div>
+          <div style="display:flex;align-items:center;gap:12px;padding:9px 0;opacity:.5"><span style="width:18px;height:18px;flex-shrink:0;border-radius:50%;background:#e2ded7"></span><span style="font-size:14px;flex:1">Save it, and tell you at 18:00</span><span style="font-size:12.5px;color:#8b8681">waiting</span></div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <sc-for list="{{ runs }}" as="j" hint-placeholder-count="4">
+          <div style="display:flex;align-items:center;gap:18px;padding:18px 22px;border-radius:20px;background:#fffdfa">
+            <span style="font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:9999px;width:74px;text-align:center;flex-shrink:0;background:{{ j.chipBg }};color:{{ j.chipFg }}">{{ j.status }}</span>
+            <div style="flex:1;min-width:0">
+              <p style="font-size:15px;font-weight:600;letter-spacing:-.01em;margin:0">{{ j.title }}</p>
+              <p style="font-size:12.5px;color:#8b8681;margin:4px 0 0">{{ j.meta }}</p>
+            </div>
+            <button style="border:none;height:34px;padding:0 15px;border-radius:9999px;background:#f9f7f4;color:#55524f;font:inherit;font-size:13px;font-weight:500;cursor:pointer;flex-shrink:0" style-hover="color:#1e1e24;background:#edebe7">{{ j.action }}</button>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+    <div style="border-radius:36px;background:#f1eeea;padding:64px 40px;text-align:center">
+      <div style="width:52px;height:52px;margin:0 auto;border-radius:16px;background:#fffdfa;display:flex;align-items:center;justify-content:center;color:#b6b1aa"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="8" width="18" height="12" rx="3"></rect><circle cx="8.6" cy="14" r="1.1" fill="currentColor" stroke="none"></circle><circle cx="15.4" cy="14" r="1.1" fill="currentColor" stroke="none"></circle><path d="M12 8V4" stroke-linecap="round"></path></svg></div>
+      <h3 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.02em;font-size:22px;font-weight:500;margin:20px 0 8px">Atlas isn't doing anything on its own</h3>
+      <p style="font-size:14.5px;line-height:1.6;color:#6d6a67;margin:0 auto;max-width:460px;text-wrap:pretty">It only works unattended when you ask it to, or on a schedule you've set. There are no schedules yet, so this stays empty — which is the correct state, not a missing feature.</p>
+      <button onClick="{{ goLearning }}" style="border:none;margin-top:24px;height:38px;padding:0 18px;border-radius:9999px;background:#fffdfa;color:#33312f;font:inherit;font-size:14px;font-weight:500;cursor:pointer" style-hover="background:#edebe7">Set up a schedule</button>
+    </div>
+    </sc-if>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isKnowledge }}" hint-placeholder-val="{{ false }}">
+  <div>
+    <sc-if value="{{ full }}" hint-placeholder-val="{{ true }}">
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+        <span style="padding:8px 15px;border-radius:9999px;background:#1e1e24;color:#f9f7f4;font-size:13px;font-weight:500">Everything · 64</span>
+        <span style="padding:8px 15px;border-radius:9999px;background:#f1eeea;color:#55524f;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#edebe7">Documents · 38</span>
+        <span style="padding:8px 15px;border-radius:9999px;background:#f1eeea;color:#55524f;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#edebe7">Web pages · 14</span>
+        <span style="padding:8px 15px;border-radius:9999px;background:#f1eeea;color:#55524f;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#edebe7">Mail · 9</span>
+        <span style="padding:8px 15px;border-radius:9999px;background:#f1eeea;color:#55524f;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#edebe7">Notes · 3</span>
+        <button style="margin-left:auto;height:38px;padding:0 18px;border-radius:9999px;background:#3461f2;border:none;color:#fff;font:inherit;font-size:14px;font-weight:500;cursor:pointer" style-hover="background:#5b7cff">Add something</button>
+      </div>
+      <div style="border-radius:36px;background:#f1eeea;padding:10px 26px">
+        <sc-for list="{{ docs }}" as="d" hint-placeholder-count="6">
+          <div style="display:flex;align-items:center;gap:16px;padding:19px 0">
+            <div style="width:36px;height:36px;flex-shrink:0;border-radius:11px;background:#fffdfa;display:flex;align-items:center;justify-content:center;color:#55524f"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"></path><path d="M14 2v5h5"></path></svg></div>
+            <div style="flex:1;min-width:0">
+              <p style="font-size:15px;font-weight:600;letter-spacing:-.01em;margin:0">{{ d.title }}</p>
+              <p style="font-size:12.5px;color:#8b8681;margin:4px 0 0">{{ d.meta }}</p>
+            </div>
+            <span style="font-size:12.5px;color:#6d6a67;flex-shrink:0">{{ d.used }}</span>
+          </div>
+        </sc-for>
+        <p style="font-size:13px;color:#6d6a67;margin:16px 0">Showing 6 of 64. Everything here is stored and indexed on this Mac.</p>
+      </div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+    <div style="border-radius:36px;background:#f1eeea;padding:36px">
+      <div style="border-radius:28px;background:#f9f7f4;padding:56px 40px;text-align:center">
+        <div style="width:52px;height:52px;margin:0 auto;border-radius:16px;background:#f1eeea;display:flex;align-items:center;justify-content:center;color:#b6b1aa"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path></svg></div>
+        <h3 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.02em;font-size:22px;font-weight:500;margin:20px 0 8px">Drop a file here</h3>
+        <p style="font-size:14.5px;line-height:1.6;color:#6d6a67;margin:0 auto;max-width:440px;text-wrap:pretty">PDFs, notes, pages you've saved. Atlas reads them once, indexes them here, and can then answer from them. The files stay on your disk.</p>
+        <button style="margin-top:24px;height:38px;padding:0 18px;border-radius:9999px;background:#3461f2;border:none;color:#fff;font:inherit;font-size:14px;font-weight:500;cursor:pointer" style-hover="background:#5b7cff">Choose a file</button>
+      </div>
+    </div>
+    </sc-if>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isResearch }}" hint-placeholder-val="{{ false }}">
+  <div>
+    <div style="display:flex;align-items:center;gap:12px;padding:14px 20px;border-radius:9999px;background:#fffdfa;margin-bottom:18px">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b6b1aa" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+      <input placeholder="What should Atlas look into while you're not here?" style="flex:1;min-width:0;border:none;outline:none;background:transparent;font:inherit;font-size:15.5px;color:#1e1e24">
+      <button style="height:34px;padding:0 16px;border-radius:9999px;background:#3461f2;border:none;color:#fff;font:inherit;font-size:13.5px;font-weight:500;cursor:pointer;flex-shrink:0" style-hover="background:#5b7cff">Add topic</button>
+    </div>
+
+    <sc-if value="{{ full }}" hint-placeholder-val="{{ true }}">
+    <div style="border-radius:36px;background:#f1eeea;padding:26px">
+      <h3 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.01em;font-size:18px;font-weight:500;margin:0 0 4px">Three topics on the go</h3>
+      <p style="font-size:13.5px;color:#6d6a67;margin:0 0 18px">Worked on overnight, in the order you've put them.</p>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <sc-for list="{{ topics }}" as="t" hint-placeholder-count="3">
+          <div style="display:flex;align-items:center;gap:18px;padding:18px 20px;border-radius:20px;background:#fffdfa">
+            <span style="font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:9999px;flex-shrink:0;background:{{ t.chipBg }};color:{{ t.chipFg }}">{{ t.priority }}</span>
+            <div style="flex:1;min-width:0">
+              <p style="font-size:15px;font-weight:600;letter-spacing:-.01em;margin:0">{{ t.title }}</p>
+              <p style="font-size:12.5px;color:#8b8681;margin:4px 0 0">{{ t.meta }}</p>
+            </div>
+            <div style="width:160px;flex-shrink:0"><div style="height:6px;border-radius:9999px;background:#edebe7;overflow:hidden"><div style="height:100%;border-radius:9999px;background:#3461f2;width:{{ t.pct }}"></div></div></div>
+            <button style="border:none;height:32px;padding:0 14px;border-radius:9999px;background:#f9f7f4;color:#55524f;font:inherit;font-size:13px;cursor:pointer;flex-shrink:0" style-hover="color:#a3352c;background:#f7e6e4">Stop</button>
+          </div>
+        </sc-for>
+      </div>
+      <p style="font-size:13.5px;color:#6d6a67;margin:20px 0 0;padding-top:18px">Two topics finished this month. <a href="#">Read what it found →</a></p>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+    <div style="border-radius:36px;background:#f1eeea;padding:64px 40px;text-align:center">
+      <div style="width:52px;height:52px;margin:0 auto;border-radius:16px;background:#fffdfa;display:flex;align-items:center;justify-content:center;color:#b6b1aa"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="11" cy="11" r="6"></circle><path d="m19 19-3.2-3.2M11 8v6M8 11h6"></path></svg></div>
+      <h3 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.02em;font-size:22px;font-weight:500;margin:20px 0 8px">Atlas isn't looking into anything</h3>
+      <p style="font-size:14.5px;line-height:1.6;color:#6d6a67;margin:0 auto;max-width:460px;text-wrap:pretty">Give it a subject and it will read around it overnight, then tell you what it found. It won't pick topics for you — it doesn't know enough about your work yet to guess well.</p>
+    </div>
+    </sc-if>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isMemory }}" hint-placeholder-val="{{ false }}">
+  <div>
+    <sc-if value="{{ full }}" hint-placeholder-val="{{ true }}">
+    <div style="display:grid;grid-template-columns:250px 1fr;gap:18px;align-items:start">
+
+      <div style="border-radius:36px;background:#f1eeea;padding:20px">
+        <p style="font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#b6b1aa;margin:0 0 12px">By category</p>
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <sc-for list="{{ cats }}" as="c" hint-placeholder-count="6">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border-radius:12px;cursor:pointer;background:{{ c.bg }}" style-hover="background:#edebe7">
+              <span style="font-size:14px;color:{{ c.fg }}">{{ c.name }}</span>
+              <span style="font-size:12.5px;color:#8b8681;font-variant-numeric:tabular-nums">{{ c.n }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <p style="font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#b6b1aa;margin:20px 0 8px;padding-top:16px">Volunteered</p>
+        <p style="font-size:12.5px;line-height:1.55;color:#8b8681;margin:0 0 10px;text-wrap:pretty">Things you chose to tell it. Kept apart, never used to guess.</p>
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border-radius:12px;cursor:pointer" style-hover="background:#edebe7"><span style="font-size:14px;color:#33312f">fears</span><span style="font-size:12.5px;color:#8b8681;font-variant-numeric:tabular-nums">2</span></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border-radius:12px;cursor:pointer" style-hover="background:#edebe7"><span style="font-size:14px;color:#33312f">dreams</span><span style="font-size:12.5px;color:#8b8681;font-variant-numeric:tabular-nums">3</span></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;border-radius:12px;cursor:pointer" style-hover="background:#edebe7"><span style="font-size:14px;color:#33312f">beliefs</span><span style="font-size:12.5px;color:#8b8681;font-variant-numeric:tabular-nums">1</span></div>
+        </div>
+      </div>
+
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px">
+          <p style="font-size:14px;color:#6d6a67;margin:0">218 things remembered · 4.2 MB · all on this Mac</p>
+          <div style="display:flex;gap:9px">
+            <button style="border:none;height:36px;padding:0 16px;border-radius:9999px;background:#fffdfa;color:#33312f;font:inherit;font-size:13.5px;font-weight:500;cursor:pointer" style-hover="background:#edebe7">Export everything</button>
+            <button style="border:none;height:36px;padding:0 16px;border-radius:9999px;background:#fffdfa;color:#a3352c;font:inherit;font-size:13.5px;font-weight:500;cursor:pointer" style-hover="background:#f7e6e4">Forget everything</button>
+          </div>
+        </div>
+
+        <div style="border-radius:36px;background:#f1eeea;padding:10px 24px">
+          <sc-for list="{{ mems }}" as="m" hint-placeholder-count="6">
+            <div style="display:flex;align-items:flex-start;gap:16px;padding:20px 0">
+              <span style="font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:9999px;background:#fffdfa;color:#55524f;flex-shrink:0;margin-top:1px">{{ m.cat }}</span>
+              <div style="flex:1;min-width:0">
+                <p style="font-size:15px;line-height:1.5;margin:0;color:#1e1e24;text-wrap:pretty">{{ m.text }}</p>
+                <p style="font-size:12.5px;color:#8b8681;margin:5px 0 0">{{ m.meta }}</p>
+              </div>
+              <div style="display:flex;gap:6px;flex-shrink:0">
+                <button style="border:none;height:30px;padding:0 12px;border-radius:9999px;background:#fffdfa;color:#55524f;font:inherit;font-size:12.5px;cursor:pointer" style-hover="color:#1e1e24;background:#edebe7">Correct</button>
+                <button style="border:none;height:30px;padding:0 12px;border-radius:9999px;background:#fffdfa;color:#8b8681;font:inherit;font-size:12.5px;cursor:pointer" style-hover="color:#a3352c;background:#f7e6e4">Forget</button>
+              </div>
+            </div>
+          </sc-for>
+          <div style="padding:18px 0 20px">
+            <p style="font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#b6b1aa;margin:0 0 12px">Changed recently</p>
+            <div style="padding:16px 18px;border-radius:18px;background:#fffdfa">
+              <p style="font-size:14.5px;margin:0;color:#1e1e24">Works at <strong style="font-weight:600">Innovo</strong>, as a founder</p>
+              <p style="font-size:13px;color:#8b8681;margin:7px 0 0;text-decoration:line-through">Works at Innovo Studio, as a designer</p>
+              <p style="font-size:12.5px;color:#8b8681;margin:8px 0 0">You corrected this yesterday. The old version is kept so you can see what changed — <a href="#">put it back</a>.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+    <div style="border-radius:36px;background:#f1eeea;padding:64px 40px;text-align:center">
+      <div style="width:52px;height:52px;margin:0 auto;border-radius:16px;background:#fffdfa;display:flex;align-items:center;justify-content:center;color:#b6b1aa"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"></path></svg></div>
+      <h3 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.02em;font-size:22px;font-weight:500;margin:20px 0 8px">Atlas doesn't know anything about you yet</h3>
+      <p style="font-size:14.5px;line-height:1.6;color:#6d6a67;margin:0 auto;max-width:470px;text-wrap:pretty">It will pick things up as you talk, and everything it picks up appears here — one line each, with the date and where it came from. You can correct or delete any of it, always.</p>
+      <a href="Atlas%20Teach.dc.html" style="display:inline-flex;align-items:center;gap:8px;margin-top:24px;height:38px;padding:0 18px;border-radius:9999px;background:#3461f2;color:#fff;font-size:14px;font-weight:500" style-hover="background:#5b7cff">Tell it something now</a>
+    </div>
+    </sc-if>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isLearning }}" hint-placeholder-val="{{ false }}">
+  <div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;padding:26px 30px;border-radius:36px;background:#fffdfa;margin-bottom:18px">
+      <div style="min-width:0;max-width:620px">
+        <h3 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.02em;font-size:22px;font-weight:500;margin:0">Let Atlas keep learning</h3>
+        <p style="font-size:14.5px;line-height:1.6;color:#6d6a67;margin:8px 0 0;text-wrap:pretty">{{ learnCopy }}</p>
+      </div>
+      <button onClick="{{ toggleLearn }}" style="width:66px;height:36px;flex-shrink:0;border-radius:9999px;border:none;cursor:pointer;padding:3px;display:flex;align-items:center;justify-content:{{ switchJustify }};background:{{ switchBg }}"><span style="width:30px;height:30px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(30,30,36,.28);display:block"></span></button>
+    </div>
+
+    <sc-if value="{{ full }}" hint-placeholder-val="{{ true }}">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(430px,1fr));gap:18px">
+      <div style="border-radius:36px;background:#f1eeea;padding:26px">
+        <h3 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.01em;font-size:18px;font-weight:500;margin:0 0 4px">On a schedule</h3>
+        <p style="font-size:13.5px;color:#6d6a67;margin:0 0 16px">Each of these can be turned off on its own.</p>
+        <sc-for list="{{ schedules }}" as="s" hint-placeholder-count="3">
+          <div style="display:flex;align-items:center;gap:16px;padding:18px 0">
+            <div style="flex:1;min-width:0">
+              <p style="font-size:15px;font-weight:600;letter-spacing:-.01em;margin:0">{{ s.title }}</p>
+              <p style="font-size:12.5px;color:#8b8681;margin:4px 0 0">{{ s.meta }}</p>
+            </div>
+            <span style="width:44px;height:24px;flex-shrink:0;border-radius:9999px;padding:2px;display:flex;align-items:center;justify-content:{{ s.justify }};background:{{ s.bg }}"><span style="width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(30,30,36,.25);display:block"></span></span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="border-radius:36px;background:#f1eeea;padding:26px">
+        <h3 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.01em;font-size:18px;font-weight:500;margin:0 0 4px">What changed this week</h3>
+        <p style="font-size:13.5px;color:#6d6a67;margin:0 0 16px">Every change Atlas made to itself, in plain terms.</p>
+        <sc-for list="{{ changes }}" as="c" hint-placeholder-count="3">
+          <div style="display:flex;gap:14px;padding:18px 0">
+            <span style="width:8px;height:8px;border-radius:50%;background:#3461f2;flex-shrink:0;margin-top:7px"></span>
+            <div style="flex:1;min-width:0">
+              <p style="font-size:14.5px;line-height:1.5;margin:0;text-wrap:pretty">{{ c.text }}</p>
+              <p style="font-size:12.5px;color:#8b8681;margin:4px 0 0">{{ c.meta }}</p>
+            </div>
+          </div>
+        </sc-for>
+        <p style="font-size:13px;color:#6d6a67;margin:16px 0 0">Nothing here trains a model. It is all written down and read back.</p>
+      </div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+    <div style="border-radius:36px;background:#f1eeea;padding:64px 40px;text-align:center">
+      <div style="width:52px;height:52px;margin:0 auto;border-radius:16px;background:#fffdfa;display:flex;align-items:center;justify-content:center;color:#b6b1aa"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"></path></svg></div>
+      <h3 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.02em;font-size:22px;font-weight:500;margin:20px 0 8px">Nothing learned yet</h3>
+      <p style="font-size:14.5px;line-height:1.6;color:#6d6a67;margin:0 auto;max-width:450px;text-wrap:pretty">Learning is on, but Atlas hasn't had a conversation to learn from. The first change it makes will be listed here, along with what caused it.</p>
+    </div>
+    </sc-if>
+  </div>
+  </sc-if>
+
+</main>
+
+<nav style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:92;display:flex;align-items:center;gap:3px;padding:5px;border-radius:9999px;background:#1e1e24;box-shadow:0 18px 44px -12px rgba(30,30,36,.5)">
+  <a href="Atlas%20Dashboard%20(Current).dc.html" title="Home" style="display:flex;align-items:center;justify-content:center;height:32px;padding:0 9px;border-radius:9999px;color:rgba(249,247,244,.8)" style-hover="color:#fff;background:rgba(249,247,244,.12)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></a>
+  <span style="display:flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:9999px;background:#3461f2;color:#fff;font-size:13px;font-weight:500"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="3"></rect><rect x="9" y="9" width="6" height="6" rx="1"></rect><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"></path></svg>Core</span>
+  <a href="Atlas%20Teach.dc.html" title="Teach" style="display:flex;align-items:center;justify-content:center;height:32px;padding:0 9px;border-radius:9999px;color:rgba(249,247,244,.8)" style-hover="color:#fff;background:rgba(249,247,244,.12)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"></path></svg></a>
+  <a href="Atlas%20Mail.dc.html" title="Mail" style="display:flex;align-items:center;justify-content:center;height:32px;padding:0 9px;border-radius:9999px;color:rgba(249,247,244,.8)" style-hover="color:#fff;background:rgba(249,247,244,.12)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="3"></rect><path d="m3.6 7 8.4 5.6L20.4 7"></path></svg></a>
+  <a href="Atlas%20Architecture%20v2.dc.html" title="Architecture" style="display:flex;align-items:center;justify-content:center;height:32px;padding:0 9px;border-radius:9999px;color:rgba(249,247,244,.8)" style-hover="color:#fff;background:rgba(249,247,244,.12)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="2.5"></circle><path d="M12 2v7M12 15v7M4.2 6.5l5.6 3.2M14.2 14.3l5.6 3.2M19.8 6.5l-5.6 3.2M9.8 14.3l-5.6 3.2"></path></svg></a>
+  <button title="Speak to Atlas" style="display:flex;align-items:center;justify-content:center;height:32px;padding:0 9px;border-radius:9999px;color:rgba(249,247,244,.8);background:transparent;border:none;font-family:inherit;cursor:pointer" style-hover="color:#fff;background:rgba(249,247,244,.12)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><path d="M12 19v3"></path></svg></button>
+  <span title="Katherine" style="width:32px;height:32px;border-radius:50%;background:rgba(249,247,244,.14);color:#f9f7f4;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-left:2px">K</span>
+</nav>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1500},&quot;dataState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;In use&quot;,&quot;Day one&quot;],&quot;default&quot;:&quot;In use&quot;,&quot;tsType&quot;:&quot;'In use' | 'Day one'&quot;,&quot;section&quot;:&quot;Content&quot},&quot;startTab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Search&quot;,&quot;Overview&quot;,&quot;Live&quot;,&quot;Agent&quot;,&quot;Knowledge&quot;,&quot;Research&quot;,&quot;Memory&quot;,&quot;Learning&quot;],&quot;default&quot;:&quot;Overview&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Content&quot}}">
+const CHIP = {
+  memory: { chipBg: 'rgba(52,97,242,.1)', chipBd: 'rgba(52,97,242,.24)', chipFg: '#2f4bbd' },
+  doc: { chipBg: '#f1eeea', chipBd: '#e2ded7', chipFg: '#55524f' },
+  talk: { chipBg: 'rgba(15,174,118,.1)', chipBd: 'rgba(15,174,118,.24)', chipFg: '#0a7a53' },
+  mail: { chipBg: '#edebe7', chipBd: '#e2ded7', chipFg: '#55524f' },
+};
+
+class Component extends DCLogic {
+  state = {
+    tab: 'overview',
+    mode: 'full',
+    q: 'what did I tell Innovo about pricing',
+    learning: true,
+  };
+
+  componentDidMount() {
+    this._esc = (e) => { if (e.key === 'Escape') this.back(); };
+    window.addEventListener('keydown', this._esc);
+    if (this.props.dataState === 'Day one') this.setState({ mode: 'empty' });
+    if (this.props.startTab) this.setState({ tab: String(this.props.startTab).toLowerCase() });
+  }
+  componentWillUnmount() { window.removeEventListener('keydown', this._esc); }
+  back() { window.location.href = 'Atlas Dashboard (Current).dc.html'; }
+
+  tabCss(key) {
+    const on = this.state.tab === key;
+    return { bg: on ? '#1e1e24' : 'transparent', fg: on ? '#f9f7f4' : '#6d6a67' };
+  }
+
+  renderVals() {
+    const t = this.state.tab;
+    const full = this.state.mode === 'full';
+    const go = (k) => () => this.setState({ tab: k });
+    const css = {};
+    ['search', 'overview', 'live', 'agent', 'knowledge', 'research', 'memory', 'learning'].forEach((k) => {
+      const c = this.tabCss(k);
+      css['bg' + k[0].toUpperCase() + k.slice(1)] = c.bg;
+      css['fg' + k[0].toUpperCase() + k.slice(1)] = c.fg;
+    });
+
+    return {
+      ...css,
+      full, empty: !full,
+      isSearch: t === 'search', isOverview: t === 'overview', isLive: t === 'live',
+      isAgent: t === 'agent', isKnowledge: t === 'knowledge', isResearch: t === 'research',
+      isMemory: t === 'memory', isLearning: t === 'learning',
+
+      goSearch: go('search'), goOverview: go('overview'), goLive: go('live'), goAgent: go('agent'),
+      goKnowledge: go('knowledge'), goResearch: go('research'), goMemory: go('memory'), goLearning: go('learning'),
+      goBack: () => this.back(),
+      orbRef: (el) => { if (el && window.AtlasSphere) window.AtlasSphere.mount(el, () => ({ state: full ? 'thinking' : 'idle' })); },
+
+      heroSub: full
+        ? 'Everything Atlas knows, everything it is doing, and everything it is learning — with nothing invented to fill the gaps.'
+        : 'Atlas has been running for six minutes. Most of this is empty, and that is exactly right.',
+
+      setFull: () => this.setState({ mode: 'full', q: 'what did I tell Innovo about pricing' }),
+      setEmpty: () => this.setState({ mode: 'empty', q: '' }),
+      fullBg: full ? '#1e1e24' : 'transparent', fullFg: full ? '#f9f7f4' : '#6d6a67',
+      emptyBg: full ? 'transparent' : '#1e1e24', emptyFg: full ? '#6d6a67' : '#f9f7f4',
+
+      stMem: full ? '218' : '0',
+      stMemSub: full ? '4 new this week' : 'nothing learned yet',
+      stMemTone: full ? '#0a7a53' : '#b6b1aa',
+      stMemArrow: full,
+      stDoc: full ? '64' : '0',
+      stDocSub: full ? '318 MB on disk' : 'no documents added',
+      stDocTone: full ? '#6d6a67' : '#b6b1aa',
+      stJob: full ? '7' : '0',
+      stJobSub: full ? '1 still running' : 'no schedules set',
+      stJobTone: full ? '#6d6a67' : '#b6b1aa',
+      stErr: full ? '1' : '0',
+      stErrSub: full ? 'a rate limit, recovered' : 'no comparison period yet',
+      stErrTone: full ? '#a3352c' : '#b6b1aa',
+
+      hasRuns: full,
+      runCount: '3',
+      q: this.state.q,
+      setQ: (e) => this.setState({ q: e.target.value }),
+
+      results: [
+        { ...CHIP.memory, kind: 'Memory', title: 'Pricing floor for Innovo work', snippet: 'You said you would not go below £950 a day for the Innovo engagement, and that you would rather cut scope than the rate.', where: 'You said this on 14 June · matched on meaning, not words', score: '0.94', pct: '94%' },
+        { ...CHIP.doc, kind: 'Document', title: 'Innovo — proposal v3.pdf', snippet: 'Day rate £950, minimum eight-day engagement, invoiced monthly in arrears…', where: 'Page 2 of 6 · added 11 June · indexed on this Mac', score: '0.91', pct: '91%' },
+        { ...CHIP.talk, kind: 'Conversation', title: 'Thursday morning, about the call', snippet: 'You asked me to remind you not to quote a fixed price before seeing their brief.', where: '19 June, 09:12 · 4 turns · kept for 90 days', score: '0.78', pct: '78%' },
+        { ...CHIP.mail, kind: 'Mail', title: 'Re: scope and rates — Dana', snippet: 'Happy with the day rate, can we look at a retainer from September?', where: 'From Dana Okafor · 21 June · read from your inbox', score: '0.64', pct: '64%' },
+      ],
+
+      events: [
+        { time: '11:42:05', dot: '#3461f2', text: 'Chose 3 memories to include', meta: 'Pricing floor · Innovo proposal · your working hours' },
+        { time: '11:42:04', dot: '#0fae76', text: 'Searched everything on this Mac', meta: '218 memories, 64 documents · 40 ms · nothing sent' },
+        { time: '11:42:03', dot: '#0fae76', text: 'Heard you finish', meta: '"remind me what I said about Innovo pricing" · 2.4s of speech' },
+        { time: '11:41:58', dot: '#0fae76', text: 'Woke up', meta: 'Heard its name · microphone was already on' },
+        { time: '11:38:00', dot: '#3950e6', text: 'Started the weekly digest', meta: 'Scheduled job · running on Bedrock, EU' },
+        { time: '09:14:22', dot: '#0fae76', text: 'Remembered something new', meta: 'work — "reviews the Innovo deck on Fridays"' },
+        { time: '06:12:01', dot: '#b6b1aa', text: 'Atlas started', meta: 'Loaded your memory file · 4.2 MB' },
+      ],
+
+      runs: [
+        { status: 'Queued', chipBg: '#f1eeea', chipBd: '#e2ded7', chipFg: '#55524f', title: 'Summarise the Innovo brief', meta: 'You asked for this at 11:20 · starts when the digest finishes', action: 'Cancel' },
+        { status: 'Queued', chipBg: '#f1eeea', chipBd: '#e2ded7', chipFg: '#55524f', title: 'Follow up on on-device inference costs', meta: 'Research topic · 2 new sources to read', action: 'Cancel' },
+        { status: 'Failed', chipBg: 'rgba(208,69,58,.1)', chipBd: 'rgba(208,69,58,.26)', chipFg: '#a3352c', title: 'Morning briefing', meta: '06:00 · rate limit at the provider · nothing was lost', action: 'Run again' },
+        { status: 'Done', chipBg: 'rgba(15,174,118,.1)', chipBd: 'rgba(15,174,118,.24)', chipFg: '#0a7a53', title: 'Read and index — Innovo proposal v3.pdf', meta: '11:04 · 6 pages · 18 seconds', action: 'Open' },
+      ],
+
+      docs: [
+        { title: 'Innovo — proposal v3.pdf', meta: 'PDF · 6 pages · added 11 June', used: 'used 9 times' },
+        { title: 'Katherine — CV 2026.pdf', meta: 'PDF · 2 pages · added 3 May', used: 'used 24 times' },
+        { title: 'Studio operating notes', meta: 'Note · written here · updated last week', used: 'used 7 times' },
+        { title: 'On-device inference: a survey', meta: 'Web page · saved 28 May', used: 'used 3 times' },
+        { title: 'Dana Okafor — thread', meta: 'Mail · 14 messages · read from your inbox', used: 'used 2 times' },
+        { title: 'Q3 planning — shared doc', meta: 'PDF · 11 pages · added 2 June', used: 'never used' },
+      ],
+
+      topics: [
+        { priority: 'High', chipBg: 'rgba(52,97,242,.1)', chipBd: 'rgba(52,97,242,.24)', chipFg: '#2f4bbd', title: 'How other studios price retainers', meta: 'Reading · 11 sources so far · started 3 days ago', pct: '72%' },
+        { priority: 'Normal', chipBg: '#f1eeea', chipBd: '#e2ded7', chipFg: '#55524f', title: 'On-device inference costs', meta: 'Reading · 5 sources · started last week', pct: '41%' },
+        { priority: 'Low', chipBg: '#f1eeea', chipBd: '#e2ded7', chipFg: '#8b8681', title: 'Voice interfaces for older users', meta: 'Waiting its turn · nothing read yet', pct: '0%' },
+      ],
+
+      cats: [
+        { name: 'everything', n: '218', bg: '#edebe7', fg: '#1e1e24' },
+        { name: 'preferences', n: '52', bg: 'transparent', fg: '#33312f' },
+        { name: 'work', n: '41', bg: 'transparent', fg: '#33312f' },
+        { name: 'relationships', n: '29', bg: 'transparent', fg: '#33312f' },
+        { name: 'habits', n: '24', bg: 'transparent', fg: '#33312f' },
+        { name: 'identity', n: '18', bg: 'transparent', fg: '#33312f' },
+        { name: 'health', n: '11', bg: 'transparent', fg: '#33312f' },
+      ],
+
+      mems: [
+        { cat: 'work', text: 'Founder at Innovo. Spends most of the week on product rather than sales.', meta: 'You told Atlas · 14 June · used 31 times' },
+        { cat: 'preferences', text: 'Would rather be given one clear recommendation than three options.', meta: 'Picked up from conversation · 2 May · used 88 times' },
+        { cat: 'relationships', text: 'Dana Okafor is the client contact at Innovo, and the one who signs off.', meta: 'From your mail · 21 June · used 12 times' },
+        { cat: 'habits', text: 'Reviews the week on Friday afternoons and does not want to be interrupted then.', meta: 'You told Atlas · 9 June · used 6 times' },
+        { cat: 'identity', text: 'Grew up in Lagos, moved to London at nineteen.', meta: 'You told Atlas · 3 May · used 4 times' },
+        { cat: 'health', text: 'Migraines when sleep drops below six hours. Wants to be told, gently.', meta: 'You told Atlas · 28 April · used 2 times' },
+      ],
+
+      learnCopy: this.state.learning
+        ? 'It writes down what seems worth keeping, tidies the file overnight, and adjusts how it talks to you. Everything it changes is listed, and every change can be undone.'
+        : 'Atlas will still answer you, but it will stop remembering anything new and stop adjusting how it talks. Nothing already learned is deleted.',
+      toggleLearn: () => this.setState((s) => ({ learning: !s.learning })),
+      switchBg: this.state.learning ? '#3461f2' : '#d8d4cd',
+      switchJustify: this.state.learning ? 'flex-end' : 'flex-start',
+
+      schedules: [
+        { title: 'Tidy up overnight', meta: 'Every night at 02:00 · last run 02:00, took 4 minutes', bg: '#3461f2', justify: 'flex-end' },
+        { title: 'Weekly digest', meta: 'Sundays at 18:00 · running now', bg: '#3461f2', justify: 'flex-end' },
+        { title: 'Follow up on research', meta: 'Every 6 hours · turned off since 12 June', bg: '#d8d4cd', justify: 'flex-start' },
+      ],
+
+      changes: [
+        { text: 'Started giving you one recommendation instead of a list.', meta: 'Tuesday · after you said "just tell me which one"' },
+        { text: 'Stopped opening with pleasantries before 10am.', meta: 'Monday · noticed across nine mornings' },
+        { text: 'Learned that "the deck" means the Innovo deck, not the pitch deck.', meta: 'Last Thursday · you corrected it once' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<style>
+button,input,textarea,select{border:none}@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Hanken+Grotesk:wght@500;600;700&family=Newsreader:ital,wght@1,500&display=swap');</style>
+<style>
+*{box-sizing:border-box}
+.scene{position:absolute;inset:0;overflow:hidden;font-family:'Geist',system-ui,sans-serif;color:#fffdfa;background:#3461f2;-webkit-font-smoothing:antialiased;cursor:default}
+.bgcv,.orbcv{position:absolute;display:block;pointer-events:none}
+.bgcv{inset:0;width:100%;height:100%;z-index:0}
+.orbcv{position:absolute;inset:0;width:100%;height:100%;z-index:1;filter:saturate(1.05)}
+.scrim{position:absolute;inset:0;z-index:3;pointer-events:none;background:linear-gradient(90deg,rgba(14,24,78,.16) 0%,transparent 30%,rgba(12,20,70,.22) 66%,rgba(10,18,64,.4) 100%)}
+.vig{position:absolute;inset:0;z-index:2;pointer-events:none;background:radial-gradient(90% 120% at 6% 50%,rgba(14,24,78,.32),transparent 55%)}
+.grid2{position:absolute;inset:0;z-index:4;display:grid;grid-template-columns:1.02fr .98fr;align-items:stretch}
+.left{display:flex;flex-direction:column;justify-content:center;padding:0 4% 0 6.5%}
+.right{position:relative;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;padding:0 6.5% 0 3%}
+.logo{position:absolute;top:5.5%;left:6.5%;z-index:6;font-family:'Hanken Grotesk',sans-serif;font-size:20px;font-weight:600;letter-spacing:-.02em}
+.dots{display:flex;gap:8px;margin-bottom:34px}
+.dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.3);transition:all .45s var(--e)}
+.dot.on{background:#fffdfa;width:20px;border-radius:4px}
+.amsg{font-family:'Hanken Grotesk',sans-serif;font-size:clamp(34px,5.4vw,62px);line-height:1.03;letter-spacing:-.04em;font-weight:600;margin:0;max-width:12ch}
+.wd{display:inline-block;margin-right:.24em;animation:wfade 1.05s cubic-bezier(.2,.65,.2,1) both}
+.caret{display:inline-block;width:4px;height:.86em;margin-left:2px;background:#fffdfa;border-radius:2px;vertical-align:-4px;animation:blink 1s steps(1) infinite}
+.sub{margin:22px 0 0;font-family:'Newsreader',serif;font-style:italic;font-size:19px;color:rgba(255,253,250,.82);max-width:26ch}
+.ans{opacity:0;transform:translateY(14px);transition:opacity .55s var(--e),transform .55s var(--e);width:100%}
+.ans.on{opacity:1;transform:none}
+.choices{display:flex;flex-direction:column;gap:14px;align-items:flex-start}
+.choice{position:relative;border:0;padding:4px 2px 10px;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(26px,3vw,34px);font-weight:600;letter-spacing:-.03em;cursor:pointer;opacity:.82;-webkit-text-fill-color:transparent;background:linear-gradient(100deg,#f2e9da 0%,#f2e9da 38%,#ffffff 50%,#f2e9da 62%,#f2e9da 100%);background-size:260% 100%;background-position:0% 0;-webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 2px 18px rgba(120,30,0,.45));transition:background-position .8s var(--e),opacity .3s var(--e),transform .38s var(--e);animation:riseIn .6s var(--e) both}
+.choices .choice:nth-child(2){animation-delay:.1s}
+.choice:hover{opacity:1;transform:translateY(-3px);background-position:100% 0}
+.bigin{width:100%;background:transparent;border:0;outline:0;color:#fffdfa;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(28px,3.4vw,40px);font-weight:600;letter-spacing:-.03em;padding:6px 0 26px;line-height:1.12;caret-color:#fffdfa;text-shadow:0 2px 20px rgba(120,30,0,.5)}
+.bigin::placeholder{color:rgba(255,253,250,.4)}
+.orbhint{margin:16px 0 0;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,253,250,.72);cursor:pointer;display:inline-flex;align-items:center;gap:9px}
+.orbhint .pip{width:8px;height:8px;border-radius:50%;background:#fffdfa;box-shadow:0 0 0 0 rgba(255,253,250,.5);animation:pip 1.8s ease-out infinite}
+.foot{display:flex;align-items:center;gap:26px;margin-top:26px;min-height:28px}
+.cont{display:inline-flex;align-items:center;gap:9px;background:none;border:0;color:#fffdfa;font-family:'Hanken Grotesk',sans-serif;font-size:19px;font-weight:600;cursor:pointer;opacity:.92;transition:gap .2s;animation:tagin .3s var(--e) both}
+.cont:hover{gap:14px}
+.tps{display:flex;gap:12px}
+.tpc{width:52px;height:52px;border-radius:50%;border:0;background:rgba(255,255,255,.13);color:#fffdfa;font-family:'Hanken Grotesk',sans-serif;font-weight:700;font-size:18px;cursor:pointer;backdrop-filter:blur(8px);transition:background .2s,transform .18s}
+.tpc:hover{background:rgba(255,255,255,.26);transform:translateY(-2px)}
+.enter{display:inline-flex;align-items:center;gap:12px;background:none;border:0;color:#fffdfa;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(24px,3vw,32px);font-weight:600;letter-spacing:-.03em;cursor:pointer;transition:gap .2s}
+.enter:hover{gap:18px;color:#fffdfa}
+@keyframes wfade{from{opacity:0;transform:translateY(.16em);filter:blur(4px)}to{opacity:1;transform:none;filter:blur(0)}}
+@keyframes riseIn{from{opacity:0;transform:translateY(16px)}to{opacity:.82;transform:none}}
+@keyframes blink{0%,50%{opacity:1}51%,100%{opacity:0}}
+@keyframes pip{0%{box-shadow:0 0 0 0 rgba(255,253,250,.5)}70%,100%{box-shadow:0 0 0 12px rgba(255,253,250,0)}}
+@keyframes tagin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+:root{--e:cubic-bezier(.22,1,.36,1)}
+</style>
+<script src="atlas-transition.js"></script>
+</helmet>
+<div class="scene" onMouseMove="{{ onMove }}" onMouseLeave="{{ onLeave }}">
+<canvas class="bgcv" ref="{{ bgRef }}"></canvas>
+<canvas class="orbcv" ref="{{ orbRef }}"></canvas>
+<div class="vig"></div>
+<div class="scrim"></div>
+<span class="logo">atlas</span>
+<div class="grid2">
+<div class="left">
+<p class="amsg"><sc-for list="{{ words }}" as="wd" hint-placeholder-count="3"><span class="wd">{{ wd.w }}</span></sc-for><sc-if value="{{ typing }}" hint-placeholder-val="{{ false }}"><span class="caret"></span></sc-if></p>
+</div>
+<div class="right">
+<div class="{{ ansCls }}">
+<sc-if value="{{ isChoice }}" hint-placeholder-val="{{ true }}"><div class="choices"><sc-for list="{{ choices }}" as="c" hint-placeholder-count="2"><button class="choice" onClick="{{ c.act }}" onMouseEnter="{{ hoverOn }}" onMouseLeave="{{ hoverOff }}">{{ c.label }}</button></sc-for></div></sc-if>
+<sc-if value="{{ isText }}" hint-placeholder-val="{{ false }}">
+<input class="bigin" placeholder="{{ ph }}" value="{{ val }}" onInput="{{ onField }}" onKeyDown="{{ onKey }}" autoFocus="{{ true }}" autoComplete="off"/>
+<div class="orbhint" onClick="{{ voice }}"><span class="pip"></span>{{ orbHint }}</div>
+<div class="foot"><sc-if value="{{ hasVal }}" hint-placeholder-val="{{ false }}"><button class="cont" onClick="{{ confirm }}">continue →</button></sc-if><div class="tps"><button class="tpc" onClick="{{ third }}"></button><button class="tpc" onClick="{{ third }}">G</button></div></div>
+</sc-if>
+<sc-if value="{{ isDone }}" hint-placeholder-val="{{ false }}"><a class="enter" href="{{ enterHref }}">Enter Atlas →</a></sc-if>
+</div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:960,&quot;height&quot;:600}}">
+class Component extends DCLogic {
+  state = { phase: 'intro', step: 'start', mode: null, name: '', toks: [], shown: 0, ready: false, listening: false, orbState: 'idle', panelKey: 0 };
+  mx = 0; my = 0; tx = 0; ty = 0;
+  STEPS = {
+    start: { kind: 'choice', msg: () => "Hey — I'm Atlas. Have we met before?", sub: () => "Tell me where to begin.", choices: [
+      { label: "Yes, we've met before", act: () => this.pick('signin', 'ident') },
+      { label: "No, we're just meeting", act: () => this.pick('signup', 'ident') } ] },
+    ident: { kind: 'text', ph: 'your name', msg: (s) => s.mode === 'signin' ? "Welcome back. Who are you?" : "Lovely. What should I call you?", sub: () => "Speak to me, or just type.", next: 'done' },
+    done: { kind: 'done', msg: (s) => `Good to see you, ${(s.name || 'friend').split(' ')[0]}.`, sub: () => "Everything is ready." }
+  };
+  cur() { return this.STEPS[this.state.step]; }
+  componentDidMount() { this._t = setTimeout(() => { this.setState({ phase: 'chat' }); this.go('start'); }, 1500); }
+  componentWillUnmount() { clearInterval(this._mt); clearTimeout(this._t); clearTimeout(this._v); }
+  tokenize(f) { return f.split(' ').map(w => ({ w })); }
+  typeMsg(f) { clearInterval(this._mt); const t = this.tokenize(f); let i = 0; this.setState({ toks: t, shown: 0, ready: false, orbState: 'speaking' }); this._mt = setInterval(() => { i++; this.setState({ shown: i }); if (i >= t.length) { clearInterval(this._mt); this.setState({ ready: true, orbState: 'idle' }); } }, 155); }
+  go(step) { const s = this.STEPS[step]; this.setState(p => ({ step, listening: false, panelKey: p.panelKey + 1 })); this.typeMsg(s.msg(this.state)); }
+  pick(mode, to) { this.setState({ mode }); const s = this.STEPS[to]; this.setState(p => ({ step: to, panelKey: p.panelKey + 1 })); this.typeMsg(s.msg({ ...this.state, mode })); }
+  onField(e) { this.setState({ name: e.target.value }); }
+  onKey(e) { if (e.key === 'Enter') this.confirm(); }
+  confirm() { if (!this.state.name.trim()) return; this.go('done'); }
+  voice() { if (this.state.listening) return; this.setState({ listening: true, orbState: 'listening' }); const target = 'Marcus Chen'; clearTimeout(this._v); this._v = setTimeout(() => { let i = 0; this._vt = setInterval(() => { i++; this.setState({ name: target.slice(0, i) }); if (i >= target.length) { clearInterval(this._vt); this.setState({ listening: false, orbState: 'idle' }); } }, 65); }, 700); }
+  third() { this.setState({ mode: this.state.mode || 'signin', name: 'Marcus Chen', orbState: 'thinking' }); clearTimeout(this._v); this._v = setTimeout(() => this.go('done'), 900); }
+  onMove(e) { const r = e.currentTarget.getBoundingClientRect(); this.mx = ((e.clientX - r.left) / r.width - 0.5) * 2; this.my = ((e.clientY - r.top) / r.height - 0.5) * 2; }
+  onLeave() { this.mx = 0; this.my = 0; }
+  hoverOn() { if (this.cur().kind === 'choice' && !this.state.listening) this.setState({ orbState: 'listening' }); }
+  hoverOff() { if (this.cur().kind === 'choice') this.setState({ orbState: 'idle' }); }
+  bg(el) {
+    if (!el || el.__run) return; el.__run = 1; const ctx = el.getContext('2d');
+    const fit = () => { const d = Math.min(2, devicePixelRatio || 1); el.width = el.clientWidth * d; el.height = el.clientHeight * d; el.__d = d; };
+    fit(); addEventListener('resize', fit);
+    const B = [{ c: '255,200,132', x: .2, y: .3, r: .8, a: .06 }, { c: '255,150,54', x: .8, y: .7, r: .9, a: .05 }, { c: '128,102,255', x: .3, y: .85, r: .7, a: .03 }];
+    const tick = (t) => { if (!el.isConnected) { if (el.__seen) { el.__run = 0; return; } requestAnimationFrame(tick); return; } el.__seen = 1; if (!el.width) fit(); const W = el.width, H = el.height; ctx.clearRect(0, 0, W, H); ctx.globalCompositeOperation = 'lighter'; for (const b of B) { const bx = W * (b.x + .1 * Math.sin(t * .0001 + b.x * 9) - this.tx * .04); const by = H * (b.y + .1 * Math.cos(t * .00012 + b.y * 9)); const g = ctx.createRadialGradient(bx, by, 0, bx, by, W * b.r); g.addColorStop(0, 'rgba(' + b.c + ',' + b.a + ')'); g.addColorStop(1, 'rgba(' + b.c + ',0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); } requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+  }
+  orb(el) {
+    if (!el || el.__run) return; el.__run = 1; const ctx = el.getContext('2d');
+    const fit = () => { const d = Math.min(2, devicePixelRatio || 1); el.width = el.clientWidth * d; el.height = el.clientHeight * d; el.__d = d; };
+    fit(); addEventListener('resize', fit);
+    const N = 6400, pts = [];
+    for (let i = 0; i < N; i++) { const th = Math.random() * 6.283, ph = Math.acos(2 * Math.random() - 1), r = Math.pow(Math.random(), .42); pts.push({ x: r * Math.sin(ph) * Math.cos(th), y: r * Math.sin(ph) * Math.sin(th), z: r * Math.cos(ph), rn: Math.random(), bl: Math.random() < .16 }); }
+    const TG = { idle: { br: .95, spd: .0026, jit: 0 }, listening: { br: 1.12, spd: .004, jit: .14 }, thinking: { br: 1, spd: .013, jit: .5 }, speaking: { br: 1.14, spd: .005, jit: .22 } };
+    const cur = { ...TG.idle }; let rot = 0;
+    const tick = (t) => {
+      if (!el.isConnected) { if (el.__seen) { el.__run = 0; return; } requestAnimationFrame(tick); return; } el.__seen = 1; if (!el.width) fit();
+      this.tx += (this.mx - this.tx) * .06; this.ty += (this.my - this.ty) * .06;
+      const S = el.width, d = el.__d, H = el.height; ctx.clearRect(0, 0, S, H);
+      const T = TG[this.state.orbState] || TG.idle; for (const k in T) cur[k] += (T[k] - cur[k]) * .06;
+      rot += cur.spd; const cxr = Math.cos(rot), sxr = Math.sin(rot);
+      const cx = S * .9 + this.tx * S * .05 + Math.sin(t * .00042) * S * .015, cy = H * .55 + this.ty * H * .05 + Math.cos(t * .00051) * H * .018;
+      const R = H * .66, breathe = 1 + Math.sin(t * .0009) * .03;
+      const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.3); cg.addColorStop(0, 'rgba(255,252,248,' + (.36 * cur.br) + ')'); cg.addColorStop(.5, 'rgba(184,204,255,.12)'); cg.addColorStop(1, 'rgba(255,150,60,0)'); ctx.fillStyle = cg; ctx.fillRect(0, 0, S, H);
+      ctx.globalCompositeOperation = 'lighter';
+      for (const p of pts) {
+        const w = (1 + Math.sin(t * .0012 + p.rn * 8) * .06) * breathe + (cur.jit ? cur.jit * Math.sin(t * .006 + p.rn * 22) * .05 : 0);
+        const x = p.x * w, y = p.y * w, z = p.z * w; const X = x * cxr + z * sxr, Z = -x * sxr + z * cxr;
+        const px = cx + X * R, py = cy + y * R, depth = (Z + 1) / 2;
+        const sz = (1.1 + p.rn * 1.35) * (.5 + depth * .7) * (S / 860);
+        const di = Math.sqrt(X * X + y * y + Z * Z); const a = Math.max(0, (1 - Math.max(0, (di - .42) / .5))) * (.55 + depth * .5) * cur.br;
+        if (a <= .02) continue;
+        let cr = 255, cgc = 255, cb = 255;
+        ctx.fillStyle = 'rgba(' + cr + ',' + cgc + ',' + cb + ',' + a.toFixed(3) + ')';
+        ctx.beginPath(); ctx.arc(px, py, sz, 0, 6.2832); ctx.fill();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+  renderVals() {
+    const st = this.state, S = this.cur();
+    return {
+      bgRef: (el) => this.bg(el), orbRef: (el) => this.orb(el),
+      onMove: (e) => this.onMove(e), onLeave: () => this.onLeave(),
+      hoverOn: () => this.hoverOn(), hoverOff: () => this.hoverOff(),
+      words: (st.toks || []).slice(0, st.shown), typing: st.phase === 'chat' && !st.ready,
+      sub: st.ready ? S.sub(st) : '',
+      ansCls: st.ready ? 'ans on' : 'ans',
+      showDots: st.phase === 'chat', dots: [{ cls: st.step !== 'start' ? 'on' : '' }, { cls: st.step === 'done' ? 'on' : '' }],
+      isChoice: S.kind === 'choice', isText: S.kind === 'text', isDone: S.kind === 'done',
+      choices: S.kind === 'choice' ? S.choices : [],
+      ph: S.ph || '', val: st.name, hasVal: !!st.name.trim(),
+      orbHint: st.listening ? 'Listening…' : 'Tap to speak',
+      onField: (e) => this.onField(e), onKey: (e) => this.onKey(e),
+      voice: () => this.voice(), confirm: () => this.confirm(), third: () => this.third(),
+      enterHref: 'Atlas%20Premium%20D%20-%20Workshop.dc.html'
+    };
+  }
+}
+</script>
+</body>
+</html>

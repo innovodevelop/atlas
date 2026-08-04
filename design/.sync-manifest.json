@@ -4,12 +4,22 @@
   "name": "Atlas premium polish (5) / design_handoff_atlas_suite_v2",
   "sha256": "d03a0610e8ff1b603ba3d072fe47ab6b8b71147054d221941488db41d1d1ca75",
   "syncedAt": "2026-08-03T20:06:00+02:00",
+  "mirroredAt": "2026-08-04T12:05:00+02:00",
+  "mirrorPath": "design/current/design_handoff_atlas_suite_v2",
   "note": "Suite v2: borderless system-wide (fill+space, #eef2fe wash), sphere v3 morph/field merged into src/lib/atlasSphere.ts (three.js RETIRED), 9 new surfaces (Onboarding/WidgetCatalog/WidgetSheet/AnswerViews/ModelLab + mock-labelled SmartHome/Health/Money/Browser), T4 admin absorb+delete, Music Player v2 (full/sleeve/compact on the shared renderer, MusicSphere.tsx deleted). Audit: docs/design-sync/2026-08-03-audit-atlas-suite-v2.md. Bundle fully implemented; Permission Lab dropped by user decision. NOT runtime-verified: the beat-driven morph needs `music:level`, which only fires under librespot in a packaged build.",
+  "mirrorNote": "The mirror was MISSING until 2026-08-04. This manifest recorded bundle (5) from 2026-08-03, but design/current/ still held atlas-premium-workshop (bundle 2, 2026-07-22) — the whole suite-v2 implementation was done straight from the zip and no reference was ever committed. Since design/current/ is the baseline the NEXT handoff is diffed against, that pointed the diff at the wrong tree. Rotated properly now: the old current went to previous/ (which held the July-15 workshop cut, discarded), and bundle (5) is unpacked here. Verified sha256 against the zip before unpacking.",
   "files": [
     "README.md",
     "PROMPT.md",
+    "22 .dc.html references",
     "atlas-sphere.js",
     "atlas-cover.js",
-    "22 .dc.html references \u2014 see zip listing"
+    "atlas-devices.js",
+    "atlas-filings.js",
+    "atlas-models.js",
+    "atlas-transition.js",
+    "image-slot.js",
+    "support.js",
+    "assets/covers/ (3 sleeve jpgs used by the music player reference)"
   ]
 }

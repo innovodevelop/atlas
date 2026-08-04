@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@0.462.0/dist/umd/lucide.min.js"></script>
+<style>
+button,input,textarea,select{border:none}
+body{margin:0;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#b95511;text-decoration:none}a:hover{color:#ff6a00}
+.page{--rz:#f1eeea;--sk:#edebe7;--ink:#1e1e24;--ink2:#6d6a67;--ink3:#b6b1aa;--bd:#e2ded7;--acc:#ff6a00;--grn:#2f7d4f;--red:#c14a35;--amb:#c98a00;min-height:100vh;position:relative;overflow-x:hidden}
+.disp{font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.03em}
+.tnum{font-variant-numeric:tabular-nums}
+.grain{position:fixed;inset:0;pointer-events:none;z-index:2;opacity:.4;mix-blend-mode:multiply;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+@keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+@keyframes hdrflow{from{transform:translateX(-18px) scale(1)}to{transform:translateX(18px) scale(1.07)}}
+@keyframes shm{from{background-position:200% 0}to{background-position:-200% 0}}
+@keyframes pls{0%,100%{opacity:1}50%{opacity:.35}}
+.hz{position:relative;z-index:2}
+.i12{width:12px;height:12px;flex-shrink:0}.i14{width:14px;height:14px;flex-shrink:0}.i16{width:16px;height:16px;flex-shrink:0}.i22{width:22px;height:22px;flex-shrink:0}
+.hdr{position:sticky;top:14px;z-index:50;display:flex;align-items:center;justify-content:space-between;gap:16px;max-width:1360px;margin:14px auto 0;padding:10px 18px;border-radius:9999px;background:#fffdfa;overflow:hidden}
+.hdrbg{position:absolute;inset:-34px;pointer-events:none;filter:blur(34px) saturate(1.15);background:radial-gradient(420px 200px at 10% 130%,rgba(255,166,77,.42),transparent 70%),radial-gradient(520px 240px at 36% -50%,rgba(255,214,153,.55),transparent 70%),radial-gradient(460px 220px at 64% 140%,rgba(122,140,255,.22),transparent 70%),radial-gradient(560px 260px at 92% -40%,rgba(255,136,60,.34),transparent 70%);animation:hdrflow 14s ease-in-out infinite alternate}
+.hdt{font-size:15px;font-weight:600;letter-spacing:-.01em;margin:0}
+.ldot{color:var(--acc)}
+.main{position:relative;z-index:10;max-width:1360px;margin:0 auto;padding:46px 24px 80px}
+.hero{margin-bottom:34px;animation:rise .8s cubic-bezier(.22,1,.36,1) both}
+.kick{font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--acc);margin:0 0 12px}
+.bh1{font-size:clamp(38px,5.5vw,60px);font-weight:500;letter-spacing:-.04em;line-height:1;margin:0 0 14px}
+.hsub{font-size:15px;line-height:1.6;color:var(--ink2);max-width:640px;margin:0}
+.shead{display:flex;align-items:baseline;gap:14px;padding-top:26px;margin:46px 0 6px}
+.snum{font-size:12px;color:var(--ink3);font-family:ui-monospace,Menlo,monospace}
+.sh2{font-size:23px;font-weight:500;margin:0}
+.secd{font-size:13px;color:var(--ink2);margin:4px 0 22px;max-width:620px;line-height:1.55}
+.wrow{display:flex;gap:22px;padding:26px 0;align-items:flex-start}
+.wrow.last{border-bottom:none}
+.wmeta{width:190px;flex-shrink:0;position:sticky;top:92px}
+.wname{font-size:16px;font-weight:600;margin:0 0 6px}
+.wdesc{font-size:12px;color:var(--ink2);line-height:1.55;margin:0}
+.wstates{display:flex;gap:14px;flex-wrap:wrap;flex:1;min-width:0}
+.mw{position:relative;width:280px;min-height:212px;border-radius:20px;background:#fffdfa;padding:44px 16px 16px;box-sizing:border-box;display:flex;flex-direction:column;transition:transform .25s,border-color .25s}
+.mw:hover{transform:translateY(-2px)}
+.mw.att{box-shadow:0 14px 34px -20px rgba(255,106,0,.45)}
+.stag{position:absolute;top:14px;left:16px;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3)}
+.att .stag{color:var(--acc)}
+.mwh{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.mwl{font-size:12px;font-weight:600;color:var(--ink);margin:0}
+.ibx{width:28px;height:28px;border-radius:9px;background:var(--sk);color:var(--ink);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ibx.on{background:var(--acc);color:#fff}
+.skb{height:10px;border-radius:6px;background:linear-gradient(90deg,var(--sk) 25%,#f7f4ef 50%,var(--sk) 75%);background-size:200% 100%;animation:shm 1.6s linear infinite;margin-bottom:10px}
+.skc{width:28px;height:28px;border-radius:9px;background:linear-gradient(90deg,var(--sk) 25%,#f7f4ef 50%,var(--sk) 75%);background-size:200% 100%;animation:shm 1.6s linear infinite}
+.ctr{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:6px;color:var(--ink3)}
+.ctt{font-size:13px;font-weight:600;color:var(--ink2);margin:0}
+.cts{font-size:11px;color:var(--ink3);margin:0;line-height:1.5;max-width:200px}
+.ghost{margin-top:6px;font-size:11px;font-weight:600;color:var(--acc);background:rgba(255,106,0,.06);padding:5px 12px;border-radius:9999px;cursor:pointer}
+.alr{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;color:#9a4a00;background:rgba(255,106,0,.1);border-radius:10px;padding:7px 10px;margin-bottom:10px}
+.alr.red{color:var(--red);background:rgba(193,74,53,.08)}
+.r1{display:flex;align-items:center;gap:9px;padding:6px 0;font-size:12px;color:var(--ink);min-width:0}
+.r1.last{border-bottom:none}
+.r1 .f1{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mut{color:var(--ink2)}.mut2{color:var(--ink3)}
+.fs11{font-size:11px}
+.bigv{font-family:'Hanken Grotesk',sans-serif;font-size:34px;font-weight:500;letter-spacing:-.03em;line-height:1;margin:0;color:var(--ink)}
+.dt{width:6px;height:6px;border-radius:50%;background:var(--acc);flex-shrink:0}
+.dt.g{background:var(--grn)}.dt.r{background:var(--red)}
+.ck{width:15px;height:15px;border-radius:50%;background:#e2ded7;flex-shrink:0}
+.ck.done{background:var(--grn)}
+.pill{font-size:10px;font-weight:600;padding:2px 8px;border-radius:9999px;flex-shrink:0}
+.pH{background:rgba(193,74,53,.1);color:var(--red)}.pM{background:rgba(201,138,0,.12);color:var(--amb)}.pL{background:var(--sk);color:var(--ink2)}
+.up{color:var(--grn);font-weight:600}.dn{color:var(--red);font-weight:600}
+.sym{font-size:11px;font-weight:700;width:40px;flex-shrink:0}
+.av2{width:24px;height:24px;border-radius:50%;background:var(--sk);font-size:9px;font-weight:600;color:var(--ink2);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ntag{font-size:9px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--acc)}
+.brk{background:var(--red);color:#fff;padding:1px 7px;border-radius:9999px}
+.joinb{margin-left:auto;font-size:11px;font-weight:600;color:#fff;background:var(--acc);border:none;padding:5px 12px;border-radius:9999px;cursor:pointer;flex-shrink:0}
+.prg{flex:1;height:5px;border-radius:9999px;background:var(--sk);overflow:hidden}
+.prg span{display:block;height:100%;background:var(--acc)}
+.lvd{width:6px;height:6px;border-radius:50%;background:var(--grn);animation:pls 2s ease-in-out infinite}
+.ngrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(280px,100%),1fr));gap:14px}
+.ring{transform:rotate(-90deg)}
+.ftr{position:relative;z-index:10;text-align:center;padding:24px;color:var(--ink3);font-size:12px}
+@media (max-width:760px){.wrow{flex-direction:column}.wmeta{position:static;width:auto}}
+</style>
+<script src="atlas-transition.js"></script>
+</helmet>
+<div class="page" ref="{{ rootRef }}">
+<div class="grain"></div>
+<header class="hdr"><div class="hdrbg"></div><div class="fx ac gap12 hz"><h1 class="hdt"><span class="disp" style="font-weight:600;letter-spacing:-.045em">Atlas<span class="ldot">.</span></span> Widget Sheet</h1></div><span class="hz" style="font-size:12px;color:var(--ink2)">Workshop system · July 2026</span></header>
+<main class="main">
+<div class="hero"><p class="kick">Design sheet</p><h2 class="bh1 disp">Every widget, every state</h2><p class="hsub">The six dashboard widgets across their five lifecycle states — loading, default, attention, empty, offline — plus six proposed additions to the grid.</p></div>
+<section data-screen-label="Widget states"><div class="shead"><span class="snum">01</span><h3 class="sh2 disp">Current widgets × states</h3></div><p class="secd">Rules: skeletons shimmer in Sand, never spinners. Attention states earn an orange hairline + one alert row — nothing else changes. Empty states explain what Atlas will do, offline states always show cache age.</p>
+
+<div class="wrow" data-screen-label="Weather states"><div class="wmeta"><h4 class="wname">Weather</h4><p class="wdesc">Full-bleed scene card. Attention = incoming precipitation or severe alert within 6h.</p></div><div class="wstates">
+<div class="mw"><span class="stag">Loading</span><div class="mwh"><div class="skb" style="width:80px;margin:0"></div><div class="skc"></div></div><div class="skb" style="width:56%;height:26px;margin-top:14px"></div><div class="skb" style="width:40%"></div><div class="skb" style="width:88%;margin-top:16px"></div><div class="skb" style="width:72%"></div></div>
+<div class="mw"><span class="stag">Default</span><div class="mwh"><p class="mwl">Weather</p><div class="ibx"><i data-lucide="cloud-sun" class="i14"></i></div></div><div class="fx jb" style="align-items:flex-end"><p class="bigv tnum">68°</p><span class="fs11 mut tnum">H 70° · L 58°</span></div><p class="fs11 mut" style="margin:5px 0 10px">Partly cloudy · San Francisco</p><div class="fx ac gap12 fs11 mut"><span class="fx ac gap4"><i data-lucide="droplets" class="i12"></i>62%</span><span class="fx ac gap4"><i data-lucide="wind" class="i12"></i>8 mph</span><span class="fx ac gap4"><i data-lucide="sun" class="i12"></i>UV 6</span></div></div>
+<div class="mw att"><span class="stag">Attention</span><div class="mwh"><p class="mwl">Weather</p><div class="ibx on"><i data-lucide="cloud-rain" class="i14"></i></div></div><div class="alr"><i data-lucide="umbrella" class="i12"></i>Rain starts ~3:10 PM — before your 3:30 walk-up</div><div class="fx jb" style="align-items:flex-end"><p class="bigv tnum">64°</p><span class="fs11 mut tnum">88% rain</span></div><p class="fs11 mut" style="margin-top:5px">Clouds building · San Francisco</p></div>
+<div class="mw"><span class="stag">Empty</span><div class="ctr"><i data-lucide="map-pin" class="i22"></i><p class="ctt">No location set</p><p class="cts">Atlas can follow your calendar's city or a fixed home base.</p><button class="ghost">Set location</button></div></div>
+<div class="mw"><span class="stag">Offline</span><div class="mwh"><p class="mwl">Weather</p><div class="ibx"><i data-lucide="cloud-off" class="i14"></i></div></div><div class="alr red"><i data-lucide="wifi-off" class="i12"></i>Station unreachable — retrying</div><div class="fx jb" style="align-items:flex-end;opacity:.55"><p class="bigv tnum">68°</p><span class="fs11 mut">cached 12 min ago</span></div><p class="fs11 mut2" style="margin-top:5px">Showing last good reading</p></div>
+</div></div>
+
+<div class="wrow" data-screen-label="Calendar states"><div class="wmeta"><h4 class="wname">Today</h4><p class="wdesc">Agenda list. Attention = event starting within 10 minutes, with join action.</p></div><div class="wstates">
+<div class="mw"><span class="stag">Loading</span><div class="mwh"><div class="skb" style="width:64px;margin:0"></div><div class="skc"></div></div><div class="skb" style="width:90%;margin-top:12px"></div><div class="skb" style="width:82%"></div><div class="skb" style="width:86%"></div><div class="skb" style="width:60%"></div></div>
+<div class="mw"><span class="stag">Default</span><div class="mwh"><p class="mwl">Today · 4 events</p><div class="ibx"><i data-lucide="calendar" class="i14"></i></div></div><div class="r1"><span class="dt"></span><span class="mut tnum fs11" style="width:50px">9:30 AM</span><span class="f1">Design sync</span></div><div class="r1"><span class="dt"></span><span class="mut tnum fs11" style="width:50px">11:00</span><span class="f1">Atlas roadmap review</span></div><div class="r1 last"><span class="dt"></span><span class="mut tnum fs11" style="width:50px">2:00 PM</span><span class="f1">1:1 with Maya</span></div></div>
+<div class="mw att"><span class="stag">Attention</span><div class="mwh"><p class="mwl">Today</p><div class="ibx on"><i data-lucide="calendar" class="i14"></i></div></div><div class="alr"><i data-lucide="clock" class="i12"></i>1:1 with Maya in 5 min</div><div class="r1 last"><span class="dt"></span><span class="mut tnum fs11" style="width:50px">2:00 PM</span><span class="f1">1:1 with Maya</span><button class="joinb">Join</button></div><p class="fs11 mut2" style="margin-top:10px">Then: Eng standup · 4:30 PM</p></div>
+<div class="mw"><span class="stag">Empty</span><div class="ctr"><i data-lucide="coffee" class="i22"></i><p class="ctt">Nothing scheduled</p><p class="cts">Clear day. Atlas will guard it — say the word to block focus time.</p><button class="ghost">Block focus time</button></div></div>
+<div class="mw"><span class="stag">Offline</span><div class="mwh"><p class="mwl">Today</p><div class="ibx"><i data-lucide="calendar-off" class="i14"></i></div></div><div class="alr red"><i data-lucide="wifi-off" class="i12"></i>Calendar sync failed</div><div style="opacity:.55"><div class="r1 last"><span class="dt"></span><span class="mut tnum fs11" style="width:50px">2:00 PM</span><span class="f1">1:1 with Maya</span></div></div><p class="fs11 mut2" style="margin-top:10px">cached 4 min ago · push channel reconnecting</p></div>
+</div></div>
+
+<div class="wrow" data-screen-label="Tasks states"><div class="wmeta"><h4 class="wname">Tasks</h4><p class="wdesc">Checklist with progress. Attention = overdue item, surfaced to the top in red.</p></div><div class="wstates">
+<div class="mw"><span class="stag">Loading</span><div class="mwh"><div class="skb" style="width:72px;margin:0"></div><div class="skc"></div></div><div class="skb" style="width:100%;height:5px;margin-top:12px"></div><div class="skb" style="width:88%;margin-top:12px"></div><div class="skb" style="width:76%"></div><div class="skb" style="width:82%"></div></div>
+<div class="mw"><span class="stag">Default</span><div class="mwh"><p class="mwl">Tasks · 1 of 5</p><div class="ibx"><i data-lucide="check" class="i14"></i></div></div><div class="fx ac gap10" style="margin-bottom:8px"><div class="prg"><span style="width:20%"></span></div><span class="fs11 mut tnum">20%</span></div><div class="r1"><span class="ck"></span><span class="f1">Send Q4 budget notes to Sarah</span><span class="pill pH">High</span></div><div class="r1 last"><span class="ck done"></span><span class="f1 mut2" style="text-decoration:line-through">Book Paris hotel</span><span class="pill pL">Done</span></div></div>
+<div class="mw att"><span class="stag">Attention</span><div class="mwh"><p class="mwl">Tasks</p><div class="ibx on"><i data-lucide="alert-circle" class="i14"></i></div></div><div class="alr red"><i data-lucide="clock" class="i12"></i>1 task overdue</div><div class="r1"><span class="ck" style=""></span><span class="f1" style="color:var(--red);font-weight:600">Renew passport — due yesterday</span></div><div class="r1 last"><span class="ck"></span><span class="f1">Send Q4 budget notes</span><span class="pill pH">High</span></div></div>
+<div class="mw"><span class="stag">Empty</span><div class="ctr"><i data-lucide="check-circle-2" class="i22"></i><p class="ctt">All clear</p><p class="cts">Nothing on your plate. Atlas files new tasks from chat and email automatically.</p></div></div>
+<div class="mw"><span class="stag">Offline</span><div class="mwh"><p class="mwl">Tasks</p><div class="ibx"><i data-lucide="cloud-off" class="i14"></i></div></div><div class="alr red"><i data-lucide="wifi-off" class="i12"></i>Changes queued locally</div><div style="opacity:.55"><div class="r1 last"><span class="ck"></span><span class="f1">Send Q4 budget notes to Sarah</span><span class="pill pH">High</span></div></div><p class="fs11 mut2" style="margin-top:10px">2 edits will sync when back online</p></div>
+</div></div>
+
+<div class="wrow" data-screen-label="Watchlist states"><div class="wmeta"><h4 class="wname">Watchlist</h4><p class="wdesc">Live tickers with sparklines. Attention = a holding moves past your ±3% threshold.</p></div><div class="wstates">
+<div class="mw"><span class="stag">Loading</span><div class="mwh"><div class="skb" style="width:90px;margin:0"></div><div class="skc"></div></div><div class="skb" style="width:92%;margin-top:12px"></div><div class="skb" style="width:88%"></div><div class="skb" style="width:90%"></div></div>
+<div class="mw"><span class="stag">Default</span><div class="mwh"><p class="mwl fx ac gap6"><span class="lvd"></span>Watchlist · Open</p><div class="ibx"><i data-lucide="activity" class="i14"></i></div></div><div class="r1"><span class="sym">AAPL</span><span class="f1 mut">Apple Inc.</span><span class="tnum">247.31</span><span class="up fs11 tnum">+1.3%</span></div><div class="r1"><span class="sym">NVDA</span><span class="f1 mut">NVIDIA</span><span class="tnum">1,204</span><span class="up fs11 tnum">+2.3%</span></div><div class="r1 last"><span class="sym">TSLA</span><span class="f1 mut">Tesla</span><span class="tnum">312.44</span><span class="dn fs11 tnum">−0.8%</span></div></div>
+<div class="mw att"><span class="stag">Attention</span><div class="mwh"><p class="mwl">Watchlist</p><div class="ibx on"><i data-lucide="trending-up" class="i14"></i></div></div><div class="alr"><i data-lucide="zap" class="i12"></i>NVDA +5.2% — crossed your alert threshold</div><div class="r1 last"><span class="sym">NVDA</span><span class="f1 mut">NVIDIA</span><span class="tnum">1,238</span><span class="up fs11 tnum">+5.2%</span></div><p class="fs11 mut2" style="margin-top:10px">Chip capacity news · Atlas summarized 3 sources</p></div>
+<div class="mw"><span class="stag">Empty</span><div class="ctr"><i data-lucide="line-chart" class="i22"></i><p class="ctt">No tickers yet</p><p class="cts">Tell Atlas what you hold or watch and it will track moves and news.</p><button class="ghost">Add tickers</button></div></div>
+<div class="mw"><span class="stag">Offline</span><div class="mwh"><p class="mwl">Watchlist</p><div class="ibx"><i data-lucide="activity" class="i14"></i></div></div><div class="alr red"><i data-lucide="wifi-off" class="i12"></i>Feed disconnected</div><div style="opacity:.55"><div class="r1 last"><span class="sym">AAPL</span><span class="f1 mut">Apple Inc.</span><span class="tnum">247.31</span><span class="up fs11 tnum">+1.3%</span></div></div><p class="fs11 mut2" style="margin-top:10px">last tick 38s ago · reconnecting</p></div>
+</div></div>
+
+<div class="wrow" data-screen-label="Inbox states"><div class="wmeta"><h4 class="wname">Inbox</h4><p class="wdesc">Priority mail. Attention = a message Atlas judges urgent, with a drafted reply ready.</p></div><div class="wstates">
+<div class="mw"><span class="stag">Loading</span><div class="mwh"><div class="skb" style="width:76px;margin:0"></div><div class="skc"></div></div><div class="fx ac gap8" style="margin-top:12px"><div class="skc" style="border-radius:50%;width:24px;height:24px"></div><div class="skb f1" style="margin:0"></div></div><div class="fx ac gap8" style="margin-top:12px"><div class="skc" style="border-radius:50%;width:24px;height:24px"></div><div class="skb f1" style="margin:0"></div></div></div>
+<div class="mw"><span class="stag">Default</span><div class="mwh"><p class="mwl">Inbox · 2 unread</p><div class="ibx"><i data-lucide="mail" class="i14"></i></div></div><div class="r1"><div class="av2">SC</div><div class="f1"><span style="font-weight:600">Sarah Chen</span><p class="fs11 mut m0" style="margin-top:2px">Q4 budget — needs your input</p></div><span class="dt"></span></div><div class="r1 last"><div class="av2">MJ</div><div class="f1"><span style="font-weight:600">Mike Johnson</span><p class="fs11 mut m0" style="margin-top:2px">Design review notes</p></div><span class="dt"></span></div></div>
+<div class="mw att"><span class="stag">Attention</span><div class="mwh"><p class="mwl">Inbox</p><div class="ibx on"><i data-lucide="mail-warning" class="i14"></i></div></div><div class="alr"><i data-lucide="sparkles" class="i12"></i>Urgent: Sarah needs the budget before Friday's board</div><div class="r1 last"><div class="av2">SC</div><div class="f1"><span style="font-weight:600">Sarah Chen</span><p class="fs11 mut m0" style="margin-top:2px">Draft reply is ready to review</p></div><button class="joinb">Review</button></div></div>
+<div class="mw"><span class="stag">Empty</span><div class="ctr"><i data-lucide="inbox" class="i22"></i><p class="ctt">Inbox zero</p><p class="cts">Nothing needs you. Atlas is triaging quietly in the background.</p></div></div>
+<div class="mw"><span class="stag">Offline</span><div class="mwh"><p class="mwl">Inbox</p><div class="ibx"><i data-lucide="mail" class="i14"></i></div></div><div class="alr red"><i data-lucide="wifi-off" class="i12"></i>Mail sync paused</div><div style="opacity:.55"><div class="r1 last"><div class="av2">SC</div><div class="f1"><span style="font-weight:600">Sarah Chen</span><p class="fs11 mut m0" style="margin-top:2px">Q4 budget — needs your input</p></div></div></div><p class="fs11 mut2" style="margin-top:10px">cached 2 min ago</p></div>
+</div></div>
+
+<div class="wrow last" data-screen-label="Briefing states"><div class="wmeta"><h4 class="wname">Briefing</h4><p class="wdesc">Curated news. Attention = breaking story on a followed topic.</p></div><div class="wstates">
+<div class="mw"><span class="stag">Loading</span><div class="mwh"><div class="skb" style="width:64px;margin:0"></div><div class="skc"></div></div><div class="skb" style="width:40%;height:8px;margin-top:12px"></div><div class="skb" style="width:94%"></div><div class="skb" style="width:52%;height:8px;margin-top:14px"></div><div class="skb" style="width:88%"></div></div>
+<div class="mw"><span class="stag">Default</span><div class="mwh"><p class="mwl">Briefing</p><div class="ibx"><i data-lucide="newspaper" class="i14"></i></div></div><div class="r1" style="display:block"><span class="ntag">Technology</span><p class="m0" style="margin-top:3px;line-height:1.4">New language models show human-level reasoning</p><span class="fs11 mut2">TechCrunch · 2h</span></div><div class="r1 last" style="display:block"><span class="ntag">Finance</span><p class="m0" style="margin-top:3px;line-height:1.4">Global markets rally on economic data</p><span class="fs11 mut2">Bloomberg · 4h</span></div></div>
+<div class="mw att"><span class="stag">Attention</span><div class="mwh"><p class="mwl">Briefing</p><div class="ibx on"><i data-lucide="radio" class="i14"></i></div></div><div class="r1 last" style="display:block"><span class="ntag brk">Breaking</span><p class="m0" style="margin-top:5px;line-height:1.4;font-weight:600">EU AI Act enforcement dates confirmed — affects your compliance task</p><span class="fs11 mut2">Reuters · 6 min · followed topic</span></div><p class="fs11 mut2" style="margin-top:10px">Atlas linked this to 2 items in your memory</p></div>
+<div class="mw"><span class="stag">Empty</span><div class="ctr"><i data-lucide="newspaper" class="i22"></i><p class="ctt">No topics followed</p><p class="cts">Pick a few topics and Atlas builds a twice-daily brief.</p><button class="ghost">Choose topics</button></div></div>
+<div class="mw"><span class="stag">Offline</span><div class="mwh"><p class="mwl">Briefing</p><div class="ibx"><i data-lucide="newspaper" class="i14"></i></div></div><div class="alr red"><i data-lucide="wifi-off" class="i12"></i>Feeds unreachable</div><div style="opacity:.55"><div class="r1 last" style="display:block"><span class="ntag">Technology</span><p class="m0" style="margin-top:3px;line-height:1.4">New language models show human-level reasoning</p></div></div><p class="fs11 mut2" style="margin-top:10px">cached 41 min ago</p></div>
+</div></div>
+</section>
+
+<section data-screen-label="Proposed widgets"><div class="shead"><span class="snum">02</span><h3 class="sh2 disp">Proposed new widgets</h3></div><p class="secd">Six candidates that fit Atlas's proactive model — each shown in its default state, ready to slot into the existing grid.</p>
+<div class="ngrid">
+<div class="mw" style="width:auto"><span class="stag" style="color:var(--acc)">Proposed</span><div class="mwh"><p class="mwl">Commute</p><div class="ibx"><i data-lucide="navigation" class="i14"></i></div></div><p class="bigv tnum">8:12</p><p class="fs11 mut" style="margin:5px 0 10px">Leave by · 24 min to HQ via 101</p><div class="alr" style="margin:0"><i data-lucide="triangle-alert" class="i12"></i>Slowdown at Cesar Chavez — +6 min vs usual</div></div>
+<div class="mw" style="width:auto"><span class="stag" style="color:var(--acc)">Proposed</span><div class="mwh"><p class="mwl">Flight watch</p><div class="ibx"><i data-lucide="plane" class="i14"></i></div></div><div class="fx jb" style="align-items:flex-end"><p class="bigv tnum">$612</p><span class="up fs11">−12% this week</span></div><p class="fs11 mut" style="margin:5px 0 10px">SFO → CDG · AF 083 · Fri 9:40 AM</p><div class="r1 last"><span class="fs11 mut f1">Held for 22h more</span><button class="joinb">Book</button></div></div>
+<div class="mw" style="width:auto"><span class="stag" style="color:var(--acc)">Proposed</span><div class="mwh"><p class="mwl">Focus</p><div class="ibx"><i data-lucide="timer" class="i14"></i></div></div><div class="fx ac gap14"><svg width="56" height="56" viewBox="0 0 42 42" class="ring"><circle cx="21" cy="21" r="17" fill="none" stroke="#edebe7" stroke-width="4"></circle><circle cx="21" cy="21" r="17" fill="none" stroke="#ff6a00" stroke-width="4" stroke-linecap="round" stroke-dasharray="72 107"></circle></svg><div><p class="bigv tnum" style="font-size:26px">34:12</p><p class="fs11 mut" style="margin-top:3px">Deep work · notifications held</p></div></div><p class="fs11 mut2" style="margin-top:12px">Atlas is holding 4 notifications and 1 call</p></div>
+<div class="mw" style="width:auto"><span class="stag" style="color:var(--acc)">Proposed</span><div class="mwh"><p class="mwl">Health</p><div class="ibx"><i data-lucide="heart-pulse" class="i14"></i></div></div><div class="fx jb"><div><p class="bigv tnum" style="font-size:26px">7h 12m</p><p class="fs11 mut" style="margin-top:3px">Sleep · good</p></div><div style="text-align:right"><p class="bigv tnum" style="font-size:26px">6,480</p><p class="fs11 mut" style="margin-top:3px">Steps</p></div></div><p class="fs11 mut2" style="margin-top:12px">Trending +40 min vs last week — late meetings moved earlier</p></div>
+<div class="mw" style="width:auto"><span class="stag" style="color:var(--acc)">Proposed</span><div class="mwh"><p class="mwl">Home</p><div class="ibx"><i data-lucide="house" class="i14"></i></div></div><div class="r1"><i data-lucide="thermometer" class="i14 mut"></i><span class="f1">Living room</span><span class="tnum">70°</span></div><div class="r1"><i data-lucide="lightbulb" class="i14 mut"></i><span class="f1">4 lights on</span><span class="fs11 mut">Auto-off 11 PM</span></div><div class="r1 last"><i data-lucide="lock" class="i14 mut"></i><span class="f1">Front door</span><span class="up fs11">Locked</span></div></div>
+<div class="mw" style="width:auto"><span class="stag" style="color:var(--acc)">Proposed</span><div class="mwh"><p class="mwl">Memory digest</p><div class="ibx"><i data-lucide="brain" class="i14"></i></div></div><p class="fs11 mut" style="margin:0 0 8px;line-height:1.5">What Atlas learned today:</p><div class="r1"><span class="dt g"></span><span class="f1">You prefer window seats long-haul</span></div><div class="r1"><span class="dt g"></span><span class="f1">Priya moved to the Paris office</span></div><div class="r1 last"><span class="dt g"></span><span class="f1">Budget review cadence: Fridays</span></div></div>
+</div></section>
+</main>
+<footer class="ftr">Atlas Widget Sheet · states + proposals · Workshop system</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  componentDidMount() { this._icons(); }
+  componentDidUpdate() { this._icons(); }
+  _icons() {
+    if (this._icoT) clearInterval(this._icoT);
+    let tries = 0;
+    this._icoT = setInterval(() => {
+      tries++;
+      const pending = document.querySelector('i[data-lucide]');
+      if (window.lucide && pending) window.lucide.createIcons();
+      if ((!pending && tries > 3) || tries > 50) { clearInterval(this._icoT); this._icoT = null; }
+    }, 120);
+  }
+  renderVals() { return { rootRef: (el) => { if (el) this._icons(); } }; }
+}
+</script>
+</body>
+</html>

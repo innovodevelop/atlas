@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="atlas-sphere.js"></script>
+<style>
+button,input,textarea,select{border:none}
+body{margin:0;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#3461f2;text-decoration:none}a:hover{color:#5b7cff}
+@keyframes rise{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pls{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes drift1{from{transform:translate(0,0) scale(1)}to{transform:translate(-48px,28px) scale(1.07)}}
+@keyframes drift2{from{transform:translate(0,0)}to{transform:translate(42px,-20px)}}
+@keyframes shim{from{background-position:210% 0}to{background-position:-110% 0}}
+@keyframes eqa{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
+@keyframes blink{50%{opacity:.15}}
+@keyframes land{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes tick{from{stroke-dashoffset:34}to{stroke-dashoffset:0}}
+</style>
+</helmet>
+
+<div style="min-height:100vh;position:relative;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;overflow-x:hidden" data-screen-label="Atlas — Teach">
+
+<div style="position:fixed;inset:0;z-index:1;pointer-events:none;overflow:hidden">
+  <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(216,227,251,.72),rgba(249,247,244,0) 44%)"></div>
+  <div style="position:absolute;top:-340px;right:-220px;width:900px;height:900px;border-radius:50%;filter:blur(64px);background:radial-gradient(closest-side,rgba(120,152,243,.34),transparent 74%);animation:drift1 20s ease-in-out infinite alternate"></div>
+  <div style="position:absolute;top:-140px;left:-260px;width:800px;height:580px;border-radius:50%;filter:blur(64px);background:radial-gradient(closest-side,rgba(198,212,249,.44),transparent 72%);animation:drift2 28s ease-in-out infinite alternate"></div>
+</div>
+<div style="position:fixed;inset:0;pointer-events:none;z-index:2;opacity:.4;mix-blend-mode:multiply;background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E&quot;)"></div>
+
+<section style="position:relative;z-index:10;display:flex;align-items:center;gap:30px;max-width:1500px;margin:0 auto;padding:40px 28px 10px;animation:rise .8s cubic-bezier(.22,1,.36,1) both">
+  <div style="width:156px;height:156px;flex-shrink:0">
+    <canvas ref="{{ orbRef }}" style="width:156px;height:156px;display:block"></canvas>
+  </div>
+  <div style="min-width:0">
+    <h1 onClick="{{ goBack }}" title="Back to dashboard" style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.03em;font-size:clamp(30px,3.8vw,52px);font-weight:500;line-height:1;margin:0;color:#1e1e24;cursor:pointer" style-hover="opacity:.72">Teach <span style="color:#3461f2">Atlas.</span></h1>
+    <p style="font-size:16px;color:#6d6a67;margin:13px 0 0;max-width:540px;line-height:1.5;text-wrap:pretty">{{ heroSub }}</p>
+    <button onClick="{{ goBack }}" style="border:none;display:inline-flex;align-items:center;gap:8px;margin-top:13px;padding:7px 14px 7px 11px;border-radius:9999px;background:#fffdfa;color:#6d6a67;font:inherit;font-size:13px;cursor:pointer" style-hover="color:#1e1e24;background:#edebe7">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path></svg>
+      <span>Back to dashboard</span>
+      <span style="padding:2px 7px;font-size:11px;background:#edebe7;border-radius:6px;color:#8b8681">Esc</span>
+    </button>
+  </div>
+  <div style="margin-left:auto;flex-shrink:0;text-align:right">
+    <p style="font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#b6b1aa;margin:0 0 8px">Preview</p>
+    <div style="display:inline-flex;gap:3px;padding:4px;border-radius:9999px;background:#f1eeea">
+      <button onClick="{{ setFull }}" style="padding:7px 15px;border-radius:9999px;border:none;font:inherit;font-size:13px;font-weight:500;cursor:pointer;background:{{ fullBg }};color:{{ fullFg }}">In use</button>
+      <button onClick="{{ setEmpty }}" style="padding:7px 15px;border-radius:9999px;border:none;font:inherit;font-size:13px;font-weight:500;cursor:pointer;background:{{ emptyBg }};color:{{ emptyFg }}">Day one</button>
+    </div>
+    <p style="font-size:32px;font-weight:500;font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.02em;margin:14px 0 0;line-height:1;font-variant-numeric:tabular-nums">{{ knownN }}</p>
+    <p style="font-size:13px;color:#6d6a67;margin:4px 0 0">things it knows about you</p>
+  </div>
+</section>
+
+<main style="position:relative;z-index:10;max-width:1500px;margin:0 auto;padding:22px 28px 150px;display:flex;flex-direction:column;gap:22px">
+
+  <section style="border-radius:36px;background:#1e1e24;color:#f9f7f4;padding:0;overflow:hidden">
+    <div onClick="{{ toggleExplain }}" style="display:flex;align-items:center;gap:20px;padding:26px 32px;cursor:pointer">
+      <div style="width:42px;height:42px;flex-shrink:0;border-radius:13px;background:rgba(249,247,244,.1);display:flex;align-items:center;justify-content:center;color:#8aa2f7"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"></path></svg></div>
+      <div style="flex:1;min-width:0">
+        <h2 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.02em;font-size:22px;font-weight:500;margin:0">What's worth teaching it</h2>
+        <p style="font-size:14px;color:rgba(249,247,244,.6);margin:5px 0 0">{{ explainSub }}</p>
+      </div>
+      <span style="flex-shrink:0;display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:rgba(249,247,244,.7)">{{ explainAction }}<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform:{{ explainRotate }}"><path d="m6 9 6 6 6-6"></path></svg></span>
+    </div>
+
+    <sc-if value="{{ explainOpen }}" hint-placeholder-val="{{ true }}">
+    <div style="padding:0 32px 34px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:32px">
+
+        <div>
+          <p style="font-size:11.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:rgba(249,247,244,.62);margin:0 0 14px">Teach it the durable things</p>
+          <p style="font-size:15px;line-height:1.65;color:rgba(249,247,244,.78);margin:0 0 16px;text-wrap:pretty">Facts that will still be true next month: who you are, what you do, the people around you, how you like to be spoken to. Not what happened today — it picks that up on its own.</p>
+          <div style="display:flex;flex-wrap:wrap;gap:7px">
+            <span style="font-size:12.5px;padding:5px 12px;border-radius:9999px;background:rgba(249,247,244,.08);color:rgba(249,247,244,.85)">who you work with</span>
+            <span style="font-size:12.5px;padding:5px 12px;border-radius:9999px;background:rgba(249,247,244,.08);color:rgba(249,247,244,.85)">how you want bad news</span>
+            <span style="font-size:12.5px;padding:5px 12px;border-radius:9999px;background:rgba(249,247,244,.08);color:rgba(249,247,244,.85)">what you're allergic to</span>
+            <span style="font-size:12.5px;padding:5px 12px;border-radius:9999px;background:rgba(249,247,244,.08);color:rgba(249,247,244,.85)">your daughter's name</span>
+          </div>
+        </div>
+
+        <div>
+          <p style="font-size:11.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:rgba(249,247,244,.62);margin:0 0 14px">Say it so it lands</p>
+          <div style="padding:16px 18px;border-radius:16px;background:rgba(15,174,118,.14)">
+            <p style="font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#5fd6a8;margin:0 0 8px">Lands</p>
+            <p style="font-size:15px;line-height:1.5;margin:0;color:#f9f7f4">"I work at Innovo as a founder, mostly on product."</p>
+            <p style="font-size:12.5px;color:rgba(249,247,244,.55);margin:9px 0 0">Specific, complete, still true in six months.</p>
+          </div>
+          <div style="padding:16px 18px;border-radius:16px;background:rgba(249,247,244,.05);margin-top:10px">
+            <p style="font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(249,247,244,.62);margin:0 0 8px">Doesn't</p>
+            <p style="font-size:15px;line-height:1.5;margin:0;color:rgba(249,247,244,.6)">"Work is busy."</p>
+            <p style="font-size:12.5px;color:rgba(249,247,244,.62);margin:9px 0 0">True today, meaningless in a month. Nothing to file it under.</p>
+          </div>
+        </div>
+
+        <div>
+          <p style="font-size:11.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:rgba(249,247,244,.62);margin:0 0 14px">What happens to it</p>
+          <div style="display:flex;gap:14px;padding-bottom:16px"><span style="width:22px;height:22px;flex-shrink:0;border-radius:7px;background:rgba(249,247,244,.1);display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:600">1</span><p style="font-size:14.5px;line-height:1.55;color:rgba(249,247,244,.78);margin:0;text-wrap:pretty">It's written to the file on this Mac, word for word, under a category.</p></div>
+          <div style="display:flex;gap:14px;padding-bottom:16px"><span style="width:22px;height:22px;flex-shrink:0;border-radius:7px;background:rgba(249,247,244,.1);display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:600">2</span><p style="font-size:14.5px;line-height:1.55;color:rgba(249,247,244,.78);margin:0;text-wrap:pretty">When it's relevant to something you ask, it gets sent along with your question.</p></div>
+          <div style="display:flex;gap:14px"><span style="width:22px;height:22px;flex-shrink:0;border-radius:7px;background:rgba(249,247,244,.1);display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:600">3</span><p style="font-size:14.5px;line-height:1.55;color:rgba(249,247,244,.78);margin:0;text-wrap:pretty">It stays until you change it or delete it. Nothing expires on its own.</p></div>
+          <p style="font-size:13.5px;margin:18px 0 0"><a href="Atlas%20Architecture%20v2.dc.html" style="color:#8aa2f7">What leaves this Mac, exactly →</a></p>
+        </div>
+
+      </div>
+    </div>
+    </sc-if>
+  </section>
+
+  <div style="display:grid;grid-template-columns:1.25fr 1fr;gap:22px;align-items:start">
+
+    <section style="border-radius:36px;background:#f1eeea;padding:26px 28px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px">
+        <h2 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.02em;font-size:20px;font-weight:500;margin:0">Just say it</h2>
+        <div style="display:flex;gap:3px;padding:3px;border-radius:9999px;background:#fffdfa">
+          <button onClick="{{ vIdle }}" style="padding:6px 12px;border-radius:9999px;border:none;font:inherit;font-size:12.5px;font-weight:500;cursor:pointer;background:{{ vbIdle }};color:{{ vfIdle }}">Idle</button>
+          <button onClick="{{ vHearing }}" style="padding:6px 12px;border-radius:9999px;border:none;font:inherit;font-size:12.5px;font-weight:500;cursor:pointer;background:{{ vbHearing }};color:{{ vfHearing }}">Hearing</button>
+          <button onClick="{{ vThinking }}" style="padding:6px 12px;border-radius:9999px;border:none;font:inherit;font-size:12.5px;font-weight:500;cursor:pointer;background:{{ vbThinking }};color:{{ vfThinking }}">Thinking</button>
+          <button onClick="{{ vResponding }}" style="padding:6px 12px;border-radius:9999px;border:none;font:inherit;font-size:12.5px;font-weight:500;cursor:pointer;background:{{ vbResponding }};color:{{ vfResponding }}">Responding</button>
+          <button onClick="{{ vCaptured }}" style="padding:6px 12px;border-radius:9999px;border:none;font:inherit;font-size:12.5px;font-weight:500;cursor:pointer;background:{{ vbCaptured }};color:{{ vfCaptured }}">Captured</button>
+        </div>
+      </div>
+
+      <div style="border-radius:28px;background:#fffdfa;padding:30px;min-height:268px;display:flex;flex-direction:column;justify-content:center">
+
+        <sc-if value="{{ isIdle }}" hint-placeholder-val="{{ true }}">
+        <div style="text-align:center">
+          <button style="width:66px;height:66px;border-radius:50%;background:#3461f2;border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;margin:0 auto" style-hover="background:#5b7cff"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><path d="M12 19v3"></path></svg></button>
+          <p style="font-size:17px;font-weight:500;margin:20px 0 0;letter-spacing:-.01em">Say "Atlas, remember…" — or just talk</p>
+          <p style="font-size:14px;color:#6d6a67;margin:8px 0 0;max-width:400px;margin-left:auto;margin-right:auto;line-height:1.55;text-wrap:pretty">It's listening already. Anything worth keeping gets picked up as you go, and shown on the right.</p>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isHearing }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="display:flex;align-items:center;gap:2.5px;height:15px"><span style="width:2.5px;height:6px;border-radius:2px;background:#3461f2;animation:eqa 1.15s ease-in-out infinite"></span><span style="width:2.5px;height:12px;border-radius:2px;background:#3461f2;animation:eqa 1.15s ease-in-out .18s infinite"></span><span style="width:2.5px;height:9px;border-radius:2px;background:#3461f2;animation:eqa 1.15s ease-in-out .36s infinite"></span><span style="width:2.5px;height:13px;border-radius:2px;background:#3461f2;animation:eqa 1.15s ease-in-out .09s infinite"></span><span style="width:2.5px;height:7px;border-radius:2px;background:#3461f2;animation:eqa 1.15s ease-in-out .27s infinite"></span></span>
+            <span style="font-size:12.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#2f4bbd">Hearing you</span>
+          </div>
+          <p style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.02em;font-size:26px;font-weight:500;line-height:1.35;margin:20px 0 0;color:#1e1e24;text-wrap:pretty">I work at Innovo as a founder, mostly on product<span style="display:inline-block;width:9px;height:20px;margin-left:4px;border-radius:2px;background:#3461f2;vertical-align:-2px;animation:blink .9s steps(2) infinite"></span></p>
+          <p style="font-size:13.5px;color:#8b8681;margin:18px 0 0">Nothing is stored while you're still talking.</p>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isThinking }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <span style="font-size:12.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#8b8681">Working out what to keep</span>
+          <p style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.02em;font-size:26px;font-weight:500;line-height:1.35;margin:16px 0 0;color:#6d6a67;text-wrap:pretty">"I work at Innovo as a founder, mostly on product."</p>
+          <div style="height:4px;border-radius:9999px;background:#edebe7;overflow:hidden;margin-top:26px"><div style="height:100%;width:100%;background:linear-gradient(100deg,#edebe7 20%,#3461f2 46%,#8aa2f7 54%,#3461f2 62%,#edebe7 82%);background-size:220% 100%;animation:shim 1.5s linear infinite"></div></div>
+          <p style="font-size:13.5px;color:#8b8681;margin:16px 0 0">Checking it against what it already knows about your work.</p>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isResponding }}" hint-placeholder-val="{{ false }}">
+        <div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="width:8px;height:8px;border-radius:50%;background:#0fae76;animation:pls 1.4s ease-in-out infinite"></span>
+            <span style="font-size:12.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#0a7a53">Speaking</span>
+          </div>
+          <p style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.02em;font-size:26px;font-weight:500;line-height:1.35;margin:20px 0 0;color:#1e1e24;text-wrap:pretty">"Got it — founder at Innovo, mostly product. I had you down as a designer there, so I've replaced that."</p>
+          <p style="font-size:13.5px;color:#8b8681;margin:18px 0 0">Say "no, wait" any time and it stops.</p>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isCaptured }}" hint-placeholder-val="{{ false }}">
+        <div style="animation:land .5s cubic-bezier(.22,1,.36,1) both">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="width:22px;height:22px;border-radius:50%;background:#0fae76;color:#fff;display:flex;align-items:center;justify-content:center"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12 5 5L20 6" stroke-dasharray="34" style="animation:tick .5s ease .1s both"></path></svg></span>
+            <span style="font-size:12.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#0a7a53">Remembered</span>
+          </div>
+          <div style="margin-top:18px;padding:20px 22px;border-radius:18px;background:#f9f7f4">
+            <span style="font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:9999px;background:rgba(52,97,242,.1);color:#2f4bbd">work</span>
+            <p style="font-size:19px;line-height:1.45;margin:12px 0 0;color:#1e1e24;text-wrap:pretty">Founder at Innovo, mostly on product.</p>
+            <p style="font-size:12.5px;color:#8b8681;margin:10px 0 0">Stored word for word · replaced "designer at Innovo Studio"</p>
+          </div>
+          <div style="display:flex;gap:9px;margin-top:16px">
+            <button style="border:none;height:34px;padding:0 15px;border-radius:9999px;background:#f9f7f4;color:#55524f;font:inherit;font-size:13px;font-weight:500;cursor:pointer" style-hover="color:#1e1e24;background:#edebe7">Change the wording</button>
+            <button style="border:none;height:34px;padding:0 15px;border-radius:9999px;background:#f9f7f4;color:#8b8681;font:inherit;font-size:13px;font-weight:500;cursor:pointer" style-hover="color:#a3352c;background:#f7e6e4">Undo</button>
+          </div>
+        </div>
+        </sc-if>
+
+      </div>
+
+      <div style="display:flex;align-items:center;gap:12px;margin-top:14px;padding:10px 12px 10px 20px;border-radius:9999px;background:#fffdfa">
+        <input placeholder="Or type it — same result, same weight" style="flex:1;min-width:0;border:none;outline:none;background:transparent;font:inherit;font-size:15px;color:#1e1e24">
+        <button style="height:36px;padding:0 18px;border-radius:9999px;background:#1e1e24;border:none;color:#f9f7f4;font:inherit;font-size:13.5px;font-weight:500;cursor:pointer;flex-shrink:0">Remember this</button>
+      </div>
+    </section>
+
+    <section style="border-radius:36px;background:#f1eeea;padding:26px 28px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px">
+        <h2 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.02em;font-size:20px;font-weight:500;margin:0">Picking things up</h2>
+        <span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:#6d6a67"><span style="width:7px;height:7px;border-radius:50%;background:#0fae76;animation:pls 2s ease-in-out infinite"></span>Live</span>
+      </div>
+      <p style="font-size:13.5px;color:#6d6a67;margin:0 0 18px;text-wrap:pretty">What Atlas took from this conversation, as it took it.</p>
+
+      <sc-if value="{{ full }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <sc-for list="{{ captures }}" as="c" hint-placeholder-count="4">
+          <div style="padding:16px 18px;border-radius:18px;background:#fffdfa;animation:land .5s cubic-bezier(.22,1,.36,1) both">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+              <span style="font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:9999px;background:{{ c.chipBg }};color:{{ c.chipFg }}">{{ c.cat }}</span>
+              <span style="font-size:12px;color:#b6b1aa">{{ c.when }}</span>
+            </div>
+            <p style="font-size:14.5px;line-height:1.5;margin:11px 0 0;color:#1e1e24;text-wrap:pretty">{{ c.text }}</p>
+            <div style="display:flex;gap:14px;margin-top:11px">
+              <button style="background:none;border:none;padding:0;font:inherit;font-size:12.5px;font-weight:500;color:#6d6a67;cursor:pointer" style-hover="color:#1e1e24">Correct</button>
+              <button style="background:none;border:none;padding:0;font:inherit;font-size:12.5px;font-weight:500;color:#8b8681;cursor:pointer" style-hover="color:#a3352c">Don't keep this</button>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:56px 24px;text-align:center;border-radius:28px;background:#fffdfa">
+        <div style="width:50px;height:50px;margin:0 auto;border-radius:50%;background:#f1eeea;display:flex;align-items:center;justify-content:center"><span style="width:8px;height:8px;border-radius:50%;background:#0fae76;animation:pls 2.4s ease-in-out infinite"></span></div>
+        <p style="font-size:17px;font-weight:500;margin:18px 0 0;letter-spacing:-.01em">Nothing picked up yet</p>
+        <p style="font-size:14px;line-height:1.6;color:#6d6a67;margin:8px auto 0;max-width:300px;text-wrap:pretty">Start talking. Anything Atlas decides is worth keeping appears here first, so you see it before it's saved.</p>
+      </div>
+      </sc-if>
+    </section>
+
+  </div>
+
+  <section style="border-radius:36px;background:#fffdfa;padding:28px 30px">
+    <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:36px;align-items:start">
+      <div>
+        <h2 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.02em;font-size:20px;font-weight:500;margin:0 0 6px">Tell it something outright</h2>
+        <p style="font-size:14px;color:#6d6a67;margin:0 0 18px;text-wrap:pretty">Stored exactly as you write it. Atlas won't rephrase it, summarise it, or wait until it thinks it matters.</p>
+        <textarea placeholder="My daughter Amara is seven. Her birthday is 4 March." style="border:none;width:100%;box-sizing:border-box;min-height:96px;resize:vertical;padding:16px 18px;border-radius:18px;background:#f9f7f4;font:inherit;font-size:16px;line-height:1.5;color:#1e1e24;outline:none"></textarea>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px">
+          <span style="font-size:13px;color:#6d6a67">File it under</span>
+          <span style="font-size:13px;font-weight:500;padding:7px 14px;border-radius:9999px;background:#1e1e24;color:#f9f7f4;cursor:pointer">Let Atlas choose</span>
+          <span style="font-size:13px;font-weight:500;padding:7px 14px;border-radius:9999px;background:#f1eeea;color:#55524f;cursor:pointer" style-hover="background:#edebe7">relationships</span>
+          <span style="font-size:13px;font-weight:500;padding:7px 14px;border-radius:9999px;background:#f1eeea;color:#55524f;cursor:pointer" style-hover="background:#edebe7">identity</span>
+          <span style="font-size:13px;font-weight:500;padding:7px 14px;border-radius:9999px;background:#f1eeea;color:#55524f;cursor:pointer" style-hover="background:#edebe7">work</span>
+          <span style="font-size:13px;font-weight:500;padding:7px 14px;border-radius:9999px;background:#f1eeea;color:#8b8681;cursor:pointer" style-hover="background:#edebe7">all 18 →</span>
+          <button style="margin-left:auto;height:40px;padding:0 22px;border-radius:9999px;background:#3461f2;border:none;color:#fff;font:inherit;font-size:14px;font-weight:500;cursor:pointer" style-hover="background:#5b7cff">Store it</button>
+        </div>
+      </div>
+      <div style="border-radius:20px;background:#f1eeea;padding:22px 24px">
+        <p style="font-size:11.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#b6b1aa;margin:0 0 14px">Then what</p>
+        <p style="font-size:14.5px;line-height:1.6;color:#33312f;margin:0 0 12px;text-wrap:pretty">Atlas repeats it back once, out loud, so you know it landed. It appears in the list below immediately.</p>
+        <p style="font-size:14.5px;line-height:1.6;color:#33312f;margin:0;text-wrap:pretty">From then on it goes out with your questions whenever it's relevant — and you can see, per memory, how often that's happened.</p>
+      </div>
+    </div>
+  </section>
+
+  <section style="border-radius:36px;background:#f1eeea;padding:26px 28px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px">
+      <div>
+        <h2 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.02em;font-size:20px;font-weight:500;margin:0">What Atlas knows</h2>
+        <p style="font-size:13.5px;color:#6d6a67;margin:5px 0 0">{{ knowsSub }}</p>
+      </div>
+      <sc-if value="{{ full }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;align-items:center;gap:12px;padding:9px 16px;border-radius:9999px;background:#fffdfa;min-width:280px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b6b1aa" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.6-3.6"></path></svg>
+        <input placeholder="Find a memory" style="flex:1;min-width:0;border:none;outline:none;background:transparent;font:inherit;font-size:14px;color:#1e1e24">
+      </div>
+      </sc-if>
+    </div>
+
+    <sc-if value="{{ full }}" hint-placeholder-val="{{ true }}">
+    <div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px">
+        <sc-for list="{{ cats }}" as="c" hint-placeholder-count="7">
+          <span style="font-size:13px;font-weight:500;padding:7px 14px;border-radius:9999px;cursor:pointer;background:{{ c.bg }};color:{{ c.fg }}">{{ c.name }} · {{ c.n }}</span>
+        </sc-for>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <sc-for list="{{ knows }}" as="k" hint-placeholder-count="6">
+          <div style="display:flex;align-items:flex-start;gap:14px;padding:16px 18px;border-radius:18px;background:#fffdfa">
+            <span style="font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:9999px;background:#f1eeea;color:#55524f;flex-shrink:0;margin-top:1px">{{ k.cat }}</span>
+            <div style="flex:1;min-width:0">
+              <p style="font-size:14.5px;line-height:1.5;margin:0;color:#1e1e24;text-wrap:pretty">{{ k.text }}</p>
+              <p style="font-size:12.5px;color:#8b8681;margin:6px 0 0">{{ k.meta }}</p>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+              <button style="border:none;width:28px;height:28px;border-radius:9999px;background:#f9f7f4;color:#8b8681;cursor:pointer;display:flex;align-items:center;justify-content:center" title="Correct" style-hover="color:#1e1e24;background:#edebe7"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 20h4L20 8l-4-4L4 16z"></path></svg></button>
+              <button style="border:none;width:28px;height:28px;border-radius:9999px;background:#f9f7f4;color:#8b8681;cursor:pointer;display:flex;align-items:center;justify-content:center" title="Forget" style-hover="color:#a3352c;background:#f7e6e4"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 7h14M9.5 7V5h5v2M7 7l1 13h8l1-13"></path></svg></button>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-top:18px;padding-top:18px">
+        <p style="font-size:13.5px;color:#6d6a67;margin:0">Showing 6 of 218 · sorted by how often Atlas actually uses them</p>
+        <button style="border:none;height:36px;padding:0 18px;border-radius:9999px;background:#fffdfa;color:#33312f;font:inherit;font-size:13.5px;font-weight:500;cursor:pointer" style-hover="background:#edebe7">See all 218</button>
+      </div>
+
+      <div style="margin-top:20px;padding:22px 24px;border-radius:20px;background:#f9f7f4">
+        <div style="display:flex;align-items:center;gap:10px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8b8681" stroke-width="1.7"><rect x="4" y="10" width="16" height="11" rx="3"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>
+          <p style="font-size:15px;font-weight:600;margin:0">Six things you volunteered</p>
+        </div>
+        <p style="font-size:13.5px;line-height:1.6;color:#6d6a67;margin:9px 0 14px;max-width:640px;text-wrap:pretty">Fears, hopes and beliefs are only ever here because you chose to say them. Atlas will not raise them, use them to make a point, or include them in a request unless the conversation is already about them.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <span style="font-size:13px;padding:6px 13px;border-radius:9999px;background:#f1eeea;color:#55524f;cursor:pointer" style-hover="background:#edebe7">fears · 2</span>
+          <span style="font-size:13px;padding:6px 13px;border-radius:9999px;background:#f1eeea;color:#55524f;cursor:pointer" style-hover="background:#edebe7">dreams · 3</span>
+          <span style="font-size:13px;padding:6px 13px;border-radius:9999px;background:#f1eeea;color:#55524f;cursor:pointer" style-hover="background:#edebe7">beliefs · 1</span>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+    <div style="padding:64px 40px;text-align:center;border-radius:28px;background:#fffdfa">
+      <div style="width:52px;height:52px;margin:0 auto;border-radius:16px;background:#f1eeea;display:flex;align-items:center;justify-content:center;color:#b6b1aa"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"></path></svg></div>
+      <h3 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.02em;font-size:22px;font-weight:500;margin:20px 0 8px">It doesn't know anything about you yet</h3>
+      <p style="font-size:14.5px;line-height:1.6;color:#6d6a67;margin:0 auto;max-width:460px;text-wrap:pretty">The fastest start is one sentence about your work and one about who's close to you. Two minutes of this is worth a week of it guessing.</p>
+      <div style="display:flex;gap:9px;justify-content:center;flex-wrap:wrap;margin-top:22px">
+        <button style="height:38px;padding:0 18px;border-radius:9999px;background:#3461f2;border:none;color:#fff;font:inherit;font-size:14px;font-weight:500;cursor:pointer" style-hover="background:#5b7cff">Start talking</button>
+        <button style="border:none;height:38px;padding:0 18px;border-radius:9999px;background:#f9f7f4;color:#33312f;font:inherit;font-size:14px;font-weight:500;cursor:pointer" style-hover="background:#edebe7">Give it your CV instead</button>
+      </div>
+    </div>
+    </sc-if>
+  </section>
+
+  <div style="display:grid;grid-template-columns:1fr 1.15fr;gap:22px;align-items:start">
+
+    <section style="border-radius:36px;background:#fffdfa;padding:26px 28px">
+      <h2 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.02em;font-size:20px;font-weight:500;margin:0 0 6px">When it's got something wrong</h2>
+      <p style="font-size:13.5px;color:#6d6a67;margin:0 0 20px;text-wrap:pretty">Say "that's not right" out loud, or press Correct on any memory. Same four steps either way.</p>
+
+      <div style="display:flex;gap:16px;padding-bottom:18px">
+        <span style="width:24px;height:24px;flex-shrink:0;border-radius:8px;background:#f1eeea;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#55524f">1</span>
+        <div style="flex:1;min-width:0">
+          <p style="font-size:14.5px;font-weight:600;margin:0">You flag it</p>
+          <div style="margin-top:9px;padding:13px 16px;border-radius:14px;background:#f1eeea"><p style="font-size:14.5px;margin:0;color:#33312f">"That's not right — it's Innovo, not Innovo Studio."</p></div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:16px;padding-bottom:18px">
+        <span style="width:24px;height:24px;flex-shrink:0;border-radius:8px;background:#f1eeea;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#55524f">2</span>
+        <div style="flex:1;min-width:0">
+          <p style="font-size:14.5px;font-weight:600;margin:0">Atlas shows you exactly what it has</p>
+          <div style="margin-top:9px;padding:14px 16px;border-radius:14px;background:#f9f7f4">
+            <span style="font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:9999px;background:#f1eeea;color:#55524f">work</span>
+            <p style="font-size:15px;margin:10px 0 0">Designer at Innovo Studio.</p>
+            <p style="font-size:12.5px;color:#8b8681;margin:7px 0 0">Learned 2 May, from conversation · used 31 times since</p>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:16px;padding-bottom:18px">
+        <span style="width:24px;height:24px;flex-shrink:0;border-radius:8px;background:#f1eeea;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#55524f">3</span>
+        <div style="flex:1;min-width:0">
+          <p style="font-size:14.5px;font-weight:600;margin:0">You give it the right version</p>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:9px;padding:8px 8px 8px 16px;border-radius:14px;background:#eef2fe">
+            <span style="font-size:15px;color:#1e1e24;flex:1">Founder at Innovo, mostly on product.</span>
+            <button style="border:none;width:34px;height:34px;border-radius:9999px;background:#fffdfa;color:#3461f2;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0" title="Say it instead"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><path d="M12 19v3"></path></svg></button>
+          </div>
+          <p style="font-size:12.5px;color:#8b8681;margin:8px 0 0">Speak it or type it. Atlas fills this in from what you said, and you can edit before it saves.</p>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:16px">
+        <span style="width:24px;height:24px;flex-shrink:0;border-radius:8px;background:rgba(15,174,118,.14);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#0a7a53">4</span>
+        <div style="flex:1;min-width:0">
+          <p style="font-size:14.5px;font-weight:600;margin:0">It confirms, and keeps the old one visible</p>
+          <div style="margin-top:9px;padding:14px 16px;border-radius:14px;background:#f9f7f4">
+            <p style="font-size:15px;margin:0">Founder at Innovo, mostly on product.</p>
+            <p style="font-size:13px;color:#8b8681;margin:8px 0 0;text-decoration:line-through">Designer at Innovo Studio.</p>
+            <p style="font-size:12.5px;color:#8b8681;margin:9px 0 0">Corrected by you, just now · <a href="#">put the old one back</a></p>
+          </div>
+          <p style="font-size:13.5px;line-height:1.6;color:#6d6a67;margin:12px 0 0;text-wrap:pretty">Superseded values are never deleted silently. An assistant that quietly overwrites itself is one you can't audit.</p>
+        </div>
+      </div>
+    </section>
+
+    <section style="border-radius:36px;background:#f1eeea;padding:26px 28px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+        <div>
+          <h2 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.02em;font-size:20px;font-weight:500;margin:0">Teach it from something you've written</h2>
+          <p style="font-size:13.5px;color:#6d6a67;margin:5px 0 0;text-wrap:pretty">A CV, a brief, a page of notes. Atlas reads it and proposes — it doesn't decide.</p>
+        </div>
+      </div>
+
+      <sc-if value="{{ empty }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:18px;border-radius:28px;background:#f9f7f4;padding:52px 40px;text-align:center">
+        <div style="width:50px;height:50px;margin:0 auto;border-radius:16px;background:#f1eeea;display:flex;align-items:center;justify-content:center;color:#b6b1aa"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path></svg></div>
+        <p style="font-size:17px;font-weight:500;margin:18px 0 0;letter-spacing:-.01em">Drop a document here</p>
+        <p style="font-size:14px;line-height:1.6;color:#6d6a67;margin:8px auto 0;max-width:360px;text-wrap:pretty">Your CV is the single fastest thing you can give it. Nothing is remembered until you've read the list and approved it.</p>
+        <button style="margin-top:20px;height:38px;padding:0 18px;border-radius:9999px;background:#3461f2;border:none;color:#fff;font:inherit;font-size:14px;font-weight:500;cursor:pointer" style-hover="background:#5b7cff">Choose a file</button>
+      </div>
+      </sc-if>
+
+      <sc-if value="{{ full }}" hint-placeholder-val="{{ true }}">
+      <div style="margin-top:18px">
+        <div style="display:flex;align-items:center;gap:14px;padding:15px 18px;border-radius:18px;background:#fffdfa">
+          <div style="width:34px;height:34px;flex-shrink:0;border-radius:11px;background:#f1eeea;display:flex;align-items:center;justify-content:center;color:#55524f"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"></path><path d="M14 2v5h5"></path></svg></div>
+          <div style="flex:1;min-width:0">
+            <p style="font-size:14.5px;font-weight:600;margin:0">Katherine — CV 2026.pdf</p>
+            <p style="font-size:12.5px;color:#8b8681;margin:3px 0 0">Read all 4 pages · found 12 things worth proposing</p>
+          </div>
+          <span style="font-size:12.5px;font-weight:600;padding:4px 11px;border-radius:9999px;background:rgba(15,174,118,.1);color:#0a7a53;flex-shrink:0">Read</span>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:14px;padding:15px 18px;border-radius:18px;background:#fffdfa;margin-top:10px">
+          <div style="width:34px;height:34px;flex-shrink:0;border-radius:11px;background:#f1eeea;display:flex;align-items:center;justify-content:center;color:#55524f"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M14 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7z"></path><path d="M14 2v5h5"></path></svg></div>
+          <div style="flex:1;min-width:0">
+            <p style="font-size:14.5px;font-weight:600;margin:0">Studio handbook.pdf</p>
+            <p style="font-size:12.5px;color:#8b8681;margin:3px 0 0">Page 34 of 96 · about 2 minutes left</p>
+            <div style="height:4px;border-radius:9999px;background:#edebe7;overflow:hidden;margin-top:9px"><div style="height:100%;width:35%;border-radius:9999px;background:#3461f2"></div></div>
+          </div>
+          <button style="border:none;height:30px;padding:0 13px;border-radius:9999px;background:#f9f7f4;color:#8b8681;font:inherit;font-size:12.5px;cursor:pointer;flex-shrink:0" style-hover="color:#a3352c;background:#f7e6e4">Stop</button>
+        </div>
+
+        <div style="margin-top:18px;padding:22px 24px;border-radius:28px;background:#eef2fe">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap">
+            <div style="min-width:0">
+              <p style="font-size:16px;font-weight:600;letter-spacing:-.01em;margin:0">Atlas found 12 things in your CV</p>
+              <p style="font-size:13.5px;color:#6d6a67;margin:6px 0 0;max-width:420px;text-wrap:pretty">None of them are saved yet. Read them, then keep what's true.</p>
+            </div>
+            <div style="display:flex;gap:8px;flex-shrink:0">
+              <button style="border:none;height:34px;padding:0 15px;border-radius:9999px;background:#f9f7f4;color:#55524f;font:inherit;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#edebe7">Reject all</button>
+              <button style="height:34px;padding:0 15px;border-radius:9999px;background:#3461f2;border:none;color:#fff;font:inherit;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#5b7cff">Keep all 12</button>
+            </div>
+          </div>
+
+          <div style="margin-top:18px;display:flex;flex-direction:column;gap:10px">
+            <sc-for list="{{ proposals }}" as="p" hint-placeholder-count="4">
+              <div style="display:flex;align-items:flex-start;gap:14px;padding:15px 17px;border-radius:16px;background:#f9f7f4">
+                <span style="font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:9999px;background:#f1eeea;color:#55524f;flex-shrink:0;margin-top:1px;cursor:pointer">{{ p.cat }}</span>
+                <div style="flex:1;min-width:0">
+                  <p style="font-size:14.5px;line-height:1.5;margin:0;text-wrap:pretty">{{ p.text }}</p>
+                  <p style="font-size:12.5px;color:#8b8681;margin:5px 0 0">{{ p.src }}</p>
+                </div>
+                <div style="display:flex;gap:6px;flex-shrink:0">
+                  <button style="border:none;width:30px;height:30px;border-radius:9999px;background:#fffdfa;color:#0a7a53;cursor:pointer;display:flex;align-items:center;justify-content:center" title="Keep" style-hover="background:#0fae76;color:#fff"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12 5 5L20 6"></path></svg></button>
+                  <button style="border:none;width:30px;height:30px;border-radius:9999px;background:#fffdfa;color:#8b8681;cursor:pointer;display:flex;align-items:center;justify-content:center" title="Edit first" style-hover="color:#1e1e24;background:#edebe7"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 20h4L20 8l-4-4L4 16z"></path></svg></button>
+                  <button style="border:none;width:30px;height:30px;border-radius:9999px;background:#fffdfa;color:#8b8681;cursor:pointer;display:flex;align-items:center;justify-content:center" title="Reject" style-hover="color:#a3352c;background:#f7e6e4"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+                </div>
+              </div>
+            </sc-for>
+            <p style="font-size:13px;color:#8b8681;margin:4px 0 0">8 more below · one is already known and marked as a duplicate</p>
+          </div>
+        </div>
+      </div>
+      </sc-if>
+    </section>
+
+  </div>
+
+  <section style="border-radius:36px;background:#fffdfa;padding:28px 30px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:22px">
+      <div>
+        <h2 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.02em;font-size:20px;font-weight:500;margin:0 0 6px">How it talks to you</h2>
+        <p style="font-size:14px;line-height:1.6;color:#6d6a67;margin:0;max-width:620px;text-wrap:pretty">Atlas drifts these on its own from how conversations go. Move one and your setting wins — permanently, until you move it back. The same five dials appear in Settings; this is the same state, not a copy.</p>
+      </div>
+      <button style="border:none;height:36px;padding:0 16px;border-radius:9999px;background:#f9f7f4;color:#55524f;font:inherit;font-size:13.5px;font-weight:500;cursor:pointer;flex-shrink:0" style-hover="color:#1e1e24;background:#edebe7">Let Atlas decide all five again</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:14px 40px">
+      <sc-for list="{{ dials }}" as="d" hint-placeholder-count="5">
+        <div style="padding:18px 0 20px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:14px">
+            <p style="font-size:15px;font-weight:600;margin:0">{{ d.label }}</p>
+            <span style="font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:9999px;flex-shrink:0;background:{{ d.badgeBg }};color:{{ d.badgeFg }}">{{ d.badge }}</span>
+          </div>
+          <p style="font-size:13px;color:#6d6a67;margin:5px 0 0;text-wrap:pretty">{{ d.desc }}</p>
+          <div style="display:flex;align-items:center;gap:14px;margin-top:14px">
+            <span style="font-size:12.5px;color:#8b8681;width:92px;flex-shrink:0">{{ d.low }}</span>
+            <div style="flex:1;height:6px;border-radius:9999px;background:#edebe7;position:relative">
+              <div style="height:100%;border-radius:9999px;background:{{ d.fill }};width:{{ d.pct }}"></div>
+              <span style="position:absolute;top:50%;width:18px;height:18px;border-radius:50%;background:{{ d.fill }};transform:translate(-50%,-50%);cursor:grab;left:{{ d.pct }}"></span>
+            </div>
+            <span style="font-size:12.5px;color:#8b8681;width:92px;flex-shrink:0;text-align:right">{{ d.high }}</span>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+    <p style="font-size:13.5px;color:#8b8681;margin:20px 0 0;text-wrap:pretty">Playfulness is turned down automatically when a conversation turns serious, whatever this is set to.</p>
+  </section>
+
+</main>
+
+<nav style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:92;display:flex;align-items:center;gap:3px;padding:5px;border-radius:9999px;background:#1e1e24;box-shadow:0 18px 44px -12px rgba(30,30,36,.5)">
+  <a href="Atlas%20Dashboard%20(Current).dc.html" title="Home" style="display:flex;align-items:center;justify-content:center;height:32px;padding:0 9px;border-radius:9999px;color:rgba(249,247,244,.8)" style-hover="color:#fff;background:rgba(249,247,244,.12)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></a>
+  <a href="Atlas%20Core.dc.html" title="Core" style="display:flex;align-items:center;justify-content:center;height:32px;padding:0 9px;border-radius:9999px;color:rgba(249,247,244,.8)" style-hover="color:#fff;background:rgba(249,247,244,.12)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="3"></rect><rect x="9" y="9" width="6" height="6" rx="1"></rect><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"></path></svg></a>
+  <span style="display:flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:9999px;background:#3461f2;color:#fff;font-size:13px;font-weight:500"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"></path></svg>Teach</span>
+  <a href="Atlas%20Mail.dc.html" title="Mail" style="display:flex;align-items:center;justify-content:center;height:32px;padding:0 9px;border-radius:9999px;color:rgba(249,247,244,.8)" style-hover="color:#fff;background:rgba(249,247,244,.12)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="3"></rect><path d="m3.6 7 8.4 5.6L20.4 7"></path></svg></a>
+  <a href="Atlas%20Architecture%20v2.dc.html" title="Architecture" style="display:flex;align-items:center;justify-content:center;height:32px;padding:0 9px;border-radius:9999px;color:rgba(249,247,244,.8)" style-hover="color:#fff;background:rgba(249,247,244,.12)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="2.5"></circle><path d="M12 2v7M12 15v7M4.2 6.5l5.6 3.2M14.2 14.3l5.6 3.2M19.8 6.5l-5.6 3.2M9.8 14.3l-5.6 3.2"></path></svg></a>
+  <button title="Speak to Atlas" style="display:flex;align-items:center;justify-content:center;height:32px;padding:0 9px;border-radius:9999px;color:rgba(249,247,244,.8);background:transparent;border:none;font-family:inherit;cursor:pointer" style-hover="color:#fff;background:rgba(249,247,244,.12)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><path d="M12 19v3"></path></svg></button>
+  <span title="Katherine" style="width:32px;height:32px;border-radius:50%;background:rgba(249,247,244,.14);color:#f9f7f4;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-left:2px">K</span>
+</nav>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1500},&quot;dataState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;In use&quot;,&quot;Day one&quot;],&quot;default&quot;:&quot;In use&quot;,&quot;tsType&quot;:&quot;'In use' | 'Day one'&quot;,&quot;section&quot;:&quot;Content&quot},&quot;voiceState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Idle&quot;,&quot;Hearing&quot;,&quot;Thinking&quot;,&quot;Responding&quot;,&quot;Captured&quot;],&quot;default&quot;:&quot;Captured&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Content&quot},&quot;technical&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Content&quot}}">
+class Component extends DCLogic {
+  state = { mode: 'full', voice: 'captured', explain: true };
+
+  componentDidMount() {
+    this._esc = (e) => { if (e.key === 'Escape') this.back(); };
+    window.addEventListener('keydown', this._esc);
+    if (this.props.dataState === 'Day one') this.setState({ mode: 'empty', voice: 'idle' });
+    if (this.props.voiceState) this.setState({ voice: String(this.props.voiceState).toLowerCase() });
+  }
+  componentWillUnmount() { window.removeEventListener('keydown', this._esc); }
+  back() { window.location.href = 'Atlas Dashboard (Current).dc.html'; }
+
+  renderVals() {
+    const full = this.state.mode === 'full';
+    const v = this.state.voice;
+    const vseg = (k) => ({
+      ['vb' + k[0].toUpperCase() + k.slice(1)]: v === k ? '#1e1e24' : 'transparent',
+      ['vf' + k[0].toUpperCase() + k.slice(1)]: v === k ? '#f9f7f4' : '#6d6a67',
+    });
+    const setV = (k) => () => this.setState({ voice: k });
+
+    return {
+      ...vseg('idle'), ...vseg('hearing'), ...vseg('thinking'), ...vseg('responding'), ...vseg('captured'),
+      vIdle: setV('idle'), vHearing: setV('hearing'), vThinking: setV('thinking'),
+      vResponding: setV('responding'), vCaptured: setV('captured'),
+      isIdle: v === 'idle', isHearing: v === 'hearing', isThinking: v === 'thinking',
+      isResponding: v === 'responding', isCaptured: v === 'captured',
+
+      full, empty: !full,
+      setFull: () => this.setState({ mode: 'full' }),
+      setEmpty: () => this.setState({ mode: 'empty', voice: 'idle' }),
+      fullBg: full ? '#1e1e24' : 'transparent', fullFg: full ? '#f9f7f4' : '#6d6a67',
+      emptyBg: full ? 'transparent' : '#1e1e24', emptyFg: full ? '#6d6a67' : '#f9f7f4',
+
+      goBack: () => this.back(),
+      orbRef: (el) => { if (el && window.AtlasSphere) window.AtlasSphere.mount(el, () => ({ state: v === 'hearing' ? 'listening' : (v === 'thinking' ? 'thinking' : 'idle') })); },
+
+      heroSub: full
+        ? 'Everything it knows, in one place — added, corrected and removed by you rather than guessed at.'
+        : 'Atlas starts knowing nothing about you. Ten minutes here is worth a month of it working it out.',
+      knownN: full ? '218' : '0',
+      knowsSub: full ? '218 memories · you can change or delete any of them' : 'Nothing yet',
+
+      explainOpen: this.state.explain,
+      explainSub: this.state.explain
+        ? 'Two minutes. Then collapse it — it stays out of your way once you know.'
+        : 'What lands, what doesn\'t, and where it goes afterwards.',
+      explainAction: this.state.explain ? 'Hide' : 'Read it',
+      explainRotate: this.state.explain ? 'rotate(180deg)' : 'rotate(0deg)',
+      toggleExplain: () => this.setState((s) => ({ explain: !s.explain })),
+
+      captures: [
+        { cat: 'work', chipBg: 'rgba(52,97,242,.1)', chipBd: 'rgba(52,97,242,.24)', chipFg: '#2f4bbd', when: 'just now', text: 'Founder at Innovo, mostly on product.' },
+        { cat: 'relationships', chipBg: '#f1eeea', chipBd: '#e2ded7', chipFg: '#55524f', when: '2 min ago', text: 'Dana Okafor is the client contact at Innovo, and signs off the work.' },
+        { cat: 'preferences', chipBg: '#f1eeea', chipBd: '#e2ded7', chipFg: '#55524f', when: '4 min ago', text: 'Would rather have one clear recommendation than a list of options.' },
+        { cat: 'habits', chipBg: '#f1eeea', chipBd: '#e2ded7', chipFg: '#55524f', when: '6 min ago', text: 'Reviews the week on Friday afternoons and does not want interrupting.' },
+      ],
+
+      cats: [
+        { name: 'everything', n: '218', bg: '#1e1e24', bd: '#1e1e24', fg: '#f9f7f4' },
+        { name: 'preferences', n: '52', bg: '#fffdfa', bd: '#e2ded7', fg: '#55524f' },
+        { name: 'work', n: '41', bg: '#fffdfa', bd: '#e2ded7', fg: '#55524f' },
+        { name: 'relationships', n: '29', bg: '#fffdfa', bd: '#e2ded7', fg: '#55524f' },
+        { name: 'habits', n: '24', bg: '#fffdfa', bd: '#e2ded7', fg: '#55524f' },
+        { name: 'identity', n: '18', bg: '#fffdfa', bd: '#e2ded7', fg: '#55524f' },
+        { name: 'health', n: '11', bg: '#fffdfa', bd: '#e2ded7', fg: '#55524f' },
+        { name: '11 more', n: '43', bg: '#fffdfa', bd: '#e2ded7', fg: '#8b8681' },
+      ],
+
+      knows: [
+        { cat: 'work', text: 'Founder at Innovo, mostly on product.', meta: 'You told Atlas · 14 June · used 31 times' },
+        { cat: 'preferences', text: 'Would rather have one clear recommendation than a list of options.', meta: 'Picked up in conversation · 2 May · used 88 times' },
+        { cat: 'relationships', text: 'Amara is her daughter. Seven years old, birthday 4 March.', meta: 'You told Atlas · 18 June · used 9 times' },
+        { cat: 'habits', text: 'Reviews the week on Friday afternoons and does not want interrupting.', meta: 'Picked up in conversation · 9 June · used 6 times' },
+        { cat: 'identity', text: 'Grew up in Lagos, moved to London at nineteen.', meta: 'From your CV · 3 May · used 4 times' },
+        { cat: 'health', text: 'Migraines when sleep drops below six hours. Wants telling, gently.', meta: 'You told Atlas · 28 April · used 2 times' },
+      ],
+
+      proposals: [
+        { cat: 'work', text: 'Founded Innovo in 2023 after six years at Rowe & Cass.', src: 'Page 1, under Experience' },
+        { cat: 'work', text: 'Specialises in product strategy for regulated industries.', src: 'Page 1, under Profile' },
+        { cat: 'identity', text: 'Studied industrial design at Central Saint Martins.', src: 'Page 3, under Education' },
+        { cat: 'achievements', text: 'Led the redesign of the Meridian banking app, 2021.', src: 'Page 2, under Selected work' },
+      ],
+
+      dials: [
+        { label: 'Warmth', desc: 'How caring and encouraging Atlas is with you.', low: 'Matter-of-fact', high: 'Very warm', pct: '72%', fill: '#3461f2', badge: 'You set this', badgeBg: 'rgba(52,97,242,.1)', badgeBd: 'rgba(52,97,242,.24)', badgeFg: '#2f4bbd' },
+        { label: 'Playfulness', desc: 'How much humour it mixes in — light jokes, the odd pun.', low: 'Strictly serious', high: 'Playful', pct: '38%', fill: '#b6b1aa', badge: 'Learned', badgeBg: '#f1eeea', badgeBd: '#e2ded7', badgeFg: '#55524f' },
+        { label: 'Formality', desc: 'Relaxed and casual, or polished and professional.', low: 'Casual', high: 'Formal', pct: '30%', fill: '#b6b1aa', badge: 'Learned', badgeBg: '#f1eeea', badgeBd: '#e2ded7', badgeFg: '#55524f' },
+        { label: 'Detail', desc: 'Quick and to the point, or thorough with the context.', low: 'Brief', high: 'Detailed', pct: '45%', fill: '#3461f2', badge: 'You set this', badgeBg: 'rgba(52,97,242,.1)', badgeBd: 'rgba(52,97,242,.24)', badgeFg: '#2f4bbd' },
+        { label: 'Directness', desc: 'Gentle suggestions, or straight answers.', low: 'Gentle', high: 'Direct', pct: '84%', fill: '#3461f2', badge: 'You set this', badgeBg: 'rgba(52,97,242,.1)', badgeBd: 'rgba(52,97,242,.24)', badgeFg: '#2f4bbd' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

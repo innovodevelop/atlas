@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<style>
+button,input,textarea,select{border:none}@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Hanken+Grotesk:wght@500;600;700&display=swap');
+html,body{margin:0;padding:0;background:#f9f7f4}
+a{color:#3461f2;text-decoration:none}a:hover{color:#5b7cff}
+*{box-sizing:border-box}
+@keyframes av-in{from{opacity:0;transform:translateY(16px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes av-word{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes av-pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes av-spin{to{transform:rotate(360deg)}}
+</style>
+<script src="https://unpkg.com/lucide@0.462.0/dist/umd/lucide.min.js"></script>
+<script src="atlas-sphere.js"></script>
+<script src="atlas-transition.js"></script>
+</helmet>
+<div ref="{{ rootRef }}" data-screen-label="Answer view" style="position:relative;min-height:100vh;background:{{ pageBg }};color:{{ pageFg }};font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:auto">
+<div style="position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none">
+<div style="position:absolute;inset:0;background:{{ washA }}"></div>
+<div style="position:absolute;top:-280px;left:50%;transform:translateX(-50%);width:1100px;height:700px;border-radius:50%;filter:blur(72px);background:{{ washB }}"></div>
+</div>
+
+<section style="position:relative;z-index:10;display:grid;grid-template-columns:170px minmax(0,1fr) auto;gap:26px;align-items:center;min-width:1400px;max-width:1640px;margin:0 auto;padding:30px 28px 10px">
+<div style="width:170px;height:170px"><canvas ref="{{ orbRef }}" style="width:170px;height:170px;display:block"></canvas></div>
+<div key="{{ runKey }}" style="animation:av-in .55s cubic-bezier(.22,1,.36,1) both">
+<p style="margin:0 0 12px;display:inline-flex;align-items:center;gap:9px;padding:6px 13px 6px 10px;border-radius:9999px;background:{{ askBg }};font-size:12.5px;color:{{ askFg }}"><i data-lucide="mic" style="width:13px;height:13px"></i>{{ question }}</p>
+<h1 style="margin:0;font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.034em;font-size:clamp(30px,3.6vw,48px);font-weight:500;line-height:1.04;text-wrap:pretty">{{ headline }}<span style="color:{{ accent }}">{{ headlineAccent }}</span></h1>
+<p style="margin:12px 0 0;font-size:15.5px;line-height:1.5;max-width:70ch;color:{{ mutFg }};text-wrap:pretty">{{ spoken }}</p>
+</div>
+<div style="display:flex;flex-direction:column;align-items:flex-end;gap:12px">
+<div style="display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:9999px;background:{{ chipBg }};color:{{ mutFg }};font-size:12px"><span style="width:7px;height:7px;border-radius:50%;background:{{ accent }};animation:av-pulse 1.6s ease-in-out infinite"></span>{{ statusLine }}</div>
+<div style="font-size:11.5px;color:{{ dimFg }};font-variant-numeric:tabular-nums">{{ recipeLine }}</div>
+<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+<sc-for list="{{ dials }}" as="d" hint-placeholder-count="3">
+<button data-k="{{ d.k }}" onClick="{{ cycleDial }}" style="border:none;display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 13px;border-radius:9999px;cursor:pointer;background:{{ dialBg }};color:{{ pageFg }};font-size:12px;font-weight:500" style-hover=""><span style="font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:{{ dimFg }}">{{ d.k }}</span>{{ d.v }}</button>
+</sc-for>
+<button onClick="{{ shuffle }}" style="display:inline-flex;align-items:center;gap:10px;height:44px;padding:0 7px 0 18px;border-radius:9999px;border:0;cursor:pointer;background:#1e1e24;color:#f9f7f4;font-size:13.5px;font-weight:600;letter-spacing:-.01em;box-shadow:0 20px 44px -22px rgba(30,30,36,.75)" style-hover="background:#33312f">
+Shuffle the answer
+<span style="width:30px;height:30px;border-radius:50%;background:{{ accent }};display:flex;align-items:center;justify-content:center;color:#fff;animation:{{ spinAnim }}"><i data-lucide="shuffle" style="width:15px;height:15px"></i></span>
+</button>
+</div>
+</div>
+</section>
+
+<main key="{{ runKey }}" style="position:relative;z-index:10;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-auto-flow:row dense;grid-auto-rows:{{ rowH }};gap:{{ gridGap }};min-width:1400px;max-width:1640px;margin:0 auto;padding:14px 28px 196px">
+<sc-for list="{{ cards }}" as="w" hint-placeholder-count="7">
+<article data-screen-label="{{ w.name }}" style="position:relative;display:flex;flex-direction:column;overflow:hidden;grid-column:span {{ w.cols }};grid-row:span {{ w.rows }};padding:{{ w.pad }};border-radius:{{ w.radius }};background:{{ w.bg }};backdrop-filter:{{ w.blur }};box-shadow:{{ w.ring }};animation:av-in .5s cubic-bezier(.22,1,.36,1) both;animation-delay:{{ w.delay }}">
+<header style="display:flex;align-items:center;gap:9px;flex-shrink:0">
+
+<p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;color:{{ w.label }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.name }}</p>
+<span style="margin-left:auto;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:{{ w.mut }};flex-shrink:0">{{ w.tag }}</span>
+</header>
+
+<sc-if value="{{ w.isMetric }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;align-items:flex-end;gap:9px;min-width:0;overflow:hidden">
+<span style="font-family:'Hanken Grotesk',sans-serif;font-weight:500;letter-spacing:-.035em;line-height:1.08;font-size:{{ w.bigSize }};color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</span>
+<span style="padding-bottom:5px;font-size:12.5px;font-weight:500;color:{{ w.accent }}">{{ w.delta }}</span>
+</div>
+<p style="margin:7px 0 0;font-size:12.5px;line-height:1.45;color:{{ w.mut }}">{{ w.caption }}</p>
+</sc-if>
+
+<sc-if value="{{ w.isStatus }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;align-items:center;gap:13px">
+<span style="width:3px;align-self:stretch;min-height:40px;border-radius:2px;background:{{ w.accent }};opacity:.55;flex-shrink:0"></span>
+<div style="min-width:0">
+<p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ w.midSize }};font-weight:600;letter-spacing:-.02em;color:{{ w.fg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.value }}</p>
+<p style="margin:5px 0 0;font-size:12.5px;color:{{ w.mut }}">{{ w.caption }}</p>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.isList }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:13px;display:flex;flex-direction:column;gap:10px;min-height:0;overflow:hidden">
+<sc-for list="{{ w.rowsData }}" as="r" hint-placeholder-count="3">
+<div style="display:flex;align-items:center;gap:10px">
+<span style="width:6px;height:6px;border-radius:50%;background:{{ w.accent }};flex-shrink:0;opacity:.8"></span>
+<span style="flex:1;min-width:0;font-size:13px;color:{{ w.fg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.label }}</span>
+<span style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ w.mut }};flex-shrink:0">{{ r.value }}</span>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.isTime }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:13px;display:flex;flex-direction:column;gap:10px;min-height:0;overflow:hidden">
+<sc-for list="{{ w.rowsData }}" as="r" hint-placeholder-count="3">
+<div style="display:grid;grid-template-columns:50px minmax(0,1fr);gap:10px;align-items:baseline">
+<span style="font-size:11.5px;font-variant-numeric:tabular-nums;color:{{ w.mut }}">{{ r.value }}</span>
+<span style="font-size:13px;color:{{ w.fg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.label }}</span>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.isBars }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;align-items:flex-end;gap:4px;height:{{ w.barH }}">
+<sc-for list="{{ w.bars }}" as="b" hint-placeholder-count="12">
+<span style="flex:1;border-radius:3px;height:{{ b.h }};background:{{ b.bg }}"></span>
+</sc-for>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:10px">
+<span style="font-size:11.5px;color:{{ w.mut }}">{{ w.caption }}</span>
+<span style="font-size:13px;font-weight:600;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</span>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.isProgress }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto">
+<div style="display:flex;align-items:baseline;gap:9px;margin-bottom:11px">
+<span style="font-family:'Hanken Grotesk',sans-serif;font-weight:500;letter-spacing:-.03em;font-size:{{ w.midSize }};line-height:1;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</span>
+<span style="font-size:12.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</span>
+</div>
+<div style="height:6px;border-radius:9999px;background:{{ w.trackBg }};overflow:hidden"><span style="display:block;height:100%;width:{{ w.pct }};border-radius:9999px;background:{{ w.accent }}"></span></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.isPeople }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;align-items:center">
+<sc-for list="{{ w.people }}" as="p" hint-placeholder-count="4">
+<span style="width:32px;height:32px;margin-right:-8px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:600;background:{{ w.mediaBg }};color:{{ w.accent }};box-shadow:0 0 0 2px {{ w.avRing }}">{{ p.i }}</span>
+</sc-for>
+<span style="margin-left:20px;font-size:12.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</span>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.isMedia }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:13px;flex:1;min-height:0;border-radius:14px;background:{{ w.mediaBg }};box-shadow:inset 0 0 0 1px {{ w.mediaRing }};position:relative;overflow:hidden">
+<span style="position:absolute;left:14px;bottom:12px;right:14px;font-size:13px;font-weight:600;color:{{ w.fg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.value }}</span>
+</div>
+<p style="margin:9px 0 0;font-size:12px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p>
+</sc-if>
+
+<sc-if value="{{ w.isCompare }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:grid;grid-template-columns:minmax(0,1fr) 1px minmax(0,1fr);gap:13px;align-items:center">
+<div style="min-width:0"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ w.midSize }};font-weight:500;letter-spacing:-.03em;line-height:1;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</p><p style="margin:6px 0 0;font-size:12px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p></div>
+<span style="height:64%;background:{{ w.trackBg }}"></span>
+<div style="min-width:0"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ w.midSize }};font-weight:500;letter-spacing:-.03em;line-height:1;color:{{ w.accent }};font-variant-numeric:tabular-nums">{{ w.value2 }}</p><p style="margin:6px 0 0;font-size:12px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption2 }}</p></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.isSaid }}" hint-placeholder-val="{{ false }}">
+<p style="margin:14px 0 0;font-size:{{ w.saidSize }};line-height:1.5;letter-spacing:-.015em;color:{{ w.fg }};text-wrap:pretty">{{ w.value }}</p>
+<p style="margin:auto 0 0;padding-top:12px;font-size:12px;color:{{ w.mut }}">{{ w.caption }}</p>
+</sc-if>
+</article>
+</sc-for>
+</main>
+
+<nav style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:92;display:flex;align-items:center;gap:3px;padding:5px;border-radius:9999px;background:#22222b;box-shadow:inset 0 0 0 1px rgba(247,245,242,.16),0 20px 46px -18px rgba(0,0,0,.6)">
+<a href="Atlas Dashboard (Current).dc.html" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 11px;border-radius:9999px;color:rgba(249,247,244,.8);font-size:13px;font-weight:500;text-decoration:none" style-hover="color:#fff;background:rgba(249,247,244,.12)"><i data-lucide="layout-grid" style="width:16px;height:16px"></i>Dashboard</a>
+<a href="Atlas Browser.dc.html" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 11px;border-radius:9999px;color:rgba(249,247,244,.8);font-size:13px;font-weight:500;text-decoration:none" style-hover="color:#fff;background:rgba(249,247,244,.12)"><i data-lucide="compass" style="width:16px;height:16px"></i>Browser</a>
+<a href="Atlas Widget Catalog.dc.html" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 11px;border-radius:9999px;color:rgba(249,247,244,.8);font-size:13px;font-weight:500;text-decoration:none" style-hover="color:#fff;background:rgba(249,247,244,.12)"><i data-lucide="layout-dashboard" style="width:16px;height:16px"></i>Widgets</a>
+<span style="display:flex;align-items:center;gap:7px;height:32px;padding:0 11px;border-radius:9999px;background:rgba(249,247,244,.14);color:#fff;font-size:13px;font-weight:500"><i data-lucide="sparkles" style="width:16px;height:16px"></i>Answer views</span>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1640,&quot;height&quot;:1000},&quot;autoShuffle&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Testing&quot}}">
+class Component extends DCLogic {
+  ACC = { time:'#3461f2', weather:'#e07a1f', travel:'#0fae76', money:'#2f7d5e', work:'#6d4bff', comms:'#3461f2', health:'#d0453a', home:'#8b6f3f', media:'#b0446f', know:'#55524f' };
+  WIDGETS = {
+    clock:['Clock','time','clock','metric',{v:'14:32',d:'CET',c:'Tuesday, 26 July'}],
+    agenda:['Agenda','time','calendar','time',{r:[['09:30','Design review'],['11:00','1:1 with Maya'],['14:00','Press briefing'],['16:30','Ledgerline call']]}],
+    next:['Up next','time','calendar-clock','status',{v:'1:1 with Maya',c:'in 18 minutes · Room 4',i2:'calendar-clock'}],
+    countdown:['Countdown','time','timer','metric',{v:'6d',d:'Lisbon',c:'Departs 1 Aug, 07:40'}],
+    zones:['Time zones','time','globe','list',{r:[['San Francisco','05:32'],['London','13:32'],['Lisbon','13:32'],['Tokyo','21:32']]}],
+    wnow:['Weather now','weather','cloud-sun','metric',{v:'68°',d:'Partly cloudy',c:'Feels 66° · H 70 L 58'}],
+    wcast:['Forecast','weather','cloud','bars',{b:[38,52,64,70,66,58,44,40,48,60,56,42],v:'H 70°',c:'Next 7 days'}],
+    radar:['Precipitation','weather','cloud-rain','media',{v:'Rain in 40 minutes',c:'Light · clearing by 19:00'}],
+    air:['Air quality','weather','wind','progress',{v:'32',c:'AQI · good',p:'32%'}],
+    sun:['Sun & UV','weather','sun','compare',{v:'06:14',c:'Sunrise',v2:'21:02',c2:'Sunset'}],
+    flight:['Flight','travel','plane','status',{v:'TP1338 on time',c:'Gate B12 · boards 06:55',i2:'plane-takeoff'}],
+    trip:['Trip','travel','luggage','media',{v:'Lisbon · 4 nights',c:'Flights, hotel and dinner confirmed'}],
+    commute:['Commute','travel','navigation','metric',{v:'24 min',d:'+6',c:'Bridge traffic · leave by 08:10'}],
+    transit:['Transit','travel','train-front','time',{r:[['3 min','N Judah · Embarcadero'],['9 min','38R · Geary & Powell'],['14 min','N Judah · Embarcadero']]}],
+    hotel:['Hotel','travel','bed-double','status',{v:'Casa Amarela',c:'Check-in 1 Aug · 15:00',i2:'key-round'}],
+    packing:['Packing','travel','backpack','progress',{v:'8/14',c:'items packed',p:'57%'}],
+    fx:['Currency','money','arrow-left-right','compare',{v:'€1',c:'Euro',v2:'$1.09',c2:'US dollar'}],
+    spend:['Spend','money','credit-card','bars',{b:[24,40,32,58,44,70,52],v:'€1,284',c:'This month'}],
+    budget:['Budget','money','wallet','progress',{v:'68%',c:'of July budget used',p:'68%'}],
+    watch:['Watchlist','money','activity','list',{r:[['NVDA','+2.4%'],['ASML','−0.8%'],['ETH','+5.1%'],['S&P 500','+0.3%']]}],
+    port:['Portfolio','money','chart-line','metric',{v:'€48.2k',d:'+1.8%',c:'Since 1 July'}],
+    invoice:['Invoices','money','receipt','list',{r:[['Northwind','€12,400'],['Ledgerline','€86,000'],['Studio Kern','€3,200']]}],
+    tasks:['Tasks','work','check','progress',{v:'3/8',c:'done today',p:'38%'}],
+    focus:['Focus','work','target','metric',{v:'2h 40m',d:'deep',c:'Longest run: 74 minutes'}],
+    notes:['Meeting notes','work','notebook-pen','time',{r:[['09:30','Design review · 6 actions'],['11:00','1:1 Maya · 2 actions'],['13:15','Standup · no actions']]}],
+    prs:['Pull requests','work','git-pull-request','list',{r:[['Sphere renderer','review'],['Mail audit trail','approved'],['Dock nav','draft']]}],
+    deploys:['Deploys','work','rocket','status',{v:'v2.4.1 live',c:'Shipped 41 minutes ago',i2:'circle-check'}],
+    queue:['Support queue','work','life-buoy','metric',{v:'12',d:'−4',c:'Median first reply: 6 min'}],
+    inbox:['Inbox','comms','mail','list',{r:[['Dana Whitfield','9:12'],['Marcus Lee','8:47'],['Priya Raman','8:05']]}],
+    threads:['Messages','comms','message-circle','people',{ppl:['MK','RN','JP','SA'],c:'4 threads need you'}],
+    call:['Call','comms','phone','status',{v:'Ledgerline sync',c:'Starts 16:30 · 4 invited',i2:'video'}],
+    drafts:['Atlas drafts','comms','pen-line','progress',{v:'5',c:'awaiting your approval',p:'42%'}],
+    steps:['Steps','health','footprints','bars',{b:[30,48,62,40,72,55,66],v:'8,240',c:'Last 7 days'}],
+    sleep:['Sleep','health','moon','metric',{v:'7h 12m',d:'+22m',c:'Deep 1h 40m · woke twice'}],
+    heart:['Heart','health','heart-pulse','metric',{v:'58',d:'bpm',c:'Resting · 5-day low'}],
+    workout:['Workout','health','dumbbell','progress',{v:'3/4',c:'sessions this week',p:'75%'}],
+    food:['Nutrition','health','apple','compare',{v:'1,840',c:'kcal in',v2:'620',c2:'kcal burned'}],
+    climate:['Climate','home','thermometer','metric',{v:'21.5°',d:'auto',c:'Living room · quiet mode'}],
+    energy:['Energy','home','zap','bars',{b:[20,26,34,52,66,48,30,24,22,28,40,58],v:'8.2 kWh',c:'Today by hour'}],
+    security:['Security','home','shield','status',{v:'Armed · away',c:'Doors locked · 2 cameras',i2:'lock'}],
+    grocery:['Groceries','home','shopping-basket','list',{r:[['Coffee','2 bags'],['Olive oil','1'],['Bread','sourdough']]}],
+    lights:['Lights','home','lamp','progress',{v:'40%',c:'warm · 6 rooms on',p:'40%'}],
+    playing:['Now playing','media','disc-3','media',{v:'Selected Ambient Works',c:'Aphex Twin · 3:12 / 4:48'}],
+    podcast:['Podcast','media','mic','progress',{v:'34 min',c:'left in this episode',p:'46%'}],
+    reading:['Reading','media','book-open','list',{r:[['The quiet interface','9 min'],['Pricing psychology','14 min'],['Lisbon, slowly','6 min']]}],
+    news:['Briefing','know','newspaper','time',{r:[['07:00','Three stories on assistive UI'],['09:20','Ledgerline raises a Series B'],['11:45','EU AI act guidance lands']]}],
+    sources:['Sources','know','link','list',{r:[['fieldnotes.press','primary'],['ec.europa.eu','official'],['ledgerline.com','press release']]}]
+  };
+  SCENES = [
+    { q:'What does my day look like?', cat:'time', h:'Four things matter today — ', a:'the 14:00 briefing most.', s:'You have four events and one hard deadline. The press briefing at 14:00 is the only one that cannot move, and you have a 90-minute clear run before it.', pool:['next','agenda','tasks','focus','notes','clock','threads','zones'], said:'Keep 12:30 to 14:00 free and you will walk into the briefing prepared.' },
+    { q:'Will it rain before my run?', cat:'weather', h:'Yes — ', a:'go now or wait until seven.', s:'Light rain arrives in about forty minutes and clears by 19:00. Air quality is good and the wind is mild, so either window works.', pool:['radar','wnow','wcast','air','sun','steps','workout','heart'], said:'If you leave in the next ten minutes you will stay ahead of it.' },
+    { q:'How is Lisbon looking?', cat:'travel', h:'Ready — ', a:'except your packing.', s:'Flights, hotel and the Thursday dinner are confirmed. Two cheaper flights appeared this morning but changing costs more than it saves.', pool:['countdown','flight','hotel','trip','packing','fx','wcast','transit'], said:'Six days out. I will re-check seat prices on Monday and only tell you if it is worth moving.' },
+    { q:'Did we close the quarter?', cat:'money', h:'Close — ', a:'one invoice short.', s:'Ledgerline is signed and Northwind clears Friday. Studio Kern is thirty days late and is the only thing between you and target.', pool:['port','invoice','spend','budget','watch','fx','queue','deploys'], said:'I have drafted a payment reminder for Studio Kern. It needs your approval before it goes.' },
+    { q:'Am I sleeping enough?', cat:'health', h:'Almost — ', a:'you are twenty minutes short.', s:'You averaged 7h 12m this week, up from last, but you woke twice on the nights you worked past ten. Resting heart rate is at a five-day low.', pool:['sleep','heart','steps','workout','food','focus','climate','podcast'], said:'Your best nights all followed days with a workout before six.' },
+    { q:'What happened while I was out?', cat:'know', h:'Three things — ', a:'one needs you.', s:'Atlas handled eleven threads, escalated one billing complaint, and shipped v2.4.1 without incident. The escalation is the only open item.', pool:['news','inbox','drafts','deploys','prs','threads','sources','queue'], said:'Everything else is closed with an audit trail. The billing case is waiting in Mail.' },
+    { q:'Is the house okay?', cat:'home', h:'All clear — ', a:'and quieter than usual.', s:'The house is armed, every door is locked, and energy use is 18% below your weekday average. The living room is holding 21.5°.', pool:['security','climate','energy','lights','grocery','playing','sun','clock'], said:'Nothing needs you. I dimmed the hallway at eleven as usual.' },
+    { q:'What should I read tonight?', cat:'media', h:'Three saved pieces — ', a:'start with the short one.', s:'You have nine minutes of reading you started this morning, and two longer pieces that have been waiting a week. Your last three finished reads were all under fifteen minutes.', pool:['reading','playing','podcast','news','sources','focus','clock','sleep'], said:'The quiet interface is the one you already began. I can read it aloud instead.' }
+  ];
+  LAYOUTS = [
+    { id:'hero', label:'Hero metric', slots:[[7,2],[5,1],[5,1],[4,1],[4,1],[4,1]] },
+    { id:'split', label:'Split focus', slots:[[8,2],[4,2],[4,1],[4,1],[4,1]] },
+    { id:'strip', label:'Answer strip', slots:[[12,1],[3,2],[3,2],[3,2],[3,2]] },
+    { id:'stack', label:'Narrative stack', slots:[[6,2],[6,1],[6,1],[3,1],[3,1],[6,1]] },
+    { id:'mosaic', label:'Mosaic', slots:[[4,2],[4,1],[4,1],[4,1],[4,1],[4,2],[4,1],[4,1],[4,1],[4,1]] },
+    { id:'gallery', label:'Even gallery', slots:[[3,2],[3,2],[3,2],[3,2],[4,1],[4,1],[4,1]] },
+    { id:'ledger', label:'Ledger', slots:[[5,3],[7,1],[7,1],[7,1],[12,1]] },
+    { id:'spotlight', label:'Spotlight', slots:[[9,3],[3,1],[3,1],[3,1],[6,1],[6,1]] }
+  ];
+  STYLES = ['glass', 'ink'];
+  state = { i:0, layout:0, style:0, run:1, spinning:false };
+  componentDidMount() { this.icons(); this.shuffleNow(true); this.autoTick(); }
+  componentDidUpdate() { this.icons(); this.autoTick(); }
+  autoTick() {
+    const on = !!this.props.autoShuffle;
+    if (on && !this._auto) this._auto = setInterval(() => this.shuffleNow(false), 4200);
+    if (!on && this._auto) { clearInterval(this._auto); this._auto = 0; }
+  }
+  componentWillUnmount() { clearInterval(this._auto); clearTimeout(this._sp); clearTimeout(this._it); }
+  icons() { clearTimeout(this._it); this._it = setTimeout(() => { if (window.lucide && window.lucide.createIcons) { try { window.lucide.createIcons(); } catch (e) {} } }, 40); }
+  rand(n) { return Math.floor(Math.random()*n); }
+  shuffleNow(first) {
+    const st = this.state;
+    let i = this.rand(this.SCENES.length), l = this.rand(this.LAYOUTS.length), s = this.rand(this.STYLES.length);
+    if (!first) { if (i === st.i) i = (i + 1) % this.SCENES.length; if (l === st.layout) l = (l + 1) % this.LAYOUTS.length; }
+    this.picks = null;
+    this.setState({ i, layout:l, style:s, run: st.run + 1, spinning: true });
+    clearTimeout(this._sp);
+    this._sp = setTimeout(() => this.setState({ spinning: false }), 900);
+  }
+  rgb(h) { h = h.replace('#',''); return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)]; }
+  alpha(h, a) { const c = this.rgb(h); return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')'; }
+  lighten(h, f) { const c = this.rgb(h).map(v => Math.round(v + (255 - v)*(f == null ? 0.42 : f))); return 'rgb(' + c.join(',') + ')'; }
+  skin(style, accent, dark) {
+    if (style === 'ink') return {
+      bg:'#1e1e24', blur:'none', ring:'none', fg:'#f7f5f2', mut:'rgba(247,245,242,.5)',
+      label:'rgba(247,245,242,.72)', accent:this.lighten(accent, 0.46),
+      rule:'rgba(247,245,242,.12)', trackBg:'rgba(247,245,242,.15)',
+      mediaBg:'rgba(247,245,242,.07)', avRing:'#1e1e24', radius:'20px', pad:'17px' };
+    return {
+      bg:'rgba(255,253,250,.62)', blur:'blur(16px) saturate(1.1)',
+      ring:'inset 0 0 0 1px rgba(255,253,250,.9),0 18px 40px -40px rgba(30,30,36,.5)',
+      fg:'#1e1e24', mut:'#8b8681', label:'#55524f', accent,
+      rule:'rgba(30,30,36,.09)', trackBg:'#eae6df',
+      mediaBg:'rgba(30,30,36,.05)', avRing:'#fffdfa', radius:'22px', pad:'17px' };
+  }
+
+  renderVals() {
+    const S = this.state;
+    const scene = this.SCENES[S.i], layout = this.LAYOUTS[S.layout], style = this.STYLES[S.style];
+    const accent = this.ACC[scene.cat], dark = style === 'ink';
+    const tallSlots = layout.slots.map((sl, i2) => (sl[0] >= 5 && sl[1] >= 2) ? i2 : -1).filter(i2 => i2 >= 0);
+    if (!this.picks || this.picks.run !== S.run) {
+      const pool = scene.pool.slice();
+      for (let k = pool.length - 1; k > 0; k--) { const j = this.rand(k + 1); const t = pool[k]; pool[k] = pool[j]; pool[j] = t; }
+      this.picks = { run:S.run, pool, saidAt: tallSlots.length ? tallSlots[this.rand(tallSlots.length)] : -1 };
+    }
+    const pool = this.picks.pool;
+    const used = new Set();
+    const cards = layout.slots.map((sl, idx) => {
+      const cols = sl[0], rows = sl[1], big = cols >= 6 || rows >= 2;
+      const sk = this.skin(style, accent, dark);
+      if (idx === this.picks.saidAt && cols >= 5 && rows >= 2) {
+        return Object.assign({}, sk, { name:'Atlas said', icon:'quote', tag:cols + '×' + rows, cols, rows,
+          pad: cols >= 7 ? '22px' : sk.pad, radius: cols >= 7 ? '24px' : sk.radius,
+          bg: sk.bg, ring: sk.ring,
+          isSaid:true, value: scene.said, caption:'Spoken aloud · ' + scene.q.toLowerCase(),
+          saidSize: (rows >= 2 ? 22 : 16) + 'px', delay:(idx*55) + 'ms' });
+      }
+      const TALLONLY = { media:1, time:1, list:1 };
+      const bad = (p) => used.has(p) || (rows < 2 && TALLONLY[(this.WIDGETS[p] || [])[3]]);
+      let id = pool[idx % pool.length];
+      if (bad(id)) { const alt = pool.find(p => !bad(p)) || pool.find(p => !used.has(p)); if (alt) id = alt; }
+      used.add(id);
+      const w = this.WIDGETS[id] || this.WIDGETS.clock;
+      const [name, cat, icon, kind, o] = w;
+      const wa = this.ACC[cat];
+      const wsk = this.skin(style, wa, dark);
+      const wide = cols >= 5, tall = rows >= 2;
+      return Object.assign({}, wsk, {
+        name, icon, icon2:o.i2 || icon, cols, rows, tag:cols + '×' + rows,
+        pad: (cols >= 7 && rows >= 2) ? '22px' : wsk.pad, radius: cols >= 7 ? '24px' : wsk.radius,
+        bigSize: (rows >= 3 ? 74 : (tall ? 52 : (wide ? 30 : 28))) + 'px',
+        midSize: (tall ? 23 : (wide ? 19 : 17)) + 'px',
+        barH: (rows >= 3 ? 130 : (tall ? 78 : 42)) + 'px',
+        value:o.v || '', value2:o.v2 || '', caption:o.c || '', caption2:o.c2 || '', delta:o.d || '', pct:o.p || '50%',
+        isMetric:kind === 'metric', isStatus:kind === 'status', isList:kind === 'list', isTime:kind === 'time',
+        isBars:kind === 'bars', isProgress:kind === 'progress', isPeople:kind === 'people', isMedia:kind === 'media', isCompare:kind === 'compare',
+        rowsData:(o.r || []).slice(0, rows >= 3 ? 5 : (tall ? 4 : 2)).map(r => ({ value:r[1], label:r[0] })),
+        bars:(o.b || []).slice(0, wide ? 12 : 7).map((h, i2, arr) => ({ h:Math.round(h) + '%', bg:i2 === arr.length - 1 ? wsk.accent : wsk.barBase })),
+        people:(o.ppl || []).map(i2 => ({ i:i2 })),
+        delay:(idx*55) + 'ms'
+      });
+    });
+    return {
+      rootRef: (el) => { this.root = el; },
+      orbRef: (el) => { if (el && window.AtlasSphere) window.AtlasSphere.mount(el, () => ({ state: this.state.spinning ? 'thinking' : 'speaking', dark: this.STYLES[this.state.style] === 'ink' })); },
+      runKey: 'run' + S.run,
+      pageBg: dark ? '#15151a' : '#f9f7f4', pageFg: dark ? '#f4f2ef' : '#1e1e24',
+      mutFg: dark ? 'rgba(244,242,239,.62)' : '#6d6a67', dimFg: dark ? 'rgba(244,242,239,.4)' : '#b6b1aa',
+      washA: dark ? 'linear-gradient(180deg,' + this.alpha(accent, 0.22) + ',rgba(21,21,26,0) 46%)' : 'linear-gradient(180deg,' + this.alpha(accent, 0.14) + ',rgba(249,247,244,0) 44%)',
+      washB: 'radial-gradient(closest-side,' + this.alpha(accent, dark ? 0.24 : 0.18) + ',transparent 74%)',
+      askBg: dark ? 'rgba(244,242,239,.08)' : 'rgba(255,253,250,.8)', askFg: dark ? 'rgba(244,242,239,.75)' : '#55524f',
+      chipBg: dark ? 'rgba(244,242,239,.08)' : 'rgba(255,253,250,.8)',
+      accent, question: scene.q, headline: scene.h, headlineAccent: scene.a, spoken: scene.s,
+      statusLine: S.spinning ? 'Composing the view…' : 'Atlas is speaking',
+      recipeLine: layout.label + ' · ' + style + ' · ' + cards.length + ' widgets',
+      rowH: layout.id === 'gallery' ? '132px' : '124px',
+      gridGap: layout.id === 'mosaic' ? '12px' : '14px',
+      cards,
+      dials: [{ k:'layout', v:layout.label }, { k:'style', v:style }, { k:'answer', v:scene.cat }],
+      dialBg: dark ? 'rgba(244,242,239,.06)' : 'rgba(255,253,250,.8)', dialBd: dark ? 'rgba(244,242,239,.16)' : '#e6e2db',
+      spinAnim: S.spinning ? 'av-spin .9s cubic-bezier(.5,0,.3,1)' : 'none',
+      shuffle: () => this.shuffleNow(false),
+      cycleDial: (e) => {
+        const k = e.currentTarget.dataset.k;
+        this.picks = null;
+        if (k === 'layout') this.setState({ layout:(S.layout + 1) % this.LAYOUTS.length, run:S.run + 1 });
+        else if (k === 'style') this.setState({ style:(S.style + 1) % this.STYLES.length, run:S.run + 1 });
+        else this.setState({ i:(S.i + 1) % this.SCENES.length, run:S.run + 1 });
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

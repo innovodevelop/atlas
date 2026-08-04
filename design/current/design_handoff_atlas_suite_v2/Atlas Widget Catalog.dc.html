@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<style>
+button,input,textarea,select{border:none}@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Hanken+Grotesk:wght@500;600;700&display=swap');
+html,body{margin:0;padding:0;background:#f9f7f4}
+a{color:#3461f2;text-decoration:none}a:hover{color:#5b7cff}
+*{box-sizing:border-box}
+@keyframes wc-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+</style>
+<script src="atlas-sphere.js"></script>
+<script src="atlas-transition.js"></script>
+</helmet>
+<div ref="{{ rootRef }}" data-screen-label="Widget catalog" style="position:relative;min-height:100vh;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:auto">
+<div style="position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none">
+<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,231,200,.7),rgba(249,247,244,0) 42%)"></div>
+<div style="position:absolute;top:-240px;right:-160px;width:760px;height:760px;border-radius:50%;filter:blur(64px);background:radial-gradient(closest-side,rgba(255,158,64,.3),transparent 74%)"></div>
+<div style="position:absolute;top:-160px;left:-200px;width:700px;height:560px;border-radius:50%;filter:blur(64px);background:radial-gradient(closest-side,rgba(122,140,255,.2),transparent 74%)"></div>
+</div>
+
+<section style="position:relative;z-index:10;display:flex;align-items:center;gap:30px;min-width:1400px;max-width:1720px;margin:0 auto;padding:34px 28px 14px;animation:wc-rise .8s cubic-bezier(.22,1,.36,1) both">
+<div style="width:186px;height:186px;flex-shrink:0"><canvas ref="{{ orbRef }}" style="width:186px;height:186px;display:block"></canvas></div>
+<div>
+<h1 style="margin:0;font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.03em;font-size:clamp(32px,4.2vw,56px);font-weight:500;line-height:1">Every information type, <span style="color:#3461f2">two designs, five sizes.</span></h1>
+<p style="margin:14px 0 0;font-size:16px;line-height:1.5;max-width:680px;color:#6d6a67">Each widget covers one kind of information and is drawn two ways — <strong style="font-weight:600">Glass</strong> on light, <strong style="font-weight:600">Ink</strong> on dark — with no icons and no coloured tiles. Every widget honours the same five sizes, so any of them drops into any slot of the dashboard grid.</p>
+</div>
+<div style="margin-left:auto;text-align:right">
+<div style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.03em;font-size:50px;font-weight:500;line-height:1;font-variant-numeric:tabular-nums">{{ shownCount }}</div>
+<div style="margin-top:6px;font-size:13px;color:#6d6a67">widgets · {{ sizeLabel }} · {{ designLabel }}</div>
+</div>
+</section>
+
+<div style="position:relative;z-index:20;display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:1400px;max-width:1720px;margin:8px 28px 0;padding:10px 18px;border-radius:9999px;background:rgba(255,253,250,.5);backdrop-filter:blur(14px) saturate(1.08);box-shadow:inset 0 0 0 1px rgba(255,253,250,.7),0 12px 32px -30px rgba(30,30,36,.5)">
+<span style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#6d6a67">Size</span>
+<div style="display:flex;align-items:center;gap:5px">
+<sc-for list="{{ sizes }}" as="z" hint-placeholder-count="5">
+<button data-id="{{ z.id }}" onClick="{{ pickSize }}" style="border:none;display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 14px;border-radius:9999px;cursor:pointer;font-size:12.5px;font-weight:500;background:{{ z.bg }};color:{{ z.fg }}" style-hover="background:#edebe7">{{ z.label }}<span style="font-size:11px;opacity:.55;font-variant-numeric:tabular-nums">{{ z.dim }}</span></button>
+</sc-for>
+</div>
+<span style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#6d6a67;margin-left:6px">State</span>
+<div style="display:flex;align-items:center;gap:5px">
+<sc-for list="{{ modes }}" as="m" hint-placeholder-count="2">
+<button data-id="{{ m.id }}" onClick="{{ pickMode }}" style="border:none;display:inline-flex;align-items:center;height:32px;padding:0 14px;border-radius:9999px;cursor:pointer;font-size:12.5px;font-weight:500;background:{{ m.bg }};color:{{ m.fg }}" style-hover="background:#edebe7">{{ m.label }}</button>
+</sc-for>
+</div>
+<span style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#6d6a67;margin-left:6px">Design</span>
+<div style="display:flex;align-items:center;gap:5px">
+<sc-for list="{{ designs }}" as="d" hint-placeholder-count="3">
+<button data-id="{{ d.id }}" onClick="{{ pickDesign }}" style="border:none;display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 14px;border-radius:9999px;cursor:pointer;font-size:12.5px;font-weight:500;background:{{ d.bg }};color:{{ d.fg }}"><span style="width:11px;height:11px;border-radius:4px;background:{{ d.chip }};box-shadow:{{ d.chipRing }}"></span>{{ d.label }}</button>
+</sc-for>
+</div>
+<div style="margin-left:auto;display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-end">
+<sc-for list="{{ cats }}" as="c" hint-placeholder-count="11">
+<button data-id="{{ c.id }}" onClick="{{ pickCat }}" style="border:none;display:inline-flex;align-items:center;gap:7px;height:29px;padding:0 12px;border-radius:9999px;cursor:pointer;font-size:12px;font-weight:500;background:{{ c.bg }};color:{{ c.fg }}" style-hover="background:#edebe7">{{ c.label }}<span style="opacity:.5">{{ c.n }}</span></button>
+</sc-for>
+</div>
+</div>
+
+<main style="position:relative;z-index:10;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-auto-flow:row dense;grid-auto-rows:126px;gap:14px;min-width:1400px;max-width:1720px;margin:0 auto;padding:20px 28px 132px">
+<sc-for list="{{ cards }}" as="w" hint-placeholder-count="16">
+<article data-screen-label="{{ w.name }} {{ w.designTag }}" style="position:relative;display:flex;flex-direction:column;overflow:hidden;grid-column:span {{ w.cols }};grid-row:span {{ w.rows }};padding:{{ w.pad }};border-radius:22px;background:{{ w.bg }};backdrop-filter:{{ w.blur }};box-shadow:{{ w.ring }}">
+<header style="display:flex;align-items:baseline;gap:10px;flex-shrink:0">
+<p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ w.label }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.name }}</p>
+<span style="margin-left:auto;font-size:10.5px;color:{{ w.mut }};flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:52%">{{ w.kicker }}</span>
+</header>
+
+<sc-if value="{{ w.isBig }}" hint-placeholder-val="{{ true }}">
+<div style="margin-top:auto;display:flex;align-items:flex-end;gap:10px;min-width:0;overflow:hidden">
+<span style="font-family:'Hanken Grotesk',sans-serif;font-weight:500;letter-spacing:-.035em;line-height:1.08;font-size:{{ w.bigSize }};color:{{ w.fg }};font-variant-numeric:tabular-nums;white-space:nowrap">{{ w.value }}</span>
+<span style="padding-bottom:5px;font-size:12.5px;font-weight:500;color:{{ w.accent }};white-space:nowrap">{{ w.delta }}</span>
+</div>
+<p style="margin:7px 0 0;font-size:12.5px;line-height:1.4;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p>
+</sc-if>
+
+<sc-if value="{{ w.isRows }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:13px;display:flex;flex-direction:column;gap:0;min-height:0;overflow:hidden">
+<sc-for list="{{ w.rowsData }}" as="r" hint-placeholder-count="3">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:9px 0">
+<span style="font-size:13px;color:{{ w.fg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.label }}</span>
+<span style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ w.mut }}">{{ r.value }}</span>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.isBars }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;align-items:flex-end;gap:{{ w.barGap }};height:{{ w.barH }}">
+<sc-for list="{{ w.bars }}" as="b" hint-placeholder-count="7">
+<span style="flex:1;border-radius:2px;height:{{ b.h }};background:{{ b.bg }}"></span>
+</sc-for>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:9px">
+<span style="font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</span>
+<span style="font-size:13px;font-weight:600;color:{{ w.fg }};font-variant-numeric:tabular-nums;flex-shrink:0">{{ w.value }}</span>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.isProgress }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto">
+<div style="display:flex;align-items:baseline;gap:9px;margin-bottom:11px">
+<span style="font-family:'Hanken Grotesk',sans-serif;font-weight:500;letter-spacing:-.03em;font-size:{{ w.midSize }};line-height:1;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</span>
+<span style="font-size:12.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</span>
+</div>
+<div style="height:5px;border-radius:9999px;background:{{ w.trackBg }};overflow:hidden"><span style="display:block;height:100%;width:{{ w.pct }};border-radius:9999px;background:{{ w.accent }}"></span></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.isSplit }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:grid;grid-template-columns:minmax(0,1fr) 1px minmax(0,1fr);gap:14px;align-items:center">
+<div style="min-width:0"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ w.midSize }};font-weight:500;letter-spacing:-.03em;line-height:1;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</p><p style="margin:6px 0 0;font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p></div>
+<span style="height:62%;background:{{ w.rule }}"></span>
+<div style="min-width:0"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ w.midSize }};font-weight:500;letter-spacing:-.03em;line-height:1;color:{{ w.accent }};font-variant-numeric:tabular-nums">{{ w.value2 }}</p><p style="margin:6px 0 0;font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption2 }}</p></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.isPeople }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;align-items:center">
+<sc-for list="{{ w.people }}" as="p" hint-placeholder-count="4">
+<span style="width:32px;height:32px;margin-right:-9px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:600;background:{{ w.avBg }};color:{{ w.fg }};box-shadow:0 0 0 2px {{ w.avRing }}">{{ p.i }}</span>
+</sc-for>
+<span style="margin-left:22px;font-size:12.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</span>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.isText }}" hint-placeholder-val="{{ false }}">
+<p style="margin:13px 0 0;font-size:{{ w.textSize }};line-height:1.5;letter-spacing:-.012em;color:{{ w.fg }};text-wrap:pretty;overflow:hidden">{{ w.value }}</p>
+<p style="margin:auto 0 0;padding-top:10px;font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p>
+</sc-if>
+
+<sc-if value="{{ w.isEmpty }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;flex-direction:{{ w.eDir }};align-items:{{ w.eAlign }};gap:10px;min-height:0;overflow:hidden">
+<sc-if value="{{ w.eGhost }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;align-items:flex-end;gap:4px;height:{{ w.eGhostH }};width:56%;opacity:.55">
+<sc-for list="{{ w.ghostBars }}" as="g" hint-placeholder-count="5">
+<span style="flex:1;border-radius:2px;height:{{ g.h }};background:{{ w.trackBg }}"></span>
+</sc-for>
+</div>
+</sc-if>
+<div style="min-width:0;flex:1">
+<p style="margin:0;font-size:13px;font-weight:550;letter-spacing:-.01em;color:{{ w.fg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.eTitle }}</p>
+<sc-if value="{{ w.showHint }}" hint-placeholder-val="{{ false }}">
+<p style="margin:4px 0 0;font-size:11.5px;line-height:1.45;color:{{ w.mut }};text-wrap:pretty">{{ w.eHint }}</p>
+</sc-if>
+</div>
+<span style="display:inline-flex;align-items:center;flex-shrink:0;height:27px;padding:0 12px;border-radius:9999px;cursor:pointer;font-size:11.5px;font-weight:550;color:{{ w.accent }};box-shadow:inset 0 0 0 1px {{ w.rule }}">{{ w.eAction }}</span>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.hasFoot }}" hint-placeholder-val="{{ false }}">
+<div style="flex-shrink:0;display:flex;justify-content:space-between;gap:10px;margin-top:11px;padding-top:9px">
+<span style="font-size:11px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.footA }}</span>
+<span style="font-size:11px;color:{{ w.mut }};font-variant-numeric:tabular-nums;flex-shrink:0">{{ w.footB }}</span>
+</div>
+</sc-if>
+
+</article>
+</sc-for>
+</main>
+
+<nav style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:92;display:flex;align-items:center;gap:3px;padding:5px;border-radius:9999px;background:#22222b;box-shadow:inset 0 0 0 1px rgba(247,245,242,.16),0 20px 46px -18px rgba(0,0,0,.6)">
+<a href="Atlas Dashboard (Current).dc.html" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:9999px;color:rgba(249,247,244,.8);font-size:13px;font-weight:500;text-decoration:none" style-hover="color:#fff;background:rgba(249,247,244,.12)">Dashboard</a>
+<a href="Atlas Browser.dc.html" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:9999px;color:rgba(249,247,244,.8);font-size:13px;font-weight:500;text-decoration:none" style-hover="color:#fff;background:rgba(249,247,244,.12)">Browser</a>
+<span style="display:flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:9999px;background:rgba(249,247,244,.14);color:#fff;font-size:13px;font-weight:500">Widgets</span>
+<a href="Atlas Answer Views.dc.html" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 14px;border-radius:9999px;background:#3461f2;color:#fff;font-size:13px;font-weight:500;text-decoration:none" style-hover="background:#5b7cff">Answer views</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1720,&quot;height&quot;:1000},&quot;design&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;both&quot;,&quot;options&quot;:[&quot;both&quot;,&quot;glass&quot;,&quot;ink&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Catalog&quot},&quot;size&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;l&quot;,&quot;options&quot;:[&quot;s&quot;,&quot;m&quot;,&quot;l&quot;,&quot;xl&quot;,&quot;hero&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Catalog&quot}}">
+class Component extends DCLogic {
+  CATS = { time:'Time', weather:'Weather', travel:'Travel', money:'Money', work:'Work', comms:'Comms', health:'Health', home:'Home', media:'Media', know:'Knowledge' };
+  ACC = { time:'#3461f2', weather:'#c2661a', travel:'#0a8f60', money:'#2f7d5e', work:'#5b3ce0', comms:'#2f4bbd', health:'#c2483d', home:'#8b6f3f', media:'#a33f66', know:'#55524f' };
+  W = [
+    ['Clock','time','big',{v:'14:32',d:'CET',c:'Tuesday, 26 July',k:'Local time'}],
+    ['Up next','time','big',{v:'1:1 Maya',d:'18 min',c:'Room 4 · with Maya Ortiz',k:'Next event'}],
+    ['Agenda','time','rows',{r:[['Design review','09:30'],['1:1 with Maya','11:00'],['Press briefing','14:00'],['Ledgerline call','16:30']],v:'4 events',c:'3h 15m booked',k:'Today'}],
+    ['Countdown','time','big',{v:'6d',d:'Lisbon',c:'Departs 1 Aug, 07:40',k:'Until departure'}],
+    ['Time zones','time','rows',{r:[['San Francisco','05:32'],['London','13:32'],['Lisbon','13:32'],['Tokyo','21:32']],v:'4 cities',c:'Team spread',k:'Right now'}],
+    ['Weather','weather','big',{v:'68°',d:'Cloudy',c:'Feels 66° · H 70 L 58',k:'San Francisco'}],
+    ['Forecast','weather','bars',{b:[38,52,64,70,66,58,44,40,48,60,56,42],v:'H 70°',c:'Next seven days',k:'Daily highs'}],
+    ['Precipitation','weather','big',{v:'40 min',d:'light',c:'Rain arrives, clears by 19:00',k:'Radar'}],
+    ['Air quality','weather','progress',{v:'32',c:'AQI · good',p:'32%',k:'Outdoor air'}],
+    ['Daylight','weather','split',{v:'06:14',c:'Sunrise',v2:'21:02',c2:'Sunset',k:'14h 48m'}],
+    ['Flight','travel','big',{v:'TP1338',d:'on time',c:'Gate B12 · boards 06:55',k:'SFO → LIS'}],
+    ['Trip','travel','rows',{r:[['Flights','confirmed'],['Casa Amarela','1–5 Aug'],['Dinner, Thu','20:00'],['Airport transfer','pending']],v:'4 nights',c:'Lisbon · everything booked but one',k:'1–5 August'}],
+    ['Commute','travel','big',{v:'24 min',d:'+6',c:'Bridge traffic · leave by 08:10',k:'Home → studio'}],
+    ['Transit','travel','rows',{r:[['N Judah · Embarcadero','3 min'],['38R · Geary & Powell','9 min'],['N Judah · Embarcadero','14 min']],v:'3 min',c:'Next departure',k:'Nearby'}],
+    ['Packing','travel','progress',{v:'8/14',c:'items packed',p:'57%',k:'Lisbon list'}],
+    ['Currency','money','split',{v:'€1',c:'Euro',v2:'$1.09',c2:'US dollar',k:'Rate today'}],
+    ['Spend','money','bars',{b:[24,40,32,58,44,70,52],v:'€1,284',c:'This month by week',k:'Cards'}],
+    ['Budget','money','progress',{v:'68%',c:'of July used',p:'68%',k:'Monthly'}],
+    ['Watchlist','money','rows',{r:[['NVDA','+2.4%'],['ASML','−0.8%'],['ETH','+5.1%'],['S&P 500','+0.3%']],v:'+1.8%',c:'Four holdings',k:'Markets open'}],
+    ['Portfolio','money','big',{v:'€48.2k',d:'+1.8%',c:'Since 1 July',k:'Total value'}],
+    ['Invoices','money','rows',{r:[['Northwind','€12,400'],['Ledgerline','€86,000'],['Studio Kern','€3,200']],v:'€101.6k',c:'Three outstanding',k:'Receivable'}],
+    ['Subscriptions','money','big',{v:'€184',d:'/mo',c:'11 active · 2 unused',k:'Recurring'}],
+    ['Tasks','work','progress',{v:'3/8',c:'done today',p:'38%',k:'Your list'}],
+    ['Focus','work','big',{v:'2h 40m',d:'deep',c:'Longest run: 74 minutes',k:'Today'}],
+    ['Meeting notes','work','rows',{r:[['Design review · 6 actions','09:30'],['1:1 Maya · 2 actions','11:00'],['Standup · no actions','13:15']],v:'8 actions',c:'From three meetings',k:'Captured'}],
+    ['Documents','work','rows',{r:[['Launch brief','2h'],['Pricing v4','1d'],['Handoff README','3d']],v:'3 files',c:'Recently edited',k:'Drive'}],
+    ['Pull requests','work','rows',{r:[['Sphere renderer','review'],['Mail audit trail','approved'],['Dock nav','draft']],v:'1 waiting',c:'On you to review',k:'atlas/app'}],
+    ['Deploys','work','big',{v:'v2.4.1',d:'live',c:'Shipped 41 minutes ago',k:'Production'}],
+    ['Incidents','work','big',{v:'All clear',d:'34d',c:'No open incidents',k:'Status'}],
+    ['Support queue','work','big',{v:'12',d:'−4',c:'Median first reply: 6 min',k:'Open tickets'}],
+    ['Inbox','comms','rows',{r:[['Dana Whitfield · The Verge','9:12'],['Marcus Lee · Northwind','8:47'],['Priya Raman','8:05']],v:'3 unread',c:'Across three mailboxes',k:'Priority'}],
+    ['Messages','comms','people',{ppl:['MK','RN','JP','SA'],v:'4',c:'threads need you',k:'Team'}],
+    ['Atlas drafts','comms','progress',{v:'5',c:'awaiting approval',p:'42%',k:'Written for you'}],
+    ['Call','comms','big',{v:'16:30',d:'today',c:'Ledgerline sync · 4 invited',k:'Scheduled'}],
+    ['Steps','health','bars',{b:[30,48,62,40,72,55,66],v:'8,240',c:'Last seven days',k:'Daily'}],
+    ['Sleep','health','big',{v:'7h 12m',d:'+22m',c:'Deep 1h 40m · woke twice',k:'Last night'}],
+    ['Heart','health','big',{v:'58',d:'bpm',c:'Resting · five-day low',k:'Today'}],
+    ['Workout','health','progress',{v:'3/4',c:'sessions this week',p:'75%',k:'Plan'}],
+    ['Nutrition','health','split',{v:'1,840',c:'kcal in',v2:'620',c2:'burned',k:'Today'}],
+    ['Climate','home','big',{v:'21.5°',d:'auto',c:'Living room · quiet mode',k:'Indoors'}],
+    ['Energy','home','bars',{b:[20,26,34,52,66,48,30,24,22,28,40,58],v:'8.2 kWh',c:'Today by hour',k:'Usage'}],
+    ['Security','home','big',{v:'Armed',d:'away',c:'Doors locked · 2 cameras',k:'House'}],
+    ['Groceries','home','rows',{r:[['Coffee','2 bags'],['Olive oil','1'],['Bread','sourdough']],v:'3 items',c:'On the list',k:'Shopping'}],
+    ['Lights','home','progress',{v:'40%',c:'warm · 6 rooms on',p:'40%',k:'Brightness'}],
+    ['Now playing','media','big',{v:'Xtal',d:'3:12',c:'Aphex Twin · Ambient Works',k:'Spotify'}],
+    ['Podcast','media','progress',{v:'34 min',c:'left in this episode',p:'46%',k:'Resume'}],
+    ['Reading','media','rows',{r:[['The quiet interface','9 min'],['Pricing psychology','14 min'],['Lisbon, slowly','6 min']],v:'29 min',c:'Three saved pieces',k:'Saved'}],
+    ['Briefing','know','rows',{r:[['Three stories on assistive UI','07:00'],['Ledgerline raises a Series B','09:20'],['EU AI act guidance lands','11:45']],v:'3 stories',c:'Followed topics',k:'This morning'}],
+    ['Answer','know','text',{v:'Yes — the embargo holds until Thursday 08:00 CET, and all three outlets have confirmed in writing.',c:'3 sources · high confidence',k:'Atlas'}],
+    ['Sources','know','rows',{r:[['fieldnotes.press','primary'],['ec.europa.eu','official'],['ledgerline.com','release']],v:'3 cited',c:'Behind this answer',k:'Provenance'}],
+    ['Atlas said','know','text',{v:'I handled eleven threads and escalated one. Nothing else needs you before the briefing.',c:'Spoken aloud · 08:12',k:'Voice'}]
+  ];
+  SIZES = [
+    { id:'s', label:'S', dim:'2×1', cols:2, rows:1 },
+    { id:'m', label:'M', dim:'3×1', cols:3, rows:1 },
+    { id:'l', label:'L', dim:'3×2', cols:3, rows:2 },
+    { id:'xl', label:'XL', dim:'6×2', cols:6, rows:2 },
+    { id:'hero', label:'Hero', dim:'6×3', cols:6, rows:3 }
+  ];
+  DESIGNS = [
+    { id:'both', label:'Both', chip:'linear-gradient(135deg,rgba(255,253,250,.9) 50%,#1e1e24 50%)', chipRing:'inset 0 0 0 1px rgba(30,30,36,.14)' },
+    { id:'glass', label:'Glass', chip:'rgba(255,253,250,.75)', chipRing:'inset 0 0 0 1px rgba(30,30,36,.14)' },
+    { id:'ink', label:'Ink', chip:'#1e1e24', chipRing:'none' }
+  ];
+  MODES = [ { id:'live', label:'With data' }, { id:'empty', label:'Empty' } ];
+  state = { size:'l', design:'both', cat:'all', mode:'live' };
+  rgb(h) { h = h.replace('#',''); return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)]; }
+  lighten(h, f) { const c = this.rgb(h).map(v => Math.round(v + (255 - v)*f)); return 'rgb(' + c.join(',') + ')'; }
+  skin(design, accent) {
+    if (design === 'ink') return { bg:'#1e1e24', blur:'none', ring:'inset 0 0 0 1px rgba(247,245,242,.09)', fg:'#f7f5f2', mut:'rgba(247,245,242,.5)', label:'rgba(247,245,242,.72)', accent:this.lighten(accent, 0.46), rule:'rgba(247,245,242,.13)', trackBg:'rgba(247,245,242,.14)', avBg:'rgba(247,245,242,.12)', avRing:'#1e1e24', barBase:'rgba(247,245,242,.2)', stamp:'rgba(247,245,242,.45)', designTag:'Ink' };
+    return { bg:'rgba(255,253,250,.62)', blur:'blur(16px) saturate(1.1)', ring:'inset 0 0 0 1px rgba(255,253,250,.9),0 18px 40px -40px rgba(30,30,36,.5)', fg:'#1e1e24', mut:'#8b8681', label:'#55524f', accent, rule:'#e8e4dd', trackBg:'#eae6df', avBg:'#f1eeea', avRing:'rgba(255,253,250,.9)', barBase:'rgba(30,30,36,.1)', stamp:'#8b8681', designTag:'Glass' };
+  }
+  renderVals() {
+    const S = this.state;
+    const size = this.SIZES.find(z => z.id === S.size) || this.SIZES[2];
+    const list = this.W.filter(w => S.cat === 'all' || w[1] === S.cat);
+    const designs = S.design === 'both' ? ['glass', 'ink'] : [S.design];
+    const chipOn = (on) => ({ bg: on ? '#1e1e24' : 'rgba(249,247,244,.8)', fg: on ? '#f9f7f4' : '#1e1e24', bd: on ? '#1e1e24' : '#e6e2db' });
+    const cards = [];
+    list.forEach((w) => {
+      const [name, cat, kind, o] = w;
+      const accent = this.ACC[cat];
+      const cols = size.cols, rows = size.rows;
+      const tall = rows >= 2, huge = rows >= 3, wide = cols >= 6;
+      designs.forEach(d => {
+        const sk = this.skin(d, accent);
+        const empty = S.mode === 'empty';
+        const rowCap = huge ? 5 : (tall ? 3 : 0);
+        const canRows = kind === 'rows' && rowCap > 0;
+        const asBig = kind === 'big' || (kind === 'rows' && !canRows) || (kind === 'people' && !tall);
+        const E = {
+          big:      ['No data yet', 'Connect a source and this number fills in live.', 'Connect source'],
+          rows:     ['Nothing to list', 'Items appear the moment Atlas sees them.', 'Add first item'],
+          bars:     ['No activity yet', 'Activity draws itself in as it happens.', 'Connect source'],
+          progress: ['No goal set', 'Set a target and Atlas tracks it for you.', 'Set a goal'],
+          split:    ['Nothing to compare', 'Both sides show up once connected.', 'Connect source'],
+          people:   ['No one here yet', 'People sync in from the accounts you grant.', 'Sync contacts'],
+          text:     ['Nothing said yet', 'Ask Atlas anything — the answer lands here.', 'Ask Atlas']
+        }[kind] || ['No data yet', 'Connect a source to begin.', 'Connect source'];
+        cards.push(Object.assign({}, sk, {
+          name, cols, rows, kicker: o.k || '',
+          pad: huge ? '22px' : (tall ? '18px' : '15px'),
+          bigSize: (huge ? 62 : (tall ? (wide ? 52 : 40) : (cols >= 3 ? 30 : 26))) + 'px',
+          midSize: (huge ? 34 : (tall ? 24 : 18)) + 'px',
+          textSize: (huge ? 21 : (tall ? 15.5 : 13)) + 'px',
+          barH: (huge ? 132 : (tall ? 68 : 34)) + 'px',
+          barGap: wide ? '5px' : '3px',
+          value: o.v || '', value2: o.v2 || '', caption: o.c || '', caption2: o.c2 || '', delta: o.d || '', pct: o.p || '50%',
+          isBig: !empty && asBig, isRows: !empty && canRows, isBars: !empty && kind === 'bars', isProgress: !empty && kind === 'progress',
+          isSplit: !empty && kind === 'split', isPeople: !empty && kind === 'people' && tall, isText: !empty && kind === 'text',
+          rowsData: (o.r || []).slice(0, rowCap).map(r => ({ label: r[0], value: r[1] })),
+          bars: (o.b || []).slice(0, wide ? 12 : 7).map((h, i, arr) => ({ h: Math.round(h) + '%', bg: i === arr.length - 1 ? sk.accent : sk.barBase })),
+          people: (o.ppl || []).map(i => ({ i })),
+          isEmpty: empty,
+          eTitle: E[0], eHint: E[1], eAction: E[2],
+          eDir: tall ? 'column' : 'row', eAlign: tall ? 'flex-start' : 'center',
+          eGhost: empty && tall, eGhostH: (huge ? 46 : 34) + 'px',
+          showHint: empty && tall,
+          ghostBars: [34, 58, 22, 72, 44, 62, 28].slice(0, wide ? 7 : 5).map(g => ({ h: g + '%' })),
+          hasFoot: !empty && tall,
+          footA: o.c2 && kind !== 'split' ? o.c2 : 'Updated 2m ago',
+          footB: (o.r ? o.r.length + ' items' : (o.d && kind !== 'big' ? o.d : 'Live'))
+        }));
+      });
+    });
+    return {
+      rootRef: (el) => { this.root = el; },
+      orbRef: (el) => { if (el && window.AtlasSphere) window.AtlasSphere.mount(el, () => ({ state:'idle' })); },
+      shownCount: String(list.length),
+      sizeLabel: size.label + ' · ' + size.dim,
+      designLabel: S.design === 'both' ? 'glass + ink' : S.design,
+      sizes: this.SIZES.map(z => Object.assign({}, z, chipOn(z.id === S.size))),
+      designs: this.DESIGNS.map(d => Object.assign({}, d, chipOn(d.id === S.design))),
+      modes: this.MODES.map(m => Object.assign({}, m, chipOn(m.id === S.mode))),
+      cats: [{ id:'all', label:'All', n:this.W.length }].concat(Object.keys(this.CATS).map(k => ({ id:k, label:this.CATS[k], n:this.W.filter(w => w[1] === k).length }))).map(c => Object.assign(c, chipOn(c.id === S.cat))),
+      cards,
+      pickSize: (e) => this.setState({ size: e.currentTarget.dataset.id }),
+      pickDesign: (e) => this.setState({ design: e.currentTarget.dataset.id }),
+      pickCat: (e) => this.setState({ cat: e.currentTarget.dataset.id }),
+      pickMode: (e) => this.setState({ mode: e.currentTarget.dataset.id })
+    };
+  }
+}
+</script>
+</body>
+</html>

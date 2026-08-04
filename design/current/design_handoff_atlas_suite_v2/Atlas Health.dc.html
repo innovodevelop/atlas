@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<style>
+button,input,textarea,select{border:none}@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Hanken+Grotesk:wght@500;600;700&display=swap');
+html,body{margin:0;padding:0;background:#f9f7f4}
+a{color:#3461f2;text-decoration:none}a:hover{color:#5b7cff}
+*{box-sizing:border-box}
+input{font:inherit}
+@keyframes hl-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes hl-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.82)}}
+</style>
+<script src="atlas-sphere.js"></script>
+<script src="atlas-transition.js"></script>
+</helmet>
+<div ref="{{ rootRef }}" data-screen-label="Health" style="position:relative;min-height:100vh;background:{{ pageBg }};color:{{ pageFg }};font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:auto">
+<div style="position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none">
+<div style="position:absolute;inset:0;background:{{ washA }}"></div>
+<div style="position:absolute;top:-260px;right:-170px;width:800px;height:800px;border-radius:50%;filter:blur(64px);background:{{ washB }}"></div>
+<div style="position:absolute;top:-160px;left:-200px;width:700px;height:560px;border-radius:50%;filter:blur(64px);background:{{ washC }}"></div>
+</div>
+
+<div onMouseEnter="{{ openNav }}" onMouseLeave="{{ closeNav }}" style="position:fixed;left:20px;top:16px;z-index:90;display:{{ launcherShow }};align-items:center;justify-content:center;width:86px;height:86px">
+<canvas ref="{{ orbRef }}" style="width:86px;height:86px;display:block;cursor:pointer"></canvas>
+<sc-for list="{{ navRing }}" as="n" hint-placeholder-count="6">
+<a href="{{ n.href }}" data-id="{{ n.id }}" onClick="{{ navGo }}" title="{{ n.label }}" style="position:absolute;left:calc(50% + {{ n.lx }});top:calc(50% + {{ n.ly }});transform:translate(-50%,-50%) scale({{ n.scale }});display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 13px;border-radius:9999px;white-space:nowrap;text-decoration:none;font-size:12px;font-weight:500;background:{{ n.bg }};color:{{ n.fg }};box-shadow:{{ n.ring }};opacity:{{ n.op }};pointer-events:{{ n.pe }};transition:transform .42s cubic-bezier(.22,1,.36,1),opacity .3s ease;transition-delay:{{ n.delay }}"><span style="width:6px;height:6px;border-radius:50%;background:{{ n.dot }}"></span>{{ n.label }}</a>
+</sc-for>
+</div>
+<sc-if value="{{ isBody }}" hint-placeholder-val="{{ true }}">
+<main style="position:relative;z-index:10;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-auto-flow:row dense;grid-auto-rows:126px;gap:14px;min-width:1400px;max-width:1720px;margin:0 auto;padding:20px 28px 132px;animation:hl-rise .7s cubic-bezier(.22,1,.36,1) both">
+<div onMouseEnter="{{ openNav }}" onMouseLeave="{{ closeNav }}" style="position:relative;grid-column:span 2;grid-row:span 2;display:flex;align-items:center;justify-content:center;z-index:{{ navZ }}">
+<canvas ref="{{ orbRef }}" style="width:200px;height:200px;display:block;cursor:pointer"></canvas>
+<span style="position:absolute;left:50%;bottom:6px;transform:translateX(-50%);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:{{ hintFg }};opacity:{{ navHintOp }};transition:opacity .3s ease;pointer-events:none;white-space:nowrap">Hover to navigate</span>
+<sc-for list="{{ navRing }}" as="n" hint-placeholder-count="6">
+<a href="{{ n.href }}" data-id="{{ n.id }}" onClick="{{ navGo }}" title="{{ n.label }}" style="position:absolute;left:calc(50% + {{ n.x }});top:calc(50% + {{ n.y }});transform:translate(-50%,-50%) scale({{ n.scale }});display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 14px;border-radius:9999px;white-space:nowrap;text-decoration:none;font-size:12px;font-weight:500;letter-spacing:-.01em;background:{{ n.bg }};color:{{ n.fg }};box-shadow:{{ n.ring }};opacity:{{ n.op }};pointer-events:{{ n.pe }};transition:transform .42s cubic-bezier(.22,1,.36,1),opacity .3s ease;transition-delay:{{ n.delay }}"><span style="width:6px;height:6px;border-radius:50%;background:{{ n.dot }}"></span>{{ n.label }}</a>
+</sc-for>
+</div>
+
+<section data-screen-label="Clay body model" style="position:relative;grid-column:span 5;grid-row:span 4;overflow:hidden;border-radius:26px;background:{{ clayCardBg }};backdrop-filter:{{ heroBlur }};box-shadow:{{ heroRing }}">
+<canvas ref="{{ clayRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
+<div style="position:absolute;left:22px;top:20px;right:22px;display:flex;align-items:baseline;gap:10px;pointer-events:none">
+<p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ labelFg }}">Your body today</p>
+<span style="margin-left:auto;font-size:10.5px;color:{{ mutFg }}">Modelled from 14 signals · {{ claySourceLine }}</span>
+</div>
+<sc-for list="{{ hotspots }}" as="h" hint-placeholder-count="6">
+<div style="position:absolute;left:{{ h.x }};top:{{ h.y }};transform:translate(-50%,-50%);display:flex;align-items:center;gap:9px;pointer-events:none">
+<span style="width:9px;height:9px;border-radius:50%;flex-shrink:0;background:{{ h.dot }};box-shadow:0 0 0 4px {{ h.halo }};animation:hl-pulse {{ h.beat }} ease-in-out infinite"></span>
+<span style="display:flex;flex-direction:column;padding:7px 11px;border-radius:12px;background:{{ pinBg }};backdrop-filter:blur(10px);box-shadow:{{ pinRing }}">
+<span style="font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:{{ mutFg }};white-space:nowrap">{{ h.label }}</span>
+<span style="margin-top:2px;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em;color:{{ pageFg }};white-space:nowrap;font-variant-numeric:tabular-nums">{{ h.value }}</span>
+</span>
+</div>
+</sc-for>
+<div style="position:absolute;left:22px;right:22px;bottom:20px;display:flex;align-items:flex-end;gap:14px;pointer-events:none">
+<div style="min-width:0">
+<p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:26px;font-weight:500;letter-spacing:-.03em;line-height:1.05;color:{{ pageFg }}">{{ clayVerdict }}</p>
+<p style="margin:7px 0 0;font-size:12.5px;line-height:1.45;color:{{ mutFg }};max-width:44ch;text-wrap:pretty">{{ clayNote }}</p>
+</div>
+<div style="margin-left:auto;display:flex;gap:6px;pointer-events:auto">
+<sc-for list="{{ clayModes }}" as="m" hint-placeholder-count="4">
+<button data-id="{{ m.id }}" onClick="{{ pickClay }}" style="border:none;height:30px;padding:0 13px;border-radius:9999px;cursor:pointer;font-size:12px;font-weight:500;background:{{ m.bg }};color:{{ m.fg }}" style-hover="">{{ m.label }}</button>
+</sc-for>
+</div>
+</div>
+</section>
+
+<sc-for list="{{ bodyCards }}" as="w" hint-placeholder-count="12">
+<article data-screen-label="{{ w.name }}" style="position:relative;display:flex;flex-direction:column;overflow:hidden;grid-column:span {{ w.cols }};grid-row:span {{ w.rows }};padding:{{ w.pad }};border-radius:22px;background:{{ w.bg }};backdrop-filter:{{ w.blur }};box-shadow:{{ w.ring }}">
+<header style="display:flex;align-items:baseline;gap:10px;flex-shrink:0">
+<p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ w.label }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.name }}</p>
+<span style="margin-left:auto;font-size:10.5px;color:{{ w.mut }};flex-shrink:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.kicker }}</span>
+</header>
+<sc-if value="{{ w.isBig }}" hint-placeholder-val="{{ true }}">
+<div style="margin-top:auto;display:flex;align-items:flex-end;gap:10px;min-width:0;overflow:hidden">
+<span style="font-family:'Hanken Grotesk',sans-serif;font-weight:500;letter-spacing:-.035em;line-height:1.08;font-size:{{ w.bigSize }};color:{{ w.fg }};font-variant-numeric:tabular-nums;white-space:nowrap">{{ w.value }}</span>
+<span style="padding-bottom:5px;font-size:12.5px;font-weight:500;color:{{ w.accent }};white-space:nowrap">{{ w.delta }}</span>
+</div>
+<p style="margin:7px 0 0;font-size:12.5px;line-height:1.4;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p>
+</sc-if>
+<sc-if value="{{ w.isRows }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:12px;display:flex;flex-direction:column;min-height:0;overflow:hidden">
+<sc-for list="{{ w.rowsData }}" as="r" hint-placeholder-count="3">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:9px 0">
+<span style="font-size:13px;color:{{ w.fg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.label }}</span>
+<span style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ w.mut }}">{{ r.value }}</span>
+</div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ w.isBars }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;align-items:flex-end;gap:{{ w.barGap }};height:{{ w.barH }}">
+<sc-for list="{{ w.bars }}" as="b" hint-placeholder-count="7">
+<span style="flex:1;border-radius:2px;height:{{ b.h }};background:{{ b.bg }}"></span>
+</sc-for>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:9px">
+<span style="font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</span>
+<span style="font-size:13px;font-weight:600;color:{{ w.fg }};font-variant-numeric:tabular-nums;flex-shrink:0">{{ w.value }}</span>
+</div>
+</sc-if>
+<sc-if value="{{ w.isProgress }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto">
+<div style="display:flex;align-items:baseline;gap:9px;margin-bottom:11px">
+<span style="font-family:'Hanken Grotesk',sans-serif;font-weight:500;letter-spacing:-.03em;font-size:{{ w.midSize }};line-height:1.08;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</span>
+<span style="font-size:12.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</span>
+</div>
+<div style="height:5px;border-radius:9999px;background:{{ w.trackBg }};overflow:hidden"><span style="display:block;height:100%;width:{{ w.pct }};border-radius:9999px;background:{{ w.accent }}"></span></div>
+</div>
+</sc-if>
+<sc-if value="{{ w.isSplit }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:grid;grid-template-columns:minmax(0,1fr) 1px minmax(0,1fr);gap:14px;align-items:center">
+<div style="min-width:0"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ w.midSize }};font-weight:500;letter-spacing:-.03em;line-height:1.08;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</p><p style="margin:6px 0 0;font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p></div>
+<span style="height:62%;background:{{ w.rule }}"></span>
+<div style="min-width:0"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ w.midSize }};font-weight:500;letter-spacing:-.03em;line-height:1.08;color:{{ w.accent }};font-variant-numeric:tabular-nums">{{ w.value2 }}</p><p style="margin:6px 0 0;font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption2 }}</p></div>
+</div>
+</sc-if>
+<sc-if value="{{ w.isRing }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;align-items:center;gap:14px">
+<span style="position:relative;width:{{ w.ringSize }};height:{{ w.ringSize }};border-radius:50%;flex-shrink:0;background:conic-gradient({{ w.accent }} {{ w.pct }},{{ w.trackBg }} 0)">
+<span style="position:absolute;inset:7px;border-radius:50%;background:{{ w.ringHole }}"></span>
+</span>
+<div style="min-width:0">
+<p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ w.midSize }};font-weight:600;letter-spacing:-.025em;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</p>
+<p style="margin:5px 0 0;font-size:12px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ w.isText }}" hint-placeholder-val="{{ false }}">
+<p style="margin:13px 0 0;font-size:{{ w.textSize }};line-height:1.5;letter-spacing:-.012em;color:{{ w.fg }};text-wrap:pretty;overflow:hidden">{{ w.value }}</p>
+<p style="margin:auto 0 0;padding-top:10px;font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p>
+</sc-if>
+</article>
+</sc-for>
+</main>
+</sc-if>
+
+<sc-if value="{{ isCatalog }}" hint-placeholder-val="{{ false }}">
+<main style="position:relative;z-index:10;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-auto-flow:row dense;grid-auto-rows:126px;gap:14px;min-width:1400px;max-width:1720px;margin:0 auto;padding:20px 28px 132px">
+<sc-for list="{{ catalogCards }}" as="w" hint-placeholder-count="16">
+<article data-screen-label="{{ w.name }} {{ w.designTag }}" style="position:relative;display:flex;flex-direction:column;overflow:hidden;grid-column:span {{ w.cols }};grid-row:span {{ w.rows }};padding:{{ w.pad }};border-radius:22px;background:{{ w.bg }};backdrop-filter:{{ w.blur }};box-shadow:{{ w.ring }}">
+<header style="display:flex;align-items:baseline;gap:10px;flex-shrink:0">
+<p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ w.label }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.name }}</p>
+<span style="margin-left:auto;font-size:10.5px;color:{{ w.mut }};flex-shrink:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.kicker }}</span>
+<span style="font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:{{ w.stamp }};flex-shrink:0">{{ w.designTag }}</span>
+</header>
+<sc-if value="{{ w.isBig }}" hint-placeholder-val="{{ true }}">
+<div style="margin-top:auto;display:flex;align-items:flex-end;gap:10px;min-width:0;overflow:hidden">
+<span style="font-family:'Hanken Grotesk',sans-serif;font-weight:500;letter-spacing:-.035em;line-height:1.08;font-size:{{ w.bigSize }};color:{{ w.fg }};font-variant-numeric:tabular-nums;white-space:nowrap">{{ w.value }}</span>
+<span style="padding-bottom:5px;font-size:12.5px;font-weight:500;color:{{ w.accent }};white-space:nowrap">{{ w.delta }}</span>
+</div>
+<p style="margin:7px 0 0;font-size:12.5px;line-height:1.4;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p>
+</sc-if>
+<sc-if value="{{ w.isRows }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:12px;display:flex;flex-direction:column;min-height:0;overflow:hidden">
+<sc-for list="{{ w.rowsData }}" as="r" hint-placeholder-count="3">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:9px 0">
+<span style="font-size:13px;color:{{ w.fg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.label }}</span>
+<span style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ w.mut }}">{{ r.value }}</span>
+</div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ w.isBars }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;align-items:flex-end;gap:{{ w.barGap }};height:{{ w.barH }}">
+<sc-for list="{{ w.bars }}" as="b" hint-placeholder-count="7">
+<span style="flex:1;border-radius:2px;height:{{ b.h }};background:{{ b.bg }}"></span>
+</sc-for>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:9px">
+<span style="font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</span>
+<span style="font-size:13px;font-weight:600;color:{{ w.fg }};font-variant-numeric:tabular-nums;flex-shrink:0">{{ w.value }}</span>
+</div>
+</sc-if>
+<sc-if value="{{ w.isProgress }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto">
+<div style="display:flex;align-items:baseline;gap:9px;margin-bottom:11px">
+<span style="font-family:'Hanken Grotesk',sans-serif;font-weight:500;letter-spacing:-.03em;font-size:{{ w.midSize }};line-height:1.08;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</span>
+<span style="font-size:12.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</span>
+</div>
+<div style="height:5px;border-radius:9999px;background:{{ w.trackBg }};overflow:hidden"><span style="display:block;height:100%;width:{{ w.pct }};border-radius:9999px;background:{{ w.accent }}"></span></div>
+</div>
+</sc-if>
+<sc-if value="{{ w.isSplit }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:grid;grid-template-columns:minmax(0,1fr) 1px minmax(0,1fr);gap:14px;align-items:center">
+<div style="min-width:0"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ w.midSize }};font-weight:500;letter-spacing:-.03em;line-height:1.08;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</p><p style="margin:6px 0 0;font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p></div>
+<span style="height:62%;background:{{ w.rule }}"></span>
+<div style="min-width:0"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ w.midSize }};font-weight:500;letter-spacing:-.03em;line-height:1.08;color:{{ w.accent }};font-variant-numeric:tabular-nums">{{ w.value2 }}</p><p style="margin:6px 0 0;font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption2 }}</p></div>
+</div>
+</sc-if>
+<sc-if value="{{ w.isRing }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;align-items:center;gap:14px">
+<span style="position:relative;width:{{ w.ringSize }};height:{{ w.ringSize }};border-radius:50%;flex-shrink:0;background:conic-gradient({{ w.accent }} {{ w.pct }},{{ w.trackBg }} 0)">
+<span style="position:absolute;inset:7px;border-radius:50%;background:{{ w.ringHole }}"></span>
+</span>
+<div style="min-width:0">
+<p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ w.midSize }};font-weight:600;letter-spacing:-.025em;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</p>
+<p style="margin:5px 0 0;font-size:12px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ w.isText }}" hint-placeholder-val="{{ false }}">
+<p style="margin:13px 0 0;font-size:{{ w.textSize }};line-height:1.5;letter-spacing:-.012em;color:{{ w.fg }};text-wrap:pretty;overflow:hidden">{{ w.value }}</p>
+<p style="margin:auto 0 0;padding-top:10px;font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p>
+</sc-if>
+</article>
+</sc-for>
+</main>
+</sc-if>
+
+<sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+<main style="position:relative;z-index:10;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:16px;min-width:1400px;max-width:1720px;margin:0 auto;padding:20px 28px 132px;animation:hl-rise .7s cubic-bezier(.22,1,.36,1) both">
+<section style="display:flex;flex-direction:column;gap:14px">
+<div style="padding:24px;border-radius:24px;background:{{ heroBg }};backdrop-filter:{{ heroBlur }};box-shadow:{{ heroRing }}">
+<p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ labelFg }}">Sources</p>
+<h2 style="margin:10px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:26px;font-weight:600;letter-spacing:-.03em">Where your health data comes from</h2>
+<p style="margin:8px 0 0;font-size:13.5px;line-height:1.5;color:{{ mutFg }};max-width:62ch">Atlas reads, never writes. Each source can be paused independently, and pausing one only removes it from the model — the history stays on your device.</p>
+<div style="display:flex;flex-direction:column;margin-top:12px">
+<sc-for list="{{ sources }}" as="s" hint-placeholder-count="5">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:14px;align-items:center;padding:14px 0">
+<div style="min-width:0">
+<p style="margin:0;font-size:13.5px;font-weight:500;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ s.name }}</p>
+<p style="margin:3px 0 0;font-size:11.5px;color:{{ mutFg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ s.meta }}</p>
+</div>
+<span style="font-size:11.5px;color:{{ s.stateFg }};font-variant-numeric:tabular-nums;white-space:nowrap">{{ s.state }}</span>
+<span data-id="{{ s.id }}" onClick="{{ toggleSource }}" style="width:46px;height:27px;border-radius:9999px;flex-shrink:0;padding:3px;cursor:pointer;display:flex;align-items:center;justify-content:{{ s.knob }};background:{{ s.switchBg }}"><span style="width:21px;height:21px;border-radius:50%;background:{{ s.knobBg }};box-shadow:0 2px 6px -2px rgba(30,30,36,.6)"></span></span>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="padding:24px;border-radius:24px;background:{{ heroBg }};backdrop-filter:{{ heroBlur }};box-shadow:{{ heroRing }}">
+<p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ labelFg }}">What the model uses</p>
+<p style="margin:9px 0 0;font-size:13px;line-height:1.5;color:{{ mutFg }};max-width:62ch">The clay figure is built from these signals. Turn one off and the model stops shading that region — it never guesses a value it has not measured.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:14px">
+<sc-for list="{{ signals }}" as="g" hint-placeholder-count="8">
+<div data-id="{{ g.id }}" onClick="{{ toggleSignal }}" style="padding:13px 15px;border-radius:16px;cursor:pointer;background:{{ g.bg }};box-shadow:inset 0 0 0 1px {{ g.ring }}">
+<div style="display:flex;align-items:center;gap:8px">
+<span style="width:7px;height:7px;border-radius:50%;background:{{ g.dot }}"></span>
+<p style="margin:0;font-size:12.5px;font-weight:600;letter-spacing:-.01em;color:{{ g.fg }}">{{ g.name }}</p>
+<span style="margin-left:auto;font-size:11px;color:{{ g.metaFg }}">{{ g.region }}</span>
+</div>
+<p style="margin:7px 0 0;font-size:11.5px;line-height:1.45;color:{{ g.metaFg }}">{{ g.note }}</p>
+</div>
+</sc-for>
+</div>
+</div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:14px">
+<div style="padding:24px;border-radius:24px;background:{{ syncBg }}">
+<p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ syncLabel }}">Devices</p>
+<h2 style="margin:10px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:23px;font-weight:600;letter-spacing:-.03em;color:{{ syncFg }}">Apple Watch Series 10</h2>
+<p style="margin:8px 0 0;font-size:13px;line-height:1.5;color:{{ syncMut }}">Paired since March. Streams heart, workouts, sleep stages and wrist temperature. Atlas holds a rolling 90 days on device and summarises the rest.</p>
+<div style="display:flex;align-items:center;gap:10px;margin-top:16px;padding:13px 15px;border-radius:16px;background:{{ syncTile }}">
+<span style="width:8px;height:8px;border-radius:50%;background:#0fae76"></span>
+<div style="flex:1;min-width:0">
+<p style="margin:0;font-size:13px;font-weight:500;color:{{ syncFg }}">Synced 4 minutes ago</p>
+<p style="margin:3px 0 0;font-size:11.5px;color:{{ syncMut }}">Battery 68% · 1,204 samples today</p>
+</div>
+<button style="height:30px;padding:0 13px;border-radius:9999px;border:0;cursor:pointer;background:{{ syncBtnBg }};color:{{ syncBtnFg }};font-size:12px;font-weight:500">Sync now</button>
+</div>
+<div style="display:flex;flex-direction:column;margin-top:8px">
+<sc-for list="{{ devices }}" as="d" hint-placeholder-count="4">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 0">
+<div style="min-width:0">
+<p style="margin:0;font-size:13px;font-weight:500;color:{{ syncFg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ d.name }}</p>
+<p style="margin:3px 0 0;font-size:11.5px;color:{{ syncMut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ d.meta }}</p>
+</div>
+<span style="font-size:11.5px;font-weight:500;color:{{ d.fg }};white-space:nowrap">{{ d.state }}</span>
+</div>
+</sc-for>
+</div>
+<button style="border:none;width:100%;margin-top:14px;height:38px;border-radius:9999px;background:transparent;color:{{ syncFg }};font-size:12.5px;font-weight:500;cursor:pointer">Pair another device</button>
+</div>
+
+<div style="padding:24px;border-radius:24px;background:{{ heroBg }};backdrop-filter:{{ heroBlur }};box-shadow:{{ heroRing }}">
+<p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ labelFg }}">Privacy</p>
+<div style="display:flex;flex-direction:column;margin-top:10px">
+<sc-for list="{{ privacy }}" as="p" hint-placeholder-count="4">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:13px 0">
+<div style="min-width:0">
+<p style="margin:0;font-size:13px;font-weight:500;letter-spacing:-.01em">{{ p.name }}</p>
+<p style="margin:3px 0 0;font-size:11.5px;line-height:1.45;color:{{ mutFg }}">{{ p.note }}</p>
+</div>
+<span data-id="{{ p.id }}" onClick="{{ togglePrivacy }}" style="width:46px;height:27px;border-radius:9999px;flex-shrink:0;padding:3px;cursor:pointer;display:flex;align-items:center;justify-content:{{ p.knob }};background:{{ p.switchBg }}"><span style="width:21px;height:21px;border-radius:50%;background:{{ p.knobBg }};box-shadow:0 2px 6px -2px rgba(30,30,36,.6)"></span></span>
+</div>
+</sc-for>
+</div>
+</div>
+</section>
+</main>
+</sc-if>
+
+<nav style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:92;display:flex;align-items:center;gap:3px;padding:5px;border-radius:9999px;background:#22222b;box-shadow:inset 0 0 0 1px rgba(247,245,242,.16),0 20px 46px -18px rgba(0,0,0,.6)">
+<a href="Atlas Dashboard (Current).dc.html" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:9999px;color:rgba(249,247,244,.8);font-size:13px;font-weight:500;text-decoration:none" style-hover="color:#fff;background:rgba(249,247,244,.12)">Dashboard</a>
+<a href="Atlas Smart Home.dc.html" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:9999px;color:rgba(249,247,244,.8);font-size:13px;font-weight:500;text-decoration:none" style-hover="color:#fff;background:rgba(249,247,244,.12)">Smart home</a>
+<span style="display:flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:9999px;background:rgba(249,247,244,.14);color:#fff;font-size:13px;font-weight:500">Health</span>
+<a href="Atlas Widget Catalog.dc.html" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 14px;border-radius:9999px;background:#3461f2;color:#fff;font-size:13px;font-weight:500;text-decoration:none" style-hover="background:#5b7cff">Widgets</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1720,&quot;height&quot;:1000},&quot;view&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;body&quot;,&quot;options&quot;:[&quot;body&quot;,&quot;catalog&quot;,&quot;settings&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;View&quot},&quot;dark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;View&quot}}">
+class Component extends DCLogic {
+  ACC = { heart:'#c2483d', move:'#c2661a', sleep:'#5b3ce0', body:'#2f7d5e', mind:'#2f4bbd', care:'#8b6f3f' };
+  W = [
+    ['Resting heart','heart','big',{v:'58',d:'bpm',c:'Five-day low · steady',k:'Today'}],
+    ['Heart rate','heart','bars',{b:[52,58,74,96,120,88,64,58,56,62,70,60],v:'58–120',c:'Range today',k:'Continuous'}],
+    ['HRV','heart','big',{v:'62 ms',d:'+8',c:'Above your 60-day median',k:'Overnight'}],
+    ['Cardio fitness','heart','big',{v:'47.2',d:'VO₂max',c:'High for your age band',k:'Estimated'}],
+    ['Blood pressure','heart','split',{v:'118',c:'Systolic',v2:'74',c2:'Diastolic',k:'Manual · Tue'}],
+    ['ECG','heart','big',{v:'Sinus',d:'normal',c:'Last reading 21 July',k:'Apple Watch'}],
+    ['Blood oxygen','heart','big',{v:'98%',d:'—',c:'Overnight average',k:'SpO₂'}],
+    ['Recovery','heart','ring',{v:'82%',c:'Ready for a hard session',p:'82%',k:'Readiness'}],
+    ['Steps','move','bars',{b:[30,48,62,40,72,55,66],v:'8,240',c:'Last seven days',k:'Daily'}],
+    ['Distance','move','big',{v:'6.4 km',d:'+1.1',c:'Walking and running',k:'Today'}],
+    ['Move ring','move','ring',{v:'420/500',c:'kcal active',p:'84%',k:'Rings'}],
+    ['Exercise ring','move','ring',{v:'38/30',c:'minutes · closed',p:'100%',k:'Rings'}],
+    ['Stand ring','move','ring',{v:'9/12',c:'hours',p:'75%',k:'Rings'}],
+    ['Workouts','move','rows',{r:[['Threshold run · 42 min','Mon'],['Strength · 55 min','Tue'],['Easy ride · 68 min','Thu']],v:'3 this week',c:'2h 45m total',k:'Logged'}],
+    ['Training load','move','bars',{b:[40,55,38,62,70,48,58],v:'balanced',c:'Acute vs chronic',k:'7 days'}],
+    ['Pace','move','split',{v:'5:12',c:'Avg /km',v2:'4:38',c2:'Best /km',k:'Running'}],
+    ['Cadence','move','big',{v:'174',d:'spm',c:'Consistent across the run',k:'Last run'}],
+    ['Elevation','move','big',{v:'184 m',d:'gain',c:'Two climbs over 40 m',k:'Today'}],
+    ['Sleep','sleep','big',{v:'7h 12m',d:'+22m',c:'Deep 1h 40m · woke twice',k:'Last night'}],
+    ['Sleep stages','sleep','rows',{r:[['Deep','1h 40m'],['Core','4h 02m'],['REM','1h 18m'],['Awake','12m']],v:'7h 12m',c:'Four stages tracked',k:'Last night'}],
+    ['Sleep debt','sleep','progress',{v:'-1h 05m',c:'across seven nights',p:'22%',k:'Rolling'}],
+    ['Bedtime','sleep','split',{v:'23:42',c:'Asleep',v2:'06:54',c2:'Awake',k:'Consistency 84%'}],
+    ['Sleeping heart','sleep','big',{v:'51',d:'bpm',c:'Lowest at 03:20',k:'Overnight'}],
+    ['Wrist temperature','sleep','big',{v:'+0.2°',d:'baseline',c:'Within your normal range',k:'Overnight'}],
+    ['Respiratory rate','sleep','big',{v:'14.2',d:'br/min',c:'Stable for 12 nights',k:'Overnight'}],
+    ['Weight','body','big',{v:'74.2 kg',d:'−0.4',c:'Trend down over 30 days',k:'Morning'}],
+    ['Body composition','body','split',{v:'17.4%',c:'Body fat',v2:'34.1 kg',c2:'Lean mass',k:'Smart scale'}],
+    ['BMI','body','big',{v:'22.4',d:'healthy',c:'Unchanged this month',k:'Derived'}],
+    ['Hydration','body','progress',{v:'1.6 L',c:'of 2.4 L target',p:'67%',k:'Today'}],
+    ['Nutrition','body','split',{v:'1,840',c:'kcal in',v2:'620',c2:'kcal burned',k:'Today'}],
+    ['Protein','body','progress',{v:'96 g',c:'of 130 g target',p:'74%',k:'Today'}],
+    ['Caffeine','body','big',{v:'180 mg',d:'2 cups',c:'Last at 13:10 — cut-off met',k:'Today'}],
+    ['Alcohol','body','big',{v:'0',d:'units',c:'11 dry days this month',k:'This week'}],
+    ['Mindful minutes','mind','progress',{v:'12/20',c:'minutes today',p:'60%',k:'Practice'}],
+    ['Mood','mind','rows',{r:[['Monday','Steady'],['Tuesday','Good'],['Wednesday','Low'],['Thursday','Good']],v:'Mostly steady',c:'Logged four days',k:'This week'}],
+    ['Stress','mind','bars',{b:[30,42,58,74,52,38,30],v:'moderate',c:'Peaks around 15:00',k:'From HRV'}],
+    ['Focus sessions','mind','big',{v:'2h 40m',d:'deep',c:'Longest run 74 minutes',k:'Today'}],
+    ['Daylight','mind','progress',{v:'46 min',c:'of 60 min outdoors',p:'77%',k:'Today'}],
+    ['Noise exposure','mind','big',{v:'68 dB',d:'safe',c:'Peak 84 dB on the train',k:'Today'}],
+    ['Medication','care','rows',{r:[['Vitamin D · 08:00','taken'],['Iron · 13:00','taken'],['Magnesium · 22:00','due']],v:'2 of 3',c:'One left today',k:'Schedule'}],
+    ['Appointments','care','rows',{r:[['Dentist · 4 Aug 09:30','confirmed'],['Blood panel · 19 Aug','to book'],['Physio · 2 Sep','confirmed']],v:'3 upcoming',c:'One needs booking',k:'Calendar'}],
+    ['Lab results','care','rows',{r:[['Ferritin','92 µg/L'],['HbA1c','5.2%'],['LDL','2.4 mmol/L'],['TSH','1.8 mIU/L']],v:'All in range',c:'Drawn 14 June',k:'Latest panel'}],
+    ['Vaccinations','care','big',{v:'Up to date',d:'—',c:'Next: influenza, October',k:'Record'}],
+    ['Cycle','care','big',{v:'Day 14',d:'—',c:'Fertile window predicted',k:'Tracking'}],
+    ['Symptoms','care','big',{v:'None logged',d:'6d',c:'Last entry: mild headache',k:'Journal'}],
+    ['Atlas said','mind','text',{v:'Your recovery is high and sleep debt is small — this is the best day this week for a hard session.',c:'Spoken aloud · 07:40',k:'Voice'}]
+  ];
+  SIZES = [
+    { id:'s', label:'S', dim:'2×1', cols:2, rows:1 },
+    { id:'m', label:'M', dim:'3×1', cols:3, rows:1 },
+    { id:'l', label:'L', dim:'3×2', cols:3, rows:2 },
+    { id:'xl', label:'XL', dim:'6×2', cols:6, rows:2 },
+    { id:'hero', label:'Hero', dim:'6×3', cols:6, rows:3 }
+  ];
+  DESIGNS = [{ id:'both', label:'Both' }, { id:'glass', label:'Glass' }, { id:'ink', label:'Ink' }];
+  BODY = [
+    ['Recovery', 3, 2], ['Sleep', 2, 1], ['Resting heart', 2, 1],
+    ['Sleep stages', 3, 2], ['Move ring', 2, 1], ['HRV', 2, 1], ['Steps', 2, 1], ['Hydration', 2, 1],
+    ['Workouts', 3, 2], ['Medication', 3, 2], ['Atlas said', 6, 1],
+    ['Body composition', 3, 1], ['Mindful minutes', 3, 1]
+  ];
+  CLAY = [
+    { id:'strain', label:'Strain' }, { id:'recovery', label:'Recovery' }, { id:'sleep', label:'Sleep' }, { id:'composition', label:'Body' }
+  ];
+  state = { view:'body', size:'l', design:'both', dark:false, clay:'recovery', sources:{ s1:1, s2:1, s3:1, s4:0, s5:1 }, privacy:{ v1:1, v2:0, v3:1, v4:1 }, signals:{ g1:1, g2:1, g3:1, g4:1, g5:1, g6:0, g7:1, g8:1 } };
+  clayFn(el) {
+    if (el) this._clayEl = el;
+    this.startClay();
+  }
+  startClay() {
+    if (this._clayAlive) return;
+    this._clayAlive = 1;
+    const draw = (t) => {
+      this._clayLast = performance.now();
+      const el = this._clayEl;
+      if (!el || !el.isConnected) return;
+      const ctx = el.__cctx || (el.__cctx = el.getContext('2d'));
+      const d = Math.min(1.5, devicePixelRatio || 1), cw = el.clientWidth, ch = el.clientHeight;
+      if (!cw || !ch) return;
+      if (el.width !== Math.round(cw*d) || el.height !== Math.round(ch*d)) { el.width = Math.round(cw*d); el.height = Math.round(ch*d); }
+      const W = el.width, H = el.height, T = t*0.001;
+      const dark = this.state.dark, mode = this.state.clay;
+      ctx.clearRect(0, 0, W, H);
+      const cx = W*0.5, unit = Math.min(W/6.4, H/11.4), top = H*0.5 - unit*4.6;
+      const sway = Math.sin(T*0.45)*0.035, breathe = 1 + Math.sin(T*0.85)*0.012;
+      const TONE = { base: dark ? [168, 166, 174] : [240, 238, 236], hi: dark ? [232, 230, 238] : [255, 255, 255], lo: dark ? [104, 102, 112] : [192, 189, 186] };
+      const zones = {
+        recovery: { chest:[52,175,124], head:[70,170,130], legs:[92,168,120], arms:[80,170,128] },
+        strain:   { chest:[214,96,72], head:[206,120,96], legs:[214,110,64], arms:[210,116,86] },
+        sleep:    { chest:[110,90,220], head:[120,100,235], legs:[116,102,214], arms:[114,98,220] },
+        composition:{ chest:[60,140,110], head:[76,142,116], legs:[62,146,116], arms:[70,144,118] }
+      }[mode] || {opacity:1};
+      const mix = (a, b, f) => [a[0] + (b[0]-a[0])*f, a[1] + (b[1]-a[1])*f, a[2] + (b[2]-a[2])*f];
+      const rgb = (c, a) => 'rgba(' + (c[0]|0) + ',' + (c[1]|0) + ',' + (c[2]|0) + ',' + a + ')';
+      const u = unit, P = (x, y) => [cx + x*u + sway*u*(y < 4 ? (4 - y)*0.06 : 0), top + y*u];
+      const fillPath = (path, zone, bounds, glowF) => {
+        const z = zones[zone];
+        const base = z ? mix(TONE.base, z, 0.07 + 0.04*Math.sin(T*1.1 + bounds[1]*0.01)) : TONE.base;
+        const g = ctx.createLinearGradient(bounds[0] - bounds[2]*0.55, bounds[1] - bounds[3]*0.66, bounds[0] + bounds[2]*0.8, bounds[1] + bounds[3]*0.75);
+        g.addColorStop(0, rgb(mix(base, TONE.hi, 0.92), 1));
+        g.addColorStop(0.38, rgb(mix(base, TONE.hi, 0.42), 1));
+        g.addColorStop(0.72, rgb(base, 1));
+        g.addColorStop(1, rgb(mix(base, TONE.lo, 0.6), 1));
+        ctx.fillStyle = g; ctx.fill(path);
+        ctx.save(); ctx.clip(path);
+        const rim = ctx.createLinearGradient(bounds[0] + bounds[2]*0.1, 0, bounds[0] + bounds[2]*0.62, 0);
+        rim.addColorStop(0, rgb(TONE.lo, 0)); rim.addColorStop(1, rgb(mix(TONE.hi, TONE.base, 0.35), dark ? 0.5 : 0.42));
+        ctx.fillStyle = rim; ctx.fill(path);
+        if (z && glowF) {
+          const pulse = 0.2 + 0.16*Math.sin(T*(zone === 'chest' ? 3.4 : 1.3));
+          const gg = ctx.createRadialGradient(bounds[0], bounds[1], 0, bounds[0], bounds[1], Math.max(bounds[2], bounds[3])*0.9);
+          gg.addColorStop(0, rgb(z, pulse*glowF)); gg.addColorStop(1, rgb(z, 0));
+          ctx.fillStyle = gg; ctx.fill(path);
+        }
+        ctx.restore();
+      };
+      const limb = (joints, widths, zone, glowF) => {
+        const pts = joints.map(j => P(j[0], j[1]));
+        const xs = pts.map(q => q[0]), ys = pts.map(q => q[1]);
+        const w0 = widths[0]*u;
+        const bx = (Math.min.apply(null, xs) + Math.max.apply(null, xs))/2;
+        const by = (Math.min.apply(null, ys) + Math.max.apply(null, ys))/2;
+        const bw = Math.max.apply(null, xs) - Math.min.apply(null, xs) + w0*2;
+        const bh = Math.max.apply(null, ys) - Math.min.apply(null, ys) + w0*2;
+        const z = zones[zone];
+        const base = z ? mix(TONE.base, z, 0.07 + 0.04*Math.sin(T*1.1 + by*0.01)) : TONE.base;
+        const g = ctx.createLinearGradient(bx - bw*0.5, by - bh*0.6, bx + bw*0.75, by + bh*0.7);
+        g.addColorStop(0, rgb(mix(base, TONE.hi, 0.78), 1));
+        g.addColorStop(0.34, rgb(mix(base, TONE.hi, 0.24), 1));
+        g.addColorStop(0.68, rgb(base, 1));
+        g.addColorStop(1, rgb(mix(base, TONE.lo, 0.72), 1));
+        ctx.save();
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        const pass = (style, scale) => {
+          ctx.strokeStyle = style;
+          for (let i = 0; i < pts.length - 1; i++) {
+            ctx.beginPath();
+            ctx.moveTo(pts[i][0], pts[i][1]);
+            ctx.lineTo(pts[i+1][0], pts[i+1][1]);
+            ctx.lineWidth = (widths[i] + widths[i+1])*u*scale;
+            ctx.stroke();
+          }
+        };
+        pass(g, 1);
+        if (z && glowF) {
+          const pulse = 0.1 + 0.07*Math.sin(T*1.3);
+          pass(rgb(z, pulse*glowF), 0.72);
+        }
+        const hi = ctx.createLinearGradient(bx - bw*0.34, by - bh*0.4, bx + bw*0.28, by + bh*0.4);
+        hi.addColorStop(0, rgb(mix(TONE.hi, [255,255,255], 0.6), dark ? 0.3 : 0.52));
+        hi.addColorStop(0.6, rgb(TONE.hi, 0));
+        hi.addColorStop(1, rgb(TONE.lo, 0));
+        pass(hi, 0.44);
+        const sh2 = ctx.createLinearGradient(bx + bw*0.05, 0, bx + bw*0.6, 0);
+        sh2.addColorStop(0, rgb(TONE.lo, 0));
+        sh2.addColorStop(1, rgb(mix(TONE.lo, [80,76,72], 0.4), dark ? 0.3 : 0.24));
+        pass(sh2, 0.9);
+        for (let i = 0; i < pts.length - 1; i++) {
+          const mx = (pts[i][0] + pts[i+1][0])/2, my = (pts[i][1] + pts[i+1][1])/2;
+          const wv = (widths[i] + widths[i+1])*u*0.5;
+          const gg = ctx.createRadialGradient(mx - wv*0.35, my - wv*0.2, 0, mx, my, wv*1.5);
+          gg.addColorStop(0, rgb(mix(TONE.hi, [255,255,255], 0.5), dark ? 0.16 : 0.3));
+          gg.addColorStop(1, rgb(TONE.hi, 0));
+          ctx.fillStyle = gg;
+          ctx.beginPath(); ctx.ellipse(mx, my, wv*0.9, wv*1.5, 0, 0, 6.2832); ctx.fill();
+        }
+        ctx.restore();
+      };
+      ctx.save();
+      ctx.translate(cx, top); ctx.scale(1, breathe); ctx.translate(-cx, -top);
+      const gy = top + u*8.62;
+      const sh = ctx.createRadialGradient(cx, gy, 0, cx, gy, u*2.4);
+      sh.addColorStop(0, dark ? 'rgba(0,0,0,.55)' : 'rgba(120,96,74,.3)'); sh.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = sh; ctx.beginPath(); ctx.ellipse(cx, gy, u*2.2, u*0.38, 0, 0, 6.2832); ctx.fill();
+
+      limb([[-0.44,4.62],[-0.52,5.7],[-0.50,6.45],[-0.44,7.5],[-0.42,8.15]], [0.44,0.38,0.28,0.24,0.16], 'legs', 1);
+      limb([[0.44,4.62],[0.52,5.7],[0.50,6.45],[0.44,7.5],[0.42,8.15]], [0.44,0.38,0.28,0.24,0.16], 'legs', 1);
+      ctx.fillStyle = rgb(mix(TONE.base, TONE.lo, 0.45), 1);
+      [[-0.42,8.3],[0.42,8.3]].forEach(f => { const p = P(f[0], f[1]); ctx.beginPath(); ctx.ellipse(p[0], p[1], u*0.26, u*0.15, 0, 0, 6.2832); ctx.fill(); });
+
+      const torso = new Path2D();
+      const t0 = P(0, 1.42), sL = P(-1.06, 2.16), aL = P(-0.94, 2.72), wL = P(-0.66, 3.72), hL = P(-0.92, 4.42), cL = P(-0.44, 4.86);
+      const cR = P(0.44, 4.86), hR = P(0.92, 4.42), wR = P(0.66, 3.72), aR = P(0.94, 2.72), sR = P(1.06, 2.16);
+      torso.moveTo(t0[0] - u*0.2, t0[1]);
+      torso.bezierCurveTo(P(-0.6, 1.66)[0], P(-0.6, 1.66)[1], sL[0] - u*0.06, sL[1] - u*0.18, sL[0], sL[1]);
+      torso.bezierCurveTo(aL[0] - u*0.06, aL[1] - u*0.12, aL[0], aL[1] + u*0.1, aL[0] + u*0.02, aL[1] + u*0.34);
+      torso.bezierCurveTo(wL[0] - u*0.06, wL[1] - u*0.34, wL[0], wL[1] - u*0.1, wL[0], wL[1]);
+      torso.bezierCurveTo(hL[0] + u*0.02, hL[1] - u*0.28, hL[0], hL[1], hL[0] + u*0.12, hL[1] + u*0.26);
+      torso.bezierCurveTo(cL[0] - u*0.16, cL[1] + u*0.06, cL[0] - u*0.04, cL[1], 0, cL[1] - u*0.06);
+      torso.bezierCurveTo(cR[0] + u*0.04, cR[1], cR[0] + u*0.16, cR[1] + u*0.06, hR[0] - u*0.12, hR[1] + u*0.26);
+      torso.bezierCurveTo(hR[0], hR[1], hR[0] - u*0.02, hR[1] - u*0.28, wR[0], wR[1]);
+      torso.bezierCurveTo(wR[0], wR[1] - u*0.1, wR[0] + u*0.06, wR[1] - u*0.34, aR[0] - u*0.02, aR[1] + u*0.34);
+      torso.bezierCurveTo(aR[0], aR[1] + u*0.1, aR[0] + u*0.06, aR[1] - u*0.12, sR[0], sR[1]);
+      torso.bezierCurveTo(sR[0] + u*0.06, sR[1] - u*0.18, P(0.6, 1.66)[0], P(0.6, 1.66)[1], t0[0] + u*0.2, t0[1]);
+      torso.closePath();
+      const tb = [P(0, 3.1)[0], P(0, 3.1)[1], u*2.1, u*2.9];
+      fillPath(torso, 'chest', tb, 1);
+      ctx.save(); ctx.clip(torso);
+      const soft = (x, y, rx, ry, col, a, rot) => {
+        const p = P(x, y);
+        const gg = ctx.createRadialGradient(p[0], p[1], 0, p[0], p[1], Math.max(rx, ry)*u);
+        gg.addColorStop(0, rgb(col, a)); gg.addColorStop(0.55, rgb(col, a*0.5)); gg.addColorStop(1, rgb(col, 0));
+        ctx.save(); ctx.translate(p[0], p[1]); ctx.rotate(rot || 0); ctx.scale(1, ry/rx); ctx.translate(-p[0], -p[1]);
+        ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(p[0], p[1], rx*u, 0, 6.2832); ctx.fill(); ctx.restore();
+      };
+      const LIT = mix(TONE.hi, [255,255,255], 0.5), SHA = mix(TONE.lo, [90,86,82], 0.35);
+      soft(-0.44, 2.52, 0.42, 0.3, LIT, dark ? 0.3 : 0.5);
+      soft(0.44, 2.52, 0.42, 0.3, LIT, dark ? 0.26 : 0.42);
+      soft(0, 2.86, 0.5, 0.1, SHA, dark ? 0.3 : 0.22);
+      soft(-0.86, 2.35, 0.3, 0.34, LIT, dark ? 0.24 : 0.38);
+      soft(0.86, 2.35, 0.3, 0.34, LIT, dark ? 0.2 : 0.3);
+      [3.12, 3.44, 3.76].forEach((ay, i) => {
+        const s = 1 - i*0.12;
+        soft(-0.24*s, ay, 0.2*s, 0.13*s, LIT, dark ? 0.2 : 0.34);
+        soft(0.24*s, ay, 0.2*s, 0.13*s, LIT, dark ? 0.17 : 0.28);
+        soft(0, ay + 0.16, 0.42*s, 0.045, SHA, dark ? 0.24 : 0.17);
+      });
+      soft(0, 3.4, 0.045, 0.75, SHA, dark ? 0.26 : 0.18);
+      soft(-0.62, 3.5, 0.28, 0.55, SHA, dark ? 0.3 : 0.2);
+      soft(0.62, 3.5, 0.28, 0.55, SHA, dark ? 0.34 : 0.24);
+      soft(0, 3.98, 0.07, 0.08, SHA, dark ? 0.35 : 0.26);
+      soft(-0.32, 4.3, 0.36, 0.22, LIT, dark ? 0.18 : 0.3);
+      soft(0.32, 4.3, 0.36, 0.22, LIT, dark ? 0.15 : 0.24);
+      soft(-0.98, 2.62, 0.26, 0.46, SHA, dark ? 0.38 : 0.26);
+      soft(0.98, 2.62, 0.26, 0.46, SHA, dark ? 0.42 : 0.3);
+      soft(0, 1.62, 0.34, 0.16, SHA, dark ? 0.3 : 0.2);
+      ctx.restore();
+
+      limb([[-0.92,2.26],[-1.16,3.1],[-1.3,4.05],[-1.28,4.66]], [0.3,0.24,0.19,0.14], 'arms', 0.55);
+      limb([[0.92,2.26],[1.16,3.1],[1.3,4.05],[1.28,4.66]], [0.3,0.24,0.19,0.14], 'arms', 0.55);
+      limb([[0,1.34],[0,1.78]], [0.24,0.28], 'head', 0.3);
+      const head = new Path2D();
+      const hc = P(0, 0.86);
+      head.moveTo(hc[0], hc[1] - u*0.66);
+      head.bezierCurveTo(hc[0] + u*0.52, hc[1] - u*0.62, hc[0] + u*0.56, hc[1] + u*0.02, hc[0] + u*0.44, hc[1] + u*0.3);
+      head.bezierCurveTo(hc[0] + u*0.34, hc[1] + u*0.56, hc[0] + u*0.16, hc[1] + u*0.7, hc[0], hc[1] + u*0.72);
+      head.bezierCurveTo(hc[0] - u*0.16, hc[1] + u*0.7, hc[0] - u*0.34, hc[1] + u*0.56, hc[0] - u*0.44, hc[1] + u*0.3);
+      head.bezierCurveTo(hc[0] - u*0.56, hc[1] + u*0.02, hc[0] - u*0.52, hc[1] - u*0.62, hc[0], hc[1] - u*0.66);
+      head.closePath();
+      fillPath(head, 'head', [hc[0], hc[1], u*1.1, u*1.4], 1);
+      ctx.restore();
+    };
+    this._clayLoop = draw;
+    const pump = (t) => { this._clayRaf = requestAnimationFrame(pump); draw(t); };
+    this._clayRaf = requestAnimationFrame(pump);
+    this._clayGuard = setInterval(() => { if (performance.now() - (this._clayLast || 0) > 400 && !this._clayRaf) this._clayRaf = requestAnimationFrame(pump); }, 400);
+  }
+  componentDidMount() { this.startClay(); }
+  componentWillUnmount() { cancelAnimationFrame(this._clayRaf); clearInterval(this._clayGuard); this._clayAlive = 0; }
+  rgbOf(h) { h = h.replace('#',''); return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)]; }
+  lighten(h, f) { const c = this.rgbOf(h).map(v => Math.round(v + (255 - v)*f)); return 'rgb(' + c.join(',') + ')'; }
+  skin(design, accent) {
+    if (design === 'ink') return { bg:'#1e1e24', blur:'none', ring:'none', fg:'#f7f5f2', mut:'rgba(247,245,242,.5)', label:'rgba(247,245,242,.72)', accent:this.lighten(accent, 0.46), rule:'rgba(247,245,242,.13)', trackBg:'rgba(247,245,242,.14)', ringHole:'#1e1e24', barBase:'rgba(247,245,242,.2)', stamp:'rgba(247,245,242,.45)', designTag:'Ink' };
+    return { bg:'rgba(255,253,250,.62)', blur:'blur(16px) saturate(1.1)', ring:'inset 0 0 0 1px rgba(255,253,250,.9),0 18px 40px -40px rgba(30,30,36,.5)', fg:'#1e1e24', mut:'#8b8681', label:'#55524f', accent, rule:'#e8e4dd', trackBg:'#eae6df', ringHole:'#fdfcfa', barBase:'rgba(30,30,36,.1)', stamp:'#8b8681', designTag:'Glass' };
+  }
+  card(w, cols, rows, design) {
+    const [name, cat, kind, o] = w;
+    const sk = this.skin(design, this.ACC[cat]);
+    const tall = rows >= 2, huge = rows >= 3, wide = cols >= 6;
+    const rowCap = huge ? 5 : (tall ? 3 : 0);
+    const canRows = kind === 'rows' && rowCap > 0;
+    const asBig = kind === 'big' || (kind === 'rows' && !canRows) || (kind === 'text' && !tall && cols < 4);
+    return Object.assign({}, sk, {
+      name, cols, rows, kicker:o.k || '',
+      pad: huge ? '22px' : (tall ? '18px' : '15px'),
+      bigSize: (huge ? 62 : (tall ? (wide ? 52 : 40) : (cols >= 3 ? 30 : 25))) + 'px',
+      midSize: (huge ? 34 : (tall ? 24 : 17)) + 'px',
+      textSize: (huge ? 21 : (tall ? 15.5 : 13)) + 'px',
+      barH: (huge ? 132 : (tall ? 68 : 34)) + 'px',
+      barGap: wide ? '5px' : '3px',
+      ringSize: (huge ? 96 : (tall ? 64 : 44)) + 'px',
+      value:o.v || '', value2:o.v2 || '', caption:o.c || '', caption2:o.c2 || '', delta:o.d || '', pct:o.p || '50%',
+      isBig: asBig, isRows: canRows, isBars: kind === 'bars', isProgress: kind === 'progress',
+      isSplit: kind === 'split', isRing: kind === 'ring', isText: kind === 'text' && !asBig,
+      rowsData:(o.r || []).slice(0, rowCap).map(r => ({ label:r[0], value:r[1] })),
+      bars:(o.b || []).slice(0, wide ? 12 : 7).map((h, i, arr) => ({ h:Math.round(h) + '%', bg:i === arr.length - 1 ? sk.accent : sk.barBase }))
+    });
+  }
+  renderVals() {
+    const S = this.state, dark = S.dark;
+    const size = this.SIZES.find(z => z.id === S.size) || this.SIZES[2];
+    const designs = S.design === 'both' ? ['glass', 'ink'] : [S.design];
+    const chipOn = (on) => ({ bg: on ? (dark ? '#f4f2ef' : '#1e1e24') : (dark ? 'rgba(244,242,239,.06)' : 'rgba(249,247,244,.8)'), fg: on ? (dark ? '#1e1e24' : '#f9f7f4') : (dark ? '#f4f2ef' : '#1e1e24'), bd: on ? (dark ? '#f4f2ef' : '#1e1e24') : (dark ? 'rgba(244,242,239,.16)' : '#e6e2db') });
+    const byName = (n) => this.W.find(w => w[0] === n) || this.W[0];
+    const cat = [];
+    this.W.forEach(w => designs.forEach(d => cat.push(this.card(w, size.cols, size.rows, d))));
+    const claySets = {
+      recovery: { verdict:'Recovered and ready', note:'HRV is eight milliseconds above your median and resting heart is at a five-day low. The model is shading green everywhere it has evidence.', src:'Apple Watch · 4 min ago' },
+      strain:   { verdict:'Yesterday still counts', note:'Legs carry most of the load from Tuesday\u2019s strength session. Atlas suggests keeping today aerobic and easy.', src:'Workouts · 3 sessions' },
+      sleep:    { verdict:'Seven hours, twelve minutes', note:'Deep sleep landed early and REM was slightly short. Two wakes, both under four minutes, neither worth worrying about.', src:'Watch + iPhone · last night' },
+      composition:{ verdict:'Steady composition', note:'Weight is trending down 0.4 kg over thirty days while lean mass held — the shape of the model has barely moved.', src:'Smart scale · Sunday' }
+    };
+    const cs = claySets[S.clay] || claySets.recovery;
+    const hot = {
+      recovery: [['Resting heart','58 bpm','#c2483d','24%','36%','1.4s'],['HRV','62 ms','#2f7d5e','74%','40%','2.4s'],['Readiness','82%','#2f7d5e','70%','66%','2.8s'],['Sleep','7h 12m','#5b3ce0','26%','14%','3.2s']],
+      strain:   [['Load','moderate','#c2661a','72%','62%','2s'],['Legs','heavy','#c2661a','30%','76%','2.2s'],['Peak HR','168 bpm','#c2483d','24%','36%','1.2s'],['Sessions','3 this week','#8b6f3f','72%','24%','3s']],
+      sleep:    [['Deep','1h 40m','#5b3ce0','26%','16%','3s'],['REM','1h 18m','#5b3ce0','72%','30%','3.4s'],['Wakes','2','#8b6f3f','26%','52%','2.6s'],['Resp. rate','14.2','#2f4bbd','72%','62%','2.2s']],
+      composition:[['Weight','74.2 kg','#2f7d5e','24%','48%','3s'],['Body fat','17.4%','#2f7d5e','74%','44%','3.2s'],['Lean mass','34.1 kg','#2f7d5e','70%','70%','2.8s'],['Hydration','67%','#2f4bbd','28%','24%','2.4s']]
+    }[S.clay] || [];
+    return {
+      rootRef: (el) => { this.root = el; },
+      orbRef: (el) => { if (el && window.AtlasSphere) window.AtlasSphere.mount(el, () => ({ state:'idle', dark: this.state.dark })); },
+      clayRef: (el) => this.clayFn(el),
+      pageBg: dark ? '#15151a' : '#f9f7f4', pageFg: dark ? '#f4f2ef' : '#1e1e24',
+      mutFg: dark ? 'rgba(244,242,239,.6)' : '#6d6a67', labelFg: dark ? 'rgba(244,242,239,.72)' : '#55524f',
+      ruleFg: dark ? 'rgba(244,242,239,.12)' : '#e8e4dd',
+      washA: dark ? 'linear-gradient(180deg,rgba(91,60,224,.18),rgba(21,21,26,0) 44%)' : 'linear-gradient(180deg,rgba(255,224,214,.66),rgba(249,247,244,0) 42%)',
+      washB: dark ? 'radial-gradient(closest-side,rgba(194,72,61,.2),transparent 74%)' : 'radial-gradient(closest-side,rgba(255,158,120,.28),transparent 74%)',
+      washC: dark ? 'radial-gradient(closest-side,rgba(122,140,255,.2),transparent 74%)' : 'radial-gradient(closest-side,rgba(150,190,255,.22),transparent 74%)',
+      barBg: dark ? 'rgba(244,242,239,.05)' : 'rgba(255,253,250,.5)', barRing: dark ? 'rgba(244,242,239,.1)' : 'rgba(255,253,250,.7)',
+      heroBg: dark ? '#1e1e24' : 'rgba(255,253,250,.62)', heroBlur: dark ? 'none' : 'blur(16px) saturate(1.1)',
+      heroRing: dark ? 'none' : 'inset 0 0 0 1px rgba(255,253,250,.9),0 18px 40px -40px rgba(30,30,36,.5)',
+      clayCardBg: dark ? '#1a1a20' : 'rgba(255,253,250,.68)',
+      pinBg: dark ? 'rgba(26,26,32,.86)' : 'rgba(255,253,250,.88)',
+      pinRing: dark ? 'inset 0 0 0 1px rgba(247,245,242,.14)' : 'inset 0 0 0 1px rgba(255,253,250,.95),0 10px 24px -20px rgba(30,30,36,.6)',
+      syncBg: dark ? '#f4f2ef' : '#1e1e24', syncFg: dark ? '#1e1e24' : '#f7f5f2',
+      syncMut: dark ? '#6d6a67' : 'rgba(247,245,242,.55)', syncLabel: dark ? '#8b8681' : 'rgba(247,245,242,.6)',
+      syncTile: dark ? 'rgba(30,30,36,.06)' : 'rgba(247,245,242,.08)', syncRule: dark ? 'rgba(30,30,36,.12)' : 'rgba(247,245,242,.16)',
+      syncBtnBg: dark ? '#1e1e24' : '#f7f5f2', syncBtnFg: dark ? '#f7f5f2' : '#1e1e24',
+      views: [{ id:'body', label:'Body' }, { id:'catalog', label:'Widget set' }, { id:'settings', label:'Settings' }].map(v => Object.assign(v, chipOn(v.id === S.view))),
+      chipRow: S.view === 'catalog'
+        ? this.SIZES.map(z => Object.assign({ k:'size', id:z.id, label:z.label, meta:z.dim }, chipOn(z.id === S.size))).concat(this.DESIGNS.map(d => Object.assign({ k:'design', id:d.id, label:d.label, meta:'' }, chipOn(d.id === S.design))))
+        : [{ k:'dark', id:'toggle', label: dark ? 'Light' : 'Dark', meta:'', bg: dark ? '#f4f2ef' : '#1e1e24', fg: dark ? '#1e1e24' : '#f9f7f4', bd: dark ? '#f4f2ef' : '#1e1e24' }],
+      navZ: S.navOpen ? 80 : 2,
+      launcherShow: S.view === 'body' ? 'none' : 'flex',
+      navHintOp: S.navOpen ? '0' : '1',
+      navRing: [{ id:'body', label:'Body' }, { id:'catalog', label:'Widget set' }, { id:'settings', label:'Settings' }, { href:'Atlas Smart Home.dc.html', label:'Home', dot:'#c98a2b' }, { href:'Atlas Banking.dc.html', label:'Money', dot:'#2f7d5e' }, { href:'Atlas Dashboard (Current).dc.html', label:'Dashboard', dot:'#3461f2' }].map((n, i, arr) => {
+        const a = (4 + i*(104/Math.max(1, arr.length - 1)))*Math.PI/180;
+        const R = 132;
+        const on = n.id && n.id === S.view;
+        return Object.assign({}, n, {
+          href: n.href || '#',
+          x: (S.navOpen ? 132 : 0) + 'px',
+          y: (S.navOpen ? (i - (arr.length - 1)/2)*38 : 0) + 'px',
+          scale: S.navOpen ? '1' : '.7',
+          op: S.navOpen ? '1' : '0',
+          pe: S.navOpen ? 'auto' : 'none',
+          lx: (S.navOpen ? 76 : 0) + 'px',
+          ly: (S.navOpen ? (48 + i*38) : 0) + 'px',
+          delay: (i*26) + 'ms',
+          bg: on ? (dark ? '#f4f2ef' : '#1e1e24') : (dark ? 'rgba(34,34,43,.95)' : 'rgba(255,253,250,.96)'),
+          fg: on ? (dark ? '#1e1e24' : '#f9f7f4') : (dark ? '#f4f2ef' : '#1e1e24'),
+          ring: dark ? 'inset 0 0 0 1px rgba(247,245,242,.16),0 18px 34px -20px rgba(0,0,0,.7)' : 'inset 0 0 0 1px #e8e4dd,0 18px 34px -22px rgba(30,30,36,.45)',
+          dot: n.dot || (on ? '#3461f2' : (dark ? 'rgba(247,245,242,.35)' : '#c9c3ba'))
+        });
+      }),
+      openNav: () => this.setState({ navOpen: true }),
+      closeNav: () => this.setState({ navOpen: false }),
+      navGo: (e) => { const id = e.currentTarget.dataset.id; if (id) { e.preventDefault(); this.setState({ view: id, navOpen: false }); } },
+      isBody: S.view === 'body', isCatalog: S.view === 'catalog', isSettings: S.view === 'settings',
+      clayVerdict: cs.verdict, clayNote: cs.note, claySourceLine: cs.src,
+      clayModes: this.CLAY.map(m => Object.assign({}, m, chipOn(m.id === S.clay))),
+      hotspots: hot.map(h => ({ label:h[0], value:h[1], dot:h[2], halo:'rgba(' + this.rgbOf(h[2]).join(',') + ',.18)', x:h[3], y:h[4], beat:h[5] })),
+      bodyCards: this.BODY.map(b => this.card(byName(b[0]), b[1], b[2], dark ? 'ink' : 'glass')),
+      catalogCards: cat,
+      sources: [
+        { id:'s1', name:'Apple Health', meta:'Primary store · 14 signal types', state:'4 min ago' },
+        { id:'s2', name:'Apple Watch Series 10', meta:'Heart, sleep, workouts, temperature', state:'live' },
+        { id:'s3', name:'Withings Body Scan', meta:'Weight and composition · Sundays', state:'2 days ago' },
+        { id:'s4', name:'Oura Ring', meta:'Duplicate sleep source — paused', state:'paused' },
+        { id:'s5', name:'Lab results (PDF import)', meta:'Parsed on device · 4 panels', state:'14 June' }
+      ].map(s => { const on = !!S.sources[s.id]; return Object.assign(s, { knob: on ? 'flex-end' : 'flex-start', switchBg: on ? '#3461f2' : (dark ? 'rgba(244,242,239,.16)' : '#ddd8d0'), knobBg: dark ? '#1e1e24' : '#fffdfa', stateFg: on ? (dark ? 'rgba(244,242,239,.6)' : '#6d6a67') : (dark ? 'rgba(244,242,239,.35)' : '#b6b1aa') }); }),
+      signals: [
+        { id:'g1', name:'Heart rate', region:'chest', note:'Drives the chest glow and its beat rate.' },
+        { id:'g2', name:'HRV', region:'chest', note:'Sets how green or amber the torso reads.' },
+        { id:'g3', name:'Sleep stages', region:'head', note:'Shades the head in the sleep view.' },
+        { id:'g4', name:'Workouts', region:'legs', note:'Adds load colour to the legs for 48 hours.' },
+        { id:'g5', name:'Body composition', region:'whole', note:'Adjusts the figure\u2019s proportions monthly.' },
+        { id:'g6', name:'Blood pressure', region:'arms', note:'Manual entries only — currently off.' },
+        { id:'g7', name:'Hydration', region:'torso', note:'Softens the clay surface when you are low.' },
+        { id:'g8', name:'Wrist temperature', region:'whole', note:'Warms the palette when above baseline.' }
+      ].map(g => { const on = !!S.signals[g.id]; return Object.assign(g, { bg: on ? (dark ? 'rgba(244,242,239,.06)' : 'rgba(249,247,244,.75)') : 'transparent', ring: on ? (dark ? 'rgba(244,242,239,.12)' : '#eae6df') : (dark ? 'rgba(244,242,239,.08)' : '#eee9e1'), dot: on ? '#0fae76' : (dark ? 'rgba(244,242,239,.25)' : '#ddd8d0'), fg: on ? (dark ? '#f4f2ef' : '#1e1e24') : (dark ? 'rgba(244,242,239,.4)' : '#b6b1aa'), metaFg: dark ? 'rgba(244,242,239,.5)' : '#8b8681' }); }),
+      devices: [
+        { name:'iPhone 17 Pro', meta:'Steps, daylight, noise', state:'Live', fg:'#0fae76' },
+        { name:'Withings Body Scan', meta:'Wi-Fi · every Sunday', state:'Connected', fg:'#0fae76' },
+        { name:'Polar H10 chest strap', meta:'Bluetooth · workouts only', state:'Connected', fg:'#0fae76' },
+        { name:'Oura Ring Gen 4', meta:'Conflicts with Watch sleep', state:'Paused', fg: dark ? '#8b8681' : 'rgba(247,245,242,.5)' }
+      ],
+      privacy: [
+        { id:'v1', name:'Keep raw samples on device', note:'Only daily summaries ever leave your phone.' },
+        { id:'v2', name:'Let Atlas mention health in answers', note:'Currently off — health stays inside this view.' },
+        { id:'v3', name:'Include health in the morning brief', note:'One line, no numbers unless you ask.' },
+        { id:'v4', name:'Alert me to unusual readings', note:'Resting heart, respiratory rate, temperature.' }
+      ].map(p => { const on = !!S.privacy[p.id]; return Object.assign(p, { knob: on ? 'flex-end' : 'flex-start', switchBg: on ? '#3461f2' : (dark ? 'rgba(244,242,239,.16)' : '#ddd8d0'), knobBg: dark ? '#1e1e24' : '#fffdfa' }); }),
+      pickView: (e) => this.setState({ view: e.currentTarget.dataset.id }),
+      pickChip: (e) => { const k = e.currentTarget.dataset.k, id = e.currentTarget.dataset.id; if (k === 'size') this.setState({ size:id }); else if (k === 'design') this.setState({ design:id }); else this.setState({ dark: !this.state.dark }); },
+      pickClay: (e) => this.setState({ clay: e.currentTarget.dataset.id }),
+      toggleSource: (e) => { const id = e.currentTarget.dataset.id; this.setState({ sources: Object.assign({}, S.sources, { [id]: S.sources[id] ? 0 : 1 }) }); },
+      toggleSignal: (e) => { const id = e.currentTarget.dataset.id; this.setState({ signals: Object.assign({}, S.signals, { [id]: S.signals[id] ? 0 : 1 }) }); },
+      togglePrivacy: (e) => { const id = e.currentTarget.dataset.id; this.setState({ privacy: Object.assign({}, S.privacy, { [id]: S.privacy[id] ? 0 : 1 }) }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

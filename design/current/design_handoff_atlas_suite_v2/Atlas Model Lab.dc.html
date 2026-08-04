@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<style>
+button,input,textarea,select{border:none}@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Hanken+Grotesk:wght@500;600;700&display=swap');
+html,body{margin:0;padding:0;background:#f9f7f4}
+a{color:#3461f2;text-decoration:none}a:hover{color:#5b7cff}
+*{box-sizing:border-box}
+input{font:inherit}
+@keyframes ml-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+</style>
+<script src="atlas-sphere.js"></script>
+<script src="atlas-models.js"></script>
+<script src="atlas-transition.js"></script>
+</helmet>
+<div ref="{{ rootRef }}" data-screen-label="Model lab" style="position:relative;min-height:100vh;background:{{ pageBg }};color:{{ pageFg }};font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:auto">
+<div style="position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none"><div style="position:absolute;inset:0;background:{{ washA }}"></div></div>
+
+<div onMouseEnter="{{ openNav }}" onMouseLeave="{{ closeNav }}" style="position:fixed;left:20px;top:16px;z-index:90;display:flex;align-items:center;justify-content:center;width:86px;height:86px">
+<canvas data-orb="1" ref="{{ orbRef }}" style="width:86px;height:86px;display:block;cursor:pointer"></canvas>
+<sc-for list="{{ navRing }}" as="n" hint-placeholder-count="5">
+<a href="{{ n.href }}" data-id="{{ n.id }}" onClick="{{ navGo }}" style="position:absolute;left:calc(50% + {{ n.lx }});top:calc(50% + {{ n.ly }});transform:translate(-50%,-50%) scale({{ n.scale }});display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 13px;border-radius:9999px;white-space:nowrap;text-decoration:none;font-size:12px;font-weight:500;background:{{ n.bg }};color:{{ n.fg }};box-shadow:{{ n.ring }};opacity:{{ n.op }};pointer-events:{{ n.pe }}"><span style="width:6px;height:6px;border-radius:50%;background:{{ n.dot }}"></span>{{ n.label }}</a>
+</sc-for>
+</div>
+
+<header style="position:relative;z-index:10;display:flex;align-items:flex-end;gap:24px;min-width:1400px;max-width:1760px;margin:0 auto;padding:26px 28px 12px 128px">
+<div>
+<p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ labelFg }}">Model lab · admin</p>
+<h1 style="margin:8px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:34px;font-weight:600;letter-spacing:-.035em;line-height:1">{{ title }}</h1>
+</div>
+<div style="display:flex;align-items:center;gap:5px;margin-left:auto">
+<sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+<button data-id="{{ t.id }}" onClick="{{ pickTab }}" style="border:none;height:32px;padding:0 15px;border-radius:9999px;cursor:pointer;font-size:12.5px;font-weight:500;background:{{ t.bg }};color:{{ t.fg }}" style-hover="background:#edebe7">{{ t.label }}</button>
+</sc-for>
+<button onClick="{{ toggleDark }}" style="height:32px;padding:0 14px;margin-left:8px;border-radius:9999px;border:0;cursor:pointer;background:{{ darkBg }};color:{{ darkFg }};font-size:12.5px;font-weight:500">{{ darkLabel }}</button>
+</div>
+</header>
+
+<sc-if value="{{ isGrid }}" hint-placeholder-val="{{ true }}">
+<main style="position:relative;z-index:10;display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:14px;min-width:1400px;max-width:1760px;margin:0 auto;padding:14px 28px 120px 128px;animation:ml-rise .6s cubic-bezier(.22,1,.36,1) both">
+<sc-for list="{{ allModels }}" as="m" hint-placeholder-count="16">
+<article data-screen-label="{{ m.name }}" data-id="{{ m.id }}" onClick="{{ editModel }}" title="Open in editor" style="display:flex;flex-direction:column;padding:12px;border-radius:20px;cursor:pointer;background:{{ cardBg }};box-shadow:{{ cardRing }}" style-hover="box-shadow:inset 0 0 0 1px #3461f2">
+<div style="position:relative;height:150px;border-radius:14px;overflow:hidden;background:{{ stageBg }}">
+<canvas data-model="{{ m.model }}" data-key="{{ m.key }}" ref="{{ modelRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
+<span style="position:absolute;left:9px;top:9px;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:{{ mutFg }}">{{ m.kind }}</span>
+</div>
+<p style="margin:11px 0 0;font-size:12.5px;font-weight:600;letter-spacing:-.015em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ m.name }}</p>
+<p style="margin:4px 0 0;font-size:11px;color:{{ mutFg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ m.meta }}</p>
+</article>
+</sc-for>
+</main>
+</sc-if>
+
+<sc-if value="{{ isDevice }}" hint-placeholder-val="{{ false }}">
+<main style="position:relative;z-index:10;display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:16px;min-width:1400px;max-width:1760px;margin:0 auto;padding:14px 28px 120px 128px;animation:ml-rise .6s cubic-bezier(.22,1,.36,1) both">
+<section style="display:flex;flex-direction:column;gap:14px">
+<div style="position:relative;height:520px;border-radius:26px;overflow:hidden;background:{{ stageBg }};box-shadow:{{ cardRing }}">
+<canvas data-model="{{ editModelId }}" data-key="editor" data-hero="1" ref="{{ modelRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
+<div style="position:absolute;left:18px;top:16px;display:flex;align-items:center;gap:9px">
+<span style="font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ labelFg }}">{{ editName }}</span>
+<span style="font-size:10.5px;color:{{ mutFg }}">{{ editMeta }}</span>
+</div>
+<div style="position:absolute;right:16px;top:14px;display:flex;gap:5px">
+<sc-for list="{{ shotAngles }}" as="a" hint-placeholder-count="4">
+<button data-v="{{ a.v }}" onClick="{{ setAngle }}" style="border:none;height:28px;padding:0 12px;border-radius:9999px;cursor:pointer;font-size:11.5px;font-weight:500;background:{{ a.bg }};color:{{ a.fg }}">{{ a.label }}</button>
+</sc-for>
+</div>
+<div style="position:absolute;left:18px;bottom:16px;display:flex;gap:14px;font-size:11px;color:{{ mutFg }};font-variant-numeric:tabular-nums">
+<span>{{ statPolys }}</span><span>{{ statTex }}</span><span>{{ statShader }}</span><span>{{ statMs }}</span>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px">
+<sc-for list="{{ texMaps }}" as="t" hint-placeholder-count="4">
+<div style="padding:12px;border-radius:18px;background:{{ cardBg }};box-shadow:{{ cardRing }}">
+<div style="position:relative;height:96px;border-radius:12px;overflow:hidden;background:{{ stageBg }}">
+<canvas data-map="{{ t.id }}" ref="{{ texRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
+</div>
+<p style="margin:9px 0 0;font-size:11.5px;font-weight:600;letter-spacing:-.01em">{{ t.label }}</p>
+<p style="margin:3px 0 0;font-size:10.5px;color:{{ mutFg }}">{{ t.meta }}</p>
+</div>
+</sc-for>
+</div>
+</section>
+
+<aside style="display:flex;flex-direction:column;gap:12px;max-height:none">
+<div style="padding:18px;border-radius:22px;background:{{ cardBg }};box-shadow:{{ cardRing }}">
+<p style="margin:0 0 12px;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ labelFg }}">Geometry</p>
+<div style="display:flex;align-items:center;gap:12px;padding:0 0 9px">
+<span style="width:112px;flex-shrink:0;font-size:12px;color:{{ pageFg }}">Device state</span>
+<span style="position:relative;flex:1;min-width:0;height:24px">
+<span style="position:absolute;left:0;right:0;top:9px;height:6px;border-radius:9999px;background:{{ trackBg }};overflow:hidden"><span style="display:block;height:100%;width:{{ stateSlider.pct }};background:#0fae76"></span></span>
+<span style="position:absolute;top:3px;left:{{ stateSlider.thumb }};width:18px;height:18px;border-radius:50%;background:{{ knobBg }};box-shadow:0 2px 8px -2px rgba(30,30,36,.55),inset 0 0 0 1px {{ hair }};pointer-events:none"></span>
+<input type="range" min="0" max="100" ref="{{ slRef }}" data-init="{{ stateSlider.value }}" onInput="{{ onStateVal }}" onChange="{{ onStateVal }}" style="border:none;position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer"/>
+</span>
+<span style="width:54px;text-align:right;font-size:11.5px;font-variant-numeric:tabular-nums;color:{{ mutFg }}">{{ stateSlider.read }}</span>
+</div>
+<sc-for list="{{ geoCtrls }}" as="c" hint-placeholder-count="5">
+<div style="display:flex;align-items:center;gap:12px;padding:9px 0">
+<span style="width:112px;flex-shrink:0;font-size:12px;color:{{ pageFg }}">{{ c.label }}</span>
+<span style="position:relative;flex:1;min-width:0;height:24px">
+<span style="position:absolute;left:0;right:0;top:9px;height:6px;border-radius:9999px;background:{{ trackBg }};overflow:hidden"><span style="display:block;height:100%;width:{{ c.pct }};background:#3461f2"></span></span>
+<span style="position:absolute;top:3px;left:{{ c.thumb }};width:18px;height:18px;border-radius:50%;background:{{ knobBg }};box-shadow:0 2px 8px -2px rgba(30,30,36,.55),inset 0 0 0 1px {{ hair }};pointer-events:none"></span>
+<input type="range" min="{{ c.min }}" max="{{ c.max }}" step="{{ c.step }}" ref="{{ slRef }}" data-init="{{ c.value }}" data-k="{{ c.k }}" onInput="{{ onCtrl }}" onChange="{{ onCtrl }}" style="border:none;position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer"/>
+</span>
+<span style="width:54px;text-align:right;font-size:11.5px;font-variant-numeric:tabular-nums;color:{{ mutFg }}">{{ c.read }}</span>
+</div>
+</sc-for>
+</div>
+
+<div style="padding:18px;border-radius:22px;background:{{ cardBg }};box-shadow:{{ cardRing }}">
+<p style="margin:0 0 12px;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ labelFg }}">Material</p>
+<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">
+<sc-for list="{{ materials }}" as="m" hint-placeholder-count="6">
+<button data-v="{{ m.id }}" onClick="{{ setMaterial }}" style="border:none;display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 12px;border-radius:9999px;cursor:pointer;font-size:11.5px;font-weight:500;background:{{ m.bg }};color:{{ m.fg }}"><span style="width:12px;height:12px;border-radius:4px;background:{{ m.swatch }};box-shadow:inset 0 0 0 1px rgba(30,30,36,.16)"></span>{{ m.label }}</button>
+</sc-for>
+</div>
+<sc-for list="{{ matCtrls }}" as="c" hint-placeholder-count="5">
+<div style="display:flex;align-items:center;gap:12px;padding:9px 0">
+<span style="width:112px;flex-shrink:0;font-size:12px;color:{{ pageFg }}">{{ c.label }}</span>
+<span style="position:relative;flex:1;min-width:0;height:24px">
+<span style="position:absolute;left:0;right:0;top:9px;height:6px;border-radius:9999px;background:{{ trackBg }};overflow:hidden"><span style="display:block;height:100%;width:{{ c.pct }};background:{{ c.fill }}"></span></span>
+<span style="position:absolute;top:3px;left:{{ c.thumb }};width:18px;height:18px;border-radius:50%;background:{{ knobBg }};box-shadow:0 2px 8px -2px rgba(30,30,36,.55),inset 0 0 0 1px {{ hair }};pointer-events:none"></span>
+<input type="range" min="{{ c.min }}" max="{{ c.max }}" step="{{ c.step }}" ref="{{ slRef }}" data-init="{{ c.value }}" data-k="{{ c.k }}" onInput="{{ onCtrl }}" onChange="{{ onCtrl }}" style="border:none;position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer"/>
+</span>
+<span style="width:54px;text-align:right;font-size:11.5px;font-variant-numeric:tabular-nums;color:{{ mutFg }}">{{ c.read }}</span>
+</div>
+</sc-for>
+</div>
+
+<div style="padding:18px;border-radius:22px;background:{{ cardBg }};box-shadow:{{ cardRing }}">
+<p style="margin:0 0 12px;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ labelFg }}">Texture synthesis</p>
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+<sc-for list="{{ texRes }}" as="t" hint-placeholder-count="4">
+<button data-v="{{ t.v }}" onClick="{{ setRes }}" style="border:none;height:30px;padding:0 13px;border-radius:9999px;cursor:pointer;font-size:11.5px;font-weight:500;background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}</button>
+</sc-for>
+</div>
+<sc-for list="{{ texCtrls }}" as="c" hint-placeholder-count="4">
+<div style="display:flex;align-items:center;gap:12px;padding:9px 0;margin-top:2px">
+<span style="width:112px;flex-shrink:0;font-size:12px;color:{{ pageFg }}">{{ c.label }}</span>
+<span style="position:relative;flex:1;min-width:0;height:24px">
+<span style="position:absolute;left:0;right:0;top:9px;height:6px;border-radius:9999px;background:{{ trackBg }};overflow:hidden"><span style="display:block;height:100%;width:{{ c.pct }};background:#8b6f3f"></span></span>
+<span style="position:absolute;top:3px;left:{{ c.thumb }};width:18px;height:18px;border-radius:50%;background:{{ knobBg }};box-shadow:0 2px 8px -2px rgba(30,30,36,.55),inset 0 0 0 1px {{ hair }};pointer-events:none"></span>
+<input type="range" min="{{ c.min }}" max="{{ c.max }}" step="{{ c.step }}" ref="{{ slRef }}" data-init="{{ c.value }}" data-k="{{ c.k }}" onInput="{{ onCtrl }}" onChange="{{ onCtrl }}" style="border:none;position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer"/>
+</span>
+<span style="width:54px;text-align:right;font-size:11.5px;font-variant-numeric:tabular-nums;color:{{ mutFg }}">{{ c.read }}</span>
+</div>
+</sc-for>
+<p style="margin:10px 0 0;font-size:11px;line-height:1.5;color:{{ mutFg }}">{{ texNote }}</p>
+</div>
+
+<div style="padding:18px;border-radius:22px;background:{{ cardBg }};box-shadow:{{ cardRing }}">
+<p style="margin:0 0 10px;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ labelFg }}">Reference</p>
+<p style="margin:0 0 10px;font-size:11.5px;line-height:1.5;color:{{ mutFg }}">Drop product photography here and the synthesiser matches palette, roughness and trim to the real device.</p>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+<sc-for list="{{ refSlots }}" as="r" hint-placeholder-count="2">
+<div style="height:78px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:11px;color:{{ mutFg }};text-align:center;padding:8px">{{ r.label }}</div>
+</sc-for>
+</div>
+<div style="display:flex;gap:8px;margin-top:12px">
+<button onClick="{{ resetCtrls }}" style="border:none;flex:1;height:34px;border-radius:9999px;background:transparent;color:{{ pageFg }};font-size:12.5px;font-weight:500;cursor:pointer">Reset</button>
+<button style="flex:1;height:34px;border-radius:9999px;border:0;background:#3461f2;color:#fff;font-size:12.5px;font-weight:500;cursor:pointer">Bake maps</button>
+</div>
+</div>
+</aside>
+</main>
+</sc-if>
+
+<sc-if value="{{ isBody }}" hint-placeholder-val="{{ false }}">
+<main style="position:relative;z-index:10;display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:16px;min-width:1400px;max-width:1760px;margin:0 auto;padding:14px 28px 120px 128px;animation:ml-rise .6s cubic-bezier(.22,1,.36,1) both">
+<section style="position:relative;height:620px;border-radius:26px;overflow:hidden;background:{{ stageBg }};box-shadow:{{ cardRing }}">
+<canvas ref="{{ bodyRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
+<div style="position:absolute;left:18px;top:16px;display:flex;align-items:center;gap:10px">
+<span style="font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ labelFg }}">Clay body model</span>
+<span style="font-size:10.5px;color:{{ mutFg }}">{{ bodyMeta }}</span>
+</div>
+<div style="position:absolute;right:16px;top:14px;display:flex;gap:5px">
+<sc-for list="{{ bodyModes }}" as="b" hint-placeholder-count="4">
+<button data-v="{{ b.v }}" onClick="{{ setBodyMode }}" style="border:none;height:28px;padding:0 12px;border-radius:9999px;cursor:pointer;font-size:11.5px;font-weight:500;background:{{ b.bg }};color:{{ b.fg }}">{{ b.label }}</button>
+</sc-for>
+</div>
+</section>
+<aside style="display:flex;flex-direction:column;gap:12px">
+<sc-for list="{{ bodyGroups }}" as="g" hint-placeholder-count="3">
+<div style="padding:18px;border-radius:22px;background:{{ cardBg }};box-shadow:{{ cardRing }}">
+<p style="margin:0 0 8px;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ labelFg }}">{{ g.title }}</p>
+<sc-for list="{{ g.ctrls }}" as="c" hint-placeholder-count="4">
+<div style="display:flex;align-items:center;gap:12px;padding:9px 0">
+<span style="width:118px;flex-shrink:0;font-size:12px;color:{{ pageFg }}">{{ c.label }}</span>
+<span style="position:relative;flex:1;min-width:0;height:24px">
+<span style="position:absolute;left:0;right:0;top:9px;height:6px;border-radius:9999px;background:{{ trackBg }};overflow:hidden"><span style="display:block;height:100%;width:{{ c.pct }};background:{{ c.fill }}"></span></span>
+<span style="position:absolute;top:3px;left:{{ c.thumb }};width:18px;height:18px;border-radius:50%;background:{{ knobBg }};box-shadow:0 2px 8px -2px rgba(30,30,36,.55),inset 0 0 0 1px {{ hair }};pointer-events:none"></span>
+<input type="range" min="{{ c.min }}" max="{{ c.max }}" step="{{ c.step }}" ref="{{ slRef }}" data-init="{{ c.value }}" data-k="{{ c.k }}" onInput="{{ onCtrl }}" onChange="{{ onCtrl }}" style="border:none;position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer"/>
+</span>
+<span style="width:54px;text-align:right;font-size:11.5px;font-variant-numeric:tabular-nums;color:{{ mutFg }}">{{ c.read }}</span>
+</div>
+</sc-for>
+</div>
+</sc-for>
+<button onClick="{{ resetCtrls }}" style="border:none;height:36px;border-radius:9999px;background:transparent;color:{{ pageFg }};font-size:12.5px;font-weight:500;cursor:pointer">Reset to shipped values</button>
+</aside>
+</main>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1760,&quot;height&quot;:1000},&quot;tab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;grid&quot;,&quot;options&quot;:[&quot;grid&quot;,&quot;device&quot;,&quot;body&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Lab&quot},&quot;dark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Lab&quot}}">
+class Component extends DCLogic {
+  DEVICES = [
+    ['floorlamp', 'Arc floor lamp', 'Living room · light'], ['pendant', 'Ceiling pendant', 'Living room · light'],
+    ['bulb', 'Bulb', 'Kitchen · light'], ['strip', 'LED strip', 'Kitchen · light'],
+    ['speaker', 'Smart speaker', 'Living room · media'], ['tv', 'Television', 'Living room · media'],
+    ['thermostat', 'Thermostat', 'Living room · climate'], ['valve', 'Radiator valve', 'Bedroom · climate'],
+    ['purifier', 'Air purifier', 'Living room · climate'], ['camera', 'Camera', 'Outdoors · security'],
+    ['doorbell', 'Doorbell', 'Outdoors · security'], ['lock', 'Smart lock', 'Outdoors · security'],
+    ['garage', 'Garage door', 'Outdoors · access'], ['blind', 'Blinds', 'Living room · shade'],
+    ['curtain', 'Curtains', 'Bedroom · shade'], ['vacuum', 'Robot vacuum', 'Utility · care'],
+    ['washer', 'Washer', 'Utility · care'], ['fridge', 'Fridge', 'Kitchen · care'],
+    ['heater', 'Boiler', 'Utility · water'], ['kettle', 'Kettle', 'Kitchen · care'],
+    ['plug', 'Smart plug', 'Kitchen · power'], ['router', 'Router', 'Utility · network'],
+    ['sensor', 'Sensor puck', 'Bedroom · sensing'], ['smoke', 'Smoke alarm', 'Kitchen · safety'],
+    ['ev', 'EV charger', 'Outdoors · power'], ['solar', 'Solar array', 'Outdoors · power'],
+    ['sprinkler', 'Irrigation', 'Outdoors · water']
+  ];
+  MATERIALS = [
+    ['matte', 'Matte polymer', '#efece7'], ['soft', 'Soft-touch', '#dcd8d2'], ['alu', 'Anodised alu', '#c9c9cf'],
+    ['brushed', 'Brushed steel', '#b9b9bd'], ['glass', 'Glass', '#dfe6ea'], ['fabric', 'Acoustic fabric', '#cfc7bb']
+  ];
+  DEF = { polys: 62, bevel: 34, seams: 40, detail: 58, rough: 42, metal: 18, clear: 26, ao: 46, aniso: 30, tile: 50, grain: 38, wear: 12, weave: 44,
+    mass: 50, tone: 46, relief: 52, soften: 30, light: 58, rim: 40, tint: 24, pose: 50 };
+  state = { tab:'grid', dark:false, edit:null, angle:0, material:'matte', res:'4k', ctrls: Object.assign({}, this.DEF), bodyMode:'recovery', navOpen:false };
+  componentDidMount() { this.startLoop(); this.drawOrb(); }
+  componentDidUpdate() { this.paintAll(); }
+  componentWillUnmount() { clearInterval(this._timer); }
+  drawOrb() {
+    const el = this._orbEl || document.querySelector('canvas[data-orb]');
+    if (!el || !el.isConnected) return;
+    const ctx = el.__ox || (el.__ox = el.getContext('2d'));
+    const d = Math.min(1.5, devicePixelRatio || 1), cw = el.clientWidth, ch = el.clientHeight;
+    if (!cw || !ch) return;
+    if (el.width !== Math.round(cw*d) || el.height !== Math.round(ch*d)) { el.width = Math.round(cw*d); el.height = Math.round(ch*d); }
+    const W = el.width, H = el.height, t = performance.now();
+    if (!this._orbPts) {
+      this._orbPts = [];
+      for (let i = 0; i < 9000; i++) { const th = Math.random()*6.2832, ph = Math.acos(2*Math.random() - 1), r = Math.pow(Math.random(), 0.7); this._orbPts.push({ x: r*Math.sin(ph)*Math.cos(th), y: r*Math.sin(ph)*Math.sin(th), z: r*Math.cos(ph), rn: Math.random() }); }
+    }
+    ctx.clearRect(0, 0, W, H);
+    const rot = t*0.0004, ca = Math.cos(rot), sa = Math.sin(rot), R = Math.min(W, H)*0.44, dark = this.state.dark;
+    for (const p of this._orbPts) {
+      const X = p.x*ca + p.z*sa, Z = -p.x*sa + p.z*ca, depth = (Z + 1)/2;
+      const dd = Math.sqrt(X*X + p.y*p.y + Z*Z);
+      let a = Math.max(0, 1 - Math.max(0, (dd - 0.42)/0.5))*(0.35 + depth*0.6);
+      if (a <= 0.02) continue;
+      ctx.fillStyle = 'rgba(' + Math.round(36 + depth*74) + ',' + Math.round(64 + depth*96) + ',' + Math.round(180 + depth*70) + ',' + a.toFixed(2) + ')';
+      const sz = (0.5 + p.rn*0.9)*(0.5 + depth*0.6)*(W/300)*0.6;
+      ctx.fillRect(W/2 + X*R - sz, H/2 + p.y*R - sz, sz*2, sz*2);
+    }
+  }
+  toTop() {
+    const go = () => { try { const se = document.scrollingElement || document.documentElement; se.scrollTop = 0; if (this.root) this.root.scrollTop = 0; } catch (e) {} this.paintAll(); };
+    go(); setTimeout(go, 60); setTimeout(go, 220);
+  }
+  mountOrb() {
+    const el = this._orbEl || (this.root ? this.root.querySelector('canvas[data-orb]') : document.querySelector('canvas[data-orb]'));
+    if (!el || el.__mounted) return;
+    if (!window.AtlasSphere) { this.startLoop(); return; }
+    el.__mounted = 1;
+    window.AtlasSphere.mount(el, () => ({ state:'idle', dark: this.state.dark }));
+  }
+  modelRef(el) { if (!el) return; this._cvs = this._cvs || []; if (!el.__reg) { el.__reg = 1; this._cvs.push(el); } this.startLoop(); }
+  startLoop() {
+    if (this._alive) return; this._alive = 1;
+    this._timer = setInterval(() => { this.drawOrb(); this.paintAll(); }, 110);
+    setTimeout(() => this.paintAll(), 60);
+  }
+  paintAll() {
+    const t = performance.now();
+    (this._cvs || []).forEach(el => {
+      if (!el.isConnected) return;
+      const stage = el.dataset.hero === '1';
+      if (!stage) { const r = el.getBoundingClientRect(); if (r.bottom < -40 || r.top > innerHeight + 40 || !r.width) return; }
+      if (!el.clientWidth) return;
+      try { this.drawModel(el, t); } catch (err) {}
+    });
+    (this._texs || []).forEach(el => { if (el.isConnected) this.drawTexture(el); });
+    if (this._bodyCv && this._bodyCv.isConnected && this._bodyCv.clientWidth) this.drawBody(this._bodyCv, t);
+  }
+  c(k) { return this.state.ctrls[k]; }
+  drawModel(el, t) {
+    const ctx = el.__x || (el.__x = el.getContext('2d'));
+    const d = Math.min(1.5, devicePixelRatio || 1), cw = el.clientWidth, ch = el.clientHeight;
+    if (!cw || !ch) return;
+    if (el.width !== Math.round(cw*d) || el.height !== Math.round(ch*d)) { el.width = Math.round(cw*d); el.height = Math.round(ch*d); }
+    const W = el.width, H = el.height, dark = this.state.dark, hero = el.dataset.hero === '1';
+    const model = el.dataset.model;
+    ctx.clearRect(0, 0, W, H);
+    if (model === 'body') { this.drawBody(el, t, 1); return; }
+    if (window.AtlasModels) {
+      const mat = this.MATERIALS.find(m => m[0] === this.state.material) || this.MATERIALS[0];
+      const DEFV = { pendant:40, floorlamp:62, bulb:60, strip:74, speaker:28, tv:0, thermostat:21.5, valve:19, purifier:1, camera:1,
+        doorbell:1, lock:1, garage:1, blind:55, curtain:0, vacuum:1, washer:52, fridge:3.4, heater:52, kettle:0, plug:1, router:1,
+        sensor:1, smoke:1, ev:64, solar:1, sprinkler:0 };
+      const dv = this.state.stateVal == null ? (DEFV[model] == null ? 60 : DEFV[model]) : this.state.stateVal;
+      window.AtlasModels.draw(ctx, W, H, { model: model, value: hero ? dv : (DEFV[model] == null ? 60 : DEFV[model]), dark: dark, col: mat[2], base: hero ? mat[2] : null, tex: hero ? this.state.material : 'matte', t: t,
+        q: hero ? { polys: this.c('polys'), seams: this.c('seams'), bevel: this.c('bevel'), rough: this.c('rough'), metal: this.c('metal'), detail: this.c('detail'), ao: this.c('ao'), grain: this.c('grain') } : { detail: 46, grain: 30 } });
+      if (hero && this.state.angle) {
+        ctx.save(); ctx.globalCompositeOperation = 'source-atop';
+        ctx.fillStyle = 'rgba(255,255,255,' + (this.c('clear')/100*0.12) + ')'; ctx.fillRect(0, 0, W, H); ctx.restore();
+      }
+      return;
+    }
+    const s = Math.min(W/(hero ? 2.6 : 1.7), H/(hero ? 2.2 : 1.5));
+    const spin = hero ? (this.state.angle*Math.PI/180) : 0;
+    const ox = W*0.5, oy = H*0.68;
+    const P = (x, y, z) => { const xr = x*Math.cos(spin) - z*Math.sin(spin), zr = x*Math.sin(spin) + z*Math.cos(spin); return [ox + (xr - zr)*0.87*s, oy + (xr + zr)*0.48*s - y*s]; };
+    const detail = this.c('detail')/100, bevel = this.c('bevel')/100, rough = this.c('rough')/100, metal = this.c('metal')/100, ao = this.c('ao')/100, clear = this.c('clear')/100;
+    const mat = this.MATERIALS.find(m => m[0] === this.state.material) || this.MATERIALS[0];
+    const base = mat[2];
+    const hex = (h) => {
+      if (typeof h !== 'string') return [200, 200, 200];
+      if (h.indexOf('rgb') === 0) { const m = h.match(/[\d.]+/g) || []; return [+m[0] || 0, +m[1] || 0, +m[2] || 0]; }
+      const q = h.replace('#','');
+      const r = parseInt(q.slice(0,2),16), g = parseInt(q.slice(2,4),16), b = parseInt(q.slice(4,6),16);
+      return [isNaN(r) ? 200 : r, isNaN(g) ? 200 : g, isNaN(b) ? 200 : b];
+    };
+    const sh = (h, f) => { const c = hex(h).map(v => Math.max(0, Math.min(255, Math.round(f > 1 ? v + (255 - v)*(f - 1) : v*f)))); return 'rgb(' + c.join(',') + ')'; };
+    const shadow = (r) => { const c = P(0, 0, 0); const g = ctx.createRadialGradient(c[0], c[1], 0, c[0], c[1], r*s); g.addColorStop(0, dark ? 'rgba(0,0,0,' + (0.3 + ao*0.4) + ')' : 'rgba(120,112,100,' + (0.12 + ao*0.26) + ')'); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(c[0], c[1], r*s, r*s*0.38, 0, 0, 6.2832); ctx.fill(); };
+    const poly = (pts, col, lit) => {
+      ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath();
+      let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+      pts.forEach(p => { x0 = Math.min(x0, p[0]); y0 = Math.min(y0, p[1]); x1 = Math.max(x1, p[0]); y1 = Math.max(y1, p[1]); });
+      const g = ctx.createLinearGradient(x0, y0, x1, y1);
+      const spread = 0.1 + (1 - rough)*0.22 + metal*0.2;
+      g.addColorStop(0, sh(col, 1 + spread*(lit ? 1.2 : 0.7)));
+      g.addColorStop(0.5, col);
+      g.addColorStop(1, sh(col, 1 - spread*(lit ? 0.5 : 0.9)));
+      ctx.fillStyle = g; ctx.fill();
+      if (bevel > 0.05) { ctx.strokeStyle = 'rgba(255,255,255,' + (0.1 + bevel*0.35 + metal*0.2) + ')'; ctx.lineWidth = Math.max(0.6, s*0.012*bevel); ctx.stroke(); }
+    };
+    const box = (x, y, z, w, h, dp, col) => {
+      const a = P(x, y + h, z), b = P(x + w, y + h, z), c = P(x + w, y + h, z + dp), e = P(x, y + h, z + dp);
+      const a2 = P(x, y, z), b2 = P(x + w, y, z), c2 = P(x + w, y, z + dp);
+      poly([a, b, c, e], sh(col, 1.06), true); poly([b, c, c2, b2], sh(col, 0.82)); poly([a, b, b2, a2], sh(col, 0.94));
+    };
+    const cyl = (x, y, z, r, h, col) => {
+      const c0 = P(x, y, z), c1 = P(x, y + h, z), rx = r*0.87*s, ry = r*0.48*s;
+      const g = ctx.createLinearGradient(c0[0] - rx, 0, c0[0] + rx, 0);
+      g.addColorStop(0, sh(col, 0.72 - metal*0.15)); g.addColorStop(0.3, sh(col, 1.1 + metal*0.25)); g.addColorStop(0.62, col); g.addColorStop(1, sh(col, 0.7));
+      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(c0[0] - rx, c0[1]); ctx.lineTo(c1[0] - rx, c1[1]);
+      ctx.ellipse(c1[0], c1[1], rx, ry, 0, Math.PI, 0, true); ctx.lineTo(c0[0] + rx, c0[1]);
+      ctx.ellipse(c0[0], c0[1], rx, ry, 0, 0, Math.PI, false); ctx.closePath(); ctx.fill();
+      const tg = ctx.createRadialGradient(c1[0] - rx*0.34, c1[1] - ry*0.4, 0, c1[0], c1[1], rx*1.2);
+      tg.addColorStop(0, sh(col, 1.14)); tg.addColorStop(1, sh(col, 0.9));
+      ctx.fillStyle = tg; ctx.beginPath(); ctx.ellipse(c1[0], c1[1], rx, ry, 0, 0, 6.2832); ctx.fill();
+      if (clear > 0.05) { ctx.strokeStyle = 'rgba(255,255,255,' + (clear*0.5) + ')'; ctx.lineWidth = Math.max(1, s*0.014); ctx.beginPath(); ctx.moveTo(c0[0] - rx*0.6, c0[1] - ry*0.3); ctx.lineTo(c1[0] - rx*0.6, c1[1] + ry*0.3); ctx.stroke(); }
+      const rings = Math.round(2 + detail*7);
+      if (detail > 0.2) { ctx.strokeStyle = 'rgba(30,30,36,' + (0.03 + detail*0.05) + ')'; ctx.lineWidth = 1; for (let i = 1; i < rings; i++) { const yy = y + h*i/rings; const cc = P(x, yy, z); ctx.beginPath(); ctx.ellipse(cc[0], cc[1], rx, ry, 0, 0.1, Math.PI - 0.1); ctx.stroke(); } }
+    };
+    shadow(1.15);
+    if (model === 'pendant' || model === 'floorlamp' || model === 'bulb') {
+      if (model === 'floorlamp') { cyl(0, 0, 0, 0.34, 0.06, base); ctx.strokeStyle = sh(base, 0.6); ctx.lineWidth = Math.max(1.5, s*0.035); const a = P(0, 0.06, 0), b = P(0.55, 1.24, 0); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.quadraticCurveTo(a[0], b[1] - s*0.25, b[0], b[1]); ctx.stroke(); }
+      const hx = model === 'floorlamp' ? 0.55 : 0, hy = model === 'bulb' ? 0.62 : (model === 'floorlamp' ? 1.2 : 0.78);
+      if (model !== 'bulb') { const c = P(hx, hy, 0), rx = 0.4*0.87*s, ry = 0.28*s; const g = ctx.createLinearGradient(c[0] - rx, c[1] - ry, c[0] + rx, c[1] + ry); g.addColorStop(0, sh(base, 1.12)); g.addColorStop(1, sh(base, 0.78)); ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(c[0], c[1], rx, ry, 0, Math.PI, 0); ctx.closePath(); ctx.fill(); }
+      const gc = P(hx, hy - (model === 'bulb' ? 0 : 0.2), 0);
+      const gg = ctx.createRadialGradient(gc[0], gc[1], 0, gc[0], gc[1], s*0.8);
+      gg.addColorStop(0, 'rgba(255,232,186,.85)'); gg.addColorStop(1, 'rgba(255,206,120,0)');
+      ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(gc[0], gc[1], s*0.8, 0, 6.2832); ctx.fill();
+    } else if (model === 'speaker' || model === 'purifier' || model === 'vacuum' || model === 'sensor' || model === 'thermostat' || model === 'valve' || model === 'kettle' || model === 'smoke') {
+      const dims = { speaker:[0.5, 0.95], purifier:[0.46, 1.1], vacuum:[0.62, 0.22], sensor:[0.34, 0.34], thermostat:[0.52, 0.3], valve:[0.34, 0.5], kettle:[0.44, 0.8], smoke:[0.5, 0.16] }[model];
+      cyl(0, 0, 0, dims[0], dims[1], base);
+      if (model === 'speaker' && detail > 0.3) { const c = P(0, dims[1]*0.5, -dims[0]); ctx.fillStyle = 'rgba(30,30,36,' + (0.05 + detail*0.08) + ')'; for (let i = 0; i < Math.round(4 + detail*8); i++) { ctx.beginPath(); ctx.ellipse(c[0], c[1] + i*s*0.06 - s*0.18, s*0.3, s*0.05, 0, 0, 6.2832); ctx.fill(); } }
+    } else if (model === 'strip' || model === 'blind' || model === 'curtain' || model === 'solar') {
+      box(-1.0, 0.2, -0.1, 2.0, 0.12, 0.2, base);
+      if (model === 'solar') { poly([P(-1.0, 0.32, -0.5), P(1.0, 0.32, -0.5), P(0.8, 0.64, 0.5), P(-1.2, 0.64, 0.5)], '#3f5a8f', true); }
+    } else {
+      const dims = { tv:[1.1, 1.3, 0.12], camera:[0.4, 0.6, 0.4], doorbell:[0.44, 0.9, 0.24], lock:[0.68, 1.0, 0.32], garage:[2.0, 1.3, 0.2], washer:[1.24, 1.15, 0.72], fridge:[1.24, 1.5, 0.72], heater:[1.24, 1.15, 0.72], plug:[0.6, 0.66, 0.36], router:[1.2, 0.2, 0.68], ev:[0.68, 1.3, 0.36], sprinkler:[0.3, 0.6, 0.3] }[model] || [0.8, 0.9, 0.5];
+      box(-dims[0]/2, 0, -dims[2]/2, dims[0], dims[1], dims[2], base);
+      if (model === 'tv') poly([P(-dims[0]/2 + 0.05, 0.1, -dims[2]/2 - 0.01), P(dims[0]/2 - 0.05, 0.1, -dims[2]/2 - 0.01), P(dims[0]/2 - 0.05, dims[1] - 0.06, -dims[2]/2 - 0.01), P(-dims[0]/2 + 0.05, dims[1] - 0.06, -dims[2]/2 - 0.01)], '#2b3a55', true);
+    }
+  }
+  texRef(el) { if (!el) return; this._texs = this._texs || []; if (!el.__reg) { el.__reg = 1; this._texs.push(el); } }
+  drawTexture(el) {
+    const ctx = el.__x || (el.__x = el.getContext('2d'));
+    const d = Math.min(1.5, devicePixelRatio || 1), cw = el.clientWidth, ch = el.clientHeight;
+    if (!cw || !ch) return;
+    if (el.width !== Math.round(cw*d)) { el.width = Math.round(cw*d); el.height = Math.round(ch*d); }
+    const W = el.width, H = el.height, map = el.dataset.map;
+    const mat = this.MATERIALS.find(m => m[0] === this.state.material) || this.MATERIALS[0];
+    const tile = 4 + Math.round(this.c('tile')/100*22), grain = this.c('grain')/100, wear = this.c('wear')/100, weave = this.c('weave')/100, rough = this.c('rough')/100, metal = this.c('metal')/100;
+    ctx.clearRect(0, 0, W, H);
+    const hex = (h) => { const q = h.replace('#',''); return [parseInt(q.slice(0,2),16), parseInt(q.slice(2,4),16), parseInt(q.slice(4,6),16)]; };
+    const c0 = hex(mat[2]);
+    const base = map === 'rough' ? [Math.round(255*rough), Math.round(255*rough), Math.round(255*rough)]
+      : map === 'normal' ? [128, 128, 245]
+      : map === 'metal' ? [Math.round(255*metal), Math.round(255*metal), Math.round(255*metal)] : c0;
+    ctx.fillStyle = 'rgb(' + base.join(',') + ')'; ctx.fillRect(0, 0, W, H);
+    const px = Math.max(2, Math.round(W/tile));
+    for (let y = 0; y < H; y += px) {
+      for (let x = 0; x < W; x += px) {
+        const n = (Math.sin(x*12.9898 + y*78.233) * 43758.5453) % 1;
+        let a = Math.abs(n)*grain*0.5;
+        if (mat[0] === 'brushed' || mat[0] === 'alu') a *= 0.4 + 0.6*Math.abs(Math.sin(y*0.6));
+        if (mat[0] === 'fabric') a = (0.35 + 0.65*Math.abs(Math.sin(x/px*1.6) * Math.cos(y/px*1.6)))*weave*0.6;
+        if (map === 'normal') { ctx.fillStyle = 'rgba(' + Math.round(128 + n*60*grain) + ',' + Math.round(128 + n*40*grain) + ',245,.85)'; }
+        else ctx.fillStyle = (n > 0 ? 'rgba(255,255,255,' : 'rgba(0,0,0,') + a.toFixed(3) + ')';
+        ctx.fillRect(x, y, px, px);
+      }
+    }
+    if (wear > 0.02 && map === 'albedo') {
+      for (let i = 0; i < Math.round(wear*40); i++) {
+        const x = (Math.sin(i*91.7)*0.5 + 0.5)*W, y = (Math.cos(i*53.3)*0.5 + 0.5)*H, r = (2 + (i % 5))*wear*3;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, 'rgba(255,255,255,.14)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill();
+      }
+    }
+  }
+  bodyRef(el) { if (el) { this._bodyCv = el; this.startLoop(); } }
+  drawBody(el, t, k) {
+    const ctx = el.__x || (el.__x = el.getContext('2d'));
+    const d = Math.min(1.5, devicePixelRatio || 1), cw = el.clientWidth, ch = el.clientHeight;
+    if (!cw || !ch) return;
+    if (el.width !== Math.round(cw*d) || el.height !== Math.round(ch*d)) { el.width = Math.round(cw*d); el.height = Math.round(ch*d); }
+    const W = el.width, H = el.height, dark = this.state.dark, T = t*0.001;
+    const mass = this.c('mass')/100, tone = this.c('tone')/100, relief = this.c('relief')/100, soften = this.c('soften')/100, light = this.c('light')/100, rim = this.c('rim')/100, tint = this.c('tint')/100, pose = this.c('pose')/100;
+    ctx.clearRect(0, 0, W, H);
+    const u = Math.min(W*0.255, H*0.094)*(k || 1), top = H*0.5 - u*4.6, cx = W*0.5;
+    const sway = Math.sin(T*0.45)*0.03*(0.4 + pose);
+    const P = (x, y) => [cx + x*u*(0.85 + mass*0.3) + sway*u*(y < 4 ? (4 - y)*0.06 : 0), top + y*u];
+    const TONE = { base: dark ? [168, 166, 174] : [240, 238, 236], hi: dark ? [232, 230, 238] : [255, 255, 255], lo: dark ? [104, 102, 112] : [192, 189, 186] };
+    const ZONE = { recovery:[52, 175, 124], strain:[214, 96, 72], sleep:[110, 90, 220], composition:[60, 140, 110] }[this.state.bodyMode] || [52, 175, 124];
+    const mix = (a, b, f) => [a[0] + (b[0] - a[0])*f, a[1] + (b[1] - a[1])*f, a[2] + (b[2] - a[2])*f];
+    const rgb = (c, a) => 'rgba(' + (c[0]|0) + ',' + (c[1]|0) + ',' + (c[2]|0) + ',' + a + ')';
+    const bodyBase = mix(TONE.base, ZONE, tint*0.4);
+    const gy = top + u*8.62;
+    const sg = ctx.createRadialGradient(cx, gy, 0, cx, gy, u*2.4);
+    sg.addColorStop(0, dark ? 'rgba(0,0,0,.5)' : 'rgba(120,96,74,.26)'); sg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = sg; ctx.beginPath(); ctx.ellipse(cx, gy, u*2.2, u*0.36, 0, 0, 6.2832); ctx.fill();
+    const limb = (joints, widths) => {
+      const pts = joints.map(j => P(j[0], j[1]));
+      const xs = pts.map(q => q[0]), ys = pts.map(q => q[1]);
+      const bx = (Math.min.apply(null, xs) + Math.max.apply(null, xs))/2, by = (Math.min.apply(null, ys) + Math.max.apply(null, ys))/2;
+      const g = ctx.createLinearGradient(bx - u, by - u, bx + u, by + u);
+      g.addColorStop(0, rgb(mix(bodyBase, TONE.hi, 0.5 + light*0.45), 1));
+      g.addColorStop(0.55, rgb(bodyBase, 1));
+      g.addColorStop(1, rgb(mix(bodyBase, TONE.lo, 0.45 + (1 - soften)*0.35), 1));
+      ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = g;
+      for (let i = 0; i < pts.length - 1; i++) { ctx.beginPath(); ctx.moveTo(pts[i][0], pts[i][1]); ctx.lineTo(pts[i+1][0], pts[i+1][1]); ctx.lineWidth = (widths[i] + widths[i+1])*u*(0.8 + mass*0.45); ctx.stroke(); }
+      if (rim > 0.05) { ctx.strokeStyle = rgb(mix(TONE.hi, [255,255,255], 0.5), rim*0.5); for (let i = 0; i < pts.length - 1; i++) { ctx.beginPath(); ctx.moveTo(pts[i][0] - u*0.06, pts[i][1]); ctx.lineTo(pts[i+1][0] - u*0.06, pts[i+1][1]); ctx.lineWidth = (widths[i] + widths[i+1])*u*0.3; ctx.stroke(); } }
+      ctx.restore();
+    };
+    limb([[-0.44, 4.62], [-0.52, 5.7], [-0.5, 6.45], [-0.44, 7.5], [-0.42, 8.15]], [0.44, 0.38, 0.28, 0.24, 0.16]);
+    limb([[0.44, 4.62], [0.52, 5.7], [0.5, 6.45], [0.44, 7.5], [0.42, 8.15]], [0.44, 0.38, 0.28, 0.24, 0.16]);
+    const torso = new Path2D();
+    const pts = [[0, 1.42], [-1.06, 2.16], [-0.94, 2.72], [-0.66, 3.72], [-0.92, 4.42], [-0.44, 4.86], [0.44, 4.86], [0.92, 4.42], [0.66, 3.72], [0.94, 2.72], [1.06, 2.16]].map(p => P(p[0], p[1]));
+    torso.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) { const prev = pts[i - 1], cur = pts[i]; torso.quadraticCurveTo(prev[0], prev[1], (prev[0] + cur[0])/2, (prev[1] + cur[1])/2); torso.lineTo(cur[0], cur[1]); }
+    torso.closePath();
+    const tg = ctx.createLinearGradient(cx - u*1.3, top + u*1.6, cx + u*1.4, top + u*5);
+    tg.addColorStop(0, rgb(mix(bodyBase, TONE.hi, 0.55 + light*0.4), 1));
+    tg.addColorStop(0.55, rgb(bodyBase, 1));
+    tg.addColorStop(1, rgb(mix(bodyBase, TONE.lo, 0.4 + (1 - soften)*0.4), 1));
+    ctx.fillStyle = tg; ctx.fill(torso);
+    ctx.save(); ctx.clip(torso);
+    const soft = (x, y, rx, ry, col, a) => { const p = P(x, y); const g = ctx.createRadialGradient(p[0], p[1], 0, p[0], p[1], Math.max(rx, ry)*u); g.addColorStop(0, rgb(col, a)); g.addColorStop(1, rgb(col, 0)); ctx.save(); ctx.translate(p[0], p[1]); ctx.scale(1, ry/rx); ctx.translate(-p[0], -p[1]); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p[0], p[1], rx*u, 0, 6.2832); ctx.fill(); ctx.restore(); };
+    const LIT = mix(TONE.hi, [255, 255, 255], 0.5), SHA = mix(TONE.lo, [90, 86, 82], 0.35);
+    const R = relief*(0.5 + tone*0.9);
+    soft(-0.44, 2.52, 0.42, 0.3, LIT, 0.5*R); soft(0.44, 2.52, 0.42, 0.3, LIT, 0.42*R);
+    soft(0, 2.86, 0.5, 0.1, SHA, 0.24*R);
+    [3.12, 3.44, 3.76].forEach((ay, i) => { const k = 1 - i*0.12; soft(-0.24*k, ay, 0.2*k, 0.13*k, LIT, 0.34*R); soft(0.24*k, ay, 0.2*k, 0.13*k, LIT, 0.28*R); soft(0, ay + 0.16, 0.42*k, 0.045, SHA, 0.18*R); });
+    soft(0, 3.4, 0.045, 0.75, SHA, 0.2*R);
+    soft(-0.98, 2.62, 0.26, 0.46, SHA, 0.28*R); soft(0.98, 2.62, 0.26, 0.46, SHA, 0.3*R);
+    ctx.restore();
+    limb([[-0.92, 2.26], [-1.16, 3.1], [-1.3, 4.05], [-1.28, 4.66]], [0.3, 0.24, 0.19, 0.14]);
+    limb([[0.92, 2.26], [1.16, 3.1], [1.3, 4.05], [1.28, 4.66]], [0.3, 0.24, 0.19, 0.14]);
+    limb([[0, 1.34], [0, 1.78]], [0.24, 0.28]);
+    const hc = P(0, 0.86);
+    const hg = ctx.createRadialGradient(hc[0] - u*0.2, hc[1] - u*0.3, 0, hc[0], hc[1], u*0.9);
+    hg.addColorStop(0, rgb(mix(bodyBase, TONE.hi, 0.6 + light*0.35), 1));
+    hg.addColorStop(1, rgb(mix(bodyBase, TONE.lo, 0.3 + (1 - soften)*0.4), 1));
+    ctx.fillStyle = hg; ctx.beginPath(); ctx.ellipse(hc[0], hc[1], u*0.5*(0.9 + mass*0.2), u*0.68, 0, 0, 6.2832); ctx.fill();
+  }
+  chip(on, dark) { return { bg: on ? (dark ? '#f4f2ef' : '#1e1e24') : (dark ? 'rgba(244,242,239,.06)' : 'rgba(249,247,244,.85)'), fg: on ? (dark ? '#1e1e24' : '#f9f7f4') : (dark ? '#f4f2ef' : '#1e1e24'), bd: on ? (dark ? '#f4f2ef' : '#1e1e24') : (dark ? 'rgba(244,242,239,.16)' : '#e6e2db') }; }
+  slider(k, label, min, max, step, unit, fill) {
+    const v = this.c(k), pv = (v - min)/(max - min)*100;
+    return { k, label, min, max, step, value: v, pct: pv.toFixed(1) + '%', thumb: 'calc(' + pv.toFixed(1) + '% - ' + (pv*0.18).toFixed(1) + 'px)', read: unit === '%' ? Math.round(v) + '%' : (unit === 'k' ? (v/10).toFixed(1) + 'k' : Math.round(v) + unit), fill: fill || '#3461f2' };
+  }
+  renderVals() {
+    const S = this.state, dark = S.dark;
+    const dev = this.DEVICES.find(d => d[0] === S.edit);
+    return {
+      rootRef: (el) => { this.root = el; },
+      orbRef: (el) => { if (el) { this._orbEl = el; this.drawOrb(); } },
+      modelRef: (el) => this.modelRef(el),
+      texRef: (el) => this.texRef(el),
+      bodyRef: (el) => this.bodyRef(el),
+      pageBg: dark ? '#15151a' : '#f9f7f4', pageFg: dark ? '#f4f2ef' : '#1e1e24',
+      mutFg: dark ? 'rgba(244,242,239,.55)' : '#8b8681', labelFg: dark ? 'rgba(244,242,239,.72)' : '#55524f',
+      washA: dark ? 'linear-gradient(180deg,rgba(52,97,242,.14),rgba(21,21,26,0) 46%)' : 'linear-gradient(180deg,rgba(226,222,215,.7),rgba(249,247,244,0) 44%)',
+      cardBg: dark ? '#1e1e24' : 'rgba(255,253,250,.72)',
+      cardRing: dark ? 'inset 0 0 0 1px rgba(247,245,242,.1)' : 'inset 0 0 0 1px #e8e4dd,0 18px 40px -40px rgba(30,30,36,.5)',
+      stageBg: dark ? 'radial-gradient(120% 90% at 50% 12%,#26262f,#141419 70%)' : 'radial-gradient(120% 90% at 50% 10%,#ffffff,#e4e0d8 78%)',
+      hair: dark ? 'rgba(247,245,242,.12)' : '#eae6df',
+      trackBg: dark ? 'rgba(247,245,242,.14)' : '#eae6df',
+      knobBg: dark ? '#22222b' : '#fffdfa',
+      dashed: dark ? 'rgba(247,245,242,.2)' : '#ddd8d0',
+      darkBg: dark ? '#f4f2ef' : '#1e1e24', darkFg: dark ? '#1e1e24' : '#f9f7f4', darkLabel: dark ? 'Light' : 'Dark',
+      title: S.tab === 'grid' ? 'Every model, one wall' : (S.tab === 'body' ? 'Body model editor' : (dev ? dev[1] + ' editor' : 'Device editor')),
+      tabs: [{ id:'grid', label:'Overview' }, { id:'device', label:'Device editor' }, { id:'body', label:'Body editor' }].map(t => Object.assign(t, this.chip(t.id === S.tab, dark))),
+      isGrid: S.tab === 'grid', isDevice: S.tab === 'device', isBody: S.tab === 'body',
+      allModels: [{ id:'body', model:'body', key:'body', name:'Clay body model', meta:'14 signals · 4 modes', kind:'Body' }].concat(this.DEVICES.map(d => ({ id:d[0], model:d[0], key:d[0], name:d[1], meta:d[2], kind:'Device' }))),
+      editModelId: S.edit || 'speaker', editName: dev ? dev[1] : 'Smart speaker', editMeta: dev ? dev[2] : 'Living room · media',
+      statPolys: Math.round(4200 + this.c('polys')*380) + ' tris',
+      statTex: (S.res || '4k').toUpperCase() + ' maps',
+      statShader: (this.MATERIALS.find(m => m[0] === S.material) || this.MATERIALS[0])[1],
+      statMs: (3.2 + this.c('polys')/100*4.6).toFixed(1) + ' ms',
+      shotAngles: [{ label:'Front', v:0 }, { label:'3/4', v:35 }, { label:'Side', v:70 }, { label:'Rear', v:145 }].map(a => Object.assign(a, this.chip(S.angle === a.v, dark))),
+      materials: this.MATERIALS.map(m => Object.assign({ id:m[0], label:m[1], swatch:m[2] }, this.chip(S.material === m[0], dark))),
+      texRes: [{ label:'1K', v:'1k' }, { label:'2K', v:'2k' }, { label:'4K', v:'4k' }, { label:'8K', v:'8k' }].map(t => Object.assign(t, this.chip(S.res === t.v, dark))),
+      texMaps: [{ id:'albedo', label:'Albedo', meta:'base colour · sRGB' }, { id:'rough', label:'Roughness', meta:'linear · grey' }, { id:'normal', label:'Normal', meta:'tangent space' }, { id:'metal', label:'Metalness', meta:'linear · grey' }],
+      stateSlider: (() => { const v = this.state.stateVal == null ? 60 : this.state.stateVal, pv = v; return { value: v, pct: pv + '%', thumb: 'calc(' + pv + '% - ' + (pv*0.18).toFixed(1) + 'px)', read: Math.round(v) + '' }; })(),
+      onStateVal: (e) => { const v = +e.target.value; this.setState({ stateVal: v }); this.paintAll(); },
+      geoCtrls: [this.slider('polys', 'Mesh density', 10, 100, 1, ' tris'), this.slider('bevel', 'Edge bevel', 0, 100, 1, '%'), this.slider('seams', 'Panel seams', 0, 100, 1, '%'), this.slider('detail', 'Surface detail', 0, 100, 1, '%'), this.slider('ao', 'Ambient occlusion', 0, 100, 1, '%')],
+      matCtrls: [this.slider('rough', 'Roughness', 0, 100, 1, '%'), this.slider('metal', 'Metalness', 0, 100, 1, '%'), this.slider('clear', 'Clearcoat', 0, 100, 1, '%'), this.slider('aniso', 'Anisotropy', 0, 100, 1, '%', '#8b6f3f')],
+      texCtrls: [this.slider('tile', 'Tiling', 0, 100, 1, '%'), this.slider('grain', 'Micro grain', 0, 100, 1, '%'), this.slider('weave', 'Weave depth', 0, 100, 1, '%'), this.slider('wear', 'Wear & smudge', 0, 100, 1, '%')],
+      texNote: 'Maps are synthesised per material at ' + (S.res || '4k').toUpperCase() + ' and previewed above — albedo, roughness, tangent-space normal and metalness.',
+      refSlots: [{ label:'Front product shot' }, { label:'Detail / material shot' }],
+      bodyMeta: '4 modes · ' + Math.round(2400 + this.c('mass')*22) + ' surface samples',
+      bodyModes: [{ label:'Recovery', v:'recovery' }, { label:'Strain', v:'strain' }, { label:'Sleep', v:'sleep' }, { label:'Body', v:'composition' }].map(b => Object.assign(b, this.chip(S.bodyMode === b.v, dark))),
+      bodyGroups: [
+        { title:'Proportion', ctrls:[this.slider('mass', 'Body mass', 0, 100, 1, '%'), this.slider('pose', 'Pose sway', 0, 100, 1, '%')] },
+        { title:'Anatomy', ctrls:[this.slider('relief', 'Muscle relief', 0, 100, 1, '%', '#c2483d'), this.slider('tone', 'Definition', 0, 100, 1, '%', '#c2483d'), this.slider('soften', 'Surface softness', 0, 100, 1, '%', '#c2483d')] },
+        { title:'Render', ctrls:[this.slider('light', 'Key light', 0, 100, 1, '%'), this.slider('rim', 'Rim light', 0, 100, 1, '%'), this.slider('tint', 'Data tint', 0, 100, 1, '%', '#0fae76')] }
+      ],
+      navRing: [{ id:'grid', label:'Overview' }, { id:'device', label:'Devices' }, { id:'body', label:'Body' }, { href:'Atlas Smart Home.dc.html', label:'Home', dot:'#c98a2b' }, { href:'Atlas Health.dc.html', label:'Health', dot:'#c2483d' }].map((n, i, arr) => {
+        const a = (4 + i*(104/Math.max(1, arr.length - 1)))*Math.PI/180;
+        const on = n.id && n.id === S.tab;
+        return Object.assign({}, n, { href: n.href || '#',
+          lx: (S.navOpen ? 76 : 0) + 'px',
+          ly: (S.navOpen ? (48 + i*38) : 0) + 'px',
+          scale: S.navOpen ? '1' : '.7', op: S.navOpen ? '1' : '0', pe: S.navOpen ? 'auto' : 'none', delay: (i*26) + 'ms',
+          bg: on ? (dark ? '#f4f2ef' : '#1e1e24') : (dark ? 'rgba(34,34,43,.95)' : 'rgba(255,253,250,.96)'),
+          fg: on ? (dark ? '#1e1e24' : '#f9f7f4') : (dark ? '#f4f2ef' : '#1e1e24'),
+          ring: dark ? 'inset 0 0 0 1px rgba(247,245,242,.16),0 18px 34px -20px rgba(0,0,0,.7)' : 'inset 0 0 0 1px #e8e4dd,0 18px 34px -22px rgba(30,30,36,.45)',
+          dot: n.dot || (on ? '#3461f2' : (dark ? 'rgba(247,245,242,.35)' : '#c9c3ba')) });
+      }),
+      openNav: () => this.setState({ navOpen: true }),
+      closeNav: () => this.setState({ navOpen: false }),
+      navGo: (e) => { const id = e.currentTarget.dataset.id; if (id) { e.preventDefault(); this.setState({ tab: id, navOpen: false }); this.toTop(); } },
+      pickTab: (e) => { this.setState({ tab: e.currentTarget.dataset.id }); this.toTop(); },
+      toggleDark: () => this.setState({ dark: !S.dark }),
+      editModel: (e) => { const id = e.currentTarget.dataset.id; this.setState(id === 'body' ? { tab:'body' } : { tab:'device', edit:id }); this.toTop(); },
+      setAngle: (e) => this.setState({ angle: +e.currentTarget.dataset.v }),
+      setMaterial: (e) => this.setState({ material: e.currentTarget.dataset.v }),
+      setRes: (e) => this.setState({ res: e.currentTarget.dataset.v }),
+      setBodyMode: (e) => this.setState({ bodyMode: e.currentTarget.dataset.v }),
+      slRef: (el) => { if (el && !el.__init) { el.__init = 1; el.value = el.dataset.init; } },
+      onCtrl: (e) => { const k = e.target.dataset.k, v = +e.target.value; this.setState(s => ({ ctrls: Object.assign({}, s.ctrls, { [k]: v }) })); this.paintAll(); },
+      resetCtrls: () => this.setState({ ctrls: Object.assign({}, this.DEF) })
+    };
+  }
+}
+</script>
+</body>
+</html>

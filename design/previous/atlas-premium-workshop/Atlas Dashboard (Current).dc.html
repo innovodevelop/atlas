@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/lucide@0.462.0/dist/umd/lucide.min.js"></script>
 <style>
-:root{--pg:#f9f7f4;--rz:#f1eeea;--sk:#edebe7;--wt:#ffffff;--ink:#1e1e24;--ink2:#6d6a67;--ink3:#b6b1aa;--bd:#e2ded7;--acc:#ff6a00;--acch:#ff773c;--alt:#3950e6;--dkf:#f9f7f4;--rsm:10px;--rmd:20px;--rlg:28px;--grn:#2f7d4f;--red:#c14a35}
+:root{--pg:#f9f7f4;--rz:#f1eeea;--sk:#edebe7;--wt:#ffffff;--ink:#1e1e24;--ink2:#6d6a67;--ink3:#b6b1aa;--bd:#e2ded7;--acc:#3461f2;--acch:#5b7cff;--alt:#3950e6;--dkf:#f9f7f4;--rsm:10px;--rmd:20px;--rlg:28px;--grn:#2f7d4f;--red:#c14a35}
 body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
 .disp{font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.03em}
 .tnum{font-variant-numeric:tabular-nums}
@@ -34,8 +34,8 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 .cta:hover{background:var(--acch);transform:scale(1.02)}
 .av{width:38px;height:38px;border-radius:50%;background:var(--ink);color:var(--dkf);font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .band{position:relative;z-index:10;display:flex;align-items:center;gap:30px;max-width:1680px;margin:0 auto;padding:44px 28px 14px;animation:rise .8s cubic-bezier(.22,1,.36,1) both}
-.orbwrap{width:150px;height:150px;flex-shrink:0;cursor:pointer}
-.orbcv{width:150px;height:150px;display:block}
+.orbwrap{width:224px;height:224px;flex-shrink:0;cursor:pointer}
+.orbcv{width:224px;height:224px;display:block}
 .greet{font-size:clamp(32px,4.2vw,58px);font-weight:500;line-height:1.0;margin:0;color:var(--ink)}
 .accw{color:var(--acc)}
 .gsub{font-size:16px;color:var(--ink2);margin:14px 0 0;max-width:540px;line-height:1.5}
@@ -45,8 +45,8 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 .grid{position:relative;z-index:10;display:grid;gap:16px;max-width:1680px;margin:0 auto;padding:20px 28px 128px;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));grid-auto-rows:minmax(118px,auto);grid-auto-flow:dense}
 .sp2{grid-column:span 2}.rs2{grid-row:span 2}
 @media (max-width:840px){.sp2{grid-column:span 1}}
-.card{background:rgba(255,253,250,.72);backdrop-filter:blur(12px) saturate(1.06);-webkit-backdrop-filter:blur(12px) saturate(1.06);border:none;border-radius:var(--rlg);display:flex;flex-direction:column;overflow:hidden;cursor:pointer;box-shadow:0 1px 2px rgba(30,30,36,.05),0 12px 32px -20px rgba(30,30,36,.24);transition:box-shadow .28s,transform .28s;animation:rise .8s cubic-bezier(.22,1,.36,1) both}
-.card:hover{transform:translateY(-3px);box-shadow:0 4px 10px rgba(30,30,36,.06),0 22px 48px -22px rgba(30,30,36,.32)}
+.card{background:rgba(255,253,250,.72);backdrop-filter:blur(12px) saturate(1.06);-webkit-backdrop-filter:blur(12px) saturate(1.06);border:none;border-radius:var(--rlg);display:flex;flex-direction:column;overflow:hidden;cursor:pointer;box-shadow:0 8px 22px -18px rgba(30,30,36,.2);transition:box-shadow .28s,transform .28s;animation:rise .8s cubic-bezier(.22,1,.36,1) both}
+.card:hover{transform:translateY(-3px);box-shadow:0 14px 32px -24px rgba(30,30,36,.24)}
 .d1{animation-delay:.08s}.d2{animation-delay:.15s}.d3{animation-delay:.22s}.d4{animation-delay:.29s}.d5{animation-delay:.36s}.d6{animation-delay:.43s}
 @keyframes rise{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 .ch{display:flex;align-items:center;justify-content:space-between;padding:20px 22px 0}
@@ -84,7 +84,7 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 .hdrviz{position:relative;flex:1;height:40px;margin:0 6px 0 18px;cursor:pointer}
 .hdrcv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .hz{position:relative;z-index:2}
-.dock{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:50;display:flex;align-items:center;gap:3px;padding:5px;border-radius:9999px;background:var(--ink);box-shadow:0 18px 44px -12px rgba(30,30,36,.5)}
+.dock{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:92;display:flex;align-items:center;gap:3px;padding:5px;border-radius:9999px;background:var(--ink);box-shadow:0 18px 44px -12px rgba(30,30,36,.5)}
 .dockb{display:flex;align-items:center;height:32px;padding:0 9px;border-radius:9999px;background:transparent;border:none;color:rgba(249,247,244,.8);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;transition:background .25s,color .25s}
 .dockb:hover{color:#fff;background:rgba(249,247,244,.12)}
 .dockl{max-width:0;opacity:0;overflow:hidden;white-space:nowrap;transition:max-width .3s ease,opacity .3s ease,margin .3s ease}
@@ -152,14 +152,53 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 .inp{flex:1;background:var(--wt);border:1px solid var(--bd);border-radius:9999px;padding:11px 16px;color:var(--ink);font-size:14px;font-family:inherit;outline:none}
 .inp:focus{border-color:var(--ink)}
 .sendBtn{width:44px;border-radius:9999px;background:var(--acc);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.exp{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;background:var(--pg);animation:fadeX .35s ease;overflow:hidden}
-.ehead{position:relative;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:20px 32px;border-bottom:1px solid var(--bd);background:var(--pg)}
+.exp{position:relative;z-index:20;display:flex;flex-direction:column;animation:expIn .5s cubic-bezier(.22,1,.36,1) both}
+@keyframes expIn{from{opacity:0;transform:translateY(30px) scale(.985)}to{opacity:1;transform:none}}
+.exp.expout{animation:expOut .3s cubic-bezier(.4,0,.2,1) both}
+@keyframes expOut{from{opacity:1;transform:none}to{opacity:0;transform:translateY(24px) scale(.99)}}
+.ehead{position:relative;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:6px 32px 16px;background:transparent}
+.ehead .ebrand,.ehead .ebsep{display:none}
 .accline{width:4px;height:26px;border-radius:9999px;background:var(--acc)}
 .etitle{font-family:'Hanken Grotesk',sans-serif;font-size:26px;font-weight:500;color:var(--ink);letter-spacing:-.02em;margin:0}
 .closeBtn{display:flex;align-items:center;gap:10px;padding:9px 16px;border-radius:9999px;background:var(--wt);border:1px solid var(--bd);color:var(--ink2);cursor:pointer;font-family:inherit;font-size:14px;font-weight:500}
 .closeBtn:hover{color:var(--ink);border-color:var(--ink3)}
 .kbd{padding:2px 8px;font-size:11px;background:var(--sk);border-radius:6px;border:1px solid var(--bd)}
-.ebody{position:relative;z-index:10;flex:1;overflow-y:auto;padding:24px 32px;display:flex;gap:20px;max-width:1600px;margin:0 auto;width:100%;box-sizing:border-box}
+.ebody{position:relative;z-index:10;padding:8px 32px 120px;display:flex;gap:22px;max-width:1600px;margin:0 auto;width:100%;box-sizing:border-box}
+.grid .card{transition:box-shadow .28s,transform .28s}
+/* fold-up-into-Atlas motion */
+@keyframes cardFoldIn{from{opacity:0;transform:translateY(40px) scale(.92);filter:blur(5px)}to{opacity:1;transform:none;filter:none}}
+@keyframes cardFoldOut{from{opacity:1;transform:none;filter:none}to{opacity:0;transform:translateY(-52px) scale(.86);filter:blur(7px)}}
+.grid.gridin .card{animation:cardFoldIn .52s cubic-bezier(.22,1,.36,1) both}
+.grid.gridout{pointer-events:none}
+.grid.gridhidden{display:none}
+.grid.gridout .card{animation:cardFoldOut .34s cubic-bezier(.4,0,.2,1) both}
+.grid .card:nth-child(1){animation-delay:0ms}.grid .card:nth-child(2){animation-delay:28ms}.grid .card:nth-child(3){animation-delay:56ms}.grid .card:nth-child(4){animation-delay:84ms}.grid .card:nth-child(5){animation-delay:112ms}.grid .card:nth-child(6){animation-delay:140ms}.grid .card:nth-child(7){animation-delay:80ms}.grid .card:nth-child(8){animation-delay:108ms}.grid .card:nth-child(9){animation-delay:136ms}.grid .card:nth-child(10){animation-delay:164ms}.grid .card:nth-child(11){animation-delay:120ms}.grid .card:nth-child(12){animation-delay:150ms}.grid .card:nth-child(13){animation-delay:180ms}
+.grid.gridout .card:nth-child(n){animation-delay:calc(var(--fo,0ms))}
+.ebrand{display:flex;align-items:center;gap:9px;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.025em;color:var(--ink)}
+.ebmk{width:27px;height:27px;border-radius:8px;background:var(--ink);color:var(--dkf);font-size:15px;display:flex;align-items:center;justify-content:center}
+.ebsep{width:1px;height:22px;background:var(--bd);margin:0 2px}
+.fctx{display:flex;align-items:center;gap:14px}
+.feyebrow{font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--acc);margin:0 0 3px}
+.fintro{font-size:14px;line-height:1.55;color:var(--ink2);max-width:640px;margin:2px 0 0}
+/* editorial focus header + de-boxed panels */
+.ehead{align-items:center;justify-content:flex-end;padding:14px 40px 4px}
+.ehead .ehl,.ehead .accline,.ehead .etitle,.ehead .ebrand,.ehead .ebsep{display:none}
+.ehl{display:flex;flex-direction:column;gap:5px}
+.ehead .accline{height:auto;align-self:stretch;width:4px;min-height:56px}
+.exp .etitle{font-size:36px;font-weight:500;letter-spacing:-.03em;line-height:.98}
+.ebody{gap:32px;padding:8px 40px 124px}
+.exp .panel{background:rgba(255,253,250,.6);border:none;border-radius:var(--rlg);padding:22px;box-shadow:0 6px 18px -16px rgba(30,30,36,.16)}
+.exp .panel2{background:rgba(255,253,250,.5);border:none;border-radius:var(--rmd);padding:20px;box-shadow:0 6px 18px -16px rgba(30,30,36,.14)}
+.greet,.gsub,.bandmeta{will-change:transform,opacity;transition:opacity .34s cubic-bezier(.22,1,.36,1),transform .34s cubic-bezier(.22,1,.36,1)}
+.greet.swapout,.bandmeta.swapout{opacity:0;transform:translateY(-18px)}
+.gsub.swapout{opacity:0;transform:translateY(16px)}
+.bandtext.bandback{cursor:pointer;transition:opacity .2s}
+.bandtext.bandback:hover{opacity:.72}
+.fback{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--ink3);font-weight:500}
+.exp .panelDk{padding:26px;border-radius:var(--rlg)}
+.exp .panel2 h3,.exp .panel h3{font-size:11px !important;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ink3);margin:0 0 16px !important}
+.exp .row0{padding-top:13px;padding-bottom:13px}
+.exp .feat{padding:2px 0}
 .panel{background:var(--rz);border:1px solid var(--bd);border-radius:var(--rlg);padding:24px}
 .panel2{background:var(--rz);border:1px solid var(--bd);border-radius:var(--rmd);padding:18px}
 .panelDk{background:var(--ink);color:var(--dkf);border-radius:var(--rlg);padding:24px;position:relative}
@@ -206,10 +245,10 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 .rangefill{height:100%;background:var(--acc);border-radius:9999px}
 .wkbar{width:58%;border-radius:6px;background:var(--ink3)}
 .wkbar.on{background:var(--acc)}
-.pillA{font-size:12px;font-weight:600;color:var(--acc);background:rgba(255,106,0,.1);border:1px solid rgba(255,106,0,.24);padding:4px 10px;border-radius:9999px;white-space:nowrap}
+.pillA{font-size:12px;font-weight:600;color:var(--acc);background:rgba(52,97,242,.1);border:1px solid rgba(52,97,242,.24);padding:4px 10px;border-radius:9999px;white-space:nowrap}
 .strokeAcc{stroke:var(--acc);fill:none}
 .tkpill{font-size:11px;font-weight:600;padding:3px 9px;border-radius:9999px;white-space:nowrap}
-.tkHigh{color:var(--acc);background:rgba(255,106,0,.1);border:1px solid rgba(255,106,0,.24)}
+.tkHigh{color:var(--acc);background:rgba(52,97,242,.1);border:1px solid rgba(52,97,242,.24)}
 .tkMed{color:var(--alt);background:rgba(57,80,230,.08);border:1px solid rgba(57,80,230,.2)}
 .tkLow{color:var(--ink2);background:var(--sk);border:1px solid var(--bd)}
 .mailrow{display:flex;align-items:flex-start;gap:14px;padding:14px 12px;border-radius:12px;border-bottom:1px solid var(--bd);cursor:pointer}
@@ -278,7 +317,7 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 .chips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:14px}
 .chip{padding:9px 15px;border-radius:9999px;background:var(--wt);border:1px solid var(--bd);color:var(--ink2);font-size:12px;font-weight:500;cursor:pointer;transition:color .2s,border-color .2s,background .2s}
 .chip:hover{color:var(--ink);border-color:var(--ink3)}
-.chip.demo{color:var(--acc);border-color:rgba(255,106,0,.3);background:rgba(255,106,0,.08)}
+.chip.demo{color:var(--acc);border-color:rgba(52,97,242,.3);background:rgba(52,97,242,.08)}
 .mcards{position:fixed;inset:0;z-index:6;pointer-events:none;overflow:hidden}
 .mcard{position:absolute;left:50%;top:calc(50% - 105px);width:232px;border-radius:14px;background:rgba(255,255,255,.42);border:1px solid rgba(255,255,255,.75);box-shadow:0 14px 36px -20px rgba(30,30,36,.3);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);opacity:0;transition:transform 1.7s cubic-bezier(.26,1.2,.32,1.02),opacity 1s ease,filter 1.2s ease,width .7s cubic-bezier(.22,1,.36,1)}
 .mcsm{width:196px}
@@ -294,7 +333,7 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 .msrc{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink2)}
 .mtitle{font-size:13px;font-weight:600;color:var(--ink);margin:7px 0 4px;letter-spacing:-.01em}
 .mtext{font-size:11.5px;line-height:1.5;color:var(--ink2);margin:0}
-.mhl{color:var(--ink);font-weight:600;background-image:linear-gradient(rgba(255,106,0,.3),rgba(255,106,0,.3));background-repeat:no-repeat;background-position:0 68%;background-size:0% 36%;animation:mhls .8s ease forwards .5s}
+.mhl{color:var(--ink);font-weight:600;background-image:linear-gradient(rgba(52,97,242,.3),rgba(52,97,242,.3));background-repeat:no-repeat;background-position:0 68%;background-size:0% 36%;animation:mhls .8s ease forwards .5s}
 @keyframes mhls{to{background-size:100% 36%}}
 .mtyped{margin-top:8px;padding-top:8px;border-top:1px solid var(--bd);color:var(--ink);min-height:15px}
 .corehead{z-index:20;display:flex;align-items:center;justify-content:space-between;padding:16px 32px;border-bottom:1px solid var(--bd);background:var(--pg);position:sticky;top:0}
@@ -313,7 +352,7 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 .statval{font-family:'Hanken Grotesk',sans-serif;font-size:30px;font-weight:500;color:var(--ink);margin:8px 0 0;letter-spacing:-.02em}
 .stattrend{display:flex;align-items:center;gap:4px;font-size:12px;margin-top:8px}
 .statico{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.ico-o{background:rgba(255,106,0,.12);border:1px solid rgba(255,106,0,.26);color:var(--acc)}
+.ico-o{background:rgba(52,97,242,.12);border:1px solid rgba(52,97,242,.26);color:var(--acc)}
 .ico-b{background:rgba(57,80,230,.1);border:1px solid rgba(57,80,230,.22);color:var(--alt)}
 .ico-i{background:var(--sk);border:1px solid var(--bd);color:var(--ink)}
 .ico-g{background:rgba(47,125,79,.1);border:1px solid rgba(47,125,79,.22);color:var(--grn)}
@@ -353,6 +392,19 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 .minicard{position:fixed;bottom:24px;right:24px;z-index:70;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:var(--rmd);background:var(--wt);border:1px solid var(--bd);box-shadow:0 24px 50px -20px rgba(30,30,36,.3);cursor:pointer;animation:popin .3s cubic-bezier(.34,1.56,.64,1)}
 @keyframes popin{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
 .minicv{width:46px;height:46px;display:block}
+.mus .lbl0{color:rgba(255,255,255,.82)}
+.musglow{position:absolute;inset:0;pointer-events:none;background:radial-gradient(130% 100% at 16% -12%,rgba(255,255,255,.2),transparent 58%)}
+.musglow2{position:absolute;top:-42%;right:-6%;width:210px;height:210px;border-radius:50%;pointer-events:none;background:radial-gradient(closest-side,rgba(255,236,205,.42),transparent 70%);filter:blur(28px);animation:hdrflow 9s ease-in-out infinite alternate}
+.musorb{width:76px;height:76px;flex-shrink:0}
+.musbar{margin-top:11px;height:3px;border-radius:9999px;background:rgba(255,255,255,.26);overflow:hidden}
+.musbar span{display:block;height:100%;width:0;background:#fff;border-radius:9999px;box-shadow:0 0 8px rgba(255,255,255,.7)}
+.musplay{width:46px;height:46px;flex-shrink:0;border:none;cursor:pointer;border-radius:50%;background:#fff;color:var(--acc);display:flex;align-items:center;justify-content:center;transition:transform .2s cubic-bezier(.22,1,.36,1)}
+.musplay:hover{transform:scale(1.08)}
+.i18{width:18px;height:18px}
+.musexpand{width:30px;height:30px;border-radius:9999px;background:rgba(255,255,255,.16);color:#fff;display:flex;align-items:center;justify-content:center;transition:background .2s,transform .2s}
+.mus:hover .musexpand{background:rgba(255,255,255,.3);transform:scale(1.06)}
+.musctl{width:44px;height:44px;border:none;cursor:pointer;border-radius:50%;background:transparent;color:rgba(255,255,255,.85);display:flex;align-items:center;justify-content:center;transition:color .18s,background .18s,transform .18s}
+.musctl:hover{color:#fff;background:rgba(255,255,255,.14);transform:scale(1.05)}
 .minimic{width:40px;height:40px;border-radius:12px;background:var(--pg);border:1px solid var(--bd);color:var(--ink2);cursor:pointer;display:flex;align-items:center;justify-content:center}
 .aqbar{position:relative;height:6px;border-radius:9999px;margin-top:16px;background:linear-gradient(90deg,#2f7d4f,#d9b23a 55%,#c14a35)}
 .aqbar span{position:absolute;top:50%;width:12px;height:12px;border-radius:50%;background:#fff;border:2px solid var(--grn);transform:translate(-50%,-50%);box-shadow:0 1px 4px rgba(0,0,0,.22)}
@@ -381,10 +433,10 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 <div class="page" data-screen-label="Atlas Premium D — Workshop"><div class="grain"></div><canvas class="bgcv" ref="{{ bgRef }}"></canvas><sc-if value="{{ isBgSky }}" hint-placeholder-val="{{ true }}"><div class="bgsky"><div class="bgwash"></div><div class="bgblob bgb1"></div><div class="bgblob bgb2"></div><div class="bgblob bgb3"></div><div class="bgblob bgb4"></div><svg class="bgclouds" viewBox="0 0 1440 420" preserveAspectRatio="xMidYMin slice"><defs><filter id="kbA" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="30"></feGaussianBlur></filter><filter id="kbB" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="14"></feGaussianBlur></filter><filter id="kbC" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="5"></feGaussianBlur></filter><linearGradient id="kgA" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fffdf8"></stop><stop offset="100%" stop-color="#e9dfce"></stop></linearGradient><linearGradient id="kgB" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fff8ee"></stop><stop offset="100%" stop-color="#e4d9c7"></stop></linearGradient></defs><g class="wxc3" filter="url(#kbA)" fill="#efe6d6" opacity=".9"><ellipse cx="300" cy="240" rx="330" ry="90"></ellipse><ellipse cx="1150" cy="190" rx="360" ry="100"></ellipse><ellipse cx="720" cy="120" rx="280" ry="70"></ellipse></g><g class="wxc1" filter="url(#kbB)" fill="url(#kgA)" opacity=".95"><ellipse cx="360" cy="190" rx="220" ry="66"></ellipse><circle cx="250" cy="170" r="68"></circle><circle cx="370" cy="132" r="92"></circle><circle cx="490" cy="170" r="64"></circle></g><g class="wxc2" filter="url(#kbC)" fill="url(#kgB)"><ellipse cx="1040" cy="130" rx="250" ry="74"></ellipse><circle cx="925" cy="112" r="76"></circle><circle cx="1050" cy="76" r="98"></circle><circle cx="1175" cy="110" r="68"></circle></g><g class="wxc3" filter="url(#kbB)" fill="#fffdf8" opacity=".65"><ellipse cx="700" cy="300" rx="190" ry="44"></ellipse></g></svg></div></sc-if>
 <header class="hdr"><div class="hdrbg"></div><canvas class="hdrcv" ref="{{ waveRef }}"></canvas><div class="brand hz fx ac gap10" onClick="{{ goHome }}"><span class="wm" style="font-family:'Geist',system-ui,sans-serif;font-weight:500;letter-spacing:-.035em">atlas</span></div><div class="hdrviz hz" title="Click to preview Atlas states" onClick="{{ cycleAtlas }}"><span class="wavelbl"><span class="eq"><span class="eqb"></span><span class="eqb"></span><span class="eqb"></span><span class="eqb"></span><span class="eqb"></span></span>{{ atlasStateLbl }}</span></div></header>
 <section class="band"><div class="orbwrap" onClick="{{ openDrawer }}"><canvas class="orbcv" width="300" height="300" ref="{{ orbRef }}"></canvas></div>
-<div><h1 class="greet disp">Good afternoon, <span class="accw">Marcus.</span></h1><p class="gsub">Four meetings today. Paris in 6 days. Two messages that look important.</p></div>
-<div class="bandmeta"><div class="bmtemp disp tnum">68°</div><div class="bml">San Francisco — Partly cloudy</div></div>
+<div class="bandtext {{ bandFocusCls }}" onClick="{{ bandBack }}"><h1 class="greet disp {{ bandSwapCls }}">{{ bandTitle }}<span class="accw">{{ bandAccent }}</span></h1><p class="gsub {{ bandSwapCls }}">{{ bandSub }}</p></div>
+<div class="bandmeta {{ bandSwapCls }}"><div class="bmtemp disp tnum">{{ bandMetaBig }}</div><div class="bml">{{ bandMetaSmall }}</div></div>
 </section>
-<main class="grid">
+<main class="grid {{ gridCls }}">
 <div class="card rs2 d1 wxcard" onClick="{{ openWeather }}"><canvas class="wxbg" ref="{{ wxCvRef }}"></canvas><div class="ch"><p class="lbl0">Weather</p></div><div class="cb">
 <div class="fx ac jb" style="margin-top:58px"><div><p class="temp tnum">68°</p><p class="cond">Partly cloudy · San Francisco</p></div><div style="text-align:right"><p class="mtx tnum" style="color:var(--ink);font-weight:600;font-size:15px">H 70° · L 58°</p><p class="mtx" style="margin-top:4px">10% rain</p></div></div>
 <div class="fx ac gap16 mt16 mtx"><span class="fx ac gap6"><i data-lucide="droplets" class="i12 irain"></i>62%</span><span class="fx ac gap6"><i data-lucide="wind" class="i12"></i>8 mph</span><span class="fx ac gap6"><i data-lucide="sun" class="i12 isun"></i>UV 6</span></div>
@@ -431,7 +483,7 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 <div class="row0 last" style="display:block"><span class="ntag">Science</span><h4 class="nt">Space agency announces new moon mission timeline</h4><span class="nm">Reuters · 6h ago</span></div>
 </div></div>
 <div class="card d1" style="cursor:default"><div class="ch"><p class="lbl0">Air quality</p><div class="icobx"><i data-lucide="leaf" class="i16"></i></div></div><div class="cb fx col" style="justify-content:center"><div class="fx ac gap12"><p class="temp tnum" style="font-size:42px">32</p><div><p class="cond" style="margin:0;color:var(--grn);font-weight:600">Good</p><p class="mtx">AQI · PM2.5 low · SF</p></div></div><div class="aqbar"><span style="left:22%"></span></div></div></div>
-<div class="card d2" style="cursor:default"><div class="ch"><p class="lbl0">Now playing</p><div class="icobx"><i data-lucide="music" class="i16"></i></div></div><div class="cb fx ac gap12"><div class="npart"><i data-lucide="disc-3" class="i20"></i></div><div class="f1" style="min-width:0"><p class="evt trunc">Weightless</p><p class="evs trunc">Marconi Union · Focus</p><div class="npbar"><span></span></div></div></div></div>
+<div class="card sp2 d2 mus" onClick="{{ openMusicExp }}" style="cursor:pointer;background:var(--acc);color:#fff;position:relative;overflow:hidden"><div class="musglow"></div><div class="musglow2"></div><div class="ch" style="position:relative;z-index:2"><p class="lbl0">Now playing</p><div class="musexpand"><i data-lucide="maximize-2" class="i14"></i></div></div><div class="cb fx ac gap16" style="position:relative;z-index:2"><div class="musorb"><canvas ref="{{ music3dRef }}" data-mrole="orb" style="width:76px;height:76px;display:block"></canvas></div><div class="f1" style="min-width:0"><p class="disp trunc" style="font-size:19px;font-weight:600;letter-spacing:-.02em;margin:0">Golden Hour</p><p class="trunc" style="font-size:13px;color:rgba(255,255,255,.82);margin:3px 0 0">Vela Sunn · Ambient</p><div class="musbar"><span ref="{{ music3dRef }}" data-mrole="prog"></span></div></div><canvas ref="{{ music3dRef }}" data-mrole="eq" style="width:34px;height:24px;flex-shrink:0"></canvas><button onClick="{{ toggleMusic }}" class="musplay" aria-label="Play or pause"><sc-if value="{{ musicPlaying }}" hint-placeholder-val="{{ true }}"><i data-lucide="pause" class="i18"></i></sc-if><sc-if value="{{ musicPaused }}" hint-placeholder-val="{{ false }}"><i data-lucide="play" class="i18" style="margin-left:2px"></i></sc-if></button></div></div>
 <div class="card sp2 d3" style="cursor:default"><div class="ch"><p class="lbl0">Activity</p><div class="icobx"><i data-lucide="flame" class="i16"></i></div></div><div class="cb fx ac gap20"><svg class="rings" viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,106,0,.16)" stroke-width="9"></circle><circle cx="50" cy="50" r="42" fill="none" stroke="var(--acc)" stroke-width="9" stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="58" transform="rotate(-90 50 50)"></circle><circle cx="50" cy="50" r="30" fill="none" stroke="rgba(47,125,79,.16)" stroke-width="9"></circle><circle cx="50" cy="50" r="30" fill="none" stroke="#2f7d4f" stroke-linecap="round" stroke-width="9" stroke-dasharray="188.5" stroke-dashoffset="72" transform="rotate(-90 50 50)"></circle><circle cx="50" cy="50" r="18" fill="none" stroke="rgba(52,97,242,.16)" stroke-width="9"></circle><circle cx="50" cy="50" r="18" fill="none" stroke="#3461f2" stroke-linecap="round" stroke-width="9" stroke-dasharray="113" stroke-dashoffset="62" transform="rotate(-90 50 50)"></circle></svg><div class="f1"><div class="actrow"><span class="actk">Move</span><span class="actv">520 / 650 cal</span></div><div class="actrow"><span class="actk">Exercise</span><span class="actv">38 / 60 min</span></div><div class="actrow"><span class="actk">Stand</span><span class="actv">9 / 12 hr</span></div><p class="mtx" style="margin-top:8px">On track — one short walk to close your rings.</p></div></div></div>
 <div class="card d4" style="cursor:default"><div class="ch"><p class="lbl0">World clock</p><div class="icobx"><i data-lucide="globe" class="i16"></i></div></div><div class="cb"><div class="wclk"><div><p class="wcity">San Francisco</p><p class="wsub">Today</p></div><span class="wtime">11:24 AM</span></div><div class="wclk"><div><p class="wcity">London</p><p class="wsub">Today</p></div><span class="wtime">7:24 PM</span></div><div class="wclk last"><div><p class="wcity">Tokyo</p><p class="wsub">Tomorrow</p></div><span class="wtime">3:24 AM</span></div></div></div>
 </main>
@@ -659,8 +711,8 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 </aside></div>
 </sc-if>
 <sc-if value="{{ isWeather }}" hint-placeholder-val="{{ false }}">
-<div class="exp" data-screen-label="Workshop — Expanded Weather">
-<header class="ehead"><div class="fx ac gap16"><div class="accline"></div><h1 class="etitle">Weather</h1></div><button class="closeBtn" onClick="{{ closeExpanded }}"><i data-lucide="minimize-2" class="i16"></i><span>Close</span><span class="kbd">Esc</span></button></header>
+<div class="exp {{ expCls }}" data-screen-label="Workshop — Expanded Weather">
+<header class="ehead"><div class="fx gap16"><div class="accline"></div><div class="ehl"><p class="feyebrow">San Francisco · Now</p><h1 class="etitle">Weather</h1><p class="fintro">A clear morning easing into a mild, partly cloudy afternoon — light rain moves in after 6 PM.</p></div></div><span class="fback"><i data-lucide="corner-up-left" class="i14"></i>Tap the title or press Esc to return</span></header>
 <div class="ebody">
 <div class="col gap16" style="width:34%;min-width:340px">
 <div class="panelDk f1 col" style="padding:0"><div style="position:relative;height:172px;flex-shrink:0;border-radius:28px 28px 0 0;overflow:hidden"><canvas class="wxhero" style="position:absolute;inset:0;width:100%;height:100%" ref="{{ wxHeroRef }}"></canvas></div>
@@ -700,8 +752,8 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 </div>
 </sc-if>
 <sc-if value="{{ isCalendar }}" hint-placeholder-val="{{ false }}">
-<div class="exp" data-screen-label="Workshop — Expanded Calendar">
-<header class="ehead"><div class="fx ac gap16"><div class="accline"></div><h1 class="etitle">Calendar</h1></div><button class="closeBtn" onClick="{{ closeExpanded }}"><i data-lucide="minimize-2" class="i16"></i><span>Close</span><span class="kbd">Esc</span></button></header>
+<div class="exp {{ expCls }}" data-screen-label="Workshop — Expanded Calendar">
+<header class="ehead"><div class="fx gap16"><div class="accline"></div><div class="ehl"><p class="feyebrow">Sunday, July 5</p><h1 class="etitle">Calendar</h1><p class="fintro">Four events, 3h 15m booked. Your next meeting — 1:1 with Maya — starts in 20 minutes.</p></div></div><span class="fback"><i data-lucide="corner-up-left" class="i14"></i>Tap the title or press Esc to return</span></header>
 <div class="ebody">
 <div class="col gap16" style="width:34%;min-width:340px">
 <div class="panel f1 col"><div class="fx ac jb mb16"><div class="fx ac gap8"><i data-lucide="calendar" class="i16 isun"></i><span class="t14" style="color:var(--ink)">Sunday, July 5</span></div><button class="xbtn"><i data-lucide="plus" class="i14"></i></button></div>
@@ -735,8 +787,8 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 </div>
 </sc-if>
 <sc-if value="{{ isTasks }}" hint-placeholder-val="{{ false }}">
-<div class="exp" data-screen-label="Workshop — Expanded Tasks">
-<header class="ehead"><div class="fx ac gap16"><div class="accline"></div><h1 class="etitle">Tasks</h1></div><button class="closeBtn" onClick="{{ closeExpanded }}"><i data-lucide="minimize-2" class="i16"></i><span>Close</span><span class="kbd">Esc</span></button></header>
+<div class="exp {{ expCls }}" data-screen-label="Workshop — Expanded Tasks">
+<header class="ehead"><div class="fx gap16"><div class="accline"></div><div class="ehl"><p class="feyebrow">Today</p><h1 class="etitle">Tasks</h1><p class="fintro">One of five done. One high-priority item is due at 2 PM, and nothing is overdue.</p></div></div><span class="fback"><i data-lucide="corner-up-left" class="i14"></i>Tap the title or press Esc to return</span></header>
 <div class="ebody">
 <div class="col gap16" style="width:34%;min-width:340px">
 <div class="panel f1 col ac jc"><svg width="152" height="152" viewBox="0 0 42 42"><circle cx="21" cy="21" r="15.9" fill="none" stroke="#e2ded7" stroke-width="3"></circle><circle cx="21" cy="21" r="15.9" fill="none" class="strokeAcc" stroke-width="3" stroke-dasharray="20 100" stroke-linecap="round" transform="rotate(-90 21 21)"></circle></svg><div class="tc" style="margin-top:14px"><div class="bigtemp tnum" style="font-size:40px">20%</div><div class="econd">1 of 5 complete</div></div></div>
@@ -757,8 +809,8 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 </div>
 </sc-if>
 <sc-if value="{{ isStocks }}" hint-placeholder-val="{{ false }}">
-<div class="exp" data-screen-label="Workshop — Expanded Watchlist">
-<header class="ehead"><div class="fx ac gap16"><div class="accline"></div><h1 class="etitle">Watchlist</h1></div><button class="closeBtn" onClick="{{ closeExpanded }}"><i data-lucide="minimize-2" class="i16"></i><span>Close</span><span class="kbd">Esc</span></button></header>
+<div class="exp {{ expCls }}" data-screen-label="Workshop — Expanded Watchlist">
+<header class="ehead"><div class="fx gap16"><div class="accline"></div><div class="ehl"><p class="feyebrow">Markets open · Live</p><h1 class="etitle">Watchlist</h1><p class="fintro">Your portfolio is up +0.75% today. Six holdings streaming live, led by NVDA at +2.31%.</p></div></div><span class="fback"><i data-lucide="corner-up-left" class="i14"></i>Tap the title or press Esc to return</span></header>
 <div class="ebody">
 <div class="col gap16" style="width:38%;min-width:360px">
 <div class="panelDk f1 col"><div class="fx ac jb mb16"><div><div class="fx ac gap8"><span style="font-size:16px;font-weight:600;color:var(--dkf)">AAPL</span><span class="fx ac gap6 fs12" style="color:#7fd39f"><span class="dot0 on" style="width:6px;height:6px;background:#7fd39f"></span>Live</span></div><span class="sn" style="color:rgba(249,247,244,.6)">Apple Inc.</span></div></div>
@@ -782,13 +834,13 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 </div>
 </sc-if>
 <sc-if value="{{ isEmail }}" hint-placeholder-val="{{ false }}">
-<div class="exp" data-screen-label="Workshop — Expanded Inbox">
-<header class="ehead"><div class="fx ac gap16"><div class="accline"></div><h1 class="etitle">Inbox</h1></div><button class="closeBtn" onClick="{{ closeExpanded }}"><i data-lucide="minimize-2" class="i16"></i><span>Close</span><span class="kbd">Esc</span></button></header>
+<div class="exp {{ expCls }}" data-screen-label="Workshop — Expanded Inbox">
+<header class="ehead"><div class="fx gap16"><div class="accline"></div><div class="ehl"><p class="feyebrow">2 unread</p><h1 class="etitle">Inbox</h1><p class="fintro">Two messages look important — Sarah's Q4 budget review needs your input before Friday.</p></div></div><span class="fback"><i data-lucide="corner-up-left" class="i14"></i>Tap the title or press Esc to return</span></header>
 <div class="ebody">
 <div class="col gap16" style="width:32%;min-width:320px">
 <div class="panel col"><button class="cta fx ac jc gap8" style="width:100%"><i data-lucide="pen-line" class="i16"></i>Compose</button>
 <div class="col gap8" style="margin-top:18px">
-<div class="fx ac jb" style="padding:10px 12px;border-radius:10px;background:rgba(255,106,0,.08)"><span class="fx ac gap10 t14 fw5"><i data-lucide="inbox" class="i16 isun"></i>Primary</span><span class="pillA">2</span></div>
+<div class="fx ac jb" style="padding:10px 12px;border-radius:10px;background:rgba(52,97,242,.08)"><span class="fx ac gap10 t14 fw5"><i data-lucide="inbox" class="i16 isun"></i>Primary</span><span class="pillA">2</span></div>
 <div class="fx ac jb" style="padding:10px 12px"><span class="fx ac gap10 t14" style="color:var(--ink2)"><i data-lucide="star" class="i16" style="color:var(--ink3)"></i>Starred</span><span class="fs12" style="color:var(--ink3)">2</span></div>
 <div class="fx ac jb" style="padding:10px 12px"><span class="fx ac gap10 t14" style="color:var(--ink2)"><i data-lucide="send" class="i16" style="color:var(--ink3)"></i>Sent</span><span class="fs12" style="color:var(--ink3)">18</span></div>
 <div class="fx ac jb" style="padding:10px 12px"><span class="fx ac gap10 t14" style="color:var(--ink2)"><i data-lucide="archive" class="i16" style="color:var(--ink3)"></i>Archive</span><span class="fs12" style="color:var(--ink3)">204</span></div>
@@ -807,13 +859,13 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 </div>
 </sc-if>
 <sc-if value="{{ isNews }}" hint-placeholder-val="{{ false }}">
-<div class="exp" data-screen-label="Workshop — Expanded Briefing">
-<header class="ehead"><div class="fx ac gap16"><div class="accline"></div><h1 class="etitle">Briefing</h1></div><button class="closeBtn" onClick="{{ closeExpanded }}"><i data-lucide="minimize-2" class="i16"></i><span>Close</span><span class="kbd">Esc</span></button></header>
+<div class="exp {{ expCls }}" data-screen-label="Workshop — Expanded Briefing">
+<header class="ehead"><div class="fx gap16"><div class="accline"></div><div class="ehl"><p class="feyebrow">Morning briefing</p><h1 class="etitle">Briefing</h1><p class="fintro">Five stories Atlas picked for you this morning, led by a leap in model reasoning.</p></div></div><span class="fback"><i data-lucide="corner-up-left" class="i14"></i>Tap the title or press Esc to return</span></header>
 <div class="ebody">
 <div class="feat" style="width:40%;min-width:360px"><div class="fx ac gap8"><span class="pillA">Technology</span><span class="fx ac gap4 fs12 isun fw6"><i data-lucide="trending-up" class="i12"></i>Trending</span></div>
 <h2 class="featTitle">AI breakthrough: new language models show human-level reasoning.</h2>
 <p class="featBody">Researchers unveiled a new class of models that match human performance on multi-step reasoning benchmarks, with early results suggesting stronger generalization to unfamiliar problems. Analysts expect rapid adoption across enterprise tooling over the coming quarters.</p>
-<div class="featImg"><svg viewBox="0 0 400 200" preserveAspectRatio="xMidYMid slice" style="width:100%;height:100%"><circle cx="300" cy="60" r="80" fill="none" stroke="#ff6a00" stroke-width="2" opacity=".5"></circle><circle cx="300" cy="60" r="46" fill="#ff6a00" opacity=".9"></circle><g stroke="rgba(249,247,244,.4)" stroke-width="1.5"><line x1="40" y1="150" x2="120" y2="110"></line><line x1="120" y1="110" x2="200" y2="140"></line><line x1="200" y1="140" x2="280" y2="120"></line></g><g fill="#f9f7f4"><circle cx="40" cy="150" r="5"></circle><circle cx="120" cy="110" r="5"></circle><circle cx="200" cy="140" r="5"></circle><circle cx="280" cy="120" r="5"></circle></g></svg></div>
+<div class="featImg"><svg viewBox="0 0 400 200" preserveAspectRatio="xMidYMid slice" style="width:100%;height:100%"><circle cx="300" cy="60" r="80" fill="none" stroke="#3461f2" stroke-width="2" opacity=".5"></circle><circle cx="300" cy="60" r="46" fill="#ff6a00" opacity=".9"></circle><g stroke="rgba(249,247,244,.4)" stroke-width="1.5"><line x1="40" y1="150" x2="120" y2="110"></line><line x1="120" y1="110" x2="200" y2="140"></line><line x1="200" y1="140" x2="280" y2="120"></line></g><g fill="#f9f7f4"><circle cx="40" cy="150" r="5"></circle><circle cx="120" cy="110" r="5"></circle><circle cx="200" cy="140" r="5"></circle><circle cx="280" cy="120" r="5"></circle></g></svg></div>
 <div class="fx ac gap8 fs12" style="margin-top:16px;color:var(--ink2)"><span>TechCrunch</span><span>·</span><span>2h ago</span><span>·</span><span>4 min read</span></div>
 </div>
 <div class="panel2 f1"><h3 class="t14 fw6 mb12">More stories</h3>
@@ -822,6 +874,23 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 <div class="row0"><div class="f1" style="min-width:0"><div class="fx ac gap8 mb8"><span class="pillA">Business</span></div><h4 class="nt" style="margin:0">Major airlines report record summer travel demand</h4><span class="nm">WSJ · 7h ago</span></div></div>
 <div class="row0"><div class="f1" style="min-width:0"><div class="fx ac gap8 mb8"><span class="pillA">Technology</span></div><h4 class="nt" style="margin:0">Chipmakers expand capacity amid surging AI demand</h4><span class="nm">The Verge · 9h ago</span></div></div>
 <div class="row0 last"><div class="f1" style="min-width:0"><div class="fx ac gap8 mb8"><span class="pillA">World</span></div><h4 class="nt" style="margin:0">Climate summit reaches agreement on emissions targets</h4><span class="nm">AP · 11h ago</span></div></div>
+</div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ isMusic }}" hint-placeholder-val="{{ false }}">
+<div class="exp {{ expCls }}" data-screen-label="Workshop — Expanded Music">
+<header class="ehead"><div class="fx ac gap16"><span class="ebrand"><span class="ebmk">A</span>atlas</span><span class="ebsep"></span><div class="accline"></div><h1 class="etitle">Now playing</h1></div><span class="fback"><i data-lucide="corner-up-left" class="i14"></i>Tap the title or press Esc to return</span></header>
+<div style="position:relative;z-index:10;min-height:72vh;display:flex;align-items:center;justify-content:center;padding:8px 28px 28px">
+<div style="position:relative;width:100%;max-width:900px;height:648px;overflow:hidden;color:#fff;display:flex;flex-direction:column;background:var(--acc);border-radius:34px;box-shadow:0 40px 90px -34px rgba(255,106,0,.6)">
+<div style="position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 70% at 50% -10%,rgba(255,255,255,.2),transparent 55%)"></div>
+<div style="position:absolute;top:-38%;right:-6%;width:440px;height:440px;border-radius:50%;pointer-events:none;background:radial-gradient(closest-side,rgba(255,236,205,.42),transparent 70%);filter:blur(44px);animation:hdrflow 11s ease-in-out infinite alternate"></div>
+<div style="position:relative;z-index:2;text-align:center;padding:28px 26px 0"><p style="font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.68);margin:0">Now playing</p><p class="disp" style="font-size:27px;font-weight:600;letter-spacing:-.025em;margin:6px 0 0">Golden Hour</p><p style="font-size:14px;color:rgba(255,255,255,.82);margin:4px 0 0">Vela Sunn · Ambient</p></div>
+<div style="position:relative;z-index:1;flex:1;min-height:0"><canvas ref="{{ music3dRef }}" data-mrole="bigorb" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas></div>
+<div style="position:relative;z-index:2;display:flex;flex-wrap:wrap;gap:8px;justify-content:center;padding:0 26px"><button onClick="{{ pickOrb }}" style="{{ psOrb }}">Orb</button><button onClick="{{ pickRings }}" style="{{ psRings }}">Orbit</button><button onClick="{{ pickBloom }}" style="{{ psBloom }}">Bloom</button><button onClick="{{ pickField }}" style="{{ psField }}">Field</button><button onClick="{{ pickBurst }}" style="{{ psBurst }}">Burst</button></div>
+<div style="position:relative;z-index:2;padding:16px 34px 30px"><canvas ref="{{ music3dRef }}" data-mrole="bigwave" onClick="{{ seekMusic }}" style="width:100%;height:56px;cursor:pointer;display:block"></canvas><div style="display:flex;align-items:center;justify-content:space-between;font-size:11.5px;font-variant-numeric:tabular-nums;color:rgba(255,255,255,.8);font-family:ui-monospace,Menlo,monospace;margin-top:6px"><span ref="{{ music3dRef }}" data-mrole="bigtime">0:00</span><span>3:34</span></div>
+<div style="display:flex;align-items:center;justify-content:center;gap:22px;margin-top:20px"><button class="musctl" aria-label="Shuffle"><i data-lucide="shuffle" class="i18"></i></button><button class="musctl" aria-label="Previous"><i data-lucide="skip-back" style="width:24px;height:24px"></i></button><button onClick="{{ toggleMusic }}" class="musplay" style="width:74px;height:74px" aria-label="Play or pause"><sc-if value="{{ musicPlaying }}" hint-placeholder-val="{{ true }}"><i data-lucide="pause" style="width:28px;height:28px"></i></sc-if><sc-if value="{{ musicPaused }}" hint-placeholder-val="{{ false }}"><i data-lucide="play" style="width:28px;height:28px;margin-left:3px"></i></sc-if></button><button class="musctl" aria-label="Next"><i data-lucide="skip-forward" style="width:24px;height:24px"></i></button><button class="musctl" aria-label="Like"><i data-lucide="heart" class="i18"></i></button></div>
+</div>
 </div>
 </div>
 </div>
@@ -836,7 +905,7 @@ body{margin:0;background:var(--pg);color:var(--ink);font-family:'Geist',Inter,sy
 </x-dc>
 <script type="text/x-dc" data-dc-script>
 class Component extends DCLogic {
-  state = { screen: 'dashboard', authMode: 'signin', showPw: false, drawer: false, expanded: null, coreTab: 'overview', wxState: 'partly', wxTemp: null, bgMode: 'atmo', hdrState: 'listening', mcards: [], ttick: null, input: '', thinking: false, msgs: [
+  state = { screen: 'dashboard', music: true, opening: null, closing: false, authMode: 'signin', showPw: false, drawer: false, expanded: null, coreTab: 'overview', wxState: 'partly', wxTemp: null, bgMode: 'atmo', hdrState: 'listening', mcards: [], ttick: null, input: '', thinking: false, msgs: [
     { role: 'a', content: "Good afternoon, Marcus. Four meetings today and Paris is 6 days out. Anything you'd like me to handle?" }
   ]};
   componentDidMount() {
@@ -865,13 +934,13 @@ class Component extends DCLogic {
       speaking: { a: 13, sp: 3.6, f: 2, jit: 0.32, mix: 1.35 }
     };
     const blobs = [
-      { c: '255,106,0', p1: 0.9, p2: 2.1, s1: 0.00021, s2: 0.00017, rr: 1.5 },
-      { c: '255,143,60', p1: 3.4, p2: 0.6, s1: 0.00016, s2: 0.00023, rr: 1.9 },
-      { c: '255,187,120', p1: 5.1, p2: 4.2, s1: 0.00027, s2: 0.00013, rr: 2.3 },
+      { c: '52,97,242', p1: 0.9, p2: 2.1, s1: 0.00021, s2: 0.00017, rr: 1.5 },
+      { c: '90,124,255', p1: 3.4, p2: 0.6, s1: 0.00016, s2: 0.00023, rr: 1.9 },
+      { c: '150,180,255', p1: 5.1, p2: 4.2, s1: 0.00027, s2: 0.00013, rr: 2.3 },
       { c: '57,80,230', p1: 1.9, p2: 5.6, s1: 0.00019, s2: 0.00026, rr: 1.4 },
-      { c: '255,106,0', p1: 4.4, p2: 3.1, s1: 0.00013, s2: 0.0002, rr: 2.1 }
+      { c: '42,79,208', p1: 4.4, p2: 3.1, s1: 0.00013, s2: 0.0002, rr: 2.1 }
     ];
-    const layers = [{ ph: 4.1, al: 0.2, c: '255,143,60', hm: 1.18 }, { ph: 2.0, al: 0.28, c: '255,106,0', hm: 1 }, { ph: 5.3, al: 0.16, c: '57,80,230', hm: 0.55 }, { ph: 0, al: 0.42, c: '255,106,0', hm: 0.78 }];
+    const layers = [{ ph: 4.1, al: 0.2, c: '90,124,255', hm: 1.18 }, { ph: 2.0, al: 0.28, c: '52,97,242', hm: 1 }, { ph: 5.3, al: 0.16, c: '57,80,230', hm: 0.55 }, { ph: 0, al: 0.42, c: '42,79,208', hm: 0.78 }];
     let pt = 0, lastT = 0;
     const tick = (t) => {
       if (!el.isConnected) { el.__run = 0; return; }
@@ -1276,7 +1345,7 @@ class Component extends DCLogic {
     if (!el || el.__run) return;
     el.__run = 1;
     const ctx = el.getContext('2d');
-    const S = el.width, N = 2100, pts = [];
+    const S = el.width, N = 5200, pts = [];
     for (let i = 0; i < N; i++) {
       const th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1);
       const r = Math.pow(Math.random(), 0.42);
@@ -1296,12 +1365,11 @@ class Component extends DCLogic {
         const X = x * cx + z * sx, Z = -x * sx + z * cx;
         const px = S / 2 + X * S * 0.44, py = S / 2 + y * S * 0.44;
         const depth = (Z + 1) / 2;
-        const sz = (1.05 + p.rn * 1.5) * (0.55 + depth * 0.7) * (S / 264);
+        const sz = (0.6 + p.rn * 1.05) * (0.5 + depth * 0.7) * (S / 360);
         const d = Math.sqrt(X * X + y * y + Z * Z);
-        const a = Math.max(0, 0.9 * (1 - Math.max(0, (d - 0.4) / 0.5))) * (0.35 + depth * 0.6);
+        const a = Math.max(0, (1 - Math.max(0, (d - 0.42) / 0.5))) * (0.4 + depth * 0.6);
         if (a <= 0.012) continue;
-        const mix = p.rn;
-        const R = Math.round(20 + 44 * mix), G = Math.round(51 + 77 * mix), B = Math.round(115 + 102 * mix);
+        const R = Math.round(36 + depth * 74), G = Math.round(64 + depth * 96), B = Math.round(180 + depth * 70);
         ctx.fillStyle = 'rgba(' + R + ',' + G + ',' + B + ',' + a.toFixed(3) + ')';
         ctx.beginPath(); ctx.arc(px, py, sz, 0, 6.2832); ctx.fill();
       }
@@ -1309,19 +1377,106 @@ class Component extends DCLogic {
     };
     requestAnimationFrame(tick);
   }
+  music3d(el) {
+    if (!el) return;
+    this._me = this._me || {};
+    this._me[el.getAttribute('data-mrole')] = el;
+    if (this._musRun) return; this._musRun = 1;
+    this.musProg = 0.34; this.musSpin = 0; this.musAmp = 0.15; this.musPulse = 0; this._mlast = 0; this._mlb = null; this.musEnergy = 1; this._eb = [0, 0, 0, 0]; this.musDur = 214;
+    this._fcache = {};
+    this._wav = Array.from({ length: 92 }, (_, i) => 0.26 + 0.74 * Math.abs(Math.sin(i * 0.5) * 0.6 + Math.sin(i * 0.17 + 1.3) * 0.4 + Math.sin(i * 1.1) * 0.2));
+    const fib = (n) => { const p = [], gr = Math.PI * (3 - Math.sqrt(5)); for (let i = 0; i < n; i++) { const y = 1 - (i / (n - 1)) * 2, r = Math.sqrt(Math.max(0, 1 - y * y)), th = gr * i; p.push([Math.cos(th) * r, y, Math.sin(th) * r]); } return p; };
+    const fibC = (n) => { if (!this._fcache[n]) this._fcache[n] = fib(n); return this._fcache[n]; };
+    const drawForm = (mode, x, w, h, amp, t) => {
+      const cx = w / 2, cy = h / 2, spin = this.musSpin, p = this.musPulse || 0;
+      if (mode === 'rings') { const R = Math.min(w, h) * 0.42 * (1 + amp * 0.08); const rings = [[0.35, 0], [1.15, 0.5], [2.0, 1.1], [0.75, 2.2]]; x.lineCap = 'round'; rings.forEach((rg, ri) => { const tilt = rg[0], ph = rg[1] + spin * (0.6 + ri * 0.12); x.beginPath(); for (let a = 0; a <= 64; a++) { const th = a / 64 * Math.PI * 2; let X = Math.cos(th), Y = Math.sin(th) * Math.cos(tilt), Z = Math.sin(th) * Math.sin(tilt); const ca = Math.cos(ph), sa = Math.sin(ph), X2 = X * ca + Z * sa; const sx = cx + X2 * R, sy = cy + Y * R; a === 0 ? x.moveTo(sx, sy) : x.lineTo(sx, sy); } x.strokeStyle = 'rgba(255,255,255,' + (0.32 + amp * 0.4) + ')'; x.lineWidth = 1.6; x.stroke(); }); const cg = x.createRadialGradient(cx, cy, 0, cx, cy, R * 0.5); cg.addColorStop(0, 'rgba(255,255,255,' + (0.6 + amp * 0.35) + ')'); cg.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = cg; x.beginPath(); x.arc(cx, cy, R * 0.5, 0, 7); x.fill(); return; }
+      if (mode === 'bloom') { const M = Math.min(w, h); const aura = x.createRadialGradient(cx, cy, 0, cx, cy, M * 0.58); aura.addColorStop(0, 'rgba(255,255,255,' + (0.2 + amp * 0.32) + ')'); aura.addColorStop(0.5, 'rgba(255,236,210,' + (0.09 + amp * 0.16) + ')'); aura.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = aura; x.fillRect(0, 0, w, h); for (let r = 0; r < 3; r++) { const pr = ((t * 0.55 + r / 3) % 1); const rr = M * 0.16 + pr * M * 0.36 * (1 + amp * 0.7); x.beginPath(); x.arc(cx, cy, rr, 0, 7); x.strokeStyle = 'rgba(255,255,255,' + ((1 - pr) * (0.16 + amp * 0.34)).toFixed(3) + ')'; x.lineWidth = 1 + amp * 2.6; x.stroke(); } const R = M * 0.37 * (1 + amp * 0.22); x.beginPath(); for (let a = 0; a <= 120; a++) { const th = a / 120 * Math.PI * 2; const rad = R * (1 + 0.13 * Math.sin(th * 3 + t * 1.6) + 0.09 * Math.sin(th * 5 - t * 2.3) + 0.06 * Math.sin(th * 7 + t * 3.1) + (0.11 + amp * 0.36) * Math.sin(th * 2 + t * 4)); const sx = cx + Math.cos(th) * rad, sy = cy + Math.sin(th) * rad; a === 0 ? x.moveTo(sx, sy) : x.lineTo(sx, sy); } x.closePath(); const g = x.createRadialGradient(cx, cy, 0, cx, cy, R * 1.4); g.addColorStop(0, 'rgba(255,255,255,.96)'); g.addColorStop(0.45, 'rgba(255,243,224,' + (0.55 + amp * 0.3) + ')'); g.addColorStop(1, 'rgba(255,255,255,.04)'); x.fillStyle = g; x.fill(); const dx = Math.cos(t * 0.9) * R * 0.14, dy = Math.sin(t * 1.15) * R * 0.14, ir = R * 0.42 * (1 + amp * 0.32); const ig = x.createRadialGradient(cx + dx, cy + dy, 0, cx + dx, cy + dy, ir); ig.addColorStop(0, 'rgba(255,255,255,.98)'); ig.addColorStop(0.6, 'rgba(255,240,218,' + (0.5 + amp * 0.4) + ')'); ig.addColorStop(1, 'rgba(255,236,208,0)'); x.fillStyle = ig; x.beginPath(); x.arc(cx + dx, cy + dy, ir, 0, 7); x.fill(); return; }
+      if (mode === 'field') { const cols = Math.max(11, Math.round(w / 18)), rows = Math.max(8, Math.round(h / 18)); for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) { const nx = (i / (cols - 1)) * 2 - 1, ny = (j / (rows - 1)) * 2 - 1; const rd = Math.hypot(nx, ny * 1.05); const edge = Math.max(0, 1 - Math.pow(Math.min(1, rd / 1.24), 2.6)); if (edge <= 0) continue; const lin = Math.sin(i * 0.48 - t * 3.0 + j * 0.28), rad0 = Math.sin(rd * 4.2 - t * 4.6); const wave = (lin + (0.7 + 1.3 * p) * rad0) / (1.7 + 1.3 * p); const off = wave * (6 + amp * 40) * edge; const px = cx + nx * (w * 0.47), py = cy + ny * (h * 0.44) + off; const crest = Math.max(0, wave); const br = Math.min(1, (0.16 + 0.62 * (wave * 0.5 + 0.5)) * edge * (0.5 + amp * 0.95)); const rad = (1 + crest * 2.9) * edge * (0.75 + amp * 1.15); if (crest > 0.4) { x.beginPath(); x.arc(px, py, rad * 2.8, 0, 7); x.fillStyle = 'rgba(255,238,210,' + (crest * edge * (amp * 0.4 + p * 0.55)).toFixed(3) + ')'; x.fill(); } x.beginPath(); x.arc(px, py, Math.max(0.5, rad), 0, 7); x.fillStyle = 'rgba(255,248,238,' + br.toFixed(3) + ')'; x.fill(); } return; }
+      if (mode === 'burst') { const R = Math.min(w, h) * 0.46, N = 54; x.lineCap = 'round'; for (let k = 0; k < N; k++) { const a = k / N * Math.PI * 2 + spin * 0.5; const len = R * (0.16 + (0.16 + amp * 0.6) * (0.4 + 0.6 * Math.abs(Math.sin(k * 0.7 + t * 5)))); const inr = R * 0.2, c = Math.cos(a), sn = Math.sin(a); x.beginPath(); x.moveTo(cx + c * inr, cy + sn * inr); x.lineTo(cx + c * (inr + len), cy + sn * (inr + len)); x.strokeStyle = 'rgba(255,255,255,' + (0.3 + amp * 0.5) + ')'; x.lineWidth = 2; x.stroke(); x.beginPath(); x.arc(cx + c * (inr + len), cy + sn * (inr + len), 1.4 + amp * 2, 0, 7); x.fillStyle = 'rgba(255,255,255,.9)'; x.fill(); } const g = x.createRadialGradient(cx, cy, 0, cx, cy, R * 0.32); g.addColorStop(0, 'rgba(255,255,255,' + (0.85 + amp * 0.15) + ')'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.beginPath(); x.arc(cx, cy, R * 0.32, 0, 7); x.fill(); return; }
+      const R = Math.min(w, h) * 0.46 * (1 + amp * 0.05); const N = Math.round(Math.min(880, Math.max(400, w * 3.6))); const pp = fibC(N); const ca = Math.cos(spin), sa = Math.sin(spin), cx2 = Math.cos(0.42), sx2 = Math.sin(0.42); const g = x.createRadialGradient(cx, cy, 0, cx, cy, R * 1.1); g.addColorStop(0, 'rgba(255,255,255,' + (0.5 + amp * 0.3) + ')'); g.addColorStop(0.4, 'rgba(255,241,220,.12)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.beginPath(); x.arc(cx, cy, R * 1.1, 0, 7); x.fill(); const rr = R * (1 + amp * 0.06); for (let i = 0; i < N; i++) { const P = pp[i]; let X = P[0] * ca + P[2] * sa, Z = -P[0] * sa + P[2] * ca; const Y = P[1] * cx2 - Z * sx2; Z = P[1] * sx2 + Z * cx2; const depth = (Z + 1) / 2; const px = cx + X * rr, py = cy + Y * rr; const rad = (0.5 + depth * 1.6) * (1 + amp * 0.5); x.beginPath(); x.arc(px, py, rad, 0, 7); x.fillStyle = 'rgba(255,' + (250 - depth * 10) + ',' + (238 - depth * 20) + ',' + (0.22 + depth * 0.72) + ')'; x.fill(); }
+    };
+    const drawWave = (x, w, h, amp) => { const n = this._wav.length, bw = w / n, cy = h / 2, ratio = this.musProg; for (let i = 0; i < n; i++) { const pp = i / n; let bh = this._wav[i] * (h * 0.86); const d = Math.abs(pp - ratio); if (d < 0.05) bh += amp * h * 0.5 * (1 - d / 0.05); bh = Math.min(bh, h); x.fillStyle = pp <= ratio ? '#fff' : 'rgba(255,255,255,.32)'; const bx = i * bw + bw * 0.2, r = bw * 0.3; x.beginPath(); x.moveTo(bx + r, cy - bh / 2); x.arcTo(bx + bw * 0.6, cy - bh / 2, bx + bw * 0.6, cy + bh / 2, r); x.arcTo(bx + bw * 0.6, cy + bh / 2, bx, cy + bh / 2, r); x.arcTo(bx, cy + bh / 2, bx, cy - bh / 2, r); x.arcTo(bx, cy - bh / 2, bx + bw * 0.6, cy - bh / 2, r); x.fill(); } x.beginPath(); x.arc(ratio * w, cy, 4.5, 0, 7); x.fillStyle = '#fff'; x.fill(); };
+    const sz = (c) => { const d = Math.min(1.5, window.devicePixelRatio || 1); const w = c.clientWidth, h = c.clientHeight; if (!w || !h) return null; if (c.width !== Math.round(w * d)) { c.width = Math.round(w * d); c.height = Math.round(h * d); } const x = c.getContext('2d'); x.setTransform(d, 0, 0, d, 0, 0); x.clearRect(0, 0, w, h); return { x, w, h }; };
+    const tick = (ts) => {
+      this._raf3 = requestAnimationFrame(tick);
+      if (this._mprev && ts - this._mprev < 33) return;
+      this._mprev = ts;
+      const t = ts / 1000, dt = Math.min(0.05, this._mlast ? (ts - this._mlast) / 1000 : 0); this._mlast = ts;
+      const bpm = 100, pl = this.musPlaying !== false;
+      this.musEnergy += ((pl ? 1 : 0) - this.musEnergy) * 0.05;
+      const beat = Math.floor(t * bpm / 60); if (this._mlb == null) this._mlb = beat; if (beat !== this._mlb) { this._mlb = beat; this._mbt = t; }
+      const kick = Math.exp(-(t - (this._mbt || 0)) * 8);
+      const tgt = Math.min(1, (0.52 * kick + 0.2 * (0.5 + 0.5 * Math.sin(t * 2.5)) + 0.14) * this.musEnergy);
+      this.musAmp += (tgt - this.musAmp) * Math.min(1, dt * 11);
+      this.musPulse += (kick * this.musEnergy - this.musPulse) * Math.min(1, dt * 16);
+      this.musSpin += dt * (0.3 + 1.3 * this.musEnergy);
+      const amp = this.musAmp;
+      if (pl) { this.musProg += dt / 210; if (this.musProg > 1) this.musProg = 0; }
+      const drawInto = (role, mode) => { const c = this._me[role]; if (!c || !c.isConnected) return; const s = sz(c); if (s) drawForm(mode, s.x, s.w, s.h, amp, t); };
+      drawInto('orb', 'orb');
+      drawInto('bigorb', this.musForm || 'orb');
+      const bwc = this._me.bigwave; if (bwc && bwc.isConnected) { const s = sz(bwc); if (s) drawWave(s.x, s.w, s.h, amp); }
+      const bt = this._me.bigtime; if (bt && bt.isConnected) { const cur = Math.floor(this.musProg * this.musDur); bt.textContent = Math.floor(cur / 60) + ':' + String(cur % 60).padStart(2, '0'); }
+      const ec = this._me.eq;
+      if (ec) { const s = sz(ec); if (s) { const { x, w, h } = s; const n = 4, gap = 3, bw = (w - gap * (n - 1)) / n; for (let i = 0; i < n; i++) { const tt = amp * (0.28 + 0.72 * Math.abs(Math.sin(t * (3 + i * 0.7) + i * 1.3))); this._eb[i] += (tt - this._eb[i]) * 0.3; const bh = Math.max(2, this._eb[i] * h), bx = i * (bw + gap), r = bw / 2; x.fillStyle = '#fff'; x.beginPath(); x.moveTo(bx + r, h - bh); x.arcTo(bx + bw, h - bh, bx + bw, h, r); x.arcTo(bx + bw, h, bx, h, r); x.arcTo(bx, h, bx, h - bh, r); x.arcTo(bx, h - bh, bx + bw, h - bh, r); x.fill(); } } }
+      if (this._me.prog) this._me.prog.style.width = (this.musProg * 100).toFixed(2) + '%';
+    };
+    requestAnimationFrame(tick);
+  }
+  beginOpen(name, extra) {
+    if (this._trans) return; this._trans = 1;
+    this.setState(Object.assign({ opening: name }, extra || {}));
+    clearTimeout(this._ot); this._ot = setTimeout(() => { this.setState({ expanded: name, opening: null }); this._trans = 0; }, 340);
+  }
   renderVals() {
     const st = this.state;
+    this.musPlaying = st.music !== false;
+    this.musForm = st.musForm || 'orb';
     const id = st.expanded;
+    const bandMap = {
+      home: { t: 'Good afternoon, ', a: 'Marcus.', s: 'Four meetings today. Paris in 6 days. Two messages that look important.', mb: '68°', ms: 'San Francisco — Partly cloudy' },
+      weather: { t: "Here's your ", a: 'weather.', s: 'Partly cloudy and mild — light rain arrives after 6 PM.', mb: '68°', ms: 'H 70° · L 58°' },
+      calendar: { t: "Here's your ", a: 'day.', s: 'Four events today — your 1:1 with Maya starts in 20 minutes.', mb: '4', ms: 'events · 3h 15m booked' },
+      tasks: { t: "Let's clear your ", a: 'tasks.', s: 'One of five done, one due at 2 PM, nothing overdue.', mb: '20%', ms: '1 of 5 complete' },
+      stocks: { t: "Here's your ", a: 'watchlist.', s: 'Portfolio up 0.75% today, led by NVDA at +2.31%.', mb: '+0.75%', ms: '$248,910 · 6 live' },
+      email: { t: "Here's your ", a: 'inbox.', s: "Two unread — Sarah's budget review needs a reply by Friday.", mb: '2', ms: 'unread messages' },
+      news: { t: 'Your morning ', a: 'briefing.', s: 'Five stories Atlas picked for you this morning.', mb: '5', ms: 'top stories' },
+      music: { t: 'Now ', a: 'playing.', s: 'Golden Hour — Vela Sunn · Ambient.', mb: '3:34', ms: 'Golden Hour' }
+    };
+    const bm = bandMap[id || 'home'] || bandMap.home;
     const signup = st.authMode === 'signup';
     const ct = st.coreTab || 'overview';
     const ws = st.wxState || 'partly';
     const wsMap = { sunny: { c: 'Sunny', t: '72\u00b0' }, partly: { c: 'Partly cloudy', t: '68\u00b0' }, cloudy: { c: 'Cloudy', t: '64\u00b0' }, rain: { c: 'Rain', t: '61\u00b0' } };
     const wtemp = st.wxTemp || wsMap[ws].t;
     const wtnum = parseInt(wtemp, 10);
+    const ps = (fid) => 'padding:8px 15px;border:none;cursor:pointer;border-radius:9999px;font-family:Geist,sans-serif;font-size:12.5px;font-weight:600;transition:background .18s,color .18s;' + ((st.musForm || 'orb') === fid ? 'background:#fff;color:#ff6a00' : 'background:rgba(255,255,255,.16);color:#fff');
     return {
       orbRef: (el) => this.orb(el),
       miniRef: (el) => this.orb(el),
       homeRef: (el) => this.orb(el),
+      music3dRef: (el) => this.music3d(el),
+      dissolveRef: null,
+      showGrid: true,
+      gridCls: st.opening ? 'gridout' : (st.expanded ? 'gridhidden' : 'gridin'),
+      expCls: st.closing ? 'expout' : '',
+      bandTitle: bm.t, bandAccent: bm.a, bandSub: bm.s, bandMetaBig: bm.mb, bandMetaSmall: bm.ms,
+      bandKey: (id || 'home'),
+      bandSwapCls: (st.opening || st.closing) ? 'swapout' : '',
+      bandFocusCls: id ? 'bandback' : '',
+      bandBack: () => { if (!st.expanded || this._trans) return; this._trans = 1; this.setState({ closing: true }); clearTimeout(this._ct); this._ct = setTimeout(() => { this.setState({ expanded: null, closing: false }); this._trans = 0; }, 300); },
+      toggleMusic: (e) => { if (e && e.stopPropagation) e.stopPropagation(); this.setState(s => ({ music: !s.music })); },
+      openMusicExp: () => this.beginOpen('music'),
+      isMusic: id === 'music',
+      seekMusic: (e) => { const c = e.currentTarget, r = c.getBoundingClientRect(); this.musProg = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)); },
+      pickOrb: () => this.setState({ musForm: 'orb' }),
+      pickRings: () => this.setState({ musForm: 'rings' }),
+      pickBloom: () => this.setState({ musForm: 'bloom' }),
+      pickField: () => this.setState({ musForm: 'field' }),
+      pickBurst: () => this.setState({ musForm: 'burst' }),
+      psOrb: ps('orb'), psRings: ps('rings'), psBloom: ps('bloom'), psField: ps('field'), psBurst: ps('burst'),
+      musicPlaying: st.music !== false,
+      musicPaused: st.music === false,
       bgRef: (el) => this.bgcanvas(el),
       wxCvRef: (el) => this.wxCanvas(el, 'partly'),
       wxHeroRef: (el) => this.wxCanvas(el, null),
@@ -1373,7 +1528,7 @@ class Component extends DCLogic {
       authCta: signup ? 'Create account' : 'Sign in',
       authQ: signup ? 'Already have an account?' : "Don't have an account?",
       authSwap: signup ? 'Sign in' : 'Sign up',
-      goAuth: () => this.setState({ screen: 'auth', drawer: false, expanded: null }),
+      goAuth: () => { window.location.href = 'Atlas Login C1 - Split.dc.html'; },
       goHome: () => this.setState({ screen: 'home', drawer: false, expanded: null }),
       goDash: () => this.setState({ screen: 'dashboard', drawer: false, expanded: null }),
       goCore: () => this.setState({ screen: 'core', drawer: false, expanded: null }),
@@ -1410,14 +1565,14 @@ class Component extends DCLogic {
       }),
       openDrawer: () => this.setState({ drawer: true }),
       closeDrawer: () => this.setState({ drawer: false }),
-      openWeather: () => this.setState({ expanded: 'weather', wxState: 'partly', wxTemp: null }),
+      openWeather: () => this.beginOpen('weather', { wxState: 'partly', wxTemp: null }),
       setWx: (e) => { const el = e.currentTarget; const tp = el.getAttribute('data-tp'); this.setState({ wxState: el.getAttribute('data-st'), wxTemp: tp ? tp + '\u00b0' : null }); },
-      openCalendar: () => this.setState({ expanded: 'calendar' }),
-      openTasks: () => this.setState({ expanded: 'tasks' }),
-      openStocks: () => this.setState({ expanded: 'stocks' }),
-      openEmail: () => this.setState({ expanded: 'email' }),
-      openNews: () => this.setState({ expanded: 'news' }),
-      closeExpanded: () => this.setState({ expanded: null }),
+      openCalendar: () => this.beginOpen('calendar'),
+      openTasks: () => this.beginOpen('tasks'),
+      openStocks: () => this.beginOpen('stocks'),
+      openEmail: () => this.beginOpen('email'),
+      openNews: () => this.beginOpen('news'),
+      closeExpanded: () => { if (this._trans) return; this._trans = 1; this.setState({ closing: true }); clearTimeout(this._ct); this._ct = setTimeout(() => { this.setState({ expanded: null, closing: false }); this._trans = 0; }, 300); },
       heroTemp: wtemp,
       heroCond: wsMap[ws].c,
       heroFeels: 'Feels like ' + (wtnum - 2) + '\u00b0',

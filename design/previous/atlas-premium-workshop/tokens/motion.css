@@ -1,8 +1,0 @@
-:root{
-  --ease-spring:cubic-bezier(.22,1,.36,1);
-  --ease-standard:cubic-bezier(.4,0,.2,1);
-  --dur-micro:160ms;
-  --dur-transition:300ms;
-  --dur-entrance:800ms;
-  --stagger:70ms;
-}

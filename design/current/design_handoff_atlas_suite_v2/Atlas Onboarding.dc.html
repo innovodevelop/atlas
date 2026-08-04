@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<style>
+button,input,textarea,select{border:none}@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Hanken+Grotesk:wght@500;600;700&display=swap');
+html,body{margin:0;padding:0;background:#f9f7f4}
+a{color:#3461f2;text-decoration:none}a:hover{color:#5b7cff}
+@keyframes ob-caret{0%,55%{opacity:1}56%,100%{opacity:0}}
+@keyframes ob-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes ob-card{from{opacity:0;transform:translate(-50%,-50%) scale(.86)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+@keyframes ob-fade{from{opacity:0}to{opacity:1}}
+@keyframes ob-word{from{opacity:0;filter:blur(6px);transform:translateY(5px)}to{opacity:1;filter:none;transform:none}}
+</style>
+<script src="atlas-sphere.js"></script>
+<script src="atlas-transition.js"></script>
+</helmet>
+<div data-screen-label="Onboarding" style="position:fixed;inset:0;overflow:hidden;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased">
+<div style="position:absolute;inset:0;pointer-events:none">
+<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,231,200,.65),rgba(249,247,244,0) 46%)"></div>
+<div style="position:absolute;top:-240px;right:-180px;width:780px;height:780px;border-radius:50%;filter:blur(70px);background:radial-gradient(closest-side,rgba(255,158,64,.26),transparent 74%)"></div>
+<div style="position:absolute;bottom:-260px;left:-220px;width:760px;height:640px;border-radius:50%;filter:blur(70px);background:radial-gradient(closest-side,rgba(122,140,255,.18),transparent 74%)"></div>
+</div>
+
+<div style="position:fixed;z-index:40;left:{{ orbL }};top:{{ orbT }};width:{{ orbS }};height:{{ orbS }};margin-left:{{ orbML }};transition:left .85s cubic-bezier(.32,.72,.24,1),top .85s cubic-bezier(.32,.72,.24,1),width .85s cubic-bezier(.32,.72,.24,1),height .85s cubic-bezier(.32,.72,.24,1),margin .85s cubic-bezier(.32,.72,.24,1);pointer-events:none">
+<canvas ref="{{ orbRef }}" style="width:100%;height:100%;display:block"></canvas>
+</div>
+
+<sc-if value="{{ isIntro }}" hint-placeholder-val="{{ true }}">
+<div data-screen-label="Intro" style="position:absolute;inset:0;z-index:30;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:16vh;animation:ob-fade .6s both">
+<p style="margin:0;min-height:34px;font-family:'Hanken Grotesk',sans-serif;font-size:26px;font-weight:500;letter-spacing:-.025em;color:#1e1e24;text-align:center">{{ spokenIntro }}<span style="display:inline-block;width:2px;height:22px;margin-left:1px;vertical-align:-3px;background:#e8862e;animation:ob-caret 1.1s infinite"></span></p>
+<p style="margin:14px 0 0;font-size:13px;color:#8b8681">Two minutes. Everything is reversible.</p>
+<div style="height:80px;display:flex;align-items:flex-end">
+<sc-if value="{{ ready }}" hint-placeholder-val="{{ false }}">
+<button onClick="{{ goPerms }}" style="height:46px;padding:0 30px;border-radius:9999px;border:0;cursor:pointer;font:inherit;font-size:14px;font-weight:550;background:#1e1e24;color:#f7f5f2;animation:ob-fade .5s both;transition:transform .2s" style-hover="transform:translateY(-1px)">Begin</button>
+</sc-if>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ hasCard }}" hint-placeholder-val="{{ false }}">
+<div style="position:fixed;z-index:35;left:50%;top:50%;transform:translate(-50%,-50%);width:{{ cw }};height:{{ ch }};border-radius:{{ cr }};background:{{ cbg }};backdrop-filter:blur(26px) saturate(1.12);box-shadow:{{ cring }};overflow:hidden;transition:width .85s cubic-bezier(.32,.72,.24,1),height .85s cubic-bezier(.32,.72,.24,1),border-radius .85s cubic-bezier(.32,.72,.24,1),background .85s;animation:ob-card .7s cubic-bezier(.22,1,.36,1) both">
+
+<sc-if value="{{ isPerms }}" hint-placeholder-val="{{ true }}">
+<div data-screen-label="Permissions" style="position:absolute;inset:0;display:grid;grid-template-columns:.78fr 1.22fr;align-items:stretch;animation:ob-fade .5s .2s both">
+<div style="display:flex;flex-direction:column;justify-content:center;padding:0 3% 0 6%;animation:ob-rise .7s .12s cubic-bezier(.22,1,.36,1) both">
+<div style="height:96px;flex-shrink:0"></div>
+<h1 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(34px,4.2vw,58px);line-height:1.03;letter-spacing:-.04em;font-weight:600;max-width:11ch;text-wrap:pretty">What may I<br/>look after?</h1>
+<div style="display:flex;gap:8px;margin-top:20px">
+<span style="width:20px;height:7px;border-radius:4px;background:#1e1e24"></span>
+<span style="width:7px;height:7px;border-radius:50%;background:rgba(30,30,36,.2)"></span>
+<span style="width:7px;height:7px;border-radius:50%;background:rgba(30,30,36,.2)"></span>
+</div>
+<p style="margin:22px 0 0;min-height:44px;max-width:34ch;font-size:15px;line-height:1.55;color:#55524f;text-wrap:pretty">{{ spoken }}<span style="display:inline-block;width:2px;height:14px;margin-left:1px;vertical-align:-2px;background:#e8862e;animation:ob-caret 1.1s infinite"></span></p>
+<div style="display:flex;align-items:center;gap:10px;margin-top:28px">
+<button onClick="{{ presetRec }}" style="border:none;height:34px;padding:0 15px;border-radius:9999px;cursor:pointer;font:inherit;font-size:12.5px;font-weight:500;background:rgba(249,247,244,.7);color:#1e1e24" style-hover="background:#edebe7">Recommended</button>
+<button onClick="{{ presetAll }}" style="border:none;height:34px;padding:0 15px;border-radius:9999px;cursor:pointer;font:inherit;font-size:12.5px;font-weight:500;background:rgba(249,247,244,.7);color:#1e1e24" style-hover="background:#edebe7">Everything</button>
+</div>
+<p style="margin:22px 0 0;font-size:11.5px;letter-spacing:.02em;color:#a8a29a">Reversible at any time · nothing is shared onward</p>
+</div>
+<div style="position:relative;display:flex;flex-direction:column;justify-content:center;padding:2.5% 3% 2.5% 1%;min-height:0">
+<div style="display:flex;flex-direction:column;min-height:0;max-height:100%;padding:18px;border-radius:26px;background:rgba(255,253,250,.7);box-shadow:inset 0 0 0 1px rgba(255,253,250,.95);animation:ob-rise .7s .26s cubic-bezier(.22,1,.36,1) both">
+<div style="flex:1;min-height:0;overflow:auto;padding:0 2px;align-content:start">
+<sc-for list="{{ perms }}" as="p" hint-placeholder-count="8">
+<sc-if value="{{ p.isGroup }}" hint-placeholder-val="{{ false }}">
+<p style="margin:11px 2px 6px;font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#a8a29a">{{ p.group }}</p>
+</sc-if>
+<sc-if value="{{ p.isTiles }}" hint-placeholder-val="{{ true }}">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));gap:7px">
+<sc-for list="{{ p.tiles }}" as="t" hint-placeholder-count="2">
+<button data-k="{{ t.k }}" onClick="{{ toggle }}" style="display:flex;flex-direction:column;gap:5px;align-items:flex-start;padding:11px 13px;border-radius:15px;border:0;cursor:pointer;text-align:left;font:inherit;background:{{ t.bg }};transition:background .3s" style-hover="background:{{ t.hover }}">
+<span style="display:flex;align-items:center;gap:8px;width:100%">
+<span style="width:7px;height:7px;border-radius:50%;background:{{ t.dot }};transition:background .3s"></span>
+<span style="font-size:13.5px;font-weight:550;letter-spacing:-.01em;color:{{ t.fg }};transition:color .3s">{{ t.name }}</span>
+<span style="margin-left:auto;font-size:9.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:{{ t.state }};transition:color .3s">{{ t.tag }}</span>
+</span>
+<span style="font-size:11px;line-height:1.4;color:{{ t.mut }};text-wrap:pretty;transition:color .3s">{{ t.why }}</span>
+
+</button>
+</sc-for>
+</div>
+</sc-if>
+</sc-for>
+</div>
+<footer style="flex-shrink:0;display:flex;align-items:center;gap:12px;margin-top:14px;padding-top:14px">
+<span style="font-size:12px;color:#8b8681;font-variant-numeric:tabular-nums">{{ grantLine }}</span>
+<button onClick="{{ goWelcome }}" style="margin-left:auto;height:42px;padding:0 24px;border-radius:9999px;border:0;cursor:pointer;font:inherit;font-size:13.5px;font-weight:550;background:#1e1e24;color:#f7f5f2" style-hover="transform:translateY(-1px)">Continue</button>
+</footer>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isWelcome }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Welcome" style="position:absolute;inset:0;display:flex;flex-direction:column;padding:66px 40px 26px;animation:ob-fade .5s .2s both">
+<header style="flex-shrink:0;text-align:center;animation:ob-rise .6s .1s cubic-bezier(.22,1,.36,1) both">
+<p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8b8681">Welcome</p>
+<h1 style="margin:8px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:34px;font-weight:500;letter-spacing:-.03em">One assistant, every surface.</h1>
+<p style="margin:9px 0 0;min-height:20px;font-size:13.5px;color:#55524f">{{ spoken }}<span style="display:inline-block;width:1.5px;height:13px;margin-left:1px;vertical-align:-2px;background:#e8862e;animation:ob-caret 1.1s infinite"></span></p>
+</header>
+<div style="flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-auto-rows:132px;gap:10px;margin-top:16px;align-content:start;padding-bottom:4px">
+<sc-for list="{{ feats }}" as="f" hint-placeholder-count="6">
+<div style="grid-column:span {{ f.span }};display:flex;flex-direction:column;overflow:hidden;padding:14px 16px;border-radius:18px;background:{{ f.bg }};box-shadow:inset 0 0 0 1px rgba(255,253,250,.9);animation:ob-rise .6s cubic-bezier(.22,1,.36,1) both;animation-delay:{{ f.delay }};transition:transform .25s" style-hover="transform:translateY(-2px)">
+<header style="display:flex;align-items:baseline;gap:8px;flex-shrink:0">
+<p style="margin:0;font-size:10px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ f.accent }}">{{ f.name }}</p>
+<span style="margin-left:auto;font-size:10.5px;color:#a8a29a;font-variant-numeric:tabular-nums">{{ f.meta }}</span>
+</header>
+<p style="margin:6px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ f.claimSize }};font-weight:550;letter-spacing:-.02em;line-height:1.15;color:#1e1e24;text-wrap:pretty">{{ f.claim }}</p>
+<sc-if value="{{ f.vRows }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;flex-direction:column;gap:0">
+<sc-for list="{{ f.rows }}" as="r" hint-placeholder-count="3">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:5px 0">
+<span style="font-size:11.5px;color:#55524f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.t }}</span>
+<span style="font-size:10.5px;font-weight:550;color:{{ r.fg }}">{{ r.s }}</span>
+</div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ f.vDots }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;flex-wrap:wrap;gap:5px;max-width:180px">
+<sc-for list="{{ f.dots }}" as="d" hint-placeholder-count="8">
+<span style="width:12px;height:12px;border-radius:4px;background:{{ d.bg }};box-shadow:{{ d.glow }}"></span>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ f.vBars }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;align-items:flex-end;gap:3px;height:40px">
+<sc-for list="{{ f.pulse }}" as="b" hint-placeholder-count="7">
+<span style="flex:1;border-radius:2px;height:{{ b.h }};background:{{ b.bg }}"></span>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ f.vBig }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto">
+<p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:27px;font-weight:500;letter-spacing:-.03em;color:#1e1e24;font-variant-numeric:tabular-nums">{{ f.big }}</p>
+<p style="margin:3px 0 0;font-size:10.5px;color:#8b8681">{{ f.bigSub }}</p>
+</div>
+</sc-if>
+<sc-if value="{{ f.vTabs }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;align-items:center;gap:6px">
+<span style="flex:1;height:22px;border-radius:9999px;background:rgba(30,30,36,.05);box-shadow:inset 0 0 0 1px rgba(30,30,36,.06);display:flex;align-items:center;padding:0 10px;font-size:10px;color:#a8a29a">ask atlas or type a url</span>
+<span style="width:8px;height:8px;border-radius:50%;background:{{ f.accent }}"></span>
+<span style="width:8px;height:8px;border-radius:50%;background:rgba(30,30,36,.12)"></span>
+<span style="width:8px;height:8px;border-radius:50%;background:rgba(30,30,36,.12)"></span>
+</div>
+</sc-if>
+<sc-if value="{{ f.vGrid }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;align-items:center;gap:7px">
+<sc-for list="{{ f.blocks }}" as="k" hint-placeholder-count="3">
+<span style="width:{{ k.w }};height:38px;border-radius:10px;background:rgba(30,30,36,.045);box-shadow:inset 0 0 0 1px rgba(30,30,36,.06);display:flex;align-items:flex-end;padding:5px"><span style="width:{{ k.f }};height:4px;border-radius:2px;background:{{ f.accent }}"></span></span>
+</sc-for>
+<span style="font-size:10.5px;color:#8b8681;margin-left:4px">composed per question</span>
+</div>
+</sc-if>
+</div>
+</sc-for>
+</div>
+<footer style="flex-shrink:0;display:flex;align-items:center;justify-content:center;gap:14px;padding-top:18px;animation:ob-rise .6s .4s cubic-bezier(.22,1,.36,1) both">
+<span style="font-size:12px;color:#8b8681">{{ grantSummary }}</span>
+<button onClick="{{ goDash }}" style="height:44px;padding:0 28px;border-radius:9999px;border:0;cursor:pointer;font:inherit;font-size:14px;font-weight:550;background:#1e1e24;color:#f7f5f2" style-hover="transform:translateY(-1px)">Enter Atlas</button>
+</footer>
+</div>
+</sc-if>
+
+
+</div>
+</sc-if>
+
+<sc-if value="{{ notIntro }}" hint-placeholder-val="{{ false }}">
+<button onClick="{{ restart }}" style="border:none;position:fixed;top:20px;right:22px;z-index:60;height:30px;padding:0 13px;border-radius:9999px;cursor:pointer;font:inherit;font-size:11.5px;font-weight:500;background:rgba(255,253,250,.6);color:#55524f" style-hover="background:#edebe7">Replay intro</button>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;accent&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;amber&quot;,&quot;blue&quot;],&quot;default&quot;:&quot;amber&quot;,&quot;tsType&quot;:&quot;'amber' | 'blue'&quot;,&quot;section&quot;:&quot;Theme&quot}}">
+class Component extends DCLogic {
+  state = { stage: 'intro', words: [], ready: false, orb: 'waking',
+    on: { mic:true, notif:true, mail:true, home:true, health:true, bank:false, loc:true, people:false } };
+
+  PERMS = [
+    ['CORE'],
+    ['mic','Voice & microphone','Atlas listens only after the wake word and never stores raw audio.','On-device',true],
+    ['notif','Notifications','Quiet by default — one digest, plus anything that truly cannot wait.','Digest first',false],
+    ['YOUR APPS'],
+    ['mail','Mail & calendar','Triage, drafting and scheduling across every account you route to Atlas.','3 accounts',false],
+    ['home','Smart home devices','Read state and operate lights, locks and climate you have paired.','Local bridge',false],
+    ['health','Health & watch data','Trends and recovery modelled on-device; nothing leaves this machine.','On-device',false],
+    ['bank','Banking','Balances and transactions through open banking. Atlas can never move money.','Read-only',false],
+    ['CONTEXT'],
+    ['loc','Location & presence','Arrive-home scenes, weather and travel time. Coarse unless you say otherwise.','Coarse',false],
+    ['people','Contacts & people','Names and relationships so replies and invites go to the right person.','Names only',false]
+  ];
+
+  REACT = {
+    mic: "I need the microphone to hear you — that one stays.",
+    notif_on: "I'll interrupt only when it truly can't wait.", notif_off: "Fine — I'll keep everything for the digest.",
+    mail_on: "I'll start triaging the moment we finish here.", mail_off: "Without mail I can't triage — you can grant it later in Settings.",
+    home_on: "I'll keep the house in the corner of my eye.", home_off: "The house stays yours alone, then.",
+    health_on: "Body insights stay on this machine, always.", health_off: "No body data — the health view will sit empty.",
+    bank_on: "Read-only. I can watch the money, never touch it.", bank_off: "Money stays out of sight until you say so.",
+    loc_on: "I'll know when you're nearly home.", loc_off: "I'll plan as if you could be anywhere.",
+    people_on: "Names only — enough to address things properly.", people_off: "I'll ask each time a name comes up."
+  };
+
+  alpha(hex, f) { const c = [1,3,5].map(i => parseInt(hex.slice(i, i + 2), 16)); return 'rgba(' + c.join(',') + ',' + f + ')'; }
+  FEATS = [
+    { span:3, name:'Mail', accent:'#3461f2', meta:'3 accounts', claim:'Eleven threads handled before coffee.', vRows:true,
+      rows:[['Vogue — interview request','drafted'],['Board update','sent 08:02'],['Newsletter batch','archived']] },
+    { span:3, name:'Smart home', accent:'#0fae76', meta:'32 devices', claim:'The whole house on one grid.', vDots:true, lit:[0,3,5,9,10] },
+    { span:2, name:'Health', accent:'#d4494f', meta:'On-device', claim:'Your body, modelled.', vBars:true, pulse:[30,72,44,92,38,64,50] },
+    { span:2, name:'Banking', accent:'#8a5a1e', meta:'Read-only', claim:'Every account, one line.', vBig:true, big:'€81,240', bigSub:'Net across four accounts' },
+    { span:2, name:'Browser', accent:'#e8862e', meta:'Built in', claim:'Reads the web beside you.', vTabs:true },
+    { span:6, name:'Answers', accent:'#7a5af5', meta:'Ask anything', claim:'A dashboard composes itself around every reply.', vGrid:true, blocks:[[86,60],[64,40],[110,75]] }
+  ];
+
+
+  componentDidMount() {
+    this._mountSphere();
+    this._script('intro');
+  }
+  componentWillUnmount() { clearTimeout(this._t); clearTimeout(this._hand); cancelAnimationFrame(this._raf); clearInterval(this._orbTry); }
+
+  /* The real Atlas particle sphere — same shared renderer as every dashboard. */
+  _mountSphere() {
+    const tryMount = () => {
+      const cv = this._canvas;
+      if (cv && window.AtlasSphere) {
+        window.AtlasSphere.mount(cv, () => ({ state: this.state.orb === 'waking' ? 'idle' : this.state.orb }));
+        clearInterval(this._orbTry);
+        return true;
+      }
+      return false;
+    };
+    if (!tryMount()) this._orbTry = setInterval(tryMount, 150);
+  }
+
+  _startOrb() { /* retired local orb renderer — superseded by _mountSphere */
+    const pts = [];
+    for (let i = 0; i < 340; i++) {
+      const y = 1 - (i / 339) * 2, r = Math.sqrt(1 - y * y), th = i * 2.39996;
+      pts.push([Math.cos(th) * r, y, Math.sin(th) * r]);
+    }
+    const TINT = { waking:'139,134,126', idle:'107,102,96', listening:'52,97,242',
+      thinking:'122,90,245', speaking:'232,134,46', working:'15,174,118', success:'15,174,118' };
+    const draw = () => {
+      let cv = this._canvas;
+      if (!cv || !document.contains(cv))
+        cv = this._canvas = document.querySelector('[data-screen-label="Onboarding"] canvas');
+      if (!cv) return;               /* no paint -> _last stays stale -> self-heal fires */
+      const t = this._last = performance.now();
+      const w = cv.clientWidth, hh = cv.clientHeight; if (!w || !hh) return;
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      if (cv.width !== Math.round(w * dpr)) cv.width = Math.round(w * dpr);
+      if (cv.height !== Math.round(hh * dpr)) cv.height = Math.round(hh * dpr);
+      const ctx = cv.getContext('2d');
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      const cx = cv.width / 2, cy = cv.height / 2, R = Math.min(cx, cy) * 0.8;
+      const tint = TINT[this.state.orb] || TINT.idle;
+      const rot = t * 0.00035, breathe = 1 + Math.sin(t * 0.0016) * 0.03;
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.25);
+      g.addColorStop(0, 'rgba(' + tint + ',0.15)'); g.addColorStop(1, 'rgba(' + tint + ',0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R * 1.25, 0, 6.2832); ctx.fill();
+      for (const p of pts) {
+        const x = p[0] * Math.cos(rot) + p[2] * Math.sin(rot);
+        const z = -p[0] * Math.sin(rot) + p[2] * Math.cos(rot);
+        const s = (z + 1.6) / 2.6;
+        ctx.fillStyle = 'rgba(' + tint + ',' + (0.12 + s * 0.7).toFixed(3) + ')';
+        ctx.beginPath();
+        ctx.arc(cx + x * R * breathe, cy + p[1] * R * breathe * 0.96, (0.5 + s * 1.5) * (R / 46), 0, 6.2832);
+        ctx.fill();
+      }
+    };
+    /* rAF for smoothness, plus an interval watchdog: hidden/preview contexts never
+       fire rAF, so frames fall back to the timer — same tactic as atlas-sphere.js. */
+    this._draw = draw;
+    const pump = () => { this._raf = requestAnimationFrame(pump); draw(); };
+    this._raf = requestAnimationFrame(pump);
+    this._rearmOrb(true);
+  }
+
+  /* The watchdog is element-owned and self-healing: a stale unmount pass from the
+     old runtime cleared a mount-owned interval, so ownership moves to the canvas
+     (cleared only when it leaves the DOM) and renderVals revives a dead loop. */
+  _rearmOrb(force) {
+    const cv = this._canvas;
+    if (!cv || !this._draw) return;
+    if (!force && cv.__obTick && performance.now() - (this._last || 0) < 800) return;
+    clearInterval(cv.__obTick);
+    cv.__obTick = setInterval(() => {
+      if (!document.contains(cv)) { clearInterval(cv.__obTick); cv.__obTick = null; return; }
+      if (performance.now() - (this._last || 0) > 350) this._draw();
+    }, 300);
+    this._draw();
+  }
+
+  /* The space lives INSIDE each span: inline-block words spaced by margin alone
+     leave no whitespace text nodes, so textContent and screen readers collapse the
+     whole narration into one run-on token. */
+  _spoken(intro) {
+    return React.createElement('span', {opacity:1},
+      this.state.words.map((w, i) => React.createElement('span', {
+        key: i,
+        style: { display: 'inline-block', whiteSpace: 'pre',
+          animation: 'ob-word .45s cubic-bezier(.22,1,.36,1) both', animationDelay: w.delay }
+      }, w.t + ' ')));
+  }
+
+  /* spoken cadence from the sign-in screen: words surface one by one, blur-in */
+  _type(lines, done) {
+    clearTimeout(this._t);
+    const step = (li) => {
+      if (li >= lines.length) { if (done) done(); return; }
+      const ws = lines[li].split(' ');
+      this.setState({ words: ws.map((t, i) => ({ t, delay: (i * 0.13) + 's' })) });
+      this._t = setTimeout(() => step(li + 1), ws.length * 130 + (li + 1 < lines.length ? 1250 : 250));
+    };
+    step(0);
+  }
+
+  _script(stage) {
+    if (stage === 'intro') {
+      this.setState({ orb: 'speaking', ready: false });
+      this._type(["Hi — I'm Atlas.", "Before we begin, let's agree on what I'm allowed to see."],
+        () => this.setState({ orb: 'listening', ready: true }));
+    }
+    if (stage === 'perms') {
+      this.setState({ orb: 'listening' });
+      this._type(["Everything here is reversible, and nothing is shared onward. Ever."]);
+    }
+    if (stage === 'welcome') {
+      this.setState({ orb: 'success' });
+      this._type(["We're set. Here's what I can do from day one."],
+        () => this.setState({ orb: 'idle' }));
+    }
+  }
+
+  _go(stage) { this.setState({ stage, words: [] }); this._script(stage); }
+
+  renderVals() {
+    const S = this.state, st = S.stage;
+    this._rearmOrb();
+    /* Filled-tile pattern from Permission Lab 2j/2k: one accent, no borders —
+       the tile surface itself carries the grant. */
+    /* Amber is mid-luminance: cream on it measures 2.6:1, so granted amber tiles
+       carry INK type (6.2:1). Blue is dark enough to keep cream. */
+    /* Amber is mid-luminance: cream on it is 2.6:1, so granted amber tiles carry INK.
+       Cream on #3461f2 tops out at 5.0:1, so the blue fill is darkened to #2a4fd0 and
+       every muted role sits at full opacity — all four text roles clear AA on both. */
+    const ACC = this.props.accent === 'blue'
+      ? { fill: '#2a4fd0', hover: '#3a63ea', on: '#fffdfa',
+          onMut: 'rgba(255,253,250,.95)', onScope: 'rgba(255,253,250,.9)',
+          onTag: 'rgba(255,253,250,.95)', onDot: '#fffdfa' }
+      : { fill: '#e8862e', hover: '#f0932f', on: '#1e1e24',
+          onMut: 'rgba(30,30,36,.9)', onScope: 'rgba(30,30,36,.9)',
+          onTag: 'rgba(30,30,36,.9)', onDot: '#1e1e24' };
+    const rows = [];
+    let bucket = null;
+    this.PERMS.forEach(p => {
+      if (p.length === 1) {
+        rows.push({ isGroup: true, isTiles: false, group: p[0] });
+        bucket = { isGroup: false, isTiles: true, tiles: [] };
+        rows.push(bucket);
+        return;
+      }
+      const [k, name, why, scope, req] = p;
+      const on = S.on[k];
+      if (bucket) bucket.tiles.push({
+        k, name, why, scope: req ? 'Required · ' + scope : scope,
+        bg: on ? ACC.fill : 'rgba(30,30,36,.045)',
+        hover: on ? ACC.hover : 'rgba(30,30,36,.08)',
+        fg: on ? ACC.on : '#8b8681',
+        mut: on ? ACC.onMut : '#a8a29a',
+        scopeFg: on ? ACC.onScope : '#c0bab1',
+        dot: on ? ACC.onDot : 'rgba(30,30,36,.15)',
+        tag: req ? 'required' : (on ? 'granted' : 'off'),
+        state: on ? ACC.onTag : '#c0bab1'
+      });
+      /* Gather-toggle: four loose particles scatter when access is off and pull
+         into one glowing point when granted — the sphere's own vocabulary. */
+      rows.push({
+        isGroup: false, isRow: true, k, name, why, scope,
+        tag: req ? 'Required' : '',
+        nameFg: on ? '#1e1e24' : '#8b8681',
+        scopeFg: on ? '#8b8681' : '#c0bab1',
+        rowOp: on ? '1' : '.7',
+        dotS: on ? '8px' : '4.5px',
+        dotM: on ? '-4px 0 0 -4px' : '-2.25px 0 0 -2.25px',
+        dotBg: on ? '#1e1e24' : '#c6c0b7',
+        dotGlow: on ? '0 0 14px rgba(232,134,46,.6)' : 'none',
+        t1: on ? 'translate(0,0)' : 'translate(-8px,-8px)',
+        t2: on ? 'translate(0,0)' : 'translate(8px,-7px)',
+        t3: on ? 'translate(0,0)' : 'translate(-7px,8px)',
+        t4: on ? 'translate(0,0)' : 'translate(7px,7px)'
+      });
+    });
+    const keys = this.PERMS.filter(p => p.length > 1);
+    const granted = keys.filter(p => S.on[p[0]]).length;
+
+    const geom = {
+      perms:   { cw:'min(1420px, 96vw)', ch:'min(780px, 92vh)', cr:'32px', half:'min(390px, 46vh)' },
+      welcome: { cw:'940px', ch:'min(700px, 92vh)', cr:'32px', half:'min(350px, 46vh)' },
+    }[st] || {opacity:1};
+
+    const orb = {
+      intro:   { L:'50%', T:'22vh', S:'220px', ML:'-110px' },
+      /* Split layout: derive x from the CARD, not the viewport — the card is a
+         centred min(1180px,94vw), so a viewport % drifts off its left edge past
+         ~1341px wide. This tracks the card's inner padding at every width. */
+      perms:   { L:'calc(50% - min(710px, 48vw) + 40px)',
+                 T:'calc(50vh - ' + (geom.half || '0px') + ' + 26px)', S:'104px', ML:'0px' },
+      welcome: { L:'50%', T:'calc(50vh - ' + (geom.half || '0px') + ' - 44px)', S:'92px', ML:'-46px' }
+    }[st];
+
+    return {
+      orbRef: (el) => { if (el) { this._canvas = el; } },
+      orbL: orb.L, orbT: orb.T, orbS: orb.S, orbML: orb.ML,
+      isIntro: st === 'intro', notIntro: st !== 'intro',
+      hasCard: st !== 'intro',
+      isPerms: st === 'perms', isWelcome: st === 'welcome',
+      cw: geom.cw || '0px', ch: geom.ch || '0px', cr: geom.cr || '30px',
+      cbg: 'rgba(255,253,250,.72)',
+      cring: 'inset 0 0 0 1px rgba(255,253,250,.95)',
+      ready: S.ready, spoken: this._spoken(false), spokenIntro: this._spoken(true),
+      perms: rows,
+      grantLine: granted + ' of ' + keys.length + ' granted · 1 required',
+      grantSummary: granted + ' permissions granted — adjust any time in Settings.',
+      toggle: (e) => {
+        const k = e.currentTarget.dataset.k;
+        const req = this.PERMS.find(p => p[0] === k)[4];
+        if (req) { this._type([this.REACT.mic]); return; }
+        const on = Object.assign({}, this.state.on, { [k]: !this.state.on[k] });
+        this.setState({ on, orb: 'thinking' });
+        this._type([this.REACT[k + (on[k] ? '_on' : '_off')]],
+          () => this.setState({ orb: 'listening' }));
+      },
+      presetRec: () => { this.setState({ on: { mic:true, notif:true, mail:true, home:true, health:true, bank:false, loc:true, people:false } }); this._type(["The recommended set — everything useful, nothing intimate."]); },
+      presetAll: () => { this.setState({ on: { mic:true, notif:true, mail:true, home:true, health:true, bank:true, loc:true, people:true } }); this._type(["Full access. I'll treat it with care."]); },
+      goPerms: () => this._go('perms'),
+      goWelcome: () => this._go('welcome'),
+      /* The 'dash' stage is a bridge frame, not the destination: the card expands
+         full-bleed and the sphere glides to its dashboard position, then we hand
+         off to the real dashboard mid-motion so the seam lands inside the veil. */
+      goDash: () => {
+        const href = 'Atlas Dashboard (Current).dc.html';
+        this.setState({ orb: 'working' });
+        if (window.AtlasTransition) window.AtlasTransition.go(href);
+        else window.location.href = encodeURI(href);
+      },
+      restart: () => this._go('intro'),
+      feats: this._featsC = this._featsC || this.FEATS.map((f, i) => Object.assign({}, f, {
+        delay: (0.22 + i * 0.08) + 's',
+        claimSize: f.span >= 3 ? '17px' : '15px',
+        bg: 'linear-gradient(160deg,' + this.alpha(f.accent, 0.09) + ',rgba(255,255,255,0) 58%),rgba(255,253,250,.66)',
+        rows: (f.rows || []).map((r, j) => ({ t: r[0], s: r[1], fg: j === 0 ? f.accent : '#a8a29a' })),
+        dots: f.vDots ? Array.from({ length: 12 }, (_, j) => ({
+          bg: f.lit.includes(j) ? f.accent : 'rgba(30,30,36,.07)',
+          glow: f.lit.includes(j) ? '0 0 10px ' + this.alpha(f.accent, 0.45) : 'none'
+        })) : [],
+        pulse: (f.pulse || []).map((v, j, arr) => ({
+          h: v + '%', bg: v === Math.max(...arr) ? f.accent : 'rgba(30,30,36,.08)'
+        })),
+        blocks: (f.blocks || []).map(b => ({ w: b[0] + 'px', f: b[1] + '%' }))
+      })),
+    };
+  }
+}
+</script>
+</body>
+</html>

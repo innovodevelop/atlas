@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="atlas-sphere.js"></script>
+<style>
+button,input,textarea,select{border:none}
+body{margin:0;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#3461f2;text-decoration:none}a:hover{color:#5b7cff}
+@keyframes rise{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pls{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes drift1{from{transform:translate(0,0) scale(1)}to{transform:translate(-48px,28px) scale(1.07)}}
+@keyframes drift2{from{transform:translate(0,0)}to{transform:translate(42px,-20px)}}
+@keyframes dashmove{to{stroke-dashoffset:-24}}
+</style>
+</helmet>
+
+<div style="min-height:100vh;position:relative;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;overflow-x:hidden" data-screen-label="Atlas — Architecture">
+
+<div style="position:fixed;inset:0;z-index:1;pointer-events:none;overflow:hidden">
+  <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(216,227,251,.8),rgba(249,247,244,0) 46%)"></div>
+  <div style="position:absolute;top:-340px;right:-220px;width:940px;height:940px;border-radius:50%;filter:blur(64px);background:radial-gradient(closest-side,rgba(120,152,243,.42),rgba(52,97,242,.1) 58%,transparent 76%);animation:drift1 18s ease-in-out infinite alternate"></div>
+  <div style="position:absolute;top:-120px;left:-260px;width:820px;height:600px;border-radius:50%;filter:blur(64px);background:radial-gradient(closest-side,rgba(198,212,249,.5),transparent 72%);animation:drift2 26s ease-in-out infinite alternate"></div>
+</div>
+<div style="position:fixed;inset:0;pointer-events:none;z-index:2;opacity:.4;mix-blend-mode:multiply;background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E&quot;)"></div>
+
+<section style="position:relative;z-index:10;display:flex;align-items:center;gap:30px;max-width:1240px;margin:0 auto;padding:44px 24px 12px;animation:rise .8s cubic-bezier(.22,1,.36,1) both">
+  <div style="width:168px;height:168px;flex-shrink:0">
+    <canvas ref="{{ orbRef }}" style="width:168px;height:168px;display:block"></canvas>
+  </div>
+  <div style="min-width:0">
+    <h1 onClick="{{ goBack }}" title="Back to dashboard" style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.03em;font-size:clamp(32px,4.2vw,56px);font-weight:500;line-height:1;margin:0;color:#1e1e24;cursor:pointer" style-hover="opacity:.72">How Atlas <span style="color:#3461f2">works.</span></h1>
+    <p style="font-size:16px;color:#6d6a67;margin:14px 0 0;max-width:560px;line-height:1.5;text-wrap:pretty">A plain account of where your words go, what stays on this Mac, and what doesn't.</p>
+    <button onClick="{{ goBack }}" style="border:none;display:inline-flex;align-items:center;gap:8px;margin-top:14px;padding:7px 14px 7px 11px;border-radius:9999px;background:#fffdfa;color:#6d6a67;font:inherit;font-size:13px;cursor:pointer" style-hover="color:#1e1e24;background:#edebe7">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"></path><path d="m12 19-7-7 7-7"></path></svg>
+      <span>Back to dashboard</span>
+      <span style="padding:2px 7px;font-size:11px;background:#edebe7;border-radius:6px;color:#8b8681">Esc</span>
+    </button>
+  </div>
+  <div style="margin-left:auto;text-align:right;flex-shrink:0">
+    <div style="display:inline-flex;align-items:center;gap:8px;font-size:13px;color:#6d6a67"><span style="width:7px;height:7px;border-radius:50%;background:#0fae76;animation:pls 2s ease-in-out infinite"></span>Running on this Mac</div>
+    <p style="font-size:44px;font-weight:500;font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.03em;color:#1e1e24;margin:8px 0 0;line-height:1">4</p>
+    <p style="font-size:13px;color:#6d6a67;margin:4px 0 0">local services · 2 remote</p>
+  </div>
+</section>
+
+<main style="position:relative;z-index:10;max-width:1240px;margin:0 auto;padding:26px 24px 150px">
+
+  <div style="display:flex;align-items:baseline;justify-content:space-between;gap:20px;flex-wrap:wrap;margin:0 0 6px">
+    <div>
+      <p style="display:flex;align-items:center;gap:10px;font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#b6b1aa;margin:0 0 12px">The whole picture</p>
+      <h2 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.03em;font-size:34px;font-weight:500;margin:0;color:#1e1e24">One trip through Atlas</h2>
+    </div>
+    <p style="font-size:15px;line-height:1.6;color:#6d6a67;margin:0;max-width:420px;text-wrap:pretty">Follow it left to right along the top, and back along the bottom. Everything inside the pale panel happens here, on your machine.</p>
+  </div>
+
+  <div style="margin-top:22px;border-radius:36px;background:#f1eeea;padding:20px;overflow-x:auto">
+  <div style="position:relative;width:1160px;height:670px;margin:0 auto">
+
+    <svg viewBox="0 0 1160 670" style="position:absolute;inset:0;width:1160px;height:670px;pointer-events:none">
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#b6b1aa"></path></marker>
+        <marker id="ahb" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#3461f2"></path></marker>
+        <marker id="ahg" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#0a7a53"></path></marker>
+      </defs>
+
+      <rect x="8" y="8" width="1144" height="340" rx="26" fill="#fffdfa"></rect>
+      <rect x="8" y="416" width="1144" height="234" rx="26" fill="#eef1f7"></rect>
+      <line x1="8" y1="382" x2="1152" y2="382" stroke="#3461f2" stroke-opacity=".38" stroke-width="1.5" stroke-dasharray="8 8"></line>
+
+      <path d="M178,139 H204" stroke="#b6b1aa" stroke-width="1.6" fill="none" marker-end="url(#ah)"></path>
+      <path d="M380,139 H406" stroke="#b6b1aa" stroke-width="1.6" fill="none" marker-end="url(#ah)"></path>
+      <path d="M582,139 H608" stroke="#b6b1aa" stroke-width="1.6" fill="none" marker-end="url(#ah)"></path>
+      <path id="pOut" d="M794,139 H852 Q880,139 880,167 V402" stroke="#3461f2" stroke-width="2" fill="none" marker-end="url(#ahb)"></path>
+      <path id="pIn" d="M704,416 V306" stroke="#0a7a53" stroke-width="2" fill="none" marker-end="url(#ahg)"></path>
+      <path d="M614,257 H588" stroke="#b6b1aa" stroke-width="1.6" fill="none" marker-end="url(#ah)"></path>
+      <path d="M412,257 H386" stroke="#b6b1aa" stroke-width="1.6" fill="none" marker-end="url(#ah)"></path>
+      <path id="pLoop" d="M295,214 C295,192 400,204 497,188" stroke="#b6b1aa" stroke-width="1.6" fill="none" stroke-dasharray="5 5" marker-end="url(#ah)"></path>
+
+      <sc-if value="{{ animate }}" hint-placeholder-val="{{ true }}">
+        <g>
+          <circle r="3.5" fill="#3461f2"><animateMotion dur="2.6s" repeatCount="indefinite" path="M794,139 H852 Q880,139 880,167 V402"></animateMotion></circle>
+          <circle r="3.5" fill="#0a7a53"><animateMotion dur="2.6s" begin="1.3s" repeatCount="indefinite" path="M704,416 V306"></animateMotion></circle>
+          <circle r="3" fill="#3461f2"><animateMotion dur="1.5s" repeatCount="indefinite" path="M178,139 H406"></animateMotion></circle>
+          <circle r="3" fill="#3461f2"><animateMotion dur="1.5s" begin=".5s" repeatCount="indefinite" path="M406,139 H608"></animateMotion></circle>
+        </g>
+      </sc-if>
+    </svg>
+
+    <p style="position:absolute;left:30px;top:26px;margin:0;font-size:11.5px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#8b8681">On this Mac</p>
+    <p style="position:absolute;left:30px;top:48px;margin:0;font-size:12.5px;color:#6d6a67">Nothing in this panel is sent anywhere</p>
+
+    <div style="position:absolute;left:28px;top:96px;width:150px;height:86px;box-sizing:border-box;background:#f9f7f4;border-radius:16px;padding:13px 14px">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#3461f2" stroke-width="1.8" stroke-linecap="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><path d="M12 19v3"></path></svg>
+      <p style="font-size:14px;font-weight:600;letter-spacing:-.01em;margin:7px 0 0">You speak</p>
+      <p style="font-size:11.5px;color:#6d6a67;margin:3px 0 0;line-height:1.35">or type, the same way</p>
+    </div>
+
+    <div style="position:absolute;left:204px;top:96px;width:176px;height:86px;box-sizing:border-box;background:#fffdfa;border-radius:16px;padding:13px 14px;box-shadow:0 10px 24px -20px rgba(30,30,36,.5)">
+      <p style="font-size:14px;font-weight:600;letter-spacing:-.01em;margin:0">Atlas hears you</p>
+      <p style="font-size:11.5px;color:#6d6a67;margin:4px 0 0;line-height:1.4">Catches its name, notices when you stop, turns sound into words</p>
+    </div>
+
+    <div style="position:absolute;left:406px;top:96px;width:176px;height:86px;box-sizing:border-box;background:#fffdfa;border-radius:16px;padding:13px 14px;box-shadow:0 10px 24px -20px rgba(30,30,36,.5)">
+      <p style="font-size:14px;font-weight:600;letter-spacing:-.01em;margin:0">It looks things up</p>
+      <p style="font-size:11.5px;color:#6d6a67;margin:4px 0 0;line-height:1.4">Searches what you've told it and picks the few bits that matter here</p>
+    </div>
+
+    <div style="position:absolute;left:608px;top:96px;width:186px;height:86px;box-sizing:border-box;background:#eef2fe;border-radius:16px;padding:13px 14px">
+      <p style="font-size:14px;font-weight:600;letter-spacing:-.01em;margin:0;color:#2f4bbd">It writes the request</p>
+      <p style="font-size:11.5px;color:#6d6a67;margin:4px 0 0;line-height:1.4">Your question, plus those bits, as one block of text</p>
+    </div>
+
+    <div style="position:absolute;left:608px;top:214px;width:186px;height:92px;box-sizing:border-box;background:#fffdfa;border-radius:16px;padding:13px 14px;box-shadow:0 10px 24px -20px rgba(30,30,36,.5)">
+      <p style="font-size:14px;font-weight:600;letter-spacing:-.01em;margin:0">It answers you</p>
+      <p style="font-size:11.5px;color:#6d6a67;margin:4px 0 0;line-height:1.4">Speaks out loud, shows the text, moves the sphere</p>
+    </div>
+
+    <div style="position:absolute;left:406px;top:214px;width:176px;height:92px;box-sizing:border-box;background:#fffdfa;border-radius:16px;padding:13px 14px;box-shadow:0 10px 24px -20px rgba(30,30,36,.5)">
+      <p style="font-size:14px;font-weight:600;letter-spacing:-.01em;margin:0">It decides what to keep</p>
+      <p style="font-size:11.5px;color:#6d6a67;margin:4px 0 0;line-height:1.4">Most of a conversation is not worth remembering</p>
+    </div>
+
+    <div style="position:absolute;left:204px;top:214px;width:176px;height:92px;box-sizing:border-box;background:#f9f7f4;border-radius:16px;padding:13px 14px">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6d6a67" stroke-width="1.6"><ellipse cx="12" cy="5" rx="8" ry="3"></ellipse><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"></path><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"></path></svg>
+      <p style="font-size:14px;font-weight:600;letter-spacing:-.01em;margin:6px 0 0">It writes it down</p>
+      <p style="font-size:11.5px;color:#6d6a67;margin:3px 0 0;line-height:1.35">Into one file, here</p>
+    </div>
+
+    <p style="position:absolute;left:296px;top:196px;margin:0;font-size:11px;color:#b6b1aa;font-style:italic">next time, it remembers</p>
+
+    <div style="position:absolute;left:28px;top:190px;width:150px;box-sizing:border-box;background:#f9f7f4;border-radius:16px;padding:13px">
+      <p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#8b8681">Stays here</p>
+      <p style="margin:9px 0 0;font-size:12.5px;color:#33312f;line-height:1.75">Your memories<br>Your documents<br>The search index<br>Your recordings<br>The wake word</p>
+    </div>
+
+    <sc-if value="{{ technical }}" hint-placeholder-val="{{ false }}">
+      <span style="position:absolute;left:204px;top:322px;font-size:11.5px;font-family:ui-monospace,'SF Mono',Menlo,monospace;color:#8b8681">SQLite + sqlite-vec · Silero VAD · openWakeWord · Whisper · local TTS</span>
+    </sc-if>
+
+    <div style="position:absolute;left:24px;top:370px;padding:2px 10px;background:#f1eeea;font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#3461f2">The edge of your Mac</div>
+
+    <div style="position:absolute;left:370px;top:356px;width:318px;text-align:right;background:#f1eeea;padding:4px 10px;box-sizing:border-box">
+      <p style="margin:0;font-size:12.5px;font-weight:600;color:#0a7a53">Comes back: the reply</p>
+      <p style="margin:2px 0 0;font-size:12px;color:#6d6a67;line-height:1.4">Text, which Atlas then speaks in your chosen voice — here, not out there.</p>
+    </div>
+
+    <div style="position:absolute;left:896px;top:356px;width:250px;background:#f1eeea;padding:4px 10px;box-sizing:border-box">
+      <p style="margin:0;font-size:12.5px;font-weight:600;color:#2f4bbd">Leaves: the request</p>
+      <p style="margin:2px 0 0;font-size:12px;color:#6d6a67;line-height:1.4">What you said, plus the memories Atlas chose to include.</p>
+    </div>
+
+    <p style="position:absolute;left:40px;top:436px;margin:0;font-size:11.5px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#8b8681">Somewhere else</p>
+
+    <div style="position:absolute;left:40px;top:468px;width:520px;height:150px;box-sizing:border-box;background:#fffdfa;border-radius:18px;padding:18px 20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <p style="font-size:16px;font-weight:600;letter-spacing:-.01em;margin:0">Anthropic</p>
+        <span style="font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:9999px;background:rgba(52,97,242,.1);color:#2f4bbd">While you're talking</span>
+      </div>
+      <p style="font-size:13.5px;color:#6d6a67;margin:9px 0 0;line-height:1.55">Every reply you hear comes from here. Chosen for the quality of the conversation, and because it will hold a long thread of context without losing the thread.</p>
+      <p style="font-size:12.5px;color:#b6b1aa;margin:10px 0 0">Sees: the request. Doesn't see: your files, your index, your recordings.</p>
+    </div>
+
+    <div style="position:absolute;left:600px;top:468px;width:520px;height:150px;box-sizing:border-box;background:#fffdfa;border-radius:18px;padding:18px 20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <p style="font-size:16px;font-weight:600;letter-spacing:-.01em;margin:0">AWS Bedrock, in Europe</p>
+        <span style="font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:9999px;background:#edebe7;color:#55524f">While you're away</span>
+      </div>
+      <p style="font-size:13.5px;color:#6d6a67;margin:9px 0 0;line-height:1.55">Overnight summaries, research, the daily briefing. Slower and cheaper, and the data stays inside the EU — which matters more for work that runs unattended.</p>
+      <p style="font-size:12.5px;color:#b6b1aa;margin:10px 0 0">Sees: the request. Runs on a schedule you set, and you can switch it off.</p>
+    </div>
+
+  </div>
+  </div>
+
+  <section style="margin-top:64px;border-radius:36px;background:#1e1e24;color:#f9f7f4;padding:44px 46px;position:relative;overflow:hidden">
+    <p style="display:flex;align-items:center;gap:10px;font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:rgba(249,247,244,.62);margin:0 0 18px">The part worth being clear about</p>
+    <h2 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.03em;font-size:clamp(28px,3.4vw,44px);font-weight:500;line-height:1.12;margin:0;max-width:820px;text-wrap:pretty">Your memories stay on this Mac. The requests built from them do not.</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:28px;margin-top:30px">
+      <div>
+        <p style="font-size:15px;line-height:1.65;color:rgba(249,247,244,.78);margin:0;text-wrap:pretty">Atlas keeps everything it knows about you in a single file on your own disk. No copy is uploaded, no account holds it, and deleting it deletes it.</p>
+      </div>
+      <div>
+        <p style="font-size:15px;line-height:1.65;color:rgba(249,247,244,.78);margin:0;text-wrap:pretty">But to answer you, it has to send your question somewhere — and it sends the relevant memories along with it, because that is what makes the answer feel like yours.</p>
+      </div>
+      <div>
+        <p style="font-size:15px;line-height:1.65;color:rgba(249,247,244,.78);margin:0;text-wrap:pretty">So the file never travels. Sentences from it do, a handful at a time, every time you ask something. That's the honest shape of it.</p>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:30px;padding-top:26px">
+      <a href="Atlas%20Core.dc.html" style="display:inline-flex;align-items:center;gap:9px;height:40px;padding:0 20px;border-radius:9999px;background:#3461f2;color:#fff;font-size:14px;font-weight:500" style-hover="background:#5b7cff">See exactly what Atlas remembers</a>
+      <span style="font-size:13.5px;color:rgba(249,247,244,.65)">Every memory is listed, and every one can be removed.</span>
+    </div>
+  </section>
+
+  <section style="margin-top:64px">
+    <p style="display:flex;align-items:center;gap:10px;font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#b6b1aa;margin:0 0 12px">Kept here</p>
+    <h2 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.03em;font-size:34px;font-weight:500;margin:0 0 10px;color:#1e1e24">Four things that never go online</h2>
+    <p style="font-size:16px;line-height:1.65;color:#6d6a67;margin:0 0 26px;max-width:620px;text-wrap:pretty">These run on your machine because they have to be fast, because they're always on, or because sending them would be indefensible.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:16px">
+
+      <div style="background:rgba(255,253,250,.8);border-radius:30px;padding:24px">
+        <div style="width:40px;height:40px;border-radius:12px;background:#edebe7;display:flex;align-items:center;justify-content:center;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><ellipse cx="12" cy="5" rx="8" ry="3"></ellipse><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"></path><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"></path></svg></div>
+        <h3 style="font-size:17px;font-weight:600;letter-spacing:-.01em;margin:16px 0 7px">The memory file</h3>
+        <p style="font-size:14px;line-height:1.6;color:#6d6a67;margin:0;text-wrap:pretty">One database on your disk holding every fact, preference and person Atlas has learned. You can open it, back it up, or delete it.</p>
+        <sc-if value="{{ technical }}" hint-placeholder-val="{{ false }}"><p style="font-size:12px;font-family:ui-monospace,'SF Mono',Menlo,monospace;color:#8b8681;margin:12px 0 0">SQLite, ~/Library/Application Support/Atlas</p></sc-if>
+      </div>
+
+      <div style="background:rgba(255,253,250,.8);border-radius:30px;padding:24px">
+        <div style="width:40px;height:40px;border-radius:12px;background:#edebe7;display:flex;align-items:center;justify-content:center;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.6-3.6"></path></svg></div>
+        <h3 style="font-size:17px;font-weight:600;letter-spacing:-.01em;margin:16px 0 7px">Search by meaning</h3>
+        <p style="font-size:14px;line-height:1.6;color:#6d6a67;margin:0;text-wrap:pretty">Ask about "the pitch" and it finds the note that says "Innovo deck". The maths that makes that work runs locally, so your documents are never indexed by anyone else.</p>
+        <sc-if value="{{ technical }}" hint-placeholder-val="{{ false }}"><p style="font-size:12px;font-family:ui-monospace,'SF Mono',Menlo,monospace;color:#8b8681;margin:12px 0 0">On-device embeddings, sqlite-vec ANN</p></sc-if>
+      </div>
+
+      <div style="background:rgba(255,253,250,.8);border-radius:30px;padding:24px">
+        <div style="width:40px;height:40px;border-radius:12px;background:#edebe7;display:flex;align-items:center;justify-content:center;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><path d="M12 19v3"></path></svg></div>
+        <h3 style="font-size:17px;font-weight:600;letter-spacing:-.01em;margin:16px 0 7px">Listening for its name</h3>
+        <p style="font-size:14px;line-height:1.6;color:#6d6a67;margin:0;text-wrap:pretty">The microphone is open, and nothing it hears goes anywhere until you say the wake phrase. That check happens here, on a model small enough to run constantly.</p>
+        <sc-if value="{{ technical }}" hint-placeholder-val="{{ false }}"><p style="font-size:12px;font-family:ui-monospace,'SF Mono',Menlo,monospace;color:#8b8681;margin:12px 0 0">openWakeWord, ONNX runtime</p></sc-if>
+      </div>
+
+      <div style="background:rgba(255,253,250,.8);border-radius:30px;padding:24px">
+        <div style="width:40px;height:40px;border-radius:12px;background:#edebe7;display:flex;align-items:center;justify-content:center;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg></div>
+        <h3 style="font-size:17px;font-weight:600;letter-spacing:-.01em;margin:16px 0 7px">Knowing when you've stopped</h3>
+        <p style="font-size:14px;line-height:1.6;color:#6d6a67;margin:0;text-wrap:pretty">Atlas waits for a real pause rather than a fixed timer, and it stops talking the moment you start. Both need to react in milliseconds, which rules out a round trip.</p>
+        <sc-if value="{{ technical }}" hint-placeholder-val="{{ false }}"><p style="font-size:12px;font-family:ui-monospace,'SF Mono',Menlo,monospace;color:#8b8681;margin:12px 0 0">Silero VAD, barge-in on the local gateway</p></sc-if>
+      </div>
+
+    </div>
+  </section>
+
+  <section style="margin-top:64px;display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:20px">
+
+    <div style="background:#f1eeea;border-radius:36px;padding:30px">
+      <p style="display:flex;align-items:center;gap:10px;font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#b6b1aa;margin:0 0 12px">How it remembers</p>
+      <h2 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.03em;font-size:26px;font-weight:500;margin:0 0 8px;color:#1e1e24">Three kinds of memory</h2>
+      <p style="font-size:14.5px;line-height:1.6;color:#6d6a67;margin:0 0 22px;text-wrap:pretty">They behave differently on purpose. Only the third one lasts.</p>
+
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <div style="display:flex;gap:16px;padding:19px 0">
+          <div style="width:34px;flex-shrink:0;font-size:13px;font-weight:600;color:#b6b1aa;font-variant-numeric:tabular-nums">01</div>
+          <div>
+            <p style="font-size:15px;font-weight:600;margin:0">This conversation</p>
+            <p style="font-size:13.5px;line-height:1.55;color:#6d6a67;margin:5px 0 0;text-wrap:pretty">What you've said in the last few minutes. Held in the moment, gone when the conversation ends.</p>
+          </div>
+        </div>
+        <div style="display:flex;gap:16px;padding:19px 0">
+          <div style="width:34px;flex-shrink:0;font-size:13px;font-weight:600;color:#b6b1aa;font-variant-numeric:tabular-nums">02</div>
+          <div>
+            <p style="font-size:15px;font-weight:600;margin:0">What it fetched</p>
+            <p style="font-size:13.5px;line-height:1.55;color:#6d6a67;margin:5px 0 0;text-wrap:pretty">A handful of memories pulled in because they seemed relevant to what you just asked. Assembled fresh each turn, then discarded.</p>
+          </div>
+        </div>
+        <div style="display:flex;gap:16px;padding:19px 0">
+          <div style="width:34px;flex-shrink:0;font-size:13px;font-weight:600;color:#3461f2;font-variant-numeric:tabular-nums">03</div>
+          <div>
+            <p style="font-size:15px;font-weight:600;margin:0">What it keeps</p>
+            <p style="font-size:13.5px;line-height:1.55;color:#6d6a67;margin:5px 0 0;text-wrap:pretty">Facts filed under a category — who you are, your work, the people around you, what you like — each with a sense of how much it matters. This is the file on your disk.</p>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px">
+              <span style="font-size:12px;padding:4px 10px;border-radius:9999px;background:#fffdfa;color:#33312f">identity</span>
+              <span style="font-size:12px;padding:4px 10px;border-radius:9999px;background:#fffdfa;color:#33312f">work</span>
+              <span style="font-size:12px;padding:4px 10px;border-radius:9999px;background:#fffdfa;color:#33312f">relationships</span>
+              <span style="font-size:12px;padding:4px 10px;border-radius:9999px;background:#fffdfa;color:#33312f">preferences</span>
+              <span style="font-size:12px;padding:4px 10px;border-radius:9999px;background:#fffdfa;color:#8b8681">+ 14 more</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:#f1eeea;border-radius:36px;padding:30px">
+      <p style="display:flex;align-items:center;gap:10px;font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#b6b1aa;margin:0 0 12px">How it learns</p>
+      <h2 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.03em;font-size:26px;font-weight:500;margin:0 0 8px;color:#1e1e24">Learning happens after the fact</h2>
+      <p style="font-size:14.5px;line-height:1.6;color:#6d6a67;margin:0 0 22px;text-wrap:pretty">Nothing about you is trained into a model. Learning here means writing things down and reading them back.</p>
+
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:16px;background:#fffdfa">
+          <span style="width:26px;height:26px;flex-shrink:0;border-radius:8px;background:#edebe7;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#55524f">1</span>
+          <div><p style="font-size:14.5px;font-weight:600;margin:0">Notice</p><p style="font-size:13px;color:#6d6a67;margin:2px 0 0">Something you said looks worth keeping</p></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:16px;background:#fffdfa">
+          <span style="width:26px;height:26px;flex-shrink:0;border-radius:8px;background:#edebe7;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#55524f">2</span>
+          <div><p style="font-size:14.5px;font-weight:600;margin:0">File it</p><p style="font-size:13px;color:#6d6a67;margin:2px 0 0">Given a category and a weight, then written to disk</p></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:16px;background:#fffdfa">
+          <span style="width:26px;height:26px;flex-shrink:0;border-radius:8px;background:#edebe7;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#55524f">3</span>
+          <div><p style="font-size:14.5px;font-weight:600;margin:0">Reconcile</p><p style="font-size:13px;color:#6d6a67;margin:2px 0 0">If it contradicts something older, the older one is superseded, not silently overwritten</p></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:16px;background:#fffdfa">
+          <span style="width:26px;height:26px;flex-shrink:0;border-radius:8px;background:rgba(52,97,242,.12);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#2f4bbd">4</span>
+          <div><p style="font-size:14.5px;font-weight:600;margin:0;color:#2f4bbd">Recall</p><p style="font-size:13px;color:#6d6a67;margin:2px 0 0">Next time it's relevant, it comes back into the request</p></div>
+        </div>
+      </div>
+      <p style="font-size:13.5px;line-height:1.6;color:#6d6a67;margin:20px 0 0;text-wrap:pretty">Overnight, the same loop runs without you: summarising the day, following up on research you asked for. That's the work that goes to Bedrock in Europe.</p>
+      <p style="margin:14px 0 0"><a href="Atlas%20Teach.dc.html" style="font-size:14px;font-weight:500">Teach it something directly →</a></p>
+    </div>
+
+  </section>
+
+  <section style="margin-top:64px;display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:20px;align-items:start">
+
+    <div style="background:rgba(255,253,250,.8);border-radius:36px;padding:30px">
+      <p style="display:flex;align-items:center;gap:10px;font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#b6b1aa;margin:0 0 12px">The sphere</p>
+      <h2 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.03em;font-size:26px;font-weight:500;margin:0 0 8px;color:#1e1e24">It isn't decoration</h2>
+      <p style="font-size:14.5px;line-height:1.6;color:#6d6a67;margin:0 0 20px;text-wrap:pretty">Twenty-six thousand points, drawn on your machine sixty times a second. Its shape is the one honest read-out of what Atlas is doing — you should be able to tell from across the room.</p>
+      <div style="display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:14px;padding:14px 0"><span style="width:9px;height:9px;border-radius:50%;background:#b6b1aa;flex-shrink:0"></span><span style="font-size:14px;font-weight:500;width:104px;flex-shrink:0">Resting</span><span style="font-size:13px;color:#6d6a67">Slow drift. Nothing is being sent.</span></div>
+        <div style="display:flex;align-items:center;gap:14px;padding:14px 0"><span style="width:9px;height:9px;border-radius:50%;background:#3461f2;flex-shrink:0"></span><span style="font-size:14px;font-weight:500;width:104px;flex-shrink:0">Listening</span><span style="font-size:13px;color:#6d6a67">Reacting to your voice in real time.</span></div>
+        <div style="display:flex;align-items:center;gap:14px;padding:14px 0"><span style="width:9px;height:9px;border-radius:50%;background:#3950e6;flex-shrink:0"></span><span style="font-size:14px;font-weight:500;width:104px;flex-shrink:0">Thinking</span><span style="font-size:13px;color:#6d6a67">The request has left. This is the honest wait.</span></div>
+        <div style="display:flex;align-items:center;gap:14px;padding:14px 0"><span style="width:9px;height:9px;border-radius:50%;background:#0fae76;flex-shrink:0"></span><span style="font-size:14px;font-weight:500;width:104px;flex-shrink:0">Working</span><span style="font-size:13px;color:#6d6a67">A job is running without you.</span></div>
+        <div style="display:flex;align-items:center;gap:14px;padding:14px 0"><span style="width:9px;height:9px;border-radius:50%;background:#d0453a;flex-shrink:0"></span><span style="font-size:14px;font-weight:500;width:104px;flex-shrink:0">Muted</span><span style="font-size:13px;color:#6d6a67">The microphone is off. Nothing is being heard.</span></div>
+      </div>
+    </div>
+
+    <div style="background:rgba(255,253,250,.8);border-radius:36px;padding:30px">
+      <p style="display:flex;align-items:center;gap:10px;font-size:12px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#b6b1aa;margin:0 0 12px">In short</p>
+      <h2 style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.03em;font-size:26px;font-weight:500;margin:0 0 20px;color:#1e1e24">What runs where</h2>
+      <div style="display:flex;flex-direction:column">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:18px 0"><span style="font-size:14.5px;color:#33312f">The app you're looking at</span><span style="font-size:13px;font-weight:500;color:#0a7a53;flex-shrink:0">This Mac</span></div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:18px 0"><span style="font-size:14.5px;color:#33312f">Voice: hearing, waking, speaking</span><span style="font-size:13px;font-weight:500;color:#0a7a53;flex-shrink:0">This Mac</span></div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:18px 0"><span style="font-size:14.5px;color:#33312f">Memories, documents, search</span><span style="font-size:13px;font-weight:500;color:#0a7a53;flex-shrink:0">This Mac</span></div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:18px 0"><span style="font-size:14.5px;color:#33312f">Deciding what to say back</span><span style="font-size:13px;font-weight:500;color:#2f4bbd;flex-shrink:0">Anthropic</span></div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:18px 0"><span style="font-size:14.5px;color:#33312f">Overnight summaries and research</span><span style="font-size:13px;font-weight:500;color:#2f4bbd;flex-shrink:0">Bedrock, EU</span></div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:18px 0"><span style="font-size:14.5px;color:#33312f">Your account and settings</span><span style="font-size:13px;font-weight:500;color:#0a7a53;flex-shrink:0">This Mac</span></div>
+      </div>
+      <sc-if value="{{ technical }}" hint-placeholder-val="{{ false }}">
+        <p style="font-size:12px;font-family:ui-monospace,'SF Mono',Menlo,monospace;line-height:1.7;color:#8b8681;margin:20px 0 0;padding-top:18px">Tauri + React shell · Rust sidecar (voice gateway, WS-B duplex) · atlas-brain orchestrator · SQLite + sqlite-vec · Anthropic Messages API · AWS Bedrock eu-central-1</p>
+      </sc-if>
+      <p style="font-size:13.5px;line-height:1.6;color:#6d6a67;margin:20px 0 0;padding-top:18px;text-wrap:pretty">Turn off the network and Atlas still hears you, still knows you, and still can't answer you. That division is deliberate.</p>
+    </div>
+
+  </section>
+
+</main>
+
+<nav style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:92;display:flex;align-items:center;gap:3px;padding:5px;border-radius:9999px;background:#1e1e24;box-shadow:0 18px 44px -12px rgba(30,30,36,.5)">
+  <a href="Atlas%20Dashboard%20(Current).dc.html" title="Home" style="display:flex;align-items:center;justify-content:center;height:32px;padding:0 9px;border-radius:9999px;color:rgba(249,247,244,.8)" style-hover="color:#fff;background:rgba(249,247,244,.12)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></a>
+  <a href="Atlas%20Core.dc.html" title="Core" style="display:flex;align-items:center;justify-content:center;height:32px;padding:0 9px;border-radius:9999px;color:rgba(249,247,244,.8)" style-hover="color:#fff;background:rgba(249,247,244,.12)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="3"></rect><rect x="9" y="9" width="6" height="6" rx="1"></rect><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"></path></svg></a>
+  <a href="Atlas%20Teach.dc.html" title="Teach" style="display:flex;align-items:center;justify-content:center;height:32px;padding:0 9px;border-radius:9999px;color:rgba(249,247,244,.8)" style-hover="color:#fff;background:rgba(249,247,244,.12)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"></path></svg></a>
+  <a href="Atlas%20Mail.dc.html" title="Mail" style="display:flex;align-items:center;justify-content:center;height:32px;padding:0 9px;border-radius:9999px;color:rgba(249,247,244,.8)" style-hover="color:#fff;background:rgba(249,247,244,.12)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="3"></rect><path d="m3.6 7 8.4 5.6L20.4 7"></path></svg></a>
+  <span style="display:flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:9999px;background:#3461f2;color:#fff;font-size:13px;font-weight:500"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="2.5"></circle><path d="M12 2v7M12 15v7M4.2 6.5l5.6 3.2M14.2 14.3l5.6 3.2M19.8 6.5l-5.6 3.2M9.8 14.3l-5.6 3.2"></path></svg>Architecture</span>
+  <button title="Speak to Atlas" style="display:flex;align-items:center;justify-content:center;height:32px;padding:0 9px;border-radius:9999px;color:rgba(249,247,244,.8);background:transparent;border:none;font-family:inherit;cursor:pointer" style-hover="color:#fff;background:rgba(249,247,244,.12)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><path d="M12 19v3"></path></svg></button>
+  <span title="Katherine" style="width:32px;height:32px;border-radius:50%;background:rgba(249,247,244,.14);color:#f9f7f4;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-left:2px">K</span>
+</nav>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;technical&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Content&quot},&quot;animate&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Content&quot}}">
+class Component extends DCLogic {
+  componentDidMount() {
+    this._esc = (e) => { if (e.key === 'Escape') this.back(); };
+    window.addEventListener('keydown', this._esc);
+  }
+  componentWillUnmount() { window.removeEventListener('keydown', this._esc); }
+  back() { window.location.href = 'Atlas Dashboard (Current).dc.html'; }
+  renderVals() {
+    return {
+      technical: this.props.technical ?? false,
+      animate: this.props.animate ?? true,
+      goBack: () => this.back(),
+      orbRef: (el) => { if (el && window.AtlasSphere) window.AtlasSphere.mount(el, () => ({ state: 'thinking' })); },
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<style>
+button,input,textarea,select{border:none}@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Hanken+Grotesk:wght@500;600;700&display=swap');
+html,body{margin:0;padding:0;background:#f9f7f4}
+a{color:#3461f2;text-decoration:none}a:hover{color:#5b7cff}
+*{box-sizing:border-box}
+input{font:inherit}
+@keyframes sh-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes sh-pulse{0%,100%{opacity:1}50%{opacity:.4}}
+</style>
+<script src="atlas-sphere.js"></script>
+<script src="atlas-models.js"></script>
+<script src="atlas-transition.js"></script>
+</helmet>
+<div ref="{{ rootRef }}" data-screen-label="Smart home" style="position:relative;min-height:100vh;background:{{ pageBg }};color:{{ pageFg }};font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:auto">
+<div style="position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none">
+<div style="position:absolute;inset:0;background:{{ washA }}"></div>
+<div style="position:absolute;top:-260px;right:-170px;width:800px;height:800px;border-radius:50%;filter:blur(64px);background:{{ washB }}"></div>
+<div style="position:absolute;top:-160px;left:-200px;width:700px;height:560px;border-radius:50%;filter:blur(64px);background:{{ washC }}"></div>
+</div>
+
+<div onMouseEnter="{{ openNav }}" onMouseLeave="{{ closeNav }}" style="position:fixed;left:20px;top:16px;z-index:90;display:{{ launcherShow }};align-items:center;justify-content:center;width:86px;height:86px">
+<canvas ref="{{ orbRef }}" style="width:86px;height:86px;display:block;cursor:pointer"></canvas>
+<sc-for list="{{ navRing }}" as="n" hint-placeholder-count="6">
+<a href="{{ n.href }}" data-id="{{ n.id }}" onClick="{{ navGo }}" title="{{ n.label }}" style="position:absolute;left:calc(50% + {{ n.lx }});top:calc(50% + {{ n.ly }});transform:translate(-50%,-50%) scale({{ n.scale }});display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 13px;border-radius:9999px;white-space:nowrap;text-decoration:none;font-size:12px;font-weight:500;background:{{ n.bg }};color:{{ n.fg }};box-shadow:{{ n.ring }};opacity:{{ n.op }};pointer-events:{{ n.pe }};transition:transform .42s cubic-bezier(.22,1,.36,1),opacity .3s ease;transition-delay:{{ n.delay }}"><span style="width:6px;height:6px;border-radius:50%;background:{{ n.dot }}"></span>{{ n.label }}</a>
+</sc-for>
+</div>
+<sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+<main style="position:relative;z-index:10;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-auto-flow:row dense;grid-auto-rows:126px;gap:14px;min-width:1400px;max-width:1720px;margin:0 auto;padding:20px 28px 132px;animation:sh-rise .7s cubic-bezier(.22,1,.36,1) both">
+<div onMouseEnter="{{ openNav }}" onMouseLeave="{{ closeNav }}" style="position:relative;grid-column:span 2;grid-row:span 2;display:flex;align-items:center;justify-content:center;z-index:{{ navZ }}">
+<canvas ref="{{ orbRef }}" style="width:200px;height:200px;display:block;cursor:pointer"></canvas>
+<span style="position:absolute;left:50%;bottom:6px;transform:translateX(-50%);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:{{ hintFg }};opacity:{{ navHintOp }};transition:opacity .3s ease;pointer-events:none;white-space:nowrap">Hover to navigate</span>
+<sc-for list="{{ navRing }}" as="n" hint-placeholder-count="6">
+<a href="{{ n.href }}" data-id="{{ n.id }}" onClick="{{ navGo }}" title="{{ n.label }}" style="position:absolute;left:calc(50% + {{ n.x }});top:calc(50% + {{ n.y }});transform:translate(-50%,-50%) scale({{ n.scale }});display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 14px;border-radius:9999px;white-space:nowrap;text-decoration:none;font-size:12px;font-weight:500;letter-spacing:-.01em;background:{{ n.bg }};color:{{ n.fg }};box-shadow:{{ n.ring }};opacity:{{ n.op }};pointer-events:{{ n.pe }};transition:transform .42s cubic-bezier(.22,1,.36,1),opacity .3s ease;transition-delay:{{ n.delay }}"><span style="width:6px;height:6px;border-radius:50%;background:{{ n.dot }}"></span>{{ n.label }}</a>
+</sc-for>
+</div>
+<div style="grid-column:span 4;grid-row:span 2;display:flex;flex-direction:column;justify-content:center;padding:22px;border-radius:22px;background:{{ heroBg }};backdrop-filter:{{ heroBlur }};box-shadow:{{ heroRing }}">
+<p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ labelFg }}">The house</p>
+<p style="margin:12px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:40px;font-weight:500;letter-spacing:-.035em;line-height:1;color:{{ pageFg }}">{{ houseState }}</p>
+<p style="margin:10px 0 0;font-size:13.5px;line-height:1.5;color:{{ mutFg }};text-wrap:pretty">{{ houseLine }}</p>
+<div style="display:flex;gap:7px;margin-top:16px;flex-wrap:wrap">
+<sc-for list="{{ scenes }}" as="s" hint-placeholder-count="4">
+<button data-id="{{ s.id }}" onClick="{{ runScene }}" style="border:none;display:inline-flex;align-items:center;gap:7px;height:31px;padding:0 13px;border-radius:9999px;cursor:pointer;font-size:12px;font-weight:500;background:{{ s.bg }};color:{{ s.fg }}" style-hover="">{{ s.label }}</button>
+</sc-for>
+</div>
+</div>
+<section data-screen-label="Recently operated" onMouseEnter="{{ openRecent }}" onMouseLeave="{{ closeRecent }}" style="position:relative;grid-column:span 12;grid-row:span 2;z-index:{{ recentZ }}">
+<div style="position:absolute;left:0;right:0;top:{{ surfTop }};bottom:{{ surfBottom }};height:{{ surfH }};padding:14px 16px;border-radius:22px;overflow:hidden;background:{{ heroBg }};backdrop-filter:{{ heroBlur }};box-shadow:{{ surfShadow }};transition:height .4s cubic-bezier(.22,1,.36,1),box-shadow .32s ease">
+<header style="display:flex;align-items:baseline;gap:12px;height:20px">
+<p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ labelFg }}">Recently operated</p>
+<span style="margin-left:auto;font-size:10.5px;color:{{ hintFg }};transition:opacity .3s ease;opacity:{{ hintOp }}">Hover for controls</span>
+</header>
+<div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:10px">
+<sc-for list="{{ recent }}" as="d" hint-placeholder-count="5">
+<div style="display:flex;align-items:flex-start;gap:11px;padding:9px 11px;border-radius:16px;background:{{ d.stage }};transition:background .3s ease">
+<div style="position:relative;width:82px;height:{{ tileH }};flex-shrink:0;border-radius:12px;overflow:hidden">
+<canvas data-key="{{ d.key }}" data-model="{{ d.model }}" ref="{{ devRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
+</div>
+<div style="flex:1;min-width:0">
+<div style="display:flex;align-items:center;gap:8px">
+<span style="width:6px;height:6px;border-radius:50%;flex-shrink:0;background:{{ d.dotBg }}"></span>
+<span style="flex:1;min-width:0;font-size:12px;font-weight:600;letter-spacing:-.015em;color:{{ pageFg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ d.name }}</span>
+</div>
+<p style="margin:4px 0 0;font-size:11.5px;font-variant-numeric:tabular-nums;color:{{ mutFg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ d.readout }}</p>
+<div style="max-height:{{ ctrlMax }};opacity:{{ ctrlOp }};overflow:hidden;transition:max-height .4s cubic-bezier(.22,1,.36,1),opacity .3s ease">
+<p style="margin:6px 0 0;font-size:10.5px;color:{{ hintFg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ d.room }} · {{ d.when }}</p>
+<p style="margin:3px 0 0;font-size:11.5px;color:{{ mutFg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ d.state }}</p>
+<div style="margin-top:9px;min-height:32px;display:flex;align-items:center">
+<sc-if value="{{ d.isSlider }}" hint-placeholder-val="{{ false }}">
+<span style="position:relative;display:block;flex:1;min-width:0;height:26px">
+<span style="position:absolute;left:0;right:0;top:10px;height:6px;border-radius:9999px;background:{{ d.trackBg }};overflow:hidden"><span style="display:block;height:100%;width:{{ d.pct }};border-radius:9999px;background:{{ d.fillBg }};transition:width .12s linear"></span></span>
+<span style="position:absolute;top:4px;left:{{ d.thumbLeft }};width:18px;height:18px;border-radius:50%;background:{{ d.knobBg }};box-shadow:0 2px 8px -2px rgba(30,30,36,.55),inset 0 0 0 1px {{ d.hair }};transition:left .12s linear;pointer-events:none"></span>
+<input type="range" min="0" max="100" value="{{ d.sliderVal }}" data-key="{{ d.key }}" onInput="{{ onDevSlide }}" onChange="{{ onDevSlide }}" style="border:none;position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer"/>
+</span>
+</sc-if>
+<sc-if value="{{ d.isToggle }}" hint-placeholder-val="{{ false }}">
+<span data-key="{{ d.key }}" onClick="{{ onDevToggle }}" style="display:flex;align-items:center;gap:10px;width:100%;cursor:pointer">
+<span style="flex:1;min-width:0;font-size:12px;font-weight:500;color:{{ mutFg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ d.readout }}</span>
+<span style="width:46px;height:26px;border-radius:9999px;flex-shrink:0;padding:3px;display:flex;align-items:center;justify-content:{{ d.knob }};background:{{ d.switchBg }};box-shadow:inset 0 0 0 1px {{ d.hair }};transition:background .28s cubic-bezier(.22,1,.36,1)"><span style="width:20px;height:20px;border-radius:50%;background:{{ d.knobBg }};box-shadow:0 2px 7px -2px rgba(30,30,36,.6)"></span></span>
+</span>
+</sc-if>
+<sc-if value="{{ d.isStep }}" hint-placeholder-val="{{ false }}">
+<button data-key="{{ d.key }}" data-d="-1" onClick="{{ onDevStep }}" style="border:none;width:30px;height:30px;border-radius:9999px;cursor:pointer;background:transparent;color:{{ pageFg }};font-size:15px;line-height:1">−</button>
+<span style="flex:1;text-align:center;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;color:{{ pageFg }};font-variant-numeric:tabular-nums">{{ d.readout }}</span>
+<button data-key="{{ d.key }}" data-d="1" onClick="{{ onDevStep }}" style="border:none;width:30px;height:30px;border-radius:9999px;cursor:pointer;background:transparent;color:{{ pageFg }};font-size:15px;line-height:1">+</button>
+</sc-if>
+<sc-if value="{{ d.isSeg }}" hint-placeholder-val="{{ false }}">
+<span style="display:flex;gap:3px;padding:3px;border-radius:9999px;background:{{ d.trackBg }};width:100%">
+<sc-for list="{{ d.segs }}" as="sg" hint-placeholder-count="4">
+<button data-key="{{ d.key }}" data-v="{{ sg.v }}" onClick="{{ onDevSeg }}" style="flex:1;height:24px;border-radius:9999px;border:0;cursor:pointer;font-size:11px;font-weight:500;background:{{ sg.bg }};color:{{ sg.fg }}">{{ sg.label }}</button>
+</sc-for>
+</span>
+</sc-if>
+<sc-if value="{{ d.isStatus }}" hint-placeholder-val="{{ false }}">
+<span style="display:inline-flex;align-items:center;height:26px;padding:0 11px;border-radius:9999px;background:{{ d.trackBg }};color:{{ mutFg }};font-size:11px">Reports only</span>
+</sc-if>
+</div>
+</div>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+</section>
+<sc-for list="{{ homeCards }}" as="w" hint-placeholder-count="10">
+<article data-screen-label="{{ w.name }}" style="position:relative;display:flex;flex-direction:column;overflow:hidden;grid-column:span {{ w.cols }};grid-row:span {{ w.rows }};padding:{{ w.pad }};border-radius:22px;background:{{ w.bg }};backdrop-filter:{{ w.blur }};box-shadow:{{ w.ring }}">
+<header style="display:flex;align-items:baseline;gap:10px;flex-shrink:0">
+<p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ w.label }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.name }}</p>
+<span style="margin-left:auto;font-size:10.5px;color:{{ w.mut }};flex-shrink:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.kicker }}</span>
+</header>
+<sc-if value="{{ w.isBig }}" hint-placeholder-val="{{ true }}">
+<div style="margin-top:auto;display:flex;align-items:flex-end;gap:10px;min-width:0;overflow:hidden">
+<span style="font-family:'Hanken Grotesk',sans-serif;font-weight:500;letter-spacing:-.035em;line-height:1.08;font-size:{{ w.bigSize }};color:{{ w.fg }};font-variant-numeric:tabular-nums;white-space:nowrap">{{ w.value }}</span>
+<span style="padding-bottom:5px;font-size:12.5px;font-weight:500;color:{{ w.accent }};white-space:nowrap">{{ w.delta }}</span>
+</div>
+<p style="margin:7px 0 0;font-size:12.5px;line-height:1.4;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p>
+</sc-if>
+<sc-if value="{{ w.isRows }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:12px;display:flex;flex-direction:column;min-height:0;overflow:hidden">
+<sc-for list="{{ w.rowsData }}" as="r" hint-placeholder-count="3">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:9px 0">
+<span style="font-size:13px;color:{{ w.fg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.label }}</span>
+<span style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ w.mut }}">{{ r.value }}</span>
+</div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ w.isToggle }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;align-items:center;gap:12px">
+<div style="min-width:0;flex:1">
+<p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ w.midSize }};font-weight:600;letter-spacing:-.02em;color:{{ w.fg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.value }}</p>
+<p style="margin:5px 0 0;font-size:12px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p>
+</div>
+<span style="width:46px;height:27px;border-radius:9999px;flex-shrink:0;padding:3px;display:flex;align-items:center;justify-content:{{ w.knob }};background:{{ w.switchBg }}"><span style="width:21px;height:21px;border-radius:50%;background:{{ w.knobBg }};box-shadow:0 2px 6px -2px rgba(30,30,36,.6)"></span></span>
+</div>
+</sc-if>
+<sc-if value="{{ w.isProgress }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto">
+<div style="display:flex;align-items:baseline;gap:9px;margin-bottom:11px">
+<span style="font-family:'Hanken Grotesk',sans-serif;font-weight:500;letter-spacing:-.03em;font-size:{{ w.midSize }};line-height:1;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</span>
+<span style="font-size:12.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</span>
+</div>
+<div style="height:5px;border-radius:9999px;background:{{ w.trackBg }};overflow:hidden"><span style="display:block;height:100%;width:{{ w.pct }};border-radius:9999px;background:{{ w.accent }}"></span></div>
+</div>
+</sc-if>
+<sc-if value="{{ w.isBars }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;align-items:flex-end;gap:{{ w.barGap }};height:{{ w.barH }}">
+<sc-for list="{{ w.bars }}" as="b" hint-placeholder-count="7">
+<span style="flex:1;border-radius:2px;height:{{ b.h }};background:{{ b.bg }}"></span>
+</sc-for>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:9px">
+<span style="font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</span>
+<span style="font-size:13px;font-weight:600;color:{{ w.fg }};font-variant-numeric:tabular-nums;flex-shrink:0">{{ w.value }}</span>
+</div>
+</sc-if>
+<sc-if value="{{ w.isSplit }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:grid;grid-template-columns:minmax(0,1fr) 1px minmax(0,1fr);gap:14px;align-items:center">
+<div style="min-width:0"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ w.midSize }};font-weight:500;letter-spacing:-.03em;line-height:1;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</p><p style="margin:6px 0 0;font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p></div>
+<span style="height:62%;background:{{ w.rule }}"></span>
+<div style="min-width:0"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ w.midSize }};font-weight:500;letter-spacing:-.03em;line-height:1;color:{{ w.accent }};font-variant-numeric:tabular-nums">{{ w.value2 }}</p><p style="margin:6px 0 0;font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption2 }}</p></div>
+</div>
+</sc-if>
+<sc-if value="{{ w.isText }}" hint-placeholder-val="{{ false }}">
+<p style="margin:13px 0 0;font-size:{{ w.textSize }};line-height:1.5;letter-spacing:-.012em;color:{{ w.fg }};text-wrap:pretty;overflow:hidden">{{ w.value }}</p>
+<p style="margin:auto 0 0;padding-top:10px;font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p>
+</sc-if>
+</article>
+</sc-for>
+</main>
+</sc-if>
+
+<sc-if value="{{ isDevices }}" hint-placeholder-val="{{ false }}">
+<main style="position:relative;z-index:10;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-auto-flow:row dense;grid-auto-rows:auto;gap:14px;min-width:1400px;max-width:1720px;margin:0 auto;padding:20px 28px 132px;animation:sh-rise .7s cubic-bezier(.22,1,.36,1) both">
+<sc-for list="{{ rooms3d }}" as="rm" hint-placeholder-count="5">
+<div style="grid-column:span 12;display:flex;align-items:baseline;gap:14px;padding:14px 4px 2px">
+<h2 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:20px;font-weight:600;letter-spacing:-.03em;color:{{ pageFg }}">{{ rm.room }}</h2>
+<span style="font-size:11.5px;color:{{ mutFg }}">{{ rm.meta }}</span>
+<span style="flex:1;height:1px;background:{{ ruleFg }}"></span>
+</div>
+<sc-for list="{{ rm.devices }}" as="d" hint-placeholder-count="8">
+<article data-screen-label="{{ d.name }}" style="grid-column:span 3;display:flex;flex-direction:column;padding:16px;border-radius:22px;background:{{ d.cardBg }};backdrop-filter:{{ d.cardBlur }};box-shadow:{{ d.cardRing }}">
+<div style="position:relative;height:208px;border-radius:16px;background:{{ d.stage }};overflow:hidden">
+<canvas data-key="{{ d.key }}" data-model="{{ d.model }}" ref="{{ devRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
+</div>
+<header style="display:flex;align-items:center;gap:9px;margin-top:13px">
+<span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:{{ d.dotBg }}"></span>
+<p style="margin:0;flex:1;min-width:0;font-size:13px;font-weight:600;letter-spacing:-.015em;color:{{ d.fg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ d.name }}</p>
+<span style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ d.mut }};flex-shrink:0">{{ d.readout }}</span>
+</header>
+<p style="margin:5px 0 0;font-size:11.5px;color:{{ d.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ d.state }}</p>
+<div style="display:flex;align-items:center;gap:9px;margin-top:11px;min-height:30px">
+<sc-if value="{{ d.isLamp }}" hint-placeholder-val="{{ false }}">
+<span style="width:22px;height:22px;border-radius:50%;flex-shrink:0;background:{{ d.lampBg }};box-shadow:{{ d.lampGlow }},{{ d.lampRing }};transition:background .25s ease,box-shadow .25s ease"></span>
+<span style="font-size:11.5px;color:{{ d.mut }}">{{ d.lampPct }} brightness</span>
+</sc-if>
+<sc-if value="{{ d.isLock }}" hint-placeholder-val="{{ false }}">
+<span style="position:relative;width:22px;height:22px;flex-shrink:0;border-radius:7px;background:{{ d.lockBg }};display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px">
+<span style="position:absolute;left:{{ d.shackleLeft }};top:{{ d.shackleTop }};width:11px;height:11px;box-shadow:inset 0 2px 0 {{ d.lockFg }},inset 2px 0 0 {{ d.lockFg }},inset -2px 0 0 {{ d.lockFg }};border-radius:6px 6px 0 0;transform:translateX(-50%) rotate({{ d.shackleRot }});transform-origin:bottom left;transition:top .3s cubic-bezier(.22,1,.36,1),left .3s cubic-bezier(.22,1,.36,1),transform .3s cubic-bezier(.22,1,.36,1)"></span>
+<span style="width:12px;height:10px;border-radius:3px;background:{{ d.lockFg }}"></span>
+</span>
+<span style="font-size:11.5px;color:{{ d.mut }}">{{ d.lockWord }}</span>
+</sc-if>
+<sc-if value="{{ d.isPower }}" hint-placeholder-val="{{ false }}">
+<span style="position:relative;width:22px;height:22px;flex-shrink:0;border-radius:50%;background:{{ d.powerBg }};display:flex;align-items:center;justify-content:center">
+<span style="width:11px;height:11px;border-radius:50%;box-shadow:inset 0 0 0 2px {{ d.powerFg }}"></span>
+<span style="position:absolute;top:4px;left:50%;transform:translateX(-50%);width:2px;height:7px;border-radius:1px;background:{{ d.powerFg }}"></span>
+</span>
+<span style="font-size:11.5px;color:{{ d.mut }}">{{ d.powerWord }}</span>
+</sc-if>
+</div>
+<div style="margin-top:11px;padding-top:11px;min-height:36px;display:flex;align-items:center;width:100%">
+<sc-if value="{{ d.isSlider }}" hint-placeholder-val="{{ false }}">
+<span style="position:relative;display:block;flex:1;min-width:0;height:26px">
+<span style="position:absolute;left:0;right:0;top:10px;height:6px;border-radius:9999px;background:{{ d.trackBg }};overflow:hidden"><span style="display:block;height:100%;width:{{ d.pct }};border-radius:9999px;background:{{ d.fillBg }};transition:width .12s linear"></span></span>
+<span style="position:absolute;top:4px;left:{{ d.thumbLeft }};width:18px;height:18px;border-radius:50%;background:{{ d.knobBg }};box-shadow:0 2px 8px -2px rgba(30,30,36,.55),inset 0 0 0 1px {{ d.hair }};transition:left .12s linear;pointer-events:none"></span>
+<input type="range" min="0" max="100" value="{{ d.sliderVal }}" data-key="{{ d.key }}" onInput="{{ onDevSlide }}" onChange="{{ onDevSlide }}" style="border:none;position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer"/>
+</span>
+</sc-if>
+<sc-if value="{{ d.isColour }}" hint-placeholder-val="{{ false }}">
+<span style="display:flex;gap:5px;margin-left:11px;flex-shrink:0">
+<sc-for list="{{ d.swatches }}" as="sw" hint-placeholder-count="4">
+<span data-key="{{ d.key }}" data-c="{{ sw.c }}" onClick="{{ pickSwatch }}" style="width:15px;height:15px;border-radius:50%;cursor:pointer;background:{{ sw.c }};box-shadow:0 0 0 2px {{ sw.ring }}"></span>
+</sc-for>
+</span>
+</sc-if>
+<sc-if value="{{ d.isToggle }}" hint-placeholder-val="{{ false }}">
+<span data-key="{{ d.key }}" onClick="{{ onDevToggle }}" style="display:flex;align-items:center;gap:10px;width:100%;cursor:pointer">
+<span style="flex:1;min-width:0;font-size:12px;font-weight:500;color:{{ d.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ d.readout }}</span>
+<span style="width:46px;height:26px;border-radius:9999px;flex-shrink:0;padding:3px;display:flex;align-items:center;justify-content:{{ d.knob }};background:{{ d.switchBg }};box-shadow:inset 0 0 0 1px {{ d.hair }};transition:background .28s cubic-bezier(.22,1,.36,1)"><span style="width:20px;height:20px;border-radius:50%;background:{{ d.knobBg }};box-shadow:0 2px 7px -2px rgba(30,30,36,.6)"></span></span>
+</span>
+</sc-if>
+<sc-if value="{{ d.isStep }}" hint-placeholder-val="{{ false }}">
+<button data-key="{{ d.key }}" data-d="-1" onClick="{{ onDevStep }}" style="border:none;width:32px;height:32px;border-radius:9999px;cursor:pointer;background:transparent;color:{{ d.fg }};font-size:16px;line-height:1">−</button>
+<span style="flex:1;text-align:center;font-family:'Hanken Grotesk',sans-serif;font-size:17px;font-weight:600;color:{{ d.fg }};font-variant-numeric:tabular-nums">{{ d.readout }}</span>
+<button data-key="{{ d.key }}" data-d="1" onClick="{{ onDevStep }}" style="border:none;width:32px;height:32px;border-radius:9999px;cursor:pointer;background:transparent;color:{{ d.fg }};font-size:16px;line-height:1">+</button>
+</sc-if>
+<sc-if value="{{ d.isSeg }}" hint-placeholder-val="{{ false }}">
+<span style="display:flex;gap:3px;padding:3px;border-radius:9999px;background:{{ d.trackBg }};width:100%">
+<sc-for list="{{ d.segs }}" as="sg" hint-placeholder-count="4">
+<button data-key="{{ d.key }}" data-v="{{ sg.v }}" onClick="{{ onDevSeg }}" style="flex:1;height:26px;border-radius:9999px;border:0;cursor:pointer;font-size:11.5px;font-weight:500;background:{{ sg.bg }};color:{{ sg.fg }}">{{ sg.label }}</button>
+</sc-for>
+</span>
+</sc-if>
+<sc-if value="{{ d.isStatus }}" hint-placeholder-val="{{ false }}">
+<span style="display:inline-flex;align-items:center;gap:8px;height:28px;padding:0 12px;border-radius:9999px;background:{{ d.trackBg }};color:{{ d.mut }};font-size:11.5px">No control · reports only</span>
+</sc-if>
+</div>
+</article>
+</sc-for>
+</sc-for>
+</main>
+</sc-if>
+
+<sc-if value="{{ isCatalog }}" hint-placeholder-val="{{ false }}">
+<main style="position:relative;z-index:10;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-auto-flow:row dense;grid-auto-rows:126px;gap:14px;min-width:1400px;max-width:1720px;margin:0 auto;padding:20px 28px 132px">
+<sc-for list="{{ catalogCards }}" as="w" hint-placeholder-count="16">
+<article data-screen-label="{{ w.name }} {{ w.designTag }}" style="position:relative;display:flex;flex-direction:column;overflow:hidden;grid-column:span {{ w.cols }};grid-row:span {{ w.rows }};padding:{{ w.pad }};border-radius:22px;background:{{ w.bg }};backdrop-filter:{{ w.blur }};box-shadow:{{ w.ring }}">
+<header style="display:flex;align-items:baseline;gap:10px;flex-shrink:0">
+<p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ w.label }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.name }}</p>
+<span style="margin-left:auto;font-size:10.5px;color:{{ w.mut }};flex-shrink:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.kicker }}</span>
+<span style="font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:{{ w.stamp }};flex-shrink:0">{{ w.designTag }}</span>
+</header>
+<sc-if value="{{ w.isBig }}" hint-placeholder-val="{{ true }}">
+<div style="margin-top:auto;display:flex;align-items:flex-end;gap:10px;min-width:0;overflow:hidden">
+<span style="font-family:'Hanken Grotesk',sans-serif;font-weight:500;letter-spacing:-.035em;line-height:1.08;font-size:{{ w.bigSize }};color:{{ w.fg }};font-variant-numeric:tabular-nums;white-space:nowrap">{{ w.value }}</span>
+<span style="padding-bottom:5px;font-size:12.5px;font-weight:500;color:{{ w.accent }};white-space:nowrap">{{ w.delta }}</span>
+</div>
+<p style="margin:7px 0 0;font-size:12.5px;line-height:1.4;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p>
+</sc-if>
+<sc-if value="{{ w.isRows }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:12px;display:flex;flex-direction:column;min-height:0;overflow:hidden">
+<sc-for list="{{ w.rowsData }}" as="r" hint-placeholder-count="3">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:9px 0">
+<span style="font-size:13px;color:{{ w.fg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.label }}</span>
+<span style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ w.mut }}">{{ r.value }}</span>
+</div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ w.isToggle }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;align-items:center;gap:12px">
+<div style="min-width:0;flex:1">
+<p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ w.midSize }};font-weight:600;letter-spacing:-.02em;color:{{ w.fg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.value }}</p>
+<p style="margin:5px 0 0;font-size:12px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p>
+</div>
+<span style="width:46px;height:27px;border-radius:9999px;flex-shrink:0;padding:3px;display:flex;align-items:center;justify-content:{{ w.knob }};background:{{ w.switchBg }}"><span style="width:21px;height:21px;border-radius:50%;background:{{ w.knobBg }};box-shadow:0 2px 6px -2px rgba(30,30,36,.6)"></span></span>
+</div>
+</sc-if>
+<sc-if value="{{ w.isProgress }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto">
+<div style="display:flex;align-items:baseline;gap:9px;margin-bottom:11px">
+<span style="font-family:'Hanken Grotesk',sans-serif;font-weight:500;letter-spacing:-.03em;font-size:{{ w.midSize }};line-height:1;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</span>
+<span style="font-size:12.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</span>
+</div>
+<div style="height:5px;border-radius:9999px;background:{{ w.trackBg }};overflow:hidden"><span style="display:block;height:100%;width:{{ w.pct }};border-radius:9999px;background:{{ w.accent }}"></span></div>
+</div>
+</sc-if>
+<sc-if value="{{ w.isBars }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;align-items:flex-end;gap:{{ w.barGap }};height:{{ w.barH }}">
+<sc-for list="{{ w.bars }}" as="b" hint-placeholder-count="7">
+<span style="flex:1;border-radius:2px;height:{{ b.h }};background:{{ b.bg }}"></span>
+</sc-for>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:9px">
+<span style="font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</span>
+<span style="font-size:13px;font-weight:600;color:{{ w.fg }};font-variant-numeric:tabular-nums;flex-shrink:0">{{ w.value }}</span>
+</div>
+</sc-if>
+<sc-if value="{{ w.isSplit }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:grid;grid-template-columns:minmax(0,1fr) 1px minmax(0,1fr);gap:14px;align-items:center">
+<div style="min-width:0"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ w.midSize }};font-weight:500;letter-spacing:-.03em;line-height:1;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</p><p style="margin:6px 0 0;font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p></div>
+<span style="height:62%;background:{{ w.rule }}"></span>
+<div style="min-width:0"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ w.midSize }};font-weight:500;letter-spacing:-.03em;line-height:1;color:{{ w.accent }};font-variant-numeric:tabular-nums">{{ w.value2 }}</p><p style="margin:6px 0 0;font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption2 }}</p></div>
+</div>
+</sc-if>
+<sc-if value="{{ w.isText }}" hint-placeholder-val="{{ false }}">
+<p style="margin:13px 0 0;font-size:{{ w.textSize }};line-height:1.5;letter-spacing:-.012em;color:{{ w.fg }};text-wrap:pretty;overflow:hidden">{{ w.value }}</p>
+<p style="margin:auto 0 0;padding-top:10px;font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p>
+</sc-if>
+</article>
+</sc-for>
+</main>
+</sc-if>
+
+<sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+<main style="position:relative;z-index:10;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:16px;min-width:1400px;max-width:1720px;margin:0 auto;padding:20px 28px 132px;animation:sh-rise .7s cubic-bezier(.22,1,.36,1) both">
+<section style="display:flex;flex-direction:column;gap:14px">
+<div style="padding:24px;border-radius:24px;background:{{ heroBg }};backdrop-filter:{{ heroBlur }};box-shadow:{{ heroRing }}">
+<div style="display:flex;align-items:center;gap:12px">
+<h2 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:24px;font-weight:600;letter-spacing:-.03em">Add a device</h2>
+<span style="display:inline-flex;align-items:center;gap:7px;height:26px;padding:0 11px;border-radius:9999px;background:rgba(15,174,118,.12);color:#0a7a53;font-size:11.5px;font-weight:500"><span style="width:6px;height:6px;border-radius:50%;background:#0fae76;animation:sh-pulse 2s ease-in-out infinite"></span>Scanning</span>
+<span style="margin-left:auto;font-size:12px;color:{{ mutFg }}">{{ foundCount }} nearby · {{ scanScope }}</span>
+</div>
+<div style="display:flex;align-items:center;gap:10px;margin-top:14px;height:46px;padding:0 8px 0 18px;border-radius:9999px;background:{{ fieldBg }};box-shadow:inset 0 0 0 1px {{ fieldRing }}">
+<input placeholder="Name, brand or pairing code" style="flex:1;min-width:0;border:0;outline:0;background:transparent;font-size:14px;color:{{ pageFg }}"/>
+<span style="font-size:11px;color:{{ dimFg }};letter-spacing:.04em">⌘K</span>
+<button style="height:34px;padding:0 16px;border-radius:9999px;border:0;cursor:pointer;background:#3461f2;color:#fff;font-size:12.5px;font-weight:500" style-hover="background:#5b7cff">Pair</button>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px">
+<sc-for list="{{ addFilters }}" as="af" hint-placeholder-count="5">
+<button data-id="{{ af.id }}" onClick="{{ pickAddFilter }}" style="border:none;display:inline-flex;align-items:center;gap:7px;height:29px;padding:0 13px;border-radius:9999px;cursor:pointer;font-size:12px;font-weight:500;background:{{ af.bg }};color:{{ af.fg }}" style-hover="background:#edebe7">{{ af.label }}<span style="opacity:.5">{{ af.n }}</span></button>
+</sc-for>
+</div>
+<div style="display:flex;flex-direction:column;margin-top:6px">
+<sc-for list="{{ discovered }}" as="d" hint-placeholder-count="4">
+<div style="display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:13px;align-items:center;padding:13px 0">
+<span style="width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:{{ d.tileBg }};box-shadow:inset 0 0 0 1px {{ d.tileRing }};font-family:'Hanken Grotesk',sans-serif;font-size:13px;font-weight:700;color:{{ d.tileFg }}">{{ d.initial }}</span>
+<div style="min-width:0">
+<p style="margin:0;font-size:13.5px;font-weight:500;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ d.name }}</p>
+<p style="margin:3px 0 0;font-size:11.5px;color:{{ mutFg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ d.proto }} · {{ d.meta }}</p>
+</div>
+<button data-id="{{ d.id }}" onClick="{{ addDevice }}" style="border:none;height:32px;padding:0 15px;border-radius:9999px;cursor:pointer;background:{{ d.bg }};color:{{ d.fg }};font-size:12.5px;font-weight:500" style-hover="">{{ d.action }}</button>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="padding:24px;border-radius:24px;background:{{ heroBg }};backdrop-filter:{{ heroBlur }};box-shadow:{{ heroRing }}">
+<div style="display:flex;align-items:baseline;gap:12px">
+<p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ labelFg }}">Connected</p>
+<span style="margin-left:auto;font-size:12px;color:{{ mutFg }}">{{ connectedMeta }}</span>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-top:14px">
+<sc-for list="{{ rooms }}" as="r" hint-placeholder-count="6">
+<div style="padding:14px 15px;border-radius:16px;background:{{ tileBg }};box-shadow:inset 0 0 0 1px {{ tileRing }}">
+<div style="display:flex;align-items:baseline;gap:8px">
+<p style="margin:0;font-size:13px;font-weight:600;letter-spacing:-.01em">{{ r.name }}</p>
+<span style="margin-left:auto;font-size:11.5px;color:{{ mutFg }};font-variant-numeric:tabular-nums">{{ r.count }}</span>
+</div>
+<p style="margin:6px 0 0;font-size:11.5px;line-height:1.45;color:{{ mutFg }}">{{ r.devices }}</p>
+<div style="display:flex;align-items:center;gap:7px;margin-top:10px">
+<span style="width:6px;height:6px;border-radius:50%;background:{{ r.dot }}"></span>
+<span style="font-size:11px;color:{{ dimFg }}">{{ r.status }}</span>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:14px">
+<div style="padding:24px;border-radius:24px;background:{{ syncBg }};box-shadow:{{ syncRing }}">
+<p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ syncLabel }}">Sync</p>
+<h2 style="margin:10px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:23px;font-weight:600;letter-spacing:-.03em;color:{{ syncFg }}">Apple Home</h2>
+<p style="margin:8px 0 0;font-size:13px;line-height:1.5;color:{{ syncMut }}">Two-way. Rooms, scenes and device names stay identical in both apps; Atlas adds its own automations on top without writing them back.</p>
+<div style="display:flex;align-items:center;gap:10px;margin-top:16px;padding:13px 15px;border-radius:16px;background:{{ syncTile }}">
+<span style="width:8px;height:8px;border-radius:50%;background:#0fae76;animation:sh-pulse 2s ease-in-out infinite"></span>
+<div style="flex:1;min-width:0">
+<p style="margin:0;font-size:13px;font-weight:500;color:{{ syncFg }}">Connected · 34 accessories</p>
+<p style="margin:3px 0 0;font-size:11.5px;color:{{ syncMut }}">Last sync 40 seconds ago</p>
+</div>
+<button style="height:30px;padding:0 13px;border-radius:9999px;border:0;cursor:pointer;background:{{ syncBtnBg }};color:{{ syncBtnFg }};font-size:12px;font-weight:500">Sync now</button>
+</div>
+<div style="display:flex;flex-direction:column;margin-top:8px">
+<sc-for list="{{ bridges }}" as="b" hint-placeholder-count="4">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 0">
+<div style="min-width:0">
+<p style="margin:0;font-size:13px;font-weight:500;color:{{ syncFg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ b.name }}</p>
+<p style="margin:3px 0 0;font-size:11.5px;color:{{ syncMut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ b.meta }}</p>
+</div>
+<span style="font-size:11.5px;font-weight:500;color:{{ b.fg }}">{{ b.state }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="padding:24px;border-radius:24px;background:{{ heroBg }};backdrop-filter:{{ heroBlur }};box-shadow:{{ heroRing }}">
+<p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ labelFg }}">What Atlas may do alone</p>
+<div style="display:flex;flex-direction:column;margin-top:10px">
+<sc-for list="{{ perms }}" as="p" hint-placeholder-count="5">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:13px 0">
+<div style="min-width:0">
+<p style="margin:0;font-size:13px;font-weight:500;letter-spacing:-.01em">{{ p.name }}</p>
+<p style="margin:3px 0 0;font-size:11.5px;line-height:1.45;color:{{ mutFg }}">{{ p.note }}</p>
+</div>
+<span data-id="{{ p.id }}" onClick="{{ togglePerm }}" style="width:46px;height:27px;border-radius:9999px;flex-shrink:0;padding:3px;cursor:pointer;display:flex;align-items:center;justify-content:{{ p.knob }};background:{{ p.switchBg }}"><span style="width:21px;height:21px;border-radius:50%;background:{{ p.knobBg }};box-shadow:0 2px 6px -2px rgba(30,30,36,.6)"></span></span>
+</div>
+</sc-for>
+</div>
+</div>
+</section>
+</main>
+</sc-if>
+
+<nav style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:92;display:flex;align-items:center;gap:3px;padding:5px;border-radius:9999px;background:#22222b;box-shadow:inset 0 0 0 1px rgba(247,245,242,.16),0 20px 46px -18px rgba(0,0,0,.6)">
+<a href="Atlas Dashboard (Current).dc.html" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:9999px;color:rgba(249,247,244,.8);font-size:13px;font-weight:500;text-decoration:none" style-hover="color:#fff;background:rgba(249,247,244,.12)">Dashboard</a>
+<a href="Atlas Widget Catalog.dc.html" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:9999px;color:rgba(249,247,244,.8);font-size:13px;font-weight:500;text-decoration:none" style-hover="color:#fff;background:rgba(249,247,244,.12)">Widgets</a>
+<span style="display:flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:9999px;background:rgba(249,247,244,.14);color:#fff;font-size:13px;font-weight:500">Smart home</span>
+<a href="Atlas Answer Views.dc.html" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 14px;border-radius:9999px;background:#3461f2;color:#fff;font-size:13px;font-weight:500;text-decoration:none" style-hover="background:#5b7cff">Answer views</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1720,&quot;height&quot;:1000},&quot;view&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;home&quot;,&quot;options&quot;:[&quot;home&quot;,&quot;catalog&quot;,&quot;settings&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;View&quot},&quot;dark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;View&quot}}">
+class Component extends DCLogic {
+  ACC = { light:'#c98a2b', climate:'#2f7d5e', security:'#c2483d', energy:'#8b6f3f', media:'#a33f66', water:'#2f4bbd', care:'#5b3ce0', net:'#3461f2' };
+  W = [
+    ['Lights','light','progress',{v:'6 on',c:'of 21 · warm 2700K',p:'29%',k:'Whole house'}],
+    ['Living room','light','toggle',{v:'On · 40%',c:'Warm white · scene Evening',on:1,k:'3 fixtures'}],
+    ['Kitchen','light','toggle',{v:'Off',c:'Last on 08:12',on:0,k:'5 fixtures'}],
+    ['Bedroom','light','toggle',{v:'On · 12%',c:'Night light until 06:30',on:1,k:'2 fixtures'}],
+    ['Hallway','light','toggle',{v:'Auto',c:'Motion after sunset',on:1,k:'4 fixtures'}],
+    ['Outdoor lights','light','toggle',{v:'On',c:'Sunset to 23:00',on:1,k:'Path + porch'}],
+    ['Colour scenes','light','rows',{r:[['Evening','active'],['Focus','—'],['Dinner','—'],['Away','—']],v:'Evening',c:'Applied 19:04',k:'4 saved'}],
+    ['Thermostat','climate','big',{v:'21.5°',d:'auto',c:'Target 21° · heating off',k:'Living room'}],
+    ['Zones','climate','rows',{r:[['Living room','21.5°'],['Bedroom','19.0°'],['Study','20.5°'],['Bathroom','22.0°']],v:'4 zones',c:'All within target',k:'Temperature'}],
+    ['Humidity','climate','big',{v:'46%',d:'ideal',c:'Steady since 14:00',k:'Indoors'}],
+    ['Air purifier','climate','toggle',{v:'Quiet',c:'PM2.5 · 4 µg/m³',on:1,k:'Living room'}],
+    ['Indoor air','climate','bars',{b:[22,26,30,24,20,18,16,14,12,14,16,18],v:'12 µg',c:'PM2.5 today',k:'Air quality'}],
+    ['CO₂','climate','big',{v:'612',d:'ppm',c:'Ventilation not needed',k:'Study'}],
+    ['Underfloor heat','climate','progress',{v:'32%',c:'Bathroom · to 22°',p:'32%',k:'Heating'}],
+    ['Front door','security','toggle',{v:'Locked',c:'Auto-locked 18:40',on:1,k:'Yale · battery 82%'}],
+    ['Back door','security','toggle',{v:'Locked',c:'No activity today',on:1,k:'Yale · battery 91%'}],
+    ['Garage','security','toggle',{v:'Closed',c:'Opened 08:06, closed 08:07',on:1,k:'Sectional'}],
+    ['Cameras','security','rows',{r:[['Front path','clear'],['Back garden','clear'],['Garage','clear'],['Side gate','offline']],v:'3 of 4',c:'One camera offline',k:'Live'}],
+    ['Doorbell','security','text',{v:'Delivery at 14:12 — parcel left in the porch. Atlas kept the clip for seven days.',c:'Last event',k:'Front door'}],
+    ['Motion','security','rows',{r:[['Hallway','14:31'],['Kitchen','13:58'],['Garden','11:04']],v:'3 today',c:'All expected',k:'Sensors'}],
+    ['Alarm','security','toggle',{v:'Armed · away',c:'Disarms when you arrive',on:1,k:'System'}],
+    ['Windows','security','rows',{r:[['Study window','open'],['Kitchen window','closed'],['Bedroom','closed']],v:'1 open',c:'Study, since 13:20',k:'Contacts'}],
+    ['Smoke & CO','security','big',{v:'All clear',d:'6/6',c:'Last self-test 21 July',k:'Detectors'}],
+    ['Guest access','security','rows',{r:[['Cleaner · Tue 09–11','weekly'],['Dog walker · daily 13:00','active'],['Neighbour · expired','—']],v:'2 active',c:'Time-boxed codes',k:'Keys'}],
+    ['Energy now','energy','big',{v:'740 W',d:'−18%',c:'Below your weekday average',k:'Live draw'}],
+    ['Energy today','energy','bars',{b:[20,26,34,52,66,48,30,24,22,28,40,58],v:'8.2 kWh',c:'By hour',k:'Consumption'}],
+    ['Solar','energy','split',{v:'3.4 kW',c:'Generating',v2:'1.9 kW',c2:'Exported',k:'Roof array'}],
+    ['Home battery','energy','progress',{v:'78%',c:'11.2 kWh stored',p:'78%',k:'Powerwall'}],
+    ['EV charger','energy','progress',{v:'64%',c:'Full by 04:10 · off-peak',p:'64%',k:'Garage'}],
+    ['Tariff','energy','split',{v:'€0.09',c:'Off-peak now',v2:'€0.31',c2:'From 17:00',k:'Rate'}],
+    ['Standby drain','energy','big',{v:'62 W',d:'−9 W',c:'Media wall is the biggest',k:'Always-on'}],
+    ['Water use','water','big',{v:'118 L',d:'today',c:'Shower 62 L · dishwasher 11 L',k:'Household'}],
+    ['Leak sensors','water','big',{v:'Dry',d:'5/5',c:'Under sink, boiler, washer',k:'Sensors'}],
+    ['Irrigation','water','progress',{v:'Paused',c:'Rain forecast within 40 min',p:'0%',k:'Garden'}],
+    ['Hot water','water','progress',{v:'52°',c:'Ready · reheats 05:30',p:'70%',k:'Cylinder'}],
+    ['Washer','care','progress',{v:'38 min',c:'Cottons 40° · ends 15:22',p:'52%',k:'Running'}],
+    ['Dryer','care','big',{v:'Idle',d:'—',c:'Filter clean · last run 09:40',k:'Utility'}],
+    ['Dishwasher','care','big',{v:'Delayed',d:'22:00',c:'Waits for off-peak power',k:'Kitchen'}],
+    ['Robot vacuum','care','progress',{v:'Level 1',c:'Living room and hallway done',p:'46%',k:'Cleaning'}],
+    ['Oven','care','big',{v:'Off',d:'cool',c:'Self-clean due in 4 uses',k:'Kitchen'}],
+    ['Fridge','care','split',{v:'3.4°',c:'Fridge',v2:'−18.1°',c2:'Freezer',k:'Kitchen'}],
+    ['Coffee','care','toggle',{v:'Scheduled',c:'Brews 06:40 on weekdays',on:1,k:'Kitchen'}],
+    ['Pet feeder','care','rows',{r:[['Breakfast 07:00','done'],['Lunch 12:30','done'],['Dinner 18:30','queued']],v:'2 of 3',c:'Portions on schedule',k:'Kitchen'}],
+    ['Speakers','media','rows',{r:[['Living room','playing'],['Kitchen','grouped'],['Study','idle']],v:'2 rooms',c:'Ambient Works · Aphex Twin',k:'Playing'}],
+    ['Television','media','toggle',{v:'Off',c:'Last input: Apple TV',on:0,k:'Living room'}],
+    ['Wi-Fi','net','big',{v:'612 Mb/s',d:'stable',c:'34 devices · 2 on guest',k:'Mesh'}],
+    ['Devices online','net','rows',{r:[['Living room','9'],['Kitchen','7'],['Bedroom','5'],['Outdoors','6']],v:'34',c:'One offline: side gate camera',k:'By room'}],
+    ['Automations','net','rows',{r:[['Sunset lights','ran 19:04'],['Away lock-up','armed 08:12'],['Off-peak laundry','queued'],['Rain delay','held']],v:'12 active',c:'4 ran today',k:'Rules'}],
+    ['Presence','net','text',{v:'You are home, Rosa left at 12:40. The house switched to Day mode on its own.',c:'Two residents tracked',k:'Who is in'}],
+    ['Atlas said','net','text',{v:'I paused the sprinklers — rain is 40 minutes out — and moved the dishwasher to the 22:00 tariff.',c:'Spoken aloud · 14:28',k:'Voice'}]
+  ];
+  SIZES = [
+    { id:'s', label:'S', dim:'2×1', cols:2, rows:1 },
+    { id:'m', label:'M', dim:'3×1', cols:3, rows:1 },
+    { id:'l', label:'L', dim:'3×2', cols:3, rows:2 },
+    { id:'xl', label:'XL', dim:'6×2', cols:6, rows:2 },
+    { id:'hero', label:'Hero', dim:'6×3', cols:6, rows:3 }
+  ];
+  DESIGNS = [{ id:'both', label:'Both' }, { id:'glass', label:'Glass' }, { id:'ink', label:'Ink' }];
+  HOME = [
+    ['Thermostat', 3, 2], ['Front door', 3, 1], ['Energy now', 3, 1],
+    ['Cameras', 3, 2], ['Automations', 3, 2], ['Lights', 3, 1], ['Solar', 3, 1],
+    ['Alarm', 3, 1], ['Washer', 3, 1], ['Presence', 6, 1],
+    ['Wi-Fi', 3, 1], ['Home battery', 3, 1], ['Water use', 3, 1], ['Air purifier', 3, 1],
+    ['Atlas said', 6, 1]
+  ];
+  state = { view:'home', size:'l', design:'both', dark:false, perms:{ p1:1, p2:1, p3:0, p4:1, p5:0 }, scene:'evening', devCol: {},
+    devVals: (() => { const o = {}; [['Living room',[['Arc floor lamp',62],['Ceiling pendant',40],['Shelf strip',74],['Sonos Era 100',28],['LG C4 65"',0],['Thermostat',21.5],['Blinds',55],['Air purifier',1]]],['Kitchen',[['Downlights',0],['Under-cabinet strip',30],['Fellow kettle',0],['Dishwasher',0],['Fridge',3.4],['Coffee machine',1],['Leak sensor',1],['Smoke alarm',1]]],['Bedroom',[['Bedside bulbs',12],['Curtains',0],['Radiator valve',19],['Air sensor',1]]],['Utility',[['Washer',52],['Robot vacuum',1],['Boiler',52],['Router',1]]],['Outdoors',[['Front door lock',1],['Doorbell',1],['Path lights',80],['Front camera',1],['Garage door',1],['EV charger',64],['Solar inverter',1],['Irrigation',0]]]].forEach(([r, l]) => l.forEach(([n, v]) => { o[r + '|' + n] = v; })); return o; })() };
+  componentDidMount() { }
+  rgb(h) { h = h.replace('#',''); return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)]; }
+  lighten(h, f) { const c = this.rgb(h).map(v => Math.round(v + (255 - v)*f)); return 'rgb(' + c.join(',') + ')'; }
+  skin(design, accent) {
+    if (design === 'ink') return { bg:'#1e1e24', blur:'none', ring:'none', fg:'#f7f5f2', mut:'rgba(247,245,242,.5)', label:'rgba(247,245,242,.72)', accent:this.lighten(accent, 0.46), rule:'rgba(247,245,242,.13)', trackBg:'rgba(247,245,242,.14)', switchOn:this.lighten(accent, 0.3), switchOff:'rgba(247,245,242,.16)', knobBg:'#1e1e24', barBase:'rgba(247,245,242,.2)', stamp:'rgba(247,245,242,.45)', designTag:'Ink' };
+    return { bg:'rgba(255,253,250,.62)', blur:'blur(16px) saturate(1.1)', ring:'inset 0 0 0 1px rgba(255,253,250,.9),0 18px 40px -40px rgba(30,30,36,.5)', fg:'#1e1e24', mut:'#8b8681', label:'#55524f', accent, rule:'#e8e4dd', trackBg:'#eae6df', switchOn:accent, switchOff:'#ddd8d0', knobBg:'#fffdfa', barBase:'rgba(30,30,36,.1)', stamp:'#8b8681', designTag:'Glass' };
+  }
+  card(w, cols, rows, design) {
+    const [name, cat, kind, o] = w;
+    const sk = this.skin(design, this.ACC[cat]);
+    const tall = rows >= 2, huge = rows >= 3, wide = cols >= 6;
+    const rowCap = huge ? 5 : (tall ? 3 : 0);
+    const canRows = kind === 'rows' && rowCap > 0;
+    const asBig = kind === 'big' || (kind === 'rows' && !canRows) || (kind === 'text' && !tall && cols < 6);
+    return Object.assign({}, sk, {
+      name, cols, rows, kicker:o.k || '',
+      pad: huge ? '22px' : (tall ? '18px' : '15px'),
+      bigSize: (huge ? 62 : (tall ? (wide ? 52 : 40) : (cols >= 3 ? 30 : 25))) + 'px',
+      midSize: (huge ? 34 : (tall ? 24 : 17)) + 'px',
+      textSize: (huge ? 21 : (tall ? 15.5 : 13)) + 'px',
+      barH: (huge ? 132 : (tall ? 68 : 34)) + 'px',
+      barGap: wide ? '5px' : '3px',
+      value:o.v || '', value2:o.v2 || '', caption:o.c || '', caption2:o.c2 || '', delta:o.d || '', pct:o.p || '50%',
+      isBig: asBig, isRows: canRows, isBars: kind === 'bars', isProgress: kind === 'progress',
+      isSplit: kind === 'split', isToggle: kind === 'toggle', isText: kind === 'text' && !asBig,
+      knob: o.on ? 'flex-end' : 'flex-start', switchBg: o.on ? sk.switchOn : sk.switchOff, knobBg: sk.knobBg,
+      rowsData:(o.r || []).slice(0, rowCap).map(r => ({ label:r[0], value:r[1] })),
+      bars:(o.b || []).slice(0, wide ? 12 : 7).map((h, i, arr) => ({ h:Math.round(h) + '%', bg:i === arr.length - 1 ? sk.accent : sk.barBase }))
+    });
+  }
+  ROOMS3D = [
+    ['Living room', [
+      ['Arc floor lamp', 'floorlamp', 'slider', 62, 'Warm white'],
+      ['Ceiling pendant', 'pendant', 'slider', 40, 'Dimmed for evening'],
+      ['Shelf strip', 'strip', 'colour', 74, 'Amber'],
+      ['Sonos Era 100', 'speaker', 'slider', 28, 'Ambient Works'],
+      ['LG C4 65"', 'tv', 'toggle', 0, 'Standby · Apple TV'],
+      ['Thermostat', 'thermostat', 'stepper', 21.5, 'Heating idle'],
+      ['Blinds', 'blind', 'slider', 55, 'Half open'],
+      ['Air purifier', 'purifier', 'seg', 1, 'PM2.5 · 4 µg']
+    ]],
+    ['Kitchen', [
+      ['Downlights', 'bulb', 'slider', 0, 'Off since 08:12'],
+      ['Under-cabinet strip', 'strip', 'colour', 30, 'Neutral'],
+      ['Fellow kettle', 'kettle', 'toggle', 0, 'Idle · 96°C preset'],
+      ['Dishwasher', 'washer', 'status', 0, 'Delayed to 22:00'],
+      ['Fridge', 'fridge', 'stepper', 3.4, 'Freezer −18.1°'],
+      ['Coffee machine', 'plug', 'toggle', 1, 'Brews 06:40'],
+      ['Leak sensor', 'sensor', 'status', 1, 'Dry · under sink'],
+      ['Smoke alarm', 'smoke', 'status', 1, 'Tested 21 July']
+    ]],
+    ['Bedroom', [
+      ['Bedside bulbs', 'bulb', 'slider', 12, 'Night light'],
+      ['Curtains', 'curtain', 'slider', 0, 'Closed'],
+      ['Radiator valve', 'valve', 'stepper', 19, 'Eco overnight'],
+      ['Air sensor', 'sensor', 'status', 1, 'CO₂ 612 ppm']
+    ]],
+    ['Utility', [
+      ['Washer', 'washer', 'status', 52, 'Cottons 40° · 38 min'],
+      ['Robot vacuum', 'vacuum', 'toggle', 1, 'Level 1 · 46%'],
+      ['Boiler', 'heater', 'stepper', 52, 'Hot water ready'],
+      ['Router', 'router', 'status', 1, '612 Mb/s · 34 devices']
+    ]],
+    ['Outdoors', [
+      ['Front door lock', 'lock', 'toggle', 1, 'Locked 18:40'],
+      ['Doorbell', 'doorbell', 'toggle', 1, 'Chime on'],
+      ['Path lights', 'bulb', 'slider', 80, 'Sunset to 23:00'],
+      ['Front camera', 'camera', 'toggle', 1, 'Recording'],
+      ['Garage door', 'garage', 'toggle', 1, 'Closed'],
+      ['EV charger', 'ev', 'slider', 64, '11 kW · off-peak'],
+      ['Solar inverter', 'solar', 'status', 1, '3.4 kW generating'],
+      ['Irrigation', 'sprinkler', 'status', 0, 'Paused for rain']
+    ]]
+  ];
+  devPaint(el) {
+    if (!el) return;
+    this._devs = this._devs || [];
+    if (!el.__reg) { el.__reg = 1; this._devs.push(el); }
+    this.startDevLoop();
+  }
+  startDevLoop() {
+    if (this._devAlive) return;
+    this._devAlive = 1;
+    const tick = () => {
+      const t = performance.now();
+      for (const el of this._devs) {
+        if (!el.isConnected) continue;
+        const r = el.getBoundingClientRect();
+        if (r.bottom < -40 || r.top > innerHeight + 40 || !r.width) continue;
+        this.drawDevice(el, t);
+      }
+    };
+    this._devTick = tick;
+    this._devTimer = setInterval(tick, 110);
+    tick();
+  }
+  drawDevice(el, t) {
+    const ctx = el.__dctx || (el.__dctx = el.getContext('2d'));
+    const d = Math.min(1.5, devicePixelRatio || 1), cw = el.clientWidth, ch = el.clientHeight;
+    if (!cw || !ch) return;
+    if (el.width !== Math.round(cw*d) || el.height !== Math.round(ch*d)) { el.width = Math.round(cw*d); el.height = Math.round(ch*d); }
+    if (!window.AtlasModels) return;
+    const key = el.dataset.key;
+    window.AtlasModels.draw(ctx, el.width, el.height, { model: el.dataset.model, value: this.dev(key), dark: this.state.dark, col: (this.state.devCol || {opacity:1})[key], t: t });
+  }
+
+  dev(key) { const d = this.state.devVals || {opacity:1}; return d[key]; }
+  renderVals() {
+    const S = this.state, dark = S.dark;
+    const size = this.SIZES.find(z => z.id === S.size) || this.SIZES[2];
+    const designs = S.design === 'both' ? ['glass', 'ink'] : [S.design];
+    const chipOn = (on) => ({ bg: on ? (dark ? '#f4f2ef' : '#1e1e24') : (dark ? 'rgba(244,242,239,.06)' : 'rgba(249,247,244,.8)'), fg: on ? (dark ? '#1e1e24' : '#f9f7f4') : (dark ? '#f4f2ef' : '#1e1e24'), bd: on ? (dark ? '#f4f2ef' : '#1e1e24') : (dark ? 'rgba(244,242,239,.16)' : '#e6e2db') });
+    const homeDesign = dark ? 'ink' : 'glass';
+    const byName = (n) => this.W.find(w => w[0] === n) || this.W[0];
+    const cat = [];
+    this.W.forEach(w => designs.forEach(d => cat.push(this.card(w, size.cols, size.rows, d))));
+    return {
+      rootRef: (el) => { this.root = el; },
+      orbRef: (el) => { if (el && window.AtlasSphere) window.AtlasSphere.mount(el, () => ({ state:'idle', dark: this.state.dark })); },
+      pageBg: dark ? '#15151a' : '#f9f7f4', pageFg: dark ? '#f4f2ef' : '#1e1e24',
+      mutFg: dark ? 'rgba(244,242,239,.6)' : '#6d6a67', dimFg: dark ? 'rgba(244,242,239,.42)' : '#b6b1aa',
+      labelFg: dark ? 'rgba(244,242,239,.72)' : '#55524f', ruleFg: dark ? 'rgba(244,242,239,.12)' : '#e8e4dd',
+      washA: dark ? 'linear-gradient(180deg,rgba(52,97,242,.16),rgba(21,21,26,0) 44%)' : 'linear-gradient(180deg,rgba(255,231,200,.7),rgba(249,247,244,0) 42%)',
+      washB: dark ? 'radial-gradient(closest-side,rgba(201,138,43,.22),transparent 74%)' : 'radial-gradient(closest-side,rgba(255,158,64,.3),transparent 74%)',
+      washC: dark ? 'radial-gradient(closest-side,rgba(122,140,255,.2),transparent 74%)' : 'radial-gradient(closest-side,rgba(122,140,255,.2),transparent 74%)',
+      barBg: dark ? 'rgba(244,242,239,.05)' : 'rgba(255,253,250,.5)', barRing: dark ? 'rgba(244,242,239,.1)' : 'rgba(255,253,250,.7)',
+      heroBg: dark ? '#1e1e24' : 'rgba(255,253,250,.62)', heroBlur: dark ? 'none' : 'blur(16px) saturate(1.1)',
+      heroRing: dark ? 'none' : 'inset 0 0 0 1px rgba(255,253,250,.9),0 18px 40px -40px rgba(30,30,36,.5)',
+      tileBg: dark ? 'rgba(244,242,239,.05)' : 'rgba(249,247,244,.7)', tileRing: dark ? 'rgba(244,242,239,.1)' : '#eae6df',
+      fieldBg: dark ? 'rgba(244,242,239,.06)' : '#f9f7f4', fieldRing: dark ? 'rgba(244,242,239,.14)' : '#e6e2db',
+      syncBg: dark ? '#f4f2ef' : '#1e1e24', syncRing: 'none', syncFg: dark ? '#1e1e24' : '#f7f5f2',
+      syncMut: dark ? '#6d6a67' : 'rgba(247,245,242,.55)', syncLabel: dark ? '#8b8681' : 'rgba(247,245,242,.6)',
+      syncTile: dark ? 'rgba(30,30,36,.06)' : 'rgba(247,245,242,.08)', syncRule: dark ? 'rgba(30,30,36,.1)' : 'rgba(247,245,242,.14)',
+      syncBtnBg: dark ? '#1e1e24' : '#f7f5f2', syncBtnFg: dark ? '#f7f5f2' : '#1e1e24',
+      views: [{ id:'home', label:'Home' }, { id:'devices', label:'Devices' }, { id:'catalog', label:'Widget set' }, { id:'settings', label:'Settings' }].map(v => Object.assign(v, chipOn(v.id === S.view))),
+      navZ: S.navOpen ? 80 : 2,
+      launcherShow: S.view === 'home' ? 'none' : 'flex',
+      navHintOp: S.navOpen ? '0' : '1',
+      navRing: [{ id:'home', label:'Home' }, { id:'devices', label:'Devices' }, { id:'catalog', label:'Widget set' }, { id:'settings', label:'Settings' }, { href:'Atlas Health.dc.html', label:'Health', dot:'#c2483d' }, { href:'Atlas Banking.dc.html', label:'Money', dot:'#2f7d5e' }].map((n, i, arr) => {
+        const a = (4 + i*(104/Math.max(1, arr.length - 1)))*Math.PI/180;
+        const R = 132;
+        const on = n.id && n.id === S.view;
+        return Object.assign({}, n, {
+          href: n.href || '#',
+          x: (S.navOpen ? 132 : 0) + 'px',
+          y: (S.navOpen ? (i - (arr.length - 1)/2)*38 : 0) + 'px',
+          scale: S.navOpen ? '1' : '.7',
+          op: S.navOpen ? '1' : '0',
+          pe: S.navOpen ? 'auto' : 'none',
+          lx: (S.navOpen ? 76 : 0) + 'px',
+          ly: (S.navOpen ? (48 + i*38) : 0) + 'px',
+          delay: (i*26) + 'ms',
+          bg: on ? (dark ? '#f4f2ef' : '#1e1e24') : (dark ? 'rgba(34,34,43,.95)' : 'rgba(255,253,250,.96)'),
+          fg: on ? (dark ? '#1e1e24' : '#f9f7f4') : (dark ? '#f4f2ef' : '#1e1e24'),
+          ring: dark ? 'inset 0 0 0 1px rgba(247,245,242,.16),0 18px 34px -20px rgba(0,0,0,.7)' : 'inset 0 0 0 1px #e8e4dd,0 18px 34px -22px rgba(30,30,36,.45)',
+          dot: n.dot || (on ? '#3461f2' : (dark ? 'rgba(247,245,242,.35)' : '#c9c3ba'))
+        });
+      }),
+      openNav: () => this.setState({ navOpen: true }),
+      closeNav: () => this.setState({ navOpen: false }),
+      navGo: (e) => { const id = e.currentTarget.dataset.id; if (id) { e.preventDefault(); this.setState({ view: id, navOpen: false }); } },
+      isDevices: S.view === 'devices',
+      devRef: (el) => this.devPaint(el),
+      onDevSlide: (e) => { const k = e.target.dataset.key, v = +e.target.value; this.setState(s => ({ devVals: Object.assign({}, s.devVals, { [k]: v }) })); if (this._devTick) this._devTick(); },
+      onDevToggle: (e) => { const k = e.currentTarget.dataset.key; this.setState(s => ({ devVals: Object.assign({}, s.devVals, { [k]: (s.devVals || {opacity:1})[k] ? 0 : 1 }) })); if (this._devTick) this._devTick(); },
+      onDevStep: (e) => { const k = e.currentTarget.dataset.key, d = +e.currentTarget.dataset.d; this.setState(s => { const cur = (s.devVals || {opacity:1})[k] || 0; return { devVals: Object.assign({}, s.devVals, { [k]: Math.round((cur + d*0.5)*10)/10 }) }; }); if (this._devTick) this._devTick(); },
+      onDevSeg: (e) => { const k = e.currentTarget.dataset.key, v = +e.currentTarget.dataset.v; this.setState(s => ({ devVals: Object.assign({}, s.devVals, { [k]: v }) })); if (this._devTick) this._devTick(); },
+      recent: (() => {
+        const picks = [['Living room', 'Arc floor lamp'], ['Outdoors', 'Front door lock'], ['Living room', 'Thermostat'], ['Kitchen', 'Coffee machine'], ['Utility', 'Robot vacuum']];
+        const when = ['2 min ago', '18 min ago', '40 min ago', '1 h ago', '2 h ago'];
+        return picks.map(([room, name], i) => {
+          const src = (this.ROOMS3D.find(r => r[0] === room) || [null, []])[1].find(x => x[0] === name) || ['', 'bulb', 'toggle', 0, ''];
+          const key = room + '|' + name, val = (S.devVals || {opacity:1})[key], on = val > 0, isTemp = src[2] === 'stepper';
+          return {
+            key, name, room, model: src[1], when: when[i], state: src[4],
+            isSlider: src[2] === 'slider' || src[2] === 'colour', isToggle: src[2] === 'toggle', isStep: isTemp, isSeg: src[2] === 'seg', isStatus: src[2] === 'status',
+            sliderVal: typeof val === 'number' ? val : 0,
+            readout: isTemp ? (val || 0).toFixed(1) + '°'
+              : src[2] === 'seg' ? (['Off', 'Quiet', 'Auto', 'Turbo'][val || 0] || 'Off')
+              : src[2] === 'toggle' ? (src[1] === 'lock' ? (on ? 'Locked' : 'Unlocked') : src[1] === 'garage' ? (on ? 'Closed' : 'Open') : src[1] === 'camera' ? (on ? 'Live' : 'Paused') : (on ? 'On' : 'Off'))
+              : src[2] === 'status' ? (val > 1 ? Math.round(val) + '%' : (on ? 'OK' : 'Idle'))
+              : Math.round(val || 0) + '%',
+            dotBg: on ? '#0fae76' : (dark ? 'rgba(247,245,242,.22)' : '#ddd8d0'),
+            knob: on ? 'flex-end' : 'flex-start',
+            switchBg: on ? '#3461f2' : (dark ? 'rgba(247,245,242,.16)' : '#ddd8d0'),
+            knobBg: dark ? '#1e1e24' : '#fffdfa',
+            trackBg: dark ? 'rgba(247,245,242,.14)' : '#eae6df',
+            btnRing: dark ? 'rgba(247,245,242,.18)' : '#e2ded7',
+            stage: dark ? 'rgba(247,245,242,.05)' : 'rgba(249,247,244,.68)',
+            hair: dark ? 'rgba(247,245,242,.12)' : '#eae6df',
+            pct: Math.round(typeof val === 'number' ? Math.max(0, Math.min(100, val)) : 0) + '%',
+            thumbLeft: (() => { const pv = Math.max(0, Math.min(100, typeof val === 'number' ? val : 0)); return 'calc(' + Math.round(pv) + '% - ' + (pv*0.18).toFixed(1) + 'px)'; })(),
+            fillBg: ['bulb', 'pendant', 'floorlamp', 'strip'].indexOf(src[1]) >= 0 ? 'linear-gradient(90deg,#f2c98a,#ffb765)' : '#3461f2',
+            segs: [['Off', 0], ['Quiet', 1], ['Auto', 2], ['Turbo', 3]].map(sg => ({ label: sg[0], v: sg[1], bg: (val || 0) === sg[1] ? (dark ? '#f4f2ef' : '#1e1e24') : 'transparent', fg: (val || 0) === sg[1] ? (dark ? '#1e1e24' : '#f9f7f4') : (dark ? 'rgba(247,245,242,.6)' : '#6d6a67') }))
+          };
+        });
+      })(),
+      recentZ: S.recentOpen ? 60 : 1,
+      surfTop: S.recentDir === 'up' ? 'auto' : '0',
+      surfBottom: S.recentDir === 'up' ? '0' : 'auto',
+      surfH: S.recentOpen ? '340px' : '100%',
+      surfShadow: S.recentOpen
+        ? (dark ? 'inset 0 0 0 1px rgba(247,245,242,.14),0 36px 72px -24px rgba(0,0,0,.72)' : 'inset 0 0 0 1px #e8e4dd,0 36px 72px -28px rgba(30,30,36,.52)')
+        : (dark ? 'none' : 'inset 0 0 0 1px rgba(255,253,250,.9),0 18px 40px -40px rgba(30,30,36,.5)'),
+      tileH: '104px',
+      ctrlMax: S.recentOpen ? '150px' : '0px',
+      ctrlOp: S.recentOpen ? '1' : '0',
+      hintOp: S.recentOpen ? '0' : '1',
+      panelTop: S.recentDir === 'up' ? 'auto' : '100%',
+      panelBottom: S.recentDir === 'up' ? '100%' : 'auto',
+      panelOpacity: S.recentOpen ? '1' : '0',
+      panelTransform: S.recentOpen ? 'translateY(0) scale(1)' : ('translateY(' + (S.recentDir === 'up' ? '10px' : '-10px') + ') scale(.982)'),
+      panelEvents: S.recentOpen ? 'auto' : 'none',
+      panelBg: dark ? '#22222b' : '#fffdfa',
+      panelRing: dark ? 'inset 0 0 0 1px rgba(247,245,242,.14),0 34px 70px -22px rgba(0,0,0,.72)' : 'inset 0 0 0 1px #e8e4dd,0 34px 70px -26px rgba(30,30,36,.5)',
+      hintFg: dark ? 'rgba(247,245,242,.4)' : '#b6b1aa',
+      openRecent: (e) => {
+        clearTimeout(this._recentT);
+        const r = e.currentTarget.getBoundingClientRect();
+        this.setState({ recentOpen: true, recentDir: (innerHeight - r.bottom) < 320 ? 'up' : 'down' });
+        if (this._devTick) setTimeout(this._devTick, 40);
+      },
+      closeRecent: () => { clearTimeout(this._recentT); this._recentT = setTimeout(() => this.setState({ recentOpen: false }), 140); },
+      rooms3d: this.ROOMS3D.map(([room, list]) => ({
+        room,
+        meta: list.length + ' devices · ' + list.filter(d => ((S.devVals || {opacity:1})[room + '|' + d[0]] || 0) > 0).length + ' active',
+        devices: list.map(d => {
+          const key = room + '|' + d[0];
+          const val = (S.devVals || {opacity:1})[key];
+          const on = val > 0;
+          const isTemp = d[2] === 'stepper';
+          return {
+            key, name: d[0], model: d[1], state: d[4],
+            cardBg: dark ? '#1e1e24' : 'rgba(255,253,250,.62)',
+            cardBlur: dark ? 'none' : 'blur(16px) saturate(1.1)',
+            cardRing: dark ? 'none' : 'inset 0 0 0 1px rgba(255,253,250,.9),0 18px 40px -40px rgba(30,30,36,.5)',
+            fg: dark ? '#f7f5f2' : '#1e1e24', mut: dark ? 'rgba(247,245,242,.5)' : '#8b8681',
+            dotBg: on ? '#0fae76' : (dark ? 'rgba(247,245,242,.22)' : '#ddd8d0'),
+            stage: dark ? 'rgba(247,245,242,.04)' : 'rgba(249,247,244,.6)',
+            hair: dark ? 'rgba(247,245,242,.12)' : '#eae6df',
+            isSlider: d[2] === 'slider' || d[2] === 'colour', isColour: d[2] === 'colour', isToggle: d[2] === 'toggle', isStep: isTemp, isSeg: d[2] === 'seg', isStatus: d[2] === 'status',
+            pct: Math.round(typeof val === 'number' ? Math.max(0, Math.min(100, val)) : 0) + '%',
+            thumbLeft: (() => { const pv = Math.max(0, Math.min(100, typeof val === 'number' ? val : 0)); return 'calc(' + Math.round(pv) + '% - ' + (pv*0.18).toFixed(1) + 'px)'; })(),
+            fillBg: ['bulb', 'pendant', 'floorlamp', 'strip'].indexOf(d[1]) >= 0 ? 'linear-gradient(90deg,#f2c98a,#ffb765)' : '#3461f2',
+            isLamp: ['bulb', 'pendant', 'floorlamp', 'strip'].indexOf(d[1]) >= 0,
+            isLock: d[1] === 'lock' || d[1] === 'garage',
+            isPower: d[2] === 'toggle' && d[1] !== 'lock' && d[1] !== 'garage',
+            lampBg: 'radial-gradient(circle at 38% 34%,rgba(255,247,222,' + (0.25 + (typeof val === 'number' ? val : 0)/100*0.75) + '),rgba(255,183,101,' + (0.2 + (typeof val === 'number' ? val : 0)/100*0.8) + '))',
+            lampGlow: '0 0 ' + Math.round(3 + (typeof val === 'number' ? val : 0)*0.26) + 'px rgba(255,186,104,' + (0.15 + (typeof val === 'number' ? val : 0)/100*0.7).toFixed(2) + ')',
+            lampRing: dark ? 'inset 0 0 0 1px rgba(247,245,242,.18)' : 'inset 0 0 0 1px rgba(30,30,36,.1)',
+            lampPct: Math.round(typeof val === 'number' ? val : 0) + '%',
+            shackleTop: on ? '-9px' : '-13px',
+            shackleLeft: on ? '50%' : '64%',
+            shackleRot: on ? '0deg' : '-18deg',
+            lockFg: on ? '#0a7a53' : '#c2661a',
+            lockBg: on ? 'rgba(15,174,118,.14)' : 'rgba(194,102,26,.14)',
+            lockWord: on ? 'Secured' : 'Open',
+            powerFg: on ? '#0a7a53' : (dark ? 'rgba(247,245,242,.45)' : '#b6b1aa'),
+            powerBg: on ? 'rgba(15,174,118,.14)' : (dark ? 'rgba(247,245,242,.08)' : 'rgba(30,30,36,.05)'),
+            powerWord: on ? 'Powered on' : 'Powered off',
+            sliderVal: typeof val === 'number' ? val : 0,
+            readout: isTemp ? (val || 0).toFixed(1) + '°'
+              : d[2] === 'seg' ? (['Off', 'Quiet', 'Auto', 'Turbo'][val || 0] || 'Off')
+              : d[2] === 'toggle' ? (d[1] === 'lock' ? (on ? 'Locked' : 'Unlocked') : d[1] === 'garage' ? (on ? 'Closed' : 'Open') : d[1] === 'camera' ? (on ? 'Live' : 'Paused') : (on ? 'On' : 'Off'))
+              : d[2] === 'status' ? (val > 1 ? Math.round(val) + '%' : (on ? 'OK' : 'Idle'))
+              : Math.round(val || 0) + '%',
+            knob: on ? 'flex-end' : 'flex-start',
+            switchBg: on ? '#3461f2' : (dark ? 'rgba(247,245,242,.16)' : '#ddd8d0'),
+            knobBg: dark ? '#1e1e24' : '#fffdfa',
+            trackBg: dark ? 'rgba(247,245,242,.14)' : '#eae6df',
+            btnRing: dark ? 'rgba(247,245,242,.18)' : '#e2ded7',
+            segs: [['Off', 0], ['Quiet', 1], ['Auto', 2], ['Turbo', 3]].map(sg => ({ label: sg[0], v: sg[1], bg: (val || 0) === sg[1] ? (dark ? '#f4f2ef' : '#1e1e24') : 'transparent', fg: (val || 0) === sg[1] ? (dark ? '#1e1e24' : '#f9f7f4') : (dark ? 'rgba(247,245,242,.6)' : '#6d6a67') })),
+            swatches: ['#ffb765', '#fff1d6', '#8fb6ff', '#e08fb0'].map(c => ({ c, ring: ((S.devCol || {opacity:1})[key] || '#ffb765') === c ? '#3461f2' : 'transparent' }))
+          };
+        })
+      })),
+      pickSwatch: (e) => { const k = e.currentTarget.dataset.key, c = e.currentTarget.dataset.c; this.setState(s => ({ devCol: Object.assign({}, s.devCol, { [k]: c }) })); if (this._devTick) this._devTick(); },
+      chipRow: S.view === 'catalog'
+        ? this.SIZES.map(z => Object.assign({ k:'size', id:z.id, label:z.label, meta:z.dim }, chipOn(z.id === S.size))).concat(this.DESIGNS.map(d => Object.assign({ k:'design', id:d.id, label:d.label, meta:'' }, chipOn(d.id === S.design))))
+        : [{ k:'dark', id:'toggle', label: dark ? 'Light' : 'Dark', meta:'' , bg: dark ? '#f4f2ef' : '#1e1e24', fg: dark ? '#1e1e24' : '#f9f7f4', bd: dark ? '#f4f2ef' : '#1e1e24' }],
+      isHome: S.view === 'home', isCatalog: S.view === 'catalog', isSettings: S.view === 'settings',
+      houseState: 'Everything is settled',
+      houseLine: 'Twelve automations are active, one window is open in the study, and the dishwasher is waiting for the 22:00 tariff. Nothing needs you.',
+      scenes: [{ id:'evening', label:'Evening' }, { id:'focus', label:'Focus' }, { id:'dinner', label:'Dinner' }, { id:'away', label:'Away' }, { id:'night', label:'Good night' }].map(s => Object.assign(s, chipOn(s.id === S.scene))),
+      homeCards: this.HOME.map(h => this.card(byName(h[0]), h[1], h[2], homeDesign)),
+      catalogCards: cat,
+      scanScope: 'Matter · Thread · Wi-Fi',
+      addFilters: [{ id:'all', label:'All', n:5 }, { id:'light', label:'Lighting', n:1 }, { id:'sensor', label:'Sensors', n:2 }, { id:'media', label:'Media', n:1 }, { id:'other', label:'Other', n:1 }].map(a => Object.assign(a, chipOn(a.id === (S.addFilter || 'all')))),
+      pickAddFilter: (e) => this.setState({ addFilter: e.currentTarget.dataset.id }),
+      foundCount: '5',
+      discovered: [
+        { id:'d1', name:'Nanoleaf Essentials A19', meta:'Living room · signal strong', proto:'Matter', action:'Add' },
+        { id:'d2', name:'Eve Door & Window', meta:'Study window · battery 100%', proto:'Thread', action:'Add' },
+        { id:'d3', name:'Aqara FP2 presence', meta:'Hallway · needs 2.4GHz', proto:'Wi-Fi', action:'Add' },
+        { id:'d4', name:'Sonos Era 100', meta:'Kitchen · already on network', proto:'AirPlay', action:'Add' },
+        { id:'d5', name:'Unknown Zigbee bulb', meta:'No manufacturer response', proto:'Zigbee', action:'Ignore' }
+      ].map((d, i) => Object.assign(d, { initial: d.name.charAt(0), bg: d.action === 'Add' ? 'transparent' : 'transparent', fg: dark ? '#f4f2ef' : '#1e1e24', bd: dark ? 'rgba(244,242,239,.2)' : '#e2ded7', tileBg: dark ? 'rgba(244,242,239,.06)' : 'rgba(249,247,244,.8)', tileRing: dark ? 'rgba(244,242,239,.12)' : '#e6e2db', tileFg: dark ? 'rgba(244,242,239,.7)' : '#55524f' })),
+      connectedMeta: '34 accessories · 6 rooms · 1 offline',
+      rooms: [
+        { name:'Living room', count:'9', devices:'Lights ×3, TV, Sonos, thermostat, purifier, blinds, camera', status:'All responding', dot:'#0fae76' },
+        { name:'Kitchen', count:'7', devices:'Lights ×5, coffee, dishwasher, fridge sensor', status:'All responding', dot:'#0fae76' },
+        { name:'Bedroom', count:'5', devices:'Lights ×2, blinds, air sensor, speaker', status:'All responding', dot:'#0fae76' },
+        { name:'Study', count:'4', devices:'Light, window contact, CO₂ sensor, desk lamp', status:'Window open', dot:'#e07a1f' },
+        { name:'Outdoors', count:'6', devices:'Path lights, porch, 3 cameras, irrigation', status:'Side gate camera offline', dot:'#d0453a' },
+        { name:'Utility', count:'3', devices:'Washer, dryer, leak sensors', status:'All responding', dot:'#0fae76' }
+      ],
+      bridges: [
+        { name:'Apple Home', meta:'Two-way · 34 accessories', state:'Connected', fg:'#0fae76' },
+        { name:'Matter fabric', meta:'Atlas is a commissioner', state:'Connected', fg:'#0fae76' },
+        { name:'Thread border router', meta:'HomePod mini · 11 nodes', state:'Connected', fg:'#0fae76' },
+        { name:'Google Home', meta:'Read-only mirror', state:'Not linked', fg: dark ? '#6d6a67' : 'rgba(247,245,242,.5)' }
+      ],
+      perms: [
+        { id:'p1', name:'Adjust lights and blinds', note:'Any time, without telling you.' },
+        { id:'p2', name:'Shift appliances to off-peak', note:'Only where the cycle can finish by morning.' },
+        { id:'p3', name:'Unlock doors', note:'Never — Atlas can lock, but only you unlock.' },
+        { id:'p4', name:'Pause irrigation for weather', note:'Uses the same forecast as the weather widget.' },
+        { id:'p5', name:'Grant guest access', note:'Requires your approval each time.' }
+      ].map(p => { const on = !!S.perms[p.id]; return Object.assign(p, { knob: on ? 'flex-end' : 'flex-start', switchBg: on ? '#3461f2' : (dark ? 'rgba(244,242,239,.16)' : '#ddd8d0'), knobBg: dark ? '#1e1e24' : '#fffdfa' }); }),
+      pickView: (e) => this.setState({ view: e.currentTarget.dataset.id }),
+      pickChip: (e) => { const k = e.currentTarget.dataset.k, id = e.currentTarget.dataset.id; if (k === 'size') this.setState({ size:id }); else if (k === 'design') this.setState({ design:id }); else this.setState({ dark: !this.state.dark }); },
+      runScene: (e) => this.setState({ scene: e.currentTarget.dataset.id }),
+      addDevice: () => {opacity:1},
+      togglePerm: (e) => { const id = e.currentTarget.dataset.id; this.setState({ perms: Object.assign({}, S.perms, { [id]: S.perms[id] ? 0 : 1 }) }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

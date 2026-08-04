@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=Newsreader:ital,wght@1,500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@0.462.0/dist/umd/lucide.min.js"></script>
+<style>
+button,input,textarea,select{border:none}
+body{margin:0;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#b95511;text-decoration:none}a:hover{color:#ff6a00}
+.page{--pg:#f9f7f4;--rz:#f1eeea;--sk:#edebe7;--ink:#1e1e24;--ink2:#6d6a67;--ink3:#b6b1aa;--bd:#e2ded7;--acc:#ff6a00;--acch:#ff773c;--grn:#2f7d4f;--red:#c14a35;min-height:100vh;position:relative;overflow-x:hidden}
+.disp{font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.03em}
+.mono{font-family:ui-monospace,'SF Mono',Menlo,monospace}
+.grain{position:fixed;inset:0;pointer-events:none;z-index:2;opacity:.4;mix-blend-mode:multiply;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.grain.off{display:none}
+.bg{position:fixed;inset:0;z-index:1;pointer-events:none;overflow:hidden}
+.blob{position:absolute;border-radius:50%;filter:blur(80px)}
+.b1{top:-30%;right:-15%;width:900px;height:800px;background:radial-gradient(closest-side,rgba(255,158,64,.3),transparent 72%);animation:drift1 26s ease-in-out infinite alternate}
+.b2{top:-15%;left:-12%;width:760px;height:700px;background:radial-gradient(closest-side,rgba(255,214,153,.4),transparent 70%);animation:drift2 32s ease-in-out infinite alternate}
+.b3{bottom:-30%;left:28%;width:1000px;height:600px;background:radial-gradient(closest-side,rgba(122,140,255,.14),transparent 72%);animation:drift1 38s ease-in-out infinite alternate-reverse}
+@keyframes drift1{from{transform:translate(0,0) scale(1)}to{transform:translate(50px,26px) scale(1.08)}}
+@keyframes drift2{from{transform:translate(0,0)}to{transform:translate(-44px,30px)}}
+@keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+@keyframes riseloop{0%{opacity:0;transform:translateY(14px)}28%{opacity:1;transform:translateY(0)}78%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(0)}}
+@keyframes pls{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes hdrflow{from{transform:translateX(-18px) scale(1)}to{transform:translateX(18px) scale(1.07)}}
+.hz{position:relative;z-index:2}
+.i16{width:16px;height:16px;flex-shrink:0}
+.hdr{position:sticky;top:14px;z-index:50;display:flex;align-items:center;justify-content:space-between;gap:16px;max-width:1160px;margin:14px auto 0;padding:10px 18px;border-radius:9999px;background:#fffdfa;overflow:hidden}
+.hdrbg{position:absolute;inset:-34px;pointer-events:none;filter:blur(34px) saturate(1.15);background:radial-gradient(420px 200px at 10% 130%,rgba(255,166,77,.42),transparent 70%),radial-gradient(520px 240px at 36% -50%,rgba(255,214,153,.55),transparent 70%),radial-gradient(460px 220px at 64% 140%,rgba(122,140,255,.22),transparent 70%),radial-gradient(560px 260px at 92% -40%,rgba(255,136,60,.34),transparent 70%);animation:hdrflow 14s ease-in-out infinite alternate}
+.mk{width:30px;height:30px;border-radius:9px;background:var(--ink);color:#f9f7f4;font-family:'Hanken Grotesk';font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.hdt{font-size:15px;font-weight:600;letter-spacing:-.01em;margin:0}
+.hver{font-size:12px;color:var(--ink2)}
+.main{position:relative;z-index:10;max-width:1160px;margin:0 auto;padding:56px 24px 80px}
+.hero{margin-bottom:10px;animation:rise .8s cubic-bezier(.22,1,.36,1) both}
+.kick{font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--acc);margin:0 0 14px}
+.bh1{font-size:clamp(54px,8vw,92px);font-weight:500;letter-spacing:-.045em;line-height:.95;margin:0 0 16px}
+.hsub{font-size:16px;line-height:1.6;color:var(--ink2);max-width:620px;margin:0}
+.shead{display:flex;align-items:baseline;gap:14px;padding-top:26px;margin:52px 0 6px}
+.snum{font-size:12px;color:var(--ink3);font-family:ui-monospace,Menlo,monospace}
+.sh2{font-size:23px;font-weight:500;margin:0}
+.secd{font-size:13px;color:var(--ink2);margin:4px 0 20px;max-width:560px;line-height:1.55}
+.lgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(330px,100%),1fr));gap:16px}
+.ltile{background:#fffdfa;border-radius:20px;overflow:hidden;transition:transform .25s,border-color .25s;cursor:pointer}
+.ltile:hover{transform:translateY(-3px)}
+.lart{height:168px;display:flex;align-items:center;justify-content:center;position:relative;background:radial-gradient(120% 120% at 50% 0%,#fffdfa,#f5f2ed)}
+.lart.dk{background:radial-gradient(120% 120% at 50% 0%,#27272e,#16161b)}
+.lbadge{position:absolute;top:12px;left:12px;font-size:11px;font-weight:600;color:var(--ink3);background:var(--pg);padding:3px 9px;border-radius:9999px}
+.dk .lbadge{background:rgba(255,255,255,.06);color:rgba(249,247,244,.6)}
+.lmeta{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 16px}
+.lname{font-size:13px;font-weight:600;margin:0}
+.lfont{font-size:11px;color:var(--ink3);margin:0;text-align:right}
+.lw1{font-family:'Hanken Grotesk';font-size:44px;font-weight:600;letter-spacing:-.045em;color:var(--ink)}
+.ldot{color:var(--acc)}
+.lw2{font-family:'Geist';font-size:42px;font-weight:500;letter-spacing:-.035em;color:var(--ink)}
+.lw3{font-family:'Geist';font-size:25px;font-weight:600;letter-spacing:.3em;text-indent:.3em;color:var(--ink)}
+.lw4{font-family:'Newsreader',serif;font-style:italic;font-size:48px;font-weight:500;letter-spacing:-.01em;color:var(--ink)}
+.lw5{font-family:'Geist';font-size:42px;font-weight:600;letter-spacing:-.04em;color:var(--ink)}
+.lacc{color:var(--acc)}
+.lw6{font-family:'Hanken Grotesk';font-size:33px;font-weight:700;letter-spacing:0;line-height:.92;color:var(--ink);text-transform:uppercase;text-align:left}
+.dk .lw1,.dk .lw2,.dk .lw3,.dk .lw4,.dk .lw5,.dk .lw6{color:#f9f7f4}
+.rgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(230px,100%),1fr));gap:12px;margin-top:16px}
+.rule{background:var(--rz);border-radius:14px;padding:14px 16px}
+.rt2{font-size:12px;font-weight:600;margin:0 0 4px}
+.rd2{font-size:12px;color:var(--ink2);margin:0;line-height:1.55}
+.airow{display:flex;align-items:flex-end;gap:26px;flex-wrap:wrap;margin-bottom:20px}
+.aistack{display:flex;flex-direction:column;align-items:center;gap:10px}
+.ailbl{font-size:11px;color:var(--ink3)}
+.aicon{display:flex;align-items:center;justify-content:center;font-family:'Hanken Grotesk';font-weight:600;color:#fff;letter-spacing:-.02em;background:linear-gradient(145deg,#ff9440,#ff5f00);box-shadow:inset 0 1px 0 rgba(255,255,255,.35),inset 0 -10px 20px rgba(175,55,0,.28),0 14px 30px -12px rgba(255,106,0,.45)}
+.aink{background:linear-gradient(145deg,#2b2b33,#16161b);color:var(--acc);box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 14px 30px -14px rgba(30,30,36,.5)}
+.apaper{background:#fffdfa;color:var(--acc);box-shadow:0 10px 24px -14px rgba(30,30,36,.25)}
+.a116{width:116px;height:116px;border-radius:31px;font-size:64px}
+.a84{width:84px;height:84px;border-radius:22px;font-size:46px}
+.a48{width:48px;height:48px;border-radius:13px;font-size:26px}
+.a32{width:32px;height:32px;border-radius:9px;font-size:18px}
+.a16{width:16px;height:16px;border-radius:5px;font-size:9px}
+.ramp{display:flex;align-items:flex-end;gap:14px}
+.tabwrap{padding:0 4px;display:flex}
+.tabmock{display:inline-flex;align-items:center;gap:8px;background:#fffdfa;border-bottom:none;border-radius:12px 12px 0 0;padding:9px 16px;font-size:12px;color:var(--ink2)}
+.cwgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(158px,100%),1fr));gap:12px}
+.csw{border-radius:16px;overflow:hidden;background:#fffdfa}
+.cswc{height:68px}
+.cswm{padding:10px 12px}
+.cswn{font-size:13px;font-weight:600;margin:0}
+.cswh{font-size:11px;font-family:ui-monospace,Menlo,monospace;color:var(--ink3);margin:2px 0 4px;text-transform:uppercase}
+.cswu{font-size:11px;color:var(--ink2);margin:0;line-height:1.4}
+.cPaper{background:#f9f7f4}.cRaise{background:#f1eeea}.cSand{background:#edebe7}.cBd{background:#e2ded7}.cInk3{background:#b6b1aa}.cInk2{background:#6d6a67}.cInk{background:#1e1e24}.cAcc{background:#ff6a00}.cAccH{background:#ff773c}.cBlue{background:#3950e6}.cGrn{background:#2f7d4f}.cRed{background:#c14a35}
+.noteb{margin-top:14px;padding:12px 16px;border-radius:12px;background:var(--rz);font-size:12px;color:var(--ink2);line-height:1.55}
+.tgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr));gap:16px;margin-bottom:18px}
+.tcard{background:#fffdfa;border-radius:20px;padding:22px}
+.tfam{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3);margin:0 0 12px}
+.tsamp1{font-family:'Hanken Grotesk';font-size:38px;font-weight:500;letter-spacing:-.03em;margin:0 0 12px;line-height:1.05}
+.tsamp2{font-size:15px;line-height:1.6;margin:0 0 12px}
+.trole{font-size:12px;color:var(--ink2);margin:0;line-height:1.5}
+.tsr{display:grid;grid-template-columns:1fr 140px 150px;gap:16px;align-items:baseline;padding:12px 4px}
+.tsr.last{border-bottom:none}
+.tss{margin:0;line-height:1.1}
+.tsn{font-size:12px;color:var(--ink2)}
+.tsd{font-size:11px;color:var(--ink3);font-family:ui-monospace,Menlo,monospace;text-align:right}
+.shrow{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px}
+.shbox{background:#fffdfa;display:flex;align-items:flex-end;justify-content:center;padding-bottom:8px;font-size:11px;color:var(--ink3);width:110px;height:82px}
+.r10{border-radius:10px}.r20{border-radius:20px}.r28{border-radius:28px}
+.rpill{border-radius:9999px;height:44px;width:150px;align-items:center;padding:0}
+.irow{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.icobx{width:38px;height:38px;border-radius:11px;background:var(--sk);color:var(--ink);display:flex;align-items:center;justify-content:center}
+.icobx.on{background:var(--acc);color:#fff}
+.mrow2{display:flex;gap:14px;flex-wrap:wrap}
+.mdemo{flex:1;min-width:220px;background:#fffdfa;border-radius:16px;padding:18px;transition:transform .25s,border-color .25s}
+.mdemo:hover{transform:translateY(-3px)}
+.mdn{font-size:13px;font-weight:600;margin:0 0 4px}
+.mdd{font-size:11px;color:var(--ink3);margin:0 0 14px;font-family:ui-monospace,Menlo,monospace}
+.risedemo{display:inline-flex;padding:7px 14px;border-radius:9999px;background:var(--rz);font-size:12px;color:var(--ink2);animation:riseloop 2.6s cubic-bezier(.22,1,.36,1) infinite}
+.pdot{width:8px;height:8px;border-radius:50%;background:var(--acc);animation:pls 2s ease-in-out infinite}
+.plbl{font-size:12px;color:var(--ink2)}
+.ftr{position:relative;z-index:10;text-align:center;padding:24px;color:var(--ink3);font-size:12px}
+</style>
+<script src="atlas-transition.js"></script>
+</helmet>
+<div class="page" ref="{{ rootRef }}">
+<div class="bg"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+<div class="{{ grainCls }}"></div>
+<header class="hdr"><div class="hdrbg"></div><div class="fx ac gap12 hz"><h1 class="hdt"><span class="disp" style="font-weight:600;letter-spacing:-.045em">Atlas<span style="color:var(--acc)">.</span></span> Brand Guide</h1></div><span class="hver hz">v1.0 · July 2026</span></header>
+<main class="main">
+<div class="hero"><p class="kick">Brand Guidelines</p><h2 class="bh1 disp">Atlas</h2><p class="hsub">A calm, warm personal-intelligence brand. Paper surfaces, ink type, one signal color. These are the essential assets and the rules that keep them consistent.</p></div>
+<section data-screen-label="Wordmark"><div class="shead"><span class="snum">01</span><h3 class="sh2 disp">Wordmark</h3></div><p class="secd">The logo is type-only — no icon in the lockup. Two are in use: L2 is the product wordmark (dashboard, in-app chrome); L1 is the brand wordmark (marketing, documents, headers). L3–L6 are archived explorations.</p>
+<div class="lgrid">
+<div class="ltile"><div class="{{ artCls }}"><span class="lbadge">L1</span><span class="lw1">Atlas<span class="ldot">.</span></span></div><div class="lmeta"><p class="lname">Full stop · <span style="color:var(--acc)">Selected — brand</span></p><p class="lfont">Hanken Grotesk · 600 · −4.5% · orange period</p></div></div>
+<div class="ltile"><div class="{{ artCls }}"><span class="lbadge">L2</span><span class="lw2">atlas</span></div><div class="lmeta"><p class="lname">Lowercase · <span style="color:var(--acc)">Selected — product</span></p><p class="lfont">Geist · 500 · −3.5%</p></div></div>
+<div class="ltile"><div class="{{ artCls }}"><span class="lbadge">L3</span><span class="lw3">ATLAS</span></div><div class="lmeta"><p class="lname">Tracked caps</p><p class="lfont">Geist · 600 · +30% tracking</p></div></div>
+<div class="ltile"><div class="{{ artCls }}"><span class="lbadge">L4</span><span class="lw4">Atlas</span></div><div class="lmeta"><p class="lname">Editorial italic</p><p class="lfont">Newsreader · 500 · italic</p></div></div>
+<div class="ltile"><div class="{{ artCls }}"><span class="lbadge">L5</span><span class="lw5"><span class="lacc">a</span>tlas</span></div><div class="lmeta"><p class="lname">Signal a</p><p class="lfont">Geist · 600 · −4% · orange lead glyph</p></div></div>
+<div class="ltile"><div class="{{ artCls }}"><span class="lbadge">L6</span><span class="lw6">AT<br>LAS</span></div><div class="lmeta"><p class="lname">Stacked</p><p class="lfont">Hanken Grotesk · 700 · square placements</p></div></div>
+</div>
+<div class="rgrid">
+<div class="rule"><p class="rt2">Clear space</p><p class="rd2">Keep one cap-height of clear space on all sides of the wordmark.</p></div>
+<div class="rule"><p class="rt2">Minimum size</p><p class="rd2">Never smaller than 20px tall on screen, 8mm in print.</p></div>
+<div class="rule"><p class="rt2">Color</p><p class="rd2">Ink on paper, paper on ink. Signal Orange only on the accent glyph.</p></div>
+<div class="rule"><p class="rt2">Don't</p><p class="rd2">No icon lockups, no stretching, no gradients, no drop shadows.</p></div>
+</div></section>
+<section data-screen-label="App icon"><div class="shead"><span class="snum">02</span><h3 class="sh2 disp">App icon &amp; favicon</h3></div><p class="secd">The monogram "a" lives only here — never next to the wordmark. Signal Orange gradient is the primary treatment.</p>
+<div class="airow">
+<div class="aistack"><div class="aicon a116">a</div><span class="ailbl">Primary · Signal Orange</span></div>
+<div class="aistack"><div class="aicon aink a84">a</div><span class="ailbl">Ink</span></div>
+<div class="aistack"><div class="aicon apaper a84">a</div><span class="ailbl">Paper</span></div>
+<div class="aistack"><div class="ramp"><div class="aicon a48">a</div><div class="aicon a32">a</div><div class="aicon a16">a</div></div><span class="ailbl">48 · 32 · 16 favicon</span></div>
+</div>
+<div class="tabwrap"><div class="tabmock"><div class="aicon a16">a</div>Atlas — Good morning, Alex</div></div></section>
+<section data-screen-label="Color"><div class="shead"><span class="snum">03</span><h3 class="sh2 disp">Color</h3></div><p class="secd">Warm neutrals do 90% of the work. Orange is the only signal color — one accent per view.</p>
+<div class="cwgrid"><sc-for list="{{ swatches }}" as="s" hint-placeholder-count="12"><div class="csw"><div class="cswc {{ s.cls }}"></div><div class="cswm"><p class="cswn">{{ s.name }}</p><p class="cswh">{{ s.hex }}</p><p class="cswu">{{ s.use }}</p></div></div></sc-for></div>
+<div class="noteb">Whites stay warm — keep saturation subtle, never pure #FFF for large surfaces. Green and Red are reserved for status (gains/losses, success/error). Atlas Blue is a supporting data color, never a CTA.</div></section>
+<section data-screen-label="Typography"><div class="shead"><span class="snum">04</span><h3 class="sh2 disp">Typography</h3></div><p class="secd">Two families, three weights. Numerals are always tabular.</p>
+<div class="tgrid">
+<div class="tcard"><p class="tfam">Display — Hanken Grotesk</p><p class="tsamp1">Good morning, Alex</p><p class="trole">Greetings, headlines, big numerals, wordmark. Weights 500–700, tracking −3%.</p></div>
+<div class="tcard"><p class="tfam">UI — Geist</p><p class="tsamp2">Atlas found a cheaper flight for Friday and drafted a reply to Priya. Two tasks need your approval.</p><p class="trole">Body, labels, buttons, metadata. Weights 400–600, default tracking.</p></div>
+</div>
+<div class="tsr"><p class="tss disp" style="font-size:44px;font-weight:500">Display</p><span class="tsn">Greeting / hero</span><span class="tsd">52px · 500 · −3%</span></div>
+<div class="tsr"><p class="tss disp" style="font-size:30px;font-weight:500">Headline</p><span class="tsn">Section titles</span><span class="tsd">32px · 500 · −3%</span></div>
+<div class="tsr"><p class="tss" style="font-size:19px;font-weight:600">Title</p><span class="tsn">Card titles</span><span class="tsd">19px · 600 · −1%</span></div>
+<div class="tsr"><p class="tss" style="font-size:14px">Body</p><span class="tsn">Content, rows</span><span class="tsd">14px · 400</span></div>
+<div class="tsr"><p class="tss" style="font-size:13px;font-weight:600">Label</p><span class="tsn">Card headers, buttons</span><span class="tsd">13px · 600</span></div>
+<div class="tsr last"><p class="tss" style="font-size:12px;color:#6d6a67">Caption</p><span class="tsn">Meta, timestamps</span><span class="tsd">12px · 400–500</span></div></section>
+<section data-screen-label="Shape"><div class="shead"><span class="snum">05</span><h3 class="sh2 disp">Shape &amp; surface</h3></div><p class="secd">Soft radii, hairline borders, no card shadows — elevation comes from a −3px hover lift and border shifts.</p>
+<div class="shrow"><div class="shbox r10">10 — inputs</div><div class="shbox r20">20 — panels</div><div class="shbox r28">28 — cards</div><div class="shbox rpill">pill — chrome</div></div>
+<div class="rgrid">
+<div class="rule"><p class="rt2">Borders</p><p class="rd2">Always 1px, #E2DED7. Hover darkens to #B6B1AA.</p></div>
+<div class="rule"><p class="rt2">Texture</p><p class="rd2">Fixed grain overlay at 40% multiply over background glows.</p></div>
+<div class="rule"><p class="rt2">Glow</p><p class="rd2">Warm blurred blobs (orange, cream, a hint of blue) behind content only.</p></div>
+</div></section>
+<section data-screen-label="Iconography"><div class="shead"><span class="snum">06</span><h3 class="sh2 disp">Iconography</h3></div><p class="secd">Lucide, 16px, 2px stroke, ink — contained in 34–38px sand boxes. Orange fill only for the active state.</p>
+<div class="irow"><div class="icobx"><i data-lucide="sun" class="i16"></i></div><div class="icobx"><i data-lucide="calendar" class="i16"></i></div><div class="icobx"><i data-lucide="mail" class="i16"></i></div><div class="icobx"><i data-lucide="trending-up" class="i16"></i></div><div class="icobx"><i data-lucide="check-circle-2" class="i16"></i></div><div class="icobx"><i data-lucide="newspaper" class="i16"></i></div><div class="icobx on"><i data-lucide="mic" class="i16"></i></div></div></section>
+<section data-screen-label="Motion"><div class="shead"><span class="snum">07</span><h3 class="sh2 disp">Motion</h3></div><p class="secd">Calm and physical. One easing curve everywhere.</p>
+<div class="mrow2">
+<div class="mdemo"><p class="mdn">Enter — rise</p><p class="mdd">.8s cubic-bezier(.22,1,.36,1) · stagger 70ms</p><span class="risedemo">Card enters</span></div>
+<div class="mdemo"><p class="mdn">Hover — lift</p><p class="mdd">−3px translate · border darkens · .25s</p><span class="plbl">Hover this card</span></div>
+<div class="mdemo"><p class="mdn">Live — pulse</p><p class="mdd">2s ease-in-out · opacity 1 → .35</p><div class="fx ac gap8"><span class="pdot"></span><span class="plbl">Atlas is live</span></div></div>
+</div></section>
+</main>
+<footer class="ftr">Atlas Brand Guide · v1.0 · July 2026</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;reverseLogos&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Preview&quot},&quot;showGrain&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Preview&quot}}">
+class Component extends DCLogic {
+  componentDidMount() { this._icons(); }
+  componentDidUpdate() { this._icons(); }
+
+  _icons() {
+    if (this._icoT) clearInterval(this._icoT);
+    let tries = 0;
+    this._icoT = setInterval(() => {
+      tries++;
+      const pending = document.querySelector('i[data-lucide]');
+      if (window.lucide && pending) window.lucide.createIcons();
+      if ((!pending && tries > 3) || tries > 50) { clearInterval(this._icoT); this._icoT = null; }
+    }, 120);
+  }
+
+  renderVals() {
+    return {
+      rootRef: (el) => { this._root = el; if (el) this._icons(); },
+      artCls: (this.props.reverseLogos ?? false) ? 'lart dk' : 'lart',
+      grainCls: (this.props.showGrain ?? true) ? 'grain' : 'grain off',
+      swatches: [
+        { cls: 'cPaper', name: 'Paper', hex: '#F9F7F4', use: 'Page background' },
+        { cls: 'cRaise', name: 'Raise', hex: '#F1EEEA', use: 'Cards, panels' },
+        { cls: 'cSand', name: 'Sand', hex: '#EDEBE7', use: 'Icon boxes, hover fills' },
+        { cls: 'cBd', name: 'Border', hex: '#E2DED7', use: 'All 1px hairlines' },
+        { cls: 'cInk3', name: 'Ink 3', hex: '#B6B1AA', use: 'Disabled, faint meta' },
+        { cls: 'cInk2', name: 'Ink 2', hex: '#6D6A67', use: 'Secondary text' },
+        { cls: 'cInk', name: 'Ink', hex: '#1E1E24', use: 'Primary text, dark chrome' },
+        { cls: 'cAcc', name: 'Signal Orange', hex: '#FF6A00', use: 'CTAs, live states, accent' },
+        { cls: 'cAccH', name: 'Orange Hover', hex: '#FF773C', use: 'Hover on orange' },
+        { cls: 'cBlue', name: 'Atlas Blue', hex: '#3950E6', use: 'Data accents, links' },
+        { cls: 'cGrn', name: 'Green', hex: '#2F7D4F', use: 'Positive, success' },
+        { cls: 'cRed', name: 'Red', hex: '#C14A35', use: 'Negative, errors' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

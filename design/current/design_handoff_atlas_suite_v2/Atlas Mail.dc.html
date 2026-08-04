@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<style>
+button,input,textarea,select{border:none}@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Hanken+Grotesk:wght@500;600;700&display=swap');
+html,body{margin:0;padding:0;background:#f9f7f4}
+a{color:#3461f2;text-decoration:none}a:hover{color:#5b7cff}
+::selection{background:rgba(52,97,242,.18)}
+*{box-sizing:border-box}
+textarea,input,button{font:inherit}
+@keyframes amail-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes amail-pulse{0%,100%{opacity:1}50%{opacity:.34}}
+@keyframes amail-sweep{from{background-position:-320px 0}to{background-position:320px 0}}
+@keyframes amail-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+</style>
+<script src="https://unpkg.com/lucide@0.462.0/dist/umd/lucide.min.js"></script>
+<script src="atlas-sphere.js"></script>
+<script src="atlas-transition.js"></script>
+</helmet>
+<div ref="{{ rootRef }}" style="position:relative;min-height:100vh;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:auto">
+<div style="position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none">
+<div style="position:absolute;inset:0;z-index:0;pointer-events:none;background:linear-gradient(180deg,rgba(255,231,200,.7),rgba(249,247,244,0) 42%)"></div>
+<div style="position:absolute;top:-300px;right:-180px;width:820px;height:820px;z-index:0;pointer-events:none;border-radius:50%;filter:blur(64px);background:radial-gradient(closest-side,rgba(255,158,64,.34),rgba(255,120,20,.1) 58%,transparent 76%)"></div>
+<div style="position:absolute;top:-140px;left:-220px;width:760px;height:560px;z-index:0;pointer-events:none;border-radius:50%;filter:blur(64px);background:radial-gradient(closest-side,rgba(122,140,255,.2),transparent 72%)"></div>
+<div style="position:absolute;inset:0;z-index:1;pointer-events:none;opacity:.4;mix-blend-mode:multiply;background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E&quot;)"></div>
+</div>
+
+<section style="position:relative;z-index:20;display:flex;align-items:center;gap:30px;min-width:1400px;max-width:1680px;margin:0 auto;padding:34px 28px 14px">
+<div style="width:224px;height:224px;flex-shrink:0"><canvas width="300" height="300" ref="{{ orbRef }}" style="width:224px;height:224px;display:block"></canvas></div>
+<div>
+<h1 style="margin:0;font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.03em;font-size:clamp(32px,4.2vw,58px);font-weight:500;line-height:1;color:#1e1e24">{{ greetLead }}<span style="color:#3461f2">{{ greetAccent }}</span></h1>
+<p style="margin:14px 0 0;font-size:16px;line-height:1.5;max-width:560px;color:#6d6a67">{{ greetSub }}</p>
+</div>
+<div style="margin-left:auto;text-align:right">
+<div style="font-family:'Hanken Grotesk','Geist',sans-serif;letter-spacing:-.03em;font-size:50px;font-weight:500;line-height:1;font-variant-numeric:tabular-nums;color:#1e1e24">{{ metaBig }}</div>
+<div style="margin-top:6px;font-size:13px;color:#6d6a67">{{ metaSmall }}</div>
+</div>
+</section>
+
+<div style="position:relative;z-index:20;display:flex;align-items:center;gap:16px;min-width:1400px;max-width:1680px;margin:0 auto;padding:10px 20px;margin:8px 28px 0;border-radius:9999px;background:rgba(255,253,250,.5);backdrop-filter:blur(14px) saturate(1.08);box-shadow:inset 0 0 0 1px rgba(255,253,250,.7),0 12px 32px -30px rgba(30,30,36,.5)">
+<div style="display:flex;align-items:center;gap:6px">
+<sc-for list="{{ accounts }}" as="a" hint-placeholder-count="4">
+<button data-acct="{{ a.id }}" onClick="{{ pickAcct }}" style="border:none;display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:9999px;cursor:pointer;font-size:13px;font-weight:500;letter-spacing:-.01em;background:{{ a.bg }};color:{{ a.fg }}" style-hover="background:#edebe7">
+<span style="width:7px;height:7px;border-radius:50%;background:{{ a.dot }}"></span>{{ a.label }}
+<span style="font-variant-numeric:tabular-nums;color:{{ a.cfg }};font-size:12px">{{ a.count }}</span>
+</button>
+</sc-for>
+</div>
+<div style="flex:1;display:flex;align-items:center;gap:9px;height:36px;max-width:400px;margin-left:14px;padding:0 14px;border-radius:9999px;background:rgba(249,247,244,.85);color:#6d6a67">
+<i data-lucide="search" style="width:15px;height:15px"></i>
+<input placeholder="Search mail, people, rules" style="flex:1;min-width:0;border:0;outline:0;background:transparent;font-size:13.5px;color:#1e1e24"/>
+<span style="font-size:11px;color:#b6b1aa;letter-spacing:.04em">⌘K</span>
+</div>
+<div style="margin-left:auto;display:flex;align-items:center;gap:12px">
+<div style="display:flex;align-items:center;gap:8px;height:34px;padding:0 13px;border-radius:9999px;background:rgba(52,97,242,.08);color:#2f4bbd;font-size:12.5px;font-weight:500">
+<span style="width:7px;height:7px;border-radius:50%;background:#3461f2;animation:amail-pulse 2s ease-in-out infinite"></span>{{ modeLabel }}
+</div>
+<button onClick="{{ startCompose }}" style="display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 18px;border-radius:9999px;border:0;cursor:pointer;background:#3461f2;color:#fff;font-size:14px;font-weight:500" style-hover="background:#5b7cff"><i data-lucide="pen-line" style="width:15px;height:15px"></i>Write</button>
+</div>
+</div>
+
+<div style="position:relative;z-index:10;display:grid;grid-template-columns:238px 392px minmax(0,1fr);gap:16px;min-width:1400px;max-width:1680px;margin:0 auto;padding:14px 28px 116px;height:calc(100vh - 300px);min-height:560px;animation:amail-rise .7s cubic-bezier(.22,1,.36,1) both">
+
+<aside style="display:flex;flex-direction:column;gap:22px;min-height:0;overflow:auto;padding:22px 16px;background:rgba(255,253,250,.72);backdrop-filter:blur(12px) saturate(1.06);border-radius:28px">
+<div style="display:flex;flex-direction:column;gap:2px">
+<sc-for list="{{ boxes }}" as="b" hint-placeholder-count="7">
+<button data-box="{{ b.id }}" onClick="{{ pickBox }}" style="display:flex;align-items:center;gap:11px;width:100%;padding:9px 12px;border-radius:12px;border:0;cursor:pointer;text-align:left;background:{{ b.bg }};color:{{ b.fg }};font-size:13.5px;font-weight:{{ b.fw }};letter-spacing:-.01em" style-hover="background:#f1eeea">
+<i data-lucide="{{ b.icon }}" style="width:16px;height:16px;flex-shrink:0;opacity:.75"></i>
+<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ b.label }}</span>
+<span style="font-variant-numeric:tabular-nums;font-size:12px;font-weight:500;color:{{ b.cfg }}">{{ b.count }}</span>
+</button>
+</sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:9px">
+<p style="margin:0 0 2px;padding:0 12px;font-size:11px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;color:#b6b1aa">Mailboxes</p>
+<sc-for list="{{ mboxes }}" as="m" hint-placeholder-count="3">
+<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:12px;background:#f9f7f4">
+<span style="width:8px;height:8px;border-radius:50%;background:{{ m.dot }};flex-shrink:0"></span>
+<div style="flex:1;min-width:0">
+<p style="margin:0;font-size:13px;font-weight:500;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ m.addr }}</p>
+<p style="margin:2px 0 0;font-size:11.5px;color:#6d6a67">{{ m.rule }}</p>
+</div>
+<span style="font-size:11.5px;font-variant-numeric:tabular-nums;color:#b6b1aa">{{ m.auto }}</span>
+</div>
+</sc-for>
+</div>
+<div style="margin-top:auto;padding:14px;border-radius:18px;background:#f1eeea">
+<p style="margin:0 0 6px;font-size:12px;font-weight:600;letter-spacing:-.01em">Routing rules</p>
+<p style="margin:0 0 11px;font-size:12px;line-height:1.5;color:#6d6a67">{{ rulesLine }}</p>
+<button onClick="{{ openRules }}" style="border:none;display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 12px;border-radius:9999px;background:#fffdfa;color:#1e1e24;font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:#edebe7"><i data-lucide="sliders-horizontal" style="width:13px;height:13px"></i>Edit rules</button>
+</div>
+</aside>
+
+<section style="display:flex;flex-direction:column;min-height:0;background:rgba(255,253,250,.72);backdrop-filter:blur(12px) saturate(1.06);border-radius:28px">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:20px 20px 12px">
+<div>
+<h2 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:20px;font-weight:600;letter-spacing:-.03em">{{ listTitle }}</h2>
+<p style="margin:4px 0 0;font-size:12.5px;color:#6d6a67">{{ listMeta }}</p>
+</div>
+<button onClick="{{ toggleSort }}" style="border:none;display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 11px;border-radius:9999px;background:#fffdfa;color:#6d6a67;font-size:12px;cursor:pointer" style-hover="color:#1e1e24;background:#edebe7"><i data-lucide="arrow-up-down" style="width:13px;height:13px"></i>{{ sortLabel }}</button>
+</div>
+<div style="flex:1;min-height:0;overflow:auto;padding:0 12px 14px;display:flex;flex-direction:column;gap:6px">
+<sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+<button data-id="{{ r.id }}" onClick="{{ pickRow }}" style="border:none;position:relative;display:block;width:100%;text-align:left;padding:13px 14px 13px 16px;border-radius:16px;cursor:pointer;background:{{ r.bg }}" style-hover="background:#edebe7">
+<span style="position:absolute;left:0;top:14px;bottom:14px;width:3px;border-radius:0 3px 3px 0;background:{{ r.dot }}"></span>
+<span style="display:flex;align-items:baseline;gap:8px">
+<span style="font-size:13.5px;font-weight:600;letter-spacing:-.015em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.from }}</span>
+<span style="font-size:11.5px;color:#b6b1aa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.org }}</span>
+<span style="margin-left:auto;font-size:11.5px;color:#b6b1aa;font-variant-numeric:tabular-nums;flex-shrink:0">{{ r.time }}</span>
+</span>
+<span style="display:block;margin-top:5px;font-size:13.5px;font-weight:500;letter-spacing:-.01em;color:#1e1e24;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.subject }}</span>
+<span style="display:block;margin-top:3px;font-size:12.5px;line-height:1.45;color:#6d6a67;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.snippet }}</span>
+<span style="display:flex;align-items:center;gap:7px;margin-top:9px">
+<span style="display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px;border-radius:9999px;background:{{ r.chipBg }};color:{{ r.chipFg }};font-size:11px;font-weight:500;letter-spacing:.01em"><i data-lucide="{{ r.chipIcon }}" style="width:11px;height:11px"></i>{{ r.chip }}</span>
+<span style="font-size:11px;color:#b6b1aa">{{ r.acctLabel }}</span>
+</span>
+</button>
+</sc-for>
+<sc-if value="{{ listEmpty }}" hint-placeholder-val="{{ false }}">
+<div style="margin:26px 8px;padding:26px 20px;border-radius:20px;text-align:center">
+<i data-lucide="check-check" style="width:22px;height:22px;color:#0fae76"></i>
+<p style="margin:10px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:17px;font-weight:600;letter-spacing:-.02em">{{ emptyTitle }}</p>
+<p style="margin:6px 0 0;font-size:12.5px;line-height:1.5;color:#6d6a67">{{ emptyBody }}</p>
+</div>
+</sc-if>
+</div>
+</section>
+
+<section style="display:flex;flex-direction:column;min-height:0;background:rgba(255,253,250,.78);backdrop-filter:blur(12px) saturate(1.06);border-radius:28px;overflow:hidden">
+<sc-if value="{{ hasSel }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;padding:24px 28px 18px">
+<div style="flex:1;min-width:0">
+<div style="display:flex;align-items:center;gap:9px;margin-bottom:8px">
+<span style="display:inline-flex;align-items:center;gap:6px;height:23px;padding:0 10px;border-radius:9999px;background:{{ sel.chipBg }};color:{{ sel.chipFg }};font-size:11px;font-weight:500"><i data-lucide="{{ sel.chipIcon }}" style="width:11px;height:11px"></i>{{ sel.chip }}</span>
+<span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:#6d6a67"><span style="width:7px;height:7px;border-radius:50%;background:{{ sel.dot }}"></span>{{ sel.acctAddr }}</span>
+</div>
+<h1 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:27px;font-weight:600;letter-spacing:-.032em;line-height:1.14;text-wrap:pretty">{{ sel.subject }}</h1>
+<p style="margin:8px 0 0;font-size:13px;color:#6d6a67">{{ sel.people }}</p>
+</div>
+<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+<button onClick="{{ doSnooze }}" title="Snooze" style="border:none;width:34px;height:34px;border-radius:9999px;background:#fffdfa;color:#6d6a67;cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="color:#1e1e24;background:#edebe7"><i data-lucide="clock" style="width:15px;height:15px"></i></button>
+<button onClick="{{ doArchive }}" title="Archive" style="border:none;width:34px;height:34px;border-radius:9999px;background:#fffdfa;color:#6d6a67;cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="color:#1e1e24;background:#edebe7"><i data-lucide="archive" style="width:15px;height:15px"></i></button>
+<button onClick="{{ doHandoff }}" style="border:none;display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 13px;border-radius:9999px;background:#fffdfa;color:#1e1e24;font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:#edebe7"><i data-lucide="user-round" style="width:14px;height:14px"></i>Hand to human</button>
+</div>
+</div>
+
+<div style="flex:1;min-height:0;overflow:auto;padding:22px 28px 26px;display:flex;flex-direction:column;gap:16px">
+
+<sc-if value="{{ sel.hasAmbient }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;gap:14px;padding:16px 18px;border-radius:20px;background:{{ sel.ambBg }};box-shadow:inset 0 0 0 1px {{ sel.ambBd }};animation:amail-in .5s cubic-bezier(.22,1,.36,1) both">
+<span style="width:30px;height:30px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:{{ sel.ambIconBg }};color:{{ sel.ambIconFg }}"><i data-lucide="{{ sel.ambIcon }}" style="width:16px;height:16px"></i></span>
+<div style="flex:1;min-width:0">
+<p style="margin:0;font-size:13.5px;font-weight:600;letter-spacing:-.015em;color:{{ sel.ambFg }}">{{ sel.ambTitle }}</p>
+<p style="margin:5px 0 0;font-size:13px;line-height:1.55;color:#4a4744;text-wrap:pretty">{{ sel.ambBody }}</p>
+<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:11px">
+<sc-for list="{{ sel.ambFacts }}" as="f" hint-placeholder-count="3">
+<span style="display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:9999px;background:rgba(255,253,250,.8);color:#4a4744;font-size:11.5px">{{ f }}</span>
+</sc-for>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-for list="{{ sel.messages }}" as="m" hint-placeholder-count="2">
+<article style="padding:18px 20px;border-radius:20px;background:{{ m.bg }};box-shadow:inset 0 0 0 1px #e8e4dd">
+<header style="display:flex;align-items:center;gap:11px;margin-bottom:11px">
+<span style="width:30px;height:30px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:{{ m.avBg }};color:{{ m.avFg }};font-size:12px;font-weight:600">{{ m.initials }}</span>
+<div style="flex:1;min-width:0">
+<p style="margin:0;font-size:13px;font-weight:600;letter-spacing:-.01em">{{ m.who }}</p>
+<p style="margin:2px 0 0;font-size:11.5px;color:#b6b1aa">{{ m.meta }}</p>
+</div>
+<span style="font-size:11.5px;color:#b6b1aa;font-variant-numeric:tabular-nums">{{ m.time }}</span>
+</header>
+<p style="margin:0;font-size:14px;line-height:1.62;color:#33312f;white-space:pre-line;text-wrap:pretty">{{ m.body }}</p>
+</article>
+</sc-for>
+
+<sc-if value="{{ sel.isDrafting }}" hint-placeholder-val="{{ false }}">
+<div style="padding:18px 20px;border-radius:20px;background:rgba(52,97,242,.05);box-shadow:inset 0 0 0 1px rgba(52,97,242,.18)">
+<div style="display:flex;align-items:center;gap:9px;margin-bottom:13px">
+<span style="width:7px;height:7px;border-radius:50%;background:#3461f2;animation:amail-pulse 1.4s ease-in-out infinite"></span>
+<p style="margin:0;font-size:13px;font-weight:600;letter-spacing:-.01em;color:#2f4bbd">{{ sel.draftingLabel }}</p>
+<span style="margin-left:auto;font-size:11.5px;color:#6d6a67">{{ sel.draftingStep }}</span>
+</div>
+<div style="display:flex;flex-direction:column;gap:9px">
+<span style="height:11px;border-radius:6px;width:92%;background:linear-gradient(90deg,rgba(52,97,242,.1),rgba(52,97,242,.22),rgba(52,97,242,.1));background-size:320px 100%;animation:amail-sweep 1.5s linear infinite"></span>
+<span style="height:11px;border-radius:6px;width:78%;background:linear-gradient(90deg,rgba(52,97,242,.1),rgba(52,97,242,.22),rgba(52,97,242,.1));background-size:320px 100%;animation:amail-sweep 1.5s linear infinite"></span>
+<span style="height:11px;border-radius:6px;width:56%;background:linear-gradient(90deg,rgba(52,97,242,.1),rgba(52,97,242,.22),rgba(52,97,242,.1));background-size:320px 100%;animation:amail-sweep 1.5s linear infinite"></span>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ sel.hasDraft }}" hint-placeholder-val="{{ true }}">
+<div style="border-radius:22px;background:#fffdfa;box-shadow:inset 0 0 0 1px rgba(52,97,242,.22),0 18px 40px -34px rgba(30,30,36,.5);overflow:hidden">
+<div style="display:flex;align-items:center;gap:10px;padding:14px 18px;background:rgba(52,97,242,.06)">
+<i data-lucide="sparkles" style="width:15px;height:15px;color:#3461f2"></i>
+<p style="margin:0;font-size:12.5px;font-weight:600;letter-spacing:-.01em;color:#2f4bbd">{{ sel.draftLabel }}</p>
+<span style="margin-left:auto;font-size:11.5px;color:#6d6a67">{{ sel.draftMeta }}</span>
+</div>
+<div style="padding:16px 18px 18px">
+<p style="margin:0 0 10px;font-size:12px;color:#b6b1aa">To {{ sel.replyTo }} · from {{ sel.acctAddr }}</p>
+<textarea ref="{{ draftRef }}" onInput="{{ onDraft }}" onChange="{{ onDraft }}" value="{{ sel.draft }}" style="width:100%;min-height:168px;resize:vertical;border:0;outline:0;background:transparent;font-size:14px;line-height:1.62;color:#33312f"></textarea>
+<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:14px;padding-top:14px">
+<button onClick="{{ doSend }}" style="display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 18px;border-radius:9999px;border:0;cursor:pointer;background:#3461f2;color:#fff;font-size:13.5px;font-weight:500" style-hover="background:#5b7cff"><i data-lucide="send" style="width:15px;height:15px"></i>{{ sel.sendLabel }}</button>
+<button onClick="{{ doRevise }}" style="border:none;display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 15px;border-radius:9999px;background:#fffdfa;color:#1e1e24;font-size:13.5px;font-weight:500;cursor:pointer" style-hover="background:#edebe7"><i data-lucide="wand-sparkles" style="width:15px;height:15px"></i>{{ reviseLabel }}</button>
+<button onClick="{{ doSchedule }}" style="border:none;display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 15px;border-radius:9999px;background:#fffdfa;color:#1e1e24;font-size:13.5px;font-weight:500;cursor:pointer" style-hover="background:#edebe7"><i data-lucide="calendar-clock" style="width:15px;height:15px"></i>Schedule</button>
+<span style="margin-left:auto;font-size:11.5px;color:#b6b1aa">{{ sel.draftHint }}</span>
+</div>
+</div>
+</div>
+</sc-if>
+
+<div style="border-radius:20px;background:#f9f7f4;box-shadow:inset 0 0 0 1px #e8e4dd;overflow:hidden">
+<button onClick="{{ toggleAudit }}" style="display:flex;align-items:center;gap:10px;width:100%;padding:14px 18px;border:0;background:transparent;cursor:pointer;text-align:left;color:#1e1e24" style-hover="background:#f1eeea">
+<i data-lucide="scroll-text" style="width:15px;height:15px;color:#6d6a67"></i>
+<span style="font-size:12.5px;font-weight:600;letter-spacing:-.01em">Audit trail</span>
+<span style="font-size:11.5px;color:#6d6a67">{{ sel.auditMeta }}</span>
+<i data-lucide="{{ auditIcon }}" style="width:15px;height:15px;margin-left:auto;color:#b6b1aa"></i>
+</button>
+<sc-if value="{{ auditOpen }}" hint-placeholder-val="{{ false }}">
+<div style="padding:2px 18px 18px;display:flex;flex-direction:column;gap:0">
+<sc-for list="{{ sel.audit }}" as="a" hint-placeholder-count="4">
+<div style="display:grid;grid-template-columns:64px 14px 1fr;gap:12px;align-items:start;padding:9px 0">
+<span style="font-size:11.5px;color:#b6b1aa;font-variant-numeric:tabular-nums;padding-top:2px">{{ a.time }}</span>
+<span style="display:flex;flex-direction:column;align-items:center;gap:3px;padding-top:5px"><span style="width:7px;height:7px;border-radius:50%;background:{{ a.dot }}"></span><span style="width:1px;flex:1;min-height:14px;background:#e2ded7"></span></span>
+<span>
+<span style="display:block;font-size:12.5px;font-weight:500;letter-spacing:-.01em">{{ a.what }}</span>
+<span style="display:block;margin-top:2px;font-size:12px;line-height:1.5;color:#6d6a67">{{ a.detail }}</span>
+</span>
+</div>
+</sc-for>
+</div>
+</sc-if>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ showZero }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:60px 40px;text-align:center">
+<span style="width:52px;height:52px;border-radius:18px;display:flex;align-items:center;justify-content:center;background:rgba(15,174,118,.1);color:#0fae76"><i data-lucide="inbox" style="width:24px;height:24px"></i></span>
+<h2 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:30px;font-weight:600;letter-spacing:-.035em">{{ zeroTitle }}</h2>
+<p style="margin:0;max-width:44ch;font-size:14.5px;line-height:1.6;color:#6d6a67;text-wrap:pretty">{{ zeroBody }}</p>
+<div style="display:flex;gap:9px;margin-top:6px">
+<button onClick="{{ startCompose }}" style="display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 17px;border-radius:9999px;border:0;background:#1e1e24;color:#f9f7f4;font-size:13.5px;font-weight:500;cursor:pointer" style-hover="background:#33312f"><i data-lucide="pen-line" style="width:15px;height:15px"></i>Write something</button>
+<button onClick="{{ openRules }}" style="border:none;display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 15px;border-radius:9999px;background:#fffdfa;color:#1e1e24;font-size:13.5px;font-weight:500;cursor:pointer" style-hover="background:#edebe7"><i data-lucide="sliders-horizontal" style="width:15px;height:15px"></i>Review rules</button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ composing }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;display:flex;flex-direction:column;min-height:0;padding:24px 28px 26px;gap:14px">
+<div style="display:flex;align-items:center;gap:12px">
+<h2 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:24px;font-weight:600;letter-spacing:-.03em">New message</h2>
+<span style="display:inline-flex;align-items:center;gap:6px;height:23px;padding:0 10px;border-radius:9999px;background:rgba(52,97,242,.08);color:#2f4bbd;font-size:11px;font-weight:500"><i data-lucide="sparkles" style="width:11px;height:11px"></i>Atlas assisting</span>
+<button onClick="{{ closeCompose }}" style="border:none;margin-left:auto;width:32px;height:32px;border-radius:9999px;background:#fffdfa;color:#6d6a67;cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="color:#1e1e24"><i data-lucide="x" style="width:15px;height:15px"></i></button>
+</div>
+<div style="display:flex;flex-direction:column;gap:0;border-radius:20px;background:#fffdfa;box-shadow:inset 0 0 0 1px #e8e4dd;overflow:hidden">
+<div style="display:flex;align-items:center;gap:10px;padding:12px 16px"><span style="font-size:12px;color:#b6b1aa;width:42px">From</span><span style="display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:500"><span style="width:7px;height:7px;border-radius:50%;background:#e07a1f"></span>press@atlas.app</span></div>
+<div style="display:flex;align-items:center;gap:10px;padding:12px 16px"><span style="font-size:12px;color:#b6b1aa;width:42px">To</span><input placeholder="Who is this for?" style="flex:1;border:0;outline:0;background:transparent;font-size:13.5px"/></div>
+<div style="display:flex;align-items:center;gap:10px;padding:12px 16px"><span style="font-size:12px;color:#b6b1aa;width:42px">Subject</span><input placeholder="Subject" style="flex:1;border:0;outline:0;background:transparent;font-size:13.5px;font-weight:500"/></div>
+</div>
+<div style="flex:1;min-height:0;padding:18px;border-radius:20px;background:#fffdfa;box-shadow:inset 0 0 0 1px #e8e4dd">
+<textarea placeholder="Write, or start typing and Atlas will finish the thought…" style="width:100%;height:100%;min-height:180px;resize:none;border:0;outline:0;background:transparent;font-size:14px;line-height:1.62;color:#33312f"></textarea>
+</div>
+<div style="display:flex;align-items:center;gap:9px">
+<button onClick="{{ closeCompose }}" style="display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 18px;border-radius:9999px;border:0;background:#3461f2;color:#fff;font-size:13.5px;font-weight:500;cursor:pointer" style-hover="background:#5b7cff"><i data-lucide="send" style="width:15px;height:15px"></i>Send</button>
+<span style="font-size:12px;color:#6d6a67">Atlas will log this send and learn the tone you keep.</span>
+</div>
+</div>
+</sc-if>
+</section>
+</div>
+
+<nav style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:92;display:flex;align-items:center;gap:3px;padding:5px;border-radius:9999px;background:#22222b;box-shadow:inset 0 0 0 1px rgba(247,245,242,.16),0 20px 46px -18px rgba(0,0,0,.6)">
+<a href="Atlas Dashboard (Current).dc.html" title="Dashboard" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 11px;border-radius:9999px;color:rgba(249,247,244,.8);font-size:13px;font-weight:500;text-decoration:none" style-hover="color:#fff;background:rgba(249,247,244,.12)"><i data-lucide="layout-grid" style="width:16px;height:16px"></i>Dashboard</a>
+<a href="Atlas Sphere.dc.html" title="Atlas Sphere" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 11px;border-radius:9999px;color:rgba(249,247,244,.8);font-size:13px;font-weight:500;text-decoration:none" style-hover="color:#fff;background:rgba(249,247,244,.12)"><i data-lucide="orbit" style="width:16px;height:16px"></i>Sphere</a>
+<span style="display:flex;align-items:center;gap:7px;height:32px;padding:0 11px;border-radius:9999px;background:rgba(249,247,244,.14);color:#fff;font-size:13px;font-weight:500"><i data-lucide="mail" style="width:16px;height:16px"></i>Mail</span>
+<button onClick="{{ startCompose }}" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:9999px;border:0;cursor:pointer;background:#3461f2;color:#fff;font-size:13px;font-weight:500" style-hover="background:#5b7cff"><i data-lucide="sparkles" style="width:16px;height:16px"></i>New reply</button>
+<span style="width:32px;height:32px;border-radius:50%;background:rgba(249,247,244,.14);box-shadow:inset 0 0 0 1px rgba(249,247,244,.25);color:#f9f7f4;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center">MK</span>
+</nav>
+<sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+<div style="position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:11px;padding:12px 18px;border-radius:9999px;background:#1e1e24;color:#f9f7f4;font-size:13px;box-shadow:0 18px 40px -24px rgba(30,30,36,.7);animation:amail-in .3s cubic-bezier(.22,1,.36,1) both">
+<i data-lucide="check" style="width:15px;height:15px;color:#7de0b4"></i>{{ toast }}
+<span style="opacity:.55;font-size:12px">{{ toastMeta }}</span>
+</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1512,&quot;height&quot;:940},&quot;autonomy&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Autonomous · audit on&quot;,&quot;options&quot;:[&quot;Autonomous · audit on&quot;,&quot;Drafts, you send&quot;,&quot;Suggests only&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Behaviour&quot},&quot;showAmbient&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Behaviour&quot},&quot;openAudit&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Behaviour&quot}}">
+class Component extends DCLogic {
+  ACC = { press:{ label:'Press', addr:'press@atlas.app', dot:'#e07a1f', rule:'Atlas answers, you approve' }, hello:{ label:'General', addr:'hello@atlas.app', dot:'#3461f2', rule:'Fully autonomous' }, partners:{ label:'Partners', addr:'partners@atlas.app', dot:'#0fae76', rule:'Autonomous under $50k' } };
+  STATUS = {
+    approve:{ chip:'Needs your approval', icon:'shield-check', bg:'rgba(224,122,31,.12)', fg:'#a2540c', dot:'#e07a1f' },
+    drafting:{ chip:'Atlas drafting', icon:'loader', bg:'rgba(52,97,242,.1)', fg:'#2f4bbd', dot:'#3461f2' },
+    escalate:{ chip:'Escalated to you', icon:'triangle-alert', bg:'rgba(208,69,58,.11)', fg:'#a3352c', dot:'#d0453a' },
+    snooze:{ chip:'Scheduled send', icon:'clock', bg:'rgba(109,106,103,.12)', fg:'#55524f', dot:'#8b8681' },
+    handled:{ chip:'Handled by Atlas', icon:'check-check', bg:'rgba(15,174,118,.12)', fg:'#0a7a53', dot:'#0fae76' },
+    handoff:{ chip:'With a human', icon:'user-round', bg:'rgba(52,97,242,.1)', fg:'#2f4bbd', dot:'#6d8bff' }
+  };
+  ITEMS = [
+    { id:'a', acct:'press', from:'Dana Whitfield', org:'The Verge', time:'9:12', status:'approve',
+      subject:'Interview request — Atlas launch week', people:'Dana Whitfield, Atlas Press · 2 messages',
+      snippet:'Hoping to get 30 minutes with the team before Thursday…',
+      messages:[{ who:'Dana Whitfield', meta:'dana@theverge.com', time:'9:12', body:'Hi — we\u2019re running a piece on ambient assistants Thursday morning and Atlas keeps coming up.\n\nCould I get 30 minutes with someone on the team before then? Happy to work around your schedule, and I can send questions ahead.' }],
+      amb:{ title:'Atlas prepared a reply and held it for you', body:'Press asks that name a publication date are always approved by a human under your rules. Everything else is ready to go.', facts:['Matches 3 prior Verge threads','Calendar: Wed 14:00 & Thu 09:30 free','Embargo language reused from launch kit'] },
+      draft:'Hi Dana,\n\nThursday works — I can offer Wednesday 14:00 or Thursday 09:30 CET, 30 minutes, video or phone.\n\nHappy to take questions in advance. I can also share the launch brief under embargo until Thursday 08:00 CET if that helps you write ahead.\n\nWho else from your side would join?\n\n— Mira, Atlas',
+      draftAlt:'Hi Dana,\n\nGlad Atlas is on your radar. Wednesday 14:00 or Thursday 09:30 CET both work — 30 minutes, video or phone, your call.\n\nSend questions whenever and I\u2019ll come prepared. The launch brief is available under embargo until Thursday 08:00 CET.\n\n— Mira, Atlas',
+      draftHint:'Held for approval · rule: press · publication date',
+      audit:[{ time:'9:12', what:'Received on press@', detail:'Classified as press · interview request · confidence 0.94', dot:'#3461f2' },{ time:'9:12', what:'Checked calendar', detail:'Two 30-minute windows before the embargo lifts', dot:'#3461f2' },{ time:'9:13', what:'Drafted reply', detail:'Tone matched to 3 prior Verge threads', dot:'#3461f2' },{ time:'9:13', what:'Paused for approval', detail:'Rule: press mail naming a publication date needs a human', dot:'#e07a1f' }] },
+    { id:'b', acct:'partners', from:'Marcus Lee', org:'Northwind', time:'8:47', status:'drafting',
+      subject:'Partnership: API access for pilot customers', people:'Marcus Lee, Atlas Partners · 4 messages',
+      snippet:'Following up on the volume tiers we discussed in Lisbon…',
+      messages:[{ who:'Marcus Lee', meta:'marcus@northwind.io', time:'8:47', body:'Following up on Lisbon — we\u2019d like API access for six pilot customers this quarter.\n\nCan you confirm the volume tier and whether sandbox keys are included?' }],
+      draftingStep:'Reading the Lisbon thread + pricing sheet',
+      audit:[{ time:'8:47', what:'Received on partners@', detail:'Matched to open deal · Northwind pilot', dot:'#3461f2' },{ time:'8:47', what:'Pulled context', detail:'Lisbon thread, pricing sheet v4, sandbox policy', dot:'#3461f2' },{ time:'8:48', what:'Drafting reply', detail:'Under the $50k autonomous ceiling — will send itself', dot:'#3461f2' }] },
+    { id:'c', acct:'hello', from:'Priya Raman', org:'', time:'8:05', status:'escalate',
+      subject:'Charged twice for the same month', people:'Priya Raman, Atlas Support · 3 messages',
+      snippet:'Second time this has happened and I\u2019d like to speak to a person…',
+      messages:[{ who:'Priya Raman', meta:'p.raman@fastmail.com', time:'8:05', body:'I\u2019ve been billed twice for June and the same thing happened in April.\n\nI don\u2019t want an automated answer this time — can a person look at my account?' }],
+      amb:{ title:'Atlas stopped and escalated this to you', body:'The sender explicitly asked for a human and the account shows a repeat billing fault. Atlas issued no promises and made no refund.', facts:['Duplicate charge confirmed · €24 ×2','Repeat incident: April, June','Refund needs a human under your rules'], tone:'warn' },
+      draft:'Hi Priya,\n\nYou\u2019re right, and I\u2019m sorry — I can see both duplicate charges on your account. I\u2019m handling this personally rather than passing it back to automation.\n\nI\u2019ve refunded €24 for June and €24 for April; both should land in 3–5 working days. I\u2019ve also flagged the billing fault so it can\u2019t repeat on your account.\n\n— Mira, Atlas',
+      draftAlt:'Hi Priya,\n\nApologies — both duplicate charges are confirmed on my side, and this is now with me rather than automation.\n\n€48 is on its way back to you (3–5 working days) and the underlying billing fault is flagged for engineering.\n\nIf anything looks off when it lands, reply here and it comes straight to me.\n\n— Mira, Atlas',
+      draftHint:'Nothing sends until you approve it',
+      audit:[{ time:'8:05', what:'Received on hello@', detail:'Classified as billing · repeat incident · sentiment negative', dot:'#3461f2' },{ time:'8:05', what:'Autonomy suspended', detail:'Sender asked for a human — rule: never override that request', dot:'#d0453a' },{ time:'8:06', what:'Assembled evidence', detail:'Two duplicate charges found, no refund issued', dot:'#3461f2' },{ time:'8:06', what:'Escalated to you', detail:'Draft prepared, held unsent', dot:'#d0453a' }] },
+    { id:'d', acct:'press', from:'Ines Kotto', org:'Wired', time:'Yest.', status:'snooze',
+      subject:'Embargo timing for Thursday', people:'Ines Kotto, Atlas Press · 5 messages',
+      snippet:'Confirmed — reply scheduled for 07:00 tomorrow…',
+      messages:[{ who:'Ines Kotto', meta:'ines@wired.com', time:'17:40', body:'All good on our side. Send the final asset list whenever it\u2019s locked.' }],
+      amb:{ title:'Reply written and scheduled', body:'Atlas holds press replies until the asset list is locked. It sends tomorrow at 07:00 CET unless you stop it.', facts:['Sends 07:00 CET, in 14 hours','Waiting on: final asset list','You can edit until it sends'] },
+      draft:'Hi Ines,\n\nAsset list is locked — final images, product shots and the two demo clips are in the shared folder, all cleared for Thursday 08:00 CET.\n\nShout if you need anything at a different crop or length.\n\n— Mira, Atlas',
+      draftAlt:'Hi Ines,\n\nEverything\u2019s locked: final images, product shots and both demo clips are in the shared folder, cleared for Thursday 08:00 CET.\n\nHappy to re-cut anything if your layout needs a different ratio.\n\n— Mira, Atlas',
+      draftHint:'Scheduled · 07:00 CET tomorrow',
+      audit:[{ time:'17:41', what:'Drafted reply', detail:'Asset list pulled from launch kit', dot:'#3461f2' },{ time:'17:41', what:'Scheduled send', detail:'07:00 CET — inside Wired\u2019s working hours', dot:'#8b8681' }] },
+    { id:'e', acct:'hello', from:'Tom Berg', org:'', time:'Yest.', status:'handled',
+      subject:'Where can I download the beta?', people:'Tom Berg, Atlas Support · 2 messages',
+      snippet:'Atlas answered in 40 seconds and closed the thread…',
+      messages:[{ who:'Tom Berg', meta:'tom.berg@gmail.com', time:'16:02', body:'Signed up last week but I can\u2019t find the download link anywhere.' },{ who:'Atlas', meta:'sent from hello@atlas.app', time:'16:03', body:'Hi Tom — your beta link is tied to the address you signed up with, so I\u2019ve re-sent it just now.\n\nIt lands from build@atlas.app and expires in seven days. If it hasn\u2019t arrived in ten minutes, reply here and I\u2019ll issue a fresh one.', atlas:true }],
+      audit:[{ time:'16:02', what:'Received on hello@', detail:'Classified as onboarding · known question', dot:'#3461f2' },{ time:'16:03', what:'Sent reply autonomously', detail:'Confidence 0.97 · matched 214 prior answers', dot:'#0fae76' },{ time:'16:03', what:'Closed thread', detail:'No human action needed', dot:'#0fae76' }] },
+    { id:'f', acct:'partners', from:'Sofia Almeida', org:'Ledgerline', time:'Mon', status:'approve',
+      subject:'Renewal + volume tiers for 2027', people:'Sofia Almeida, Atlas Partners · 6 messages',
+      snippet:'Renewal is above your autonomous ceiling, so Atlas paused…',
+      messages:[{ who:'Sofia Almeida', meta:'sofia@ledgerline.com', time:'11:20', body:'We\u2019d like to renew early and move to the 5M-call tier. Can you send updated terms this week?' }],
+      amb:{ title:'Atlas paused: above your autonomous ceiling', body:'The renewal is worth €86k, over the €50k limit you set for partners@. Terms are drafted and attached, nothing has been promised.', facts:['€86k · over €50k ceiling','Terms drafted from template v4','Legal review not required'] },
+      draft:'Hi Sofia,\n\nGreat news. Updated terms for the 5M-call tier are attached — same commercial structure, with the early-renewal discount applied from 1 September.\n\nIf the numbers look right I\u2019ll send it for signature today.\n\n— Mira, Atlas',
+      draftAlt:'Hi Sofia,\n\nHappy to move early. Attached are the 5M-call terms with the early-renewal discount from 1 September, structure otherwise unchanged.\n\nSay the word and this goes out for signature today.\n\n— Mira, Atlas',
+      draftHint:'Held for approval · rule: partners > €50k',
+      audit:[{ time:'11:20', what:'Received on partners@', detail:'Matched to renewal · Ledgerline', dot:'#3461f2' },{ time:'11:21', what:'Priced the tier', detail:'€86k/yr with early-renewal discount', dot:'#3461f2' },{ time:'11:21', what:'Paused for approval', detail:'Above the €50k autonomous ceiling', dot:'#e07a1f' }] },
+    { id:'g', acct:'hello', from:'Jae Park', org:'', time:'Mon', status:'handoff',
+      subject:'Accessibility of voice mode for screen readers', people:'Jae Park, Atlas Support · 3 messages',
+      snippet:'Passed to Rosa on the accessibility team with full context…',
+      messages:[{ who:'Jae Park', meta:'jae@parkstudio.co', time:'9:30', body:'Does voice mode announce state changes to VoiceOver? We\u2019re evaluating Atlas for a public-sector client.' }],
+      amb:{ title:'Handed to Rosa with a written brief', body:'Atlas could not answer this from documentation, so it packaged the thread and passed it to a specialist instead of guessing.', facts:['Assigned: Rosa Neu · accessibility','Brief attached · 4 sources','Sender told a human is looking'] },
+      audit:[{ time:'9:30', what:'Received on hello@', detail:'Classified as accessibility · low confidence 0.41', dot:'#3461f2' },{ time:'9:31', what:'Declined to answer', detail:'Below the 0.7 confidence floor for factual claims', dot:'#d0453a' },{ time:'9:31', what:'Handed to Rosa Neu', detail:'Thread + 4 sources attached, sender notified', dot:'#6d8bff' }] }
+  ];
+  BOXES = [
+    { id:'triage', label:'Triage', icon:'inbox' },
+    { id:'approve', label:'Needs approval', icon:'shield-check' },
+    { id:'drafting', label:'Atlas drafting', icon:'sparkles' },
+    { id:'escalate', label:'Escalations', icon:'triangle-alert' },
+    { id:'snooze', label:'Scheduled', icon:'clock' },
+    { id:'handled', label:'Handled by Atlas', icon:'check-check' },
+    { id:'handoff', label:'With humans', icon:'user-round' },
+    { id:'sent', label:'Sent today', icon:'send' }
+  ];
+  state = { box:'triage', acct:'all', sel:'a', auditOpen:false, composing:false, drafts: {}, statusOv: {}, sentIds:[], toast:'', toastMeta:'', sortNewest:true, revising:false, altDraft: {}};
+  componentDidMount() { this.icons(); }
+  componentDidUpdate() { this.icons(); }
+  icons() { if (window.lucide && window.lucide.createIcons) { try { window.lucide.createIcons(); } catch (e) {} } }
+  st(it) { return this.state.statusOv[it.id] || it.status; }
+  greetLine() {
+    const n = (k) => this.ITEMS.filter(it => this.st(it) === k).length;
+    const parts = [];
+    if (n('approve')) parts.push(n('approve') + (n('approve') === 1 ? ' reply needs' : ' replies need') + ' your approval');
+    if (n('escalate')) parts.push(n('escalate') + ' escalated to you');
+    if (n('drafting')) parts.push(n('drafting') + ' being written now');
+    if (!parts.length) parts.push('nothing waiting on you');
+    return 'Atlas answered 14 threads since 6am \u2014 ' + parts.join(', ') + '.';
+  }
+  orb(el) {
+    if (!el || !window.AtlasSphere) return;
+    window.AtlasSphere.mount(el, () => ({ state: this.sphereState() }));
+  }
+  sphereState() {
+    const S = this.state;
+    if (S.composing) return 'speaking';
+    const sel = this.current();
+    if (!sel) return 'success';
+    const s = this.st(sel);
+    if (s === 'drafting') return 'thinking';
+    if (s === 'escalate') return 'alert';
+    if (s === 'approve') return 'listening';
+    if (s === 'snooze') return 'muted';
+    if (s === 'handled') return 'success';
+    return 'idle';
+  }
+  visible() {
+    const box = this.state.box, acct = this.state.acct, sent = this.state.sentIds;
+    let out = this.ITEMS.filter(it => {
+      const s = this.st(it);
+      if (acct !== 'all' && it.acct !== acct) return false;
+      if (box === 'triage') return s !== 'handled' && sent.indexOf(it.id) < 0;
+      if (box === 'sent') return sent.indexOf(it.id) >= 0;
+      return s === box;
+    });
+    if (!this.state.sortNewest) out = out.slice().reverse();
+    return out;
+  }
+  countFor(box) { const acct = this.state.acct, sent = this.state.sentIds; return this.ITEMS.filter(it => { const s = this.st(it); if (acct !== 'all' && it.acct !== acct) return false; if (box === 'triage') return s !== 'handled' && sent.indexOf(it.id) < 0; if (box === 'sent') return sent.indexOf(it.id) >= 0; return s === box; }).length; }
+  flash(msg, meta) { this.setState({ toast: msg, toastMeta: meta || '' }); clearTimeout(this._tt); this._tt = setTimeout(() => this.setState({ toast:'', toastMeta:'' }), 3400); }
+  current() { const vis = this.visible(); let it = this.ITEMS.find(x => x.id === this.state.sel); if (!it || vis.indexOf(it) < 0) it = vis[0]; return it || null; }
+  renderVals() {
+    const S = this.state, sel = this.current(), vis = this.visible();
+    const draftOf = (it) => { if (S.drafts[it.id] != null) return S.drafts[it.id]; return (S.altDraft[it.id] && it.draftAlt) ? it.draftAlt : (it.draft || ''); };
+    const chip = (it) => this.STATUS[this.st(it)] || this.STATUS.handled;
+    const boxLabels = { triage:'Triage', approve:'Needs your approval', drafting:'Atlas drafting', escalate:'Escalations', snooze:'Scheduled sends', handled:'Handled by Atlas', handoff:'With humans', sent:'Sent today' };
+    const emptyCopy = {
+      triage:['Triage is clear','Atlas handled everything that arrived. New mail lands here the moment it needs a decision from you.'],
+      approve:['Nothing waiting on you','Every draft that needed a signature has been sent.'],
+      drafting:['Atlas is idle','No replies in progress right now.'],
+      escalate:['No escalations','Atlas has not hit a case it refused to answer today.'],
+      snooze:['Nothing scheduled','Replies you schedule will queue up here.'],
+      handled:['Nothing yet today','Autonomous replies will collect here with their audit trail.'],
+      handoff:['No open handoffs','Nothing is sitting with a human right now.'],
+      sent:['Nothing sent yet','Approve a draft and it will appear here with a full record of what Atlas did.']
+    };
+    const ec = emptyCopy[S.box] || emptyCopy.triage;
+    let selVals = {};
+    if (sel && !S.composing) {
+      const c = chip(sel), st = this.st(sel), acc = this.ACC[sel.acct], amb = sel.amb;
+      const warn = amb && amb.tone === 'warn';
+      const ambOn = (this.props.showAmbient ?? true) && !!amb;
+      selVals = { sel: {
+        subject: sel.subject, people: sel.people, chip: c.chip, chipBg: c.bg, chipFg: c.fg, chipIcon: c.icon, dot: acc.dot, acctAddr: acc.addr,
+        messages: (sel.messages || []).map(m => ({ who: m.who, meta: m.meta, time: m.time, body: m.body, initials: m.atlas ? 'A' : m.who.split(' ').map(w => w[0]).join('').slice(0,2), bg: m.atlas ? 'rgba(52,97,242,.05)' : '#fffdfa', avBg: m.atlas ? '#3461f2' : '#f1eeea', avFg: m.atlas ? '#fff' : '#55524f' })),
+        hasAmbient: ambOn, ambTitle: amb ? amb.title : '', ambBody: amb ? amb.body : '', ambFacts: amb ? amb.facts : [],
+        ambBg: warn ? 'rgba(208,69,58,.07)' : 'rgba(52,97,242,.055)', ambBd: warn ? 'rgba(208,69,58,.2)' : 'rgba(52,97,242,.16)',
+        ambIcon: warn ? 'triangle-alert' : (st === 'handoff' ? 'user-round' : 'sparkles'), ambIconBg: warn ? 'rgba(208,69,58,.14)' : 'rgba(52,97,242,.12)', ambIconFg: warn ? '#a3352c' : '#3461f2', ambFg: warn ? '#a3352c' : '#2f4bbd',
+        isDrafting: st === 'drafting', draftingLabel: 'Atlas is writing a reply', draftingStep: sel.draftingStep || '',
+        hasDraft: st !== 'drafting' && !!sel.draft, draft: draftOf(sel),
+        draftLabel: st === 'snooze' ? 'Scheduled reply — editable until it sends' : (st === 'escalate' ? 'Draft prepared, nothing sent' : 'Atlas drafted this reply'),
+        draftMeta: st === 'snooze' ? 'Sends 07:00 CET' : 'Editable', draftHint: sel.draftHint || '',
+        sendLabel: st === 'snooze' ? 'Send now' : 'Approve & send', replyTo: (sel.messages && sel.messages[0] ? sel.messages[0].meta : ''),
+        audit: sel.audit || [], auditMeta: (sel.audit ? sel.audit.length : 0) + ' steps · ' + acc.label.toLowerCase() + ' rules'
+      } };
+    }
+    return Object.assign({
+      rootRef: (el) => { this.root = el; },
+      orbRef: (el) => this.orb(el),
+      greetLead: 'Your mail is ', greetAccent: 'handled.',
+      greetSub: this.greetLine(),
+      metaBig: String(this.ITEMS.filter(it => this.st(it) === 'approve').length),
+      metaSmall: 'waiting on you \u00b7 3 mailboxes',
+      draftRef: (el) => { this._ta = el; },
+      modeLabel: this.props.autonomy ?? 'Autonomous · audit on',
+      rulesLine: 'General is fully autonomous. Press and partners pause on dates, money over €50k, and any request for a human.',
+      accounts: [{ id:'all', label:'All mail', dot:'#1e1e24', count: this.ITEMS.filter(it => this.st(it) !== 'handled' && S.sentIds.indexOf(it.id) < 0).length }].concat(['press','hello','partners'].map(k => ({ id:k, label:this.ACC[k].label, dot:this.ACC[k].dot, count:this.ITEMS.filter(it => it.acct === k && this.st(it) !== 'handled' && S.sentIds.indexOf(it.id) < 0).length }))).map(a => { const on = S.acct === a.id; return Object.assign(a, { bg: on ? '#1e1e24' : '#f9f7f4', fg: on ? '#f9f7f4' : '#1e1e24', bd: on ? '#1e1e24' : '#e2ded7', cfg: on ? 'rgba(249,247,244,.6)' : '#b6b1aa' }); }),
+      boxes: this.BOXES.map(b => { const on = S.box === b.id, n = this.countFor(b.id); return { id:b.id, label:b.label, icon:b.icon, count: n || '', bg: on ? '#f1eeea' : 'transparent', fg: on ? '#1e1e24' : '#55524f', fw: on ? 600 : 500, cfg: on ? '#1e1e24' : '#b6b1aa' }; }),
+      mboxes: ['press','hello','partners'].map(k => ({ addr:this.ACC[k].addr, rule:this.ACC[k].rule, dot:this.ACC[k].dot, auto: this.ITEMS.filter(it => it.acct === k).length + ' threads' })),
+      listTitle: boxLabels[S.box] || 'Triage',
+      listMeta: vis.length ? (vis.length + (vis.length === 1 ? ' thread' : ' threads') + ' · ' + (S.acct === 'all' ? 'all mailboxes' : this.ACC[S.acct].addr)) : (S.acct === 'all' ? 'all mailboxes' : this.ACC[S.acct].addr),
+      sortLabel: S.sortNewest ? 'Newest' : 'Oldest',
+      rows: vis.map(it => { const c = chip(it), on = sel && it.id === sel.id; return { id:it.id, from:it.from, org:it.org, time:it.time, subject:it.subject, snippet:it.snippet, chip:c.chip, chipBg:c.bg, chipFg:c.fg, chipIcon:c.icon, dot:c.dot, acctLabel:this.ACC[it.acct].addr, bg: on ? '#fffdfa' : 'transparent', bd: on ? '#d9d4cc' : 'transparent' }; }),
+      listEmpty: vis.length === 0, emptyTitle: ec[0], emptyBody: ec[1],
+      hasSel: !!sel && !S.composing, showZero: !sel && !S.composing, zeroTitle: ec[0], zeroBody: ec[1],
+      composing: S.composing, auditOpen: S.auditOpen || !!this.props.openAudit, auditIcon: (S.auditOpen || this.props.openAudit) ? 'chevron-up' : 'chevron-down',
+      reviseLabel: S.revising ? 'Revising…' : 'Ask Atlas to revise',
+      hasToast: !!S.toast, toast: S.toast, toastMeta: S.toastMeta,
+      pickAcct: (e) => this.setState({ acct: e.currentTarget.dataset.acct }),
+      pickBox: (e) => this.setState({ box: e.currentTarget.dataset.box, auditOpen: false, composing: false }),
+      pickRow: (e) => this.setState({ sel: e.currentTarget.dataset.id, auditOpen: false, composing: false }),
+      toggleSort: () => this.setState({ sortNewest: !S.sortNewest }),
+      toggleAudit: () => this.setState({ auditOpen: !S.auditOpen }),
+      onDraft: (e) => { const v = e.target.value; this.setState({ drafts: Object.assign({}, S.drafts, { [sel.id]: v }) }); },
+      doSend: () => { if (!sel) return; this.setState({ sentIds: S.sentIds.concat([sel.id]), statusOv: Object.assign({}, S.statusOv, { [sel.id]: 'handled' }) }); this.flash('Sent from ' + this.ACC[sel.acct].addr, 'logged to audit trail'); },
+      doRevise: () => { if (!sel || S.revising) return; this.setState({ revising: true }); setTimeout(() => { const d = Object.assign({}, this.state.drafts); delete d[sel.id]; this.setState({ revising: false, altDraft: Object.assign({}, this.state.altDraft, { [sel.id]: !this.state.altDraft[sel.id] }), drafts: d }); this.flash('Atlas rewrote the draft', 'tone kept, length trimmed'); }, 1300); },
+      doSchedule: () => { if (!sel) return; this.setState({ statusOv: Object.assign({}, S.statusOv, { [sel.id]: 'snooze' }) }); this.flash('Scheduled for 07:00 CET', 'editable until it sends'); },
+      doSnooze: () => { if (!sel) return; this.setState({ statusOv: Object.assign({}, S.statusOv, { [sel.id]: 'snooze' }) }); this.flash('Snoozed until tomorrow 07:00', ''); },
+      doArchive: () => { if (!sel) return; this.setState({ statusOv: Object.assign({}, S.statusOv, { [sel.id]: 'handled' }) }); this.flash('Archived', 'Atlas keeps the record'); },
+      doHandoff: () => { if (!sel) return; this.setState({ statusOv: Object.assign({}, S.statusOv, { [sel.id]: 'handoff' }) }); this.flash('Handed to Rosa Neu', 'brief + thread attached'); },
+      startCompose: () => this.setState({ composing: true }),
+      closeCompose: () => this.setState({ composing: false }),
+      openRules: () => this.flash('Routing rules', '3 mailboxes · 7 active rules')
+    }, selVals);
+  }
+}
+</script>
+</body>
+</html>

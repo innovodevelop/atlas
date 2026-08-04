@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<style>
+button,input,textarea,select{border:none}@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Hanken+Grotesk:wght@500;600;700&display=swap');
+html,body{margin:0;padding:0;background:#f9f7f4}
+a{color:#3461f2;text-decoration:none}a:hover{color:#5b7cff}
+*{box-sizing:border-box}
+input{font:inherit}
+@keyframes bk-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes bk-pulse{0%,100%{opacity:1}50%{opacity:.4}}
+</style>
+<script src="atlas-sphere.js"></script>
+<script src="atlas-transition.js"></script>
+</helmet>
+<div ref="{{ rootRef }}" data-screen-label="Banking" style="position:relative;min-height:100vh;background:{{ pageBg }};color:{{ pageFg }};font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:auto">
+<div style="position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none">
+<div style="position:absolute;inset:0;background:{{ washA }}"></div>
+<div style="position:absolute;top:-260px;right:-170px;width:800px;height:800px;border-radius:50%;filter:blur(64px);background:{{ washB }}"></div>
+<div style="position:absolute;top:-160px;left:-200px;width:700px;height:560px;border-radius:50%;filter:blur(64px);background:{{ washC }}"></div>
+</div>
+
+<div onMouseEnter="{{ openNav }}" onMouseLeave="{{ closeNav }}" style="position:fixed;left:20px;top:16px;z-index:90;display:{{ launcherShow }};align-items:center;justify-content:center;width:86px;height:86px">
+<canvas ref="{{ orbRef }}" style="width:86px;height:86px;display:block;cursor:pointer"></canvas>
+<sc-for list="{{ navRing }}" as="n" hint-placeholder-count="6">
+<a href="{{ n.href }}" data-id="{{ n.id }}" onClick="{{ navGo }}" title="{{ n.label }}" style="position:absolute;left:calc(50% + {{ n.lx }});top:calc(50% + {{ n.ly }});transform:translate(-50%,-50%) scale({{ n.scale }});display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 13px;border-radius:9999px;white-space:nowrap;text-decoration:none;font-size:12px;font-weight:500;background:{{ n.bg }};color:{{ n.fg }};box-shadow:{{ n.ring }};opacity:{{ n.op }};pointer-events:{{ n.pe }};transition:transform .42s cubic-bezier(.22,1,.36,1),opacity .3s ease;transition-delay:{{ n.delay }}"><span style="width:6px;height:6px;border-radius:50%;background:{{ n.dot }}"></span>{{ n.label }}</a>
+</sc-for>
+</div>
+<sc-if value="{{ isMoney }}" hint-placeholder-val="{{ true }}">
+<main style="position:relative;z-index:10;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-auto-flow:row dense;grid-auto-rows:126px;gap:14px;min-width:1400px;max-width:1720px;margin:0 auto;padding:20px 28px 132px;animation:bk-rise .7s cubic-bezier(.22,1,.36,1) both">
+<div onMouseEnter="{{ openNav }}" onMouseLeave="{{ closeNav }}" style="position:relative;grid-column:span 2;grid-row:span 2;display:flex;align-items:center;justify-content:center;z-index:{{ navZ }}">
+<canvas ref="{{ orbRef }}" style="width:200px;height:200px;display:block;cursor:pointer"></canvas>
+<span style="position:absolute;left:50%;bottom:6px;transform:translateX(-50%);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:{{ hintFg }};opacity:{{ navHintOp }};transition:opacity .3s ease;pointer-events:none;white-space:nowrap">Hover to navigate</span>
+<sc-for list="{{ navRing }}" as="n" hint-placeholder-count="6">
+<a href="{{ n.href }}" data-id="{{ n.id }}" onClick="{{ navGo }}" title="{{ n.label }}" style="position:absolute;left:calc(50% + {{ n.x }});top:calc(50% + {{ n.y }});transform:translate(-50%,-50%) scale({{ n.scale }});display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 14px;border-radius:9999px;white-space:nowrap;text-decoration:none;font-size:12px;font-weight:500;letter-spacing:-.01em;background:{{ n.bg }};color:{{ n.fg }};box-shadow:{{ n.ring }};opacity:{{ n.op }};pointer-events:{{ n.pe }};transition:transform .42s cubic-bezier(.22,1,.36,1),opacity .3s ease;transition-delay:{{ n.delay }}"><span style="width:6px;height:6px;border-radius:50%;background:{{ n.dot }}"></span>{{ n.label }}</a>
+</sc-for>
+</div>
+<div style="grid-column:span 4;grid-row:span 2;display:flex;flex-direction:column;justify-content:center;padding:22px;border-radius:22px;background:{{ heroBg }};backdrop-filter:{{ heroBlur }};box-shadow:{{ heroRing }}">
+<p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ labelFg }}">{{ heroLabel }}</p>
+<p style="margin:12px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:44px;font-weight:500;letter-spacing:-.035em;line-height:1;color:{{ pageFg }};font-variant-numeric:tabular-nums">{{ heroValue }}</p>
+<p style="margin:10px 0 0;font-size:13.5px;line-height:1.5;color:{{ mutFg }};text-wrap:pretty">{{ heroLine }}</p>
+<div style="display:flex;gap:7px;margin-top:16px;flex-wrap:wrap">
+<sc-for list="{{ scopes }}" as="s" hint-placeholder-count="3">
+<button data-id="{{ s.id }}" onClick="{{ pickScope }}" style="border:none;display:inline-flex;align-items:center;gap:7px;height:31px;padding:0 13px;border-radius:9999px;cursor:pointer;font-size:12px;font-weight:500;background:{{ s.bg }};color:{{ s.fg }}" style-hover=""><span style="width:7px;height:7px;border-radius:50%;background:{{ s.dot }}"></span>{{ s.label }}</button>
+</sc-for>
+</div>
+</div>
+<sc-for list="{{ moneyCards }}" as="w" hint-placeholder-count="13">
+<article data-screen-label="{{ w.name }}" style="position:relative;display:flex;flex-direction:column;overflow:hidden;grid-column:span {{ w.cols }};grid-row:span {{ w.rows }};padding:{{ w.pad }};border-radius:22px;background:{{ w.bg }};backdrop-filter:{{ w.blur }};box-shadow:{{ w.ring }}">
+<header style="display:flex;align-items:baseline;gap:10px;flex-shrink:0">
+<p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ w.label }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.name }}</p>
+<span style="margin-left:auto;font-size:10.5px;color:{{ w.mut }};flex-shrink:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.kicker }}</span>
+</header>
+<sc-if value="{{ w.isBig }}" hint-placeholder-val="{{ true }}">
+<div style="margin-top:auto;display:flex;align-items:flex-end;gap:10px;min-width:0;overflow:hidden">
+<span style="font-family:'Hanken Grotesk',sans-serif;font-weight:500;letter-spacing:-.035em;line-height:1.08;font-size:{{ w.bigSize }};color:{{ w.fg }};font-variant-numeric:tabular-nums;white-space:nowrap">{{ w.value }}</span>
+<span style="padding-bottom:5px;font-size:12.5px;font-weight:500;color:{{ w.accent }};white-space:nowrap">{{ w.delta }}</span>
+</div>
+<p style="margin:7px 0 0;font-size:12.5px;line-height:1.4;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p>
+</sc-if>
+<sc-if value="{{ w.isRows }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:12px;display:flex;flex-direction:column;min-height:0;overflow:hidden">
+<sc-for list="{{ w.rowsData }}" as="r" hint-placeholder-count="3">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:9px 0">
+<span style="font-size:13px;color:{{ w.fg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.label }}</span>
+<span style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ w.mut }}">{{ r.value }}</span>
+</div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ w.isBars }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;align-items:flex-end;gap:{{ w.barGap }};height:{{ w.barH }}">
+<sc-for list="{{ w.bars }}" as="b" hint-placeholder-count="7">
+<span style="flex:1;border-radius:2px;height:{{ b.h }};background:{{ b.bg }}"></span>
+</sc-for>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:9px">
+<span style="font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</span>
+<span style="font-size:13px;font-weight:600;color:{{ w.fg }};font-variant-numeric:tabular-nums;flex-shrink:0">{{ w.value }}</span>
+</div>
+</sc-if>
+<sc-if value="{{ w.isProgress }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto">
+<div style="display:flex;align-items:baseline;gap:9px;margin-bottom:11px">
+<span style="font-family:'Hanken Grotesk',sans-serif;font-weight:500;letter-spacing:-.03em;font-size:{{ w.midSize }};line-height:1.08;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</span>
+<span style="font-size:12.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</span>
+</div>
+<div style="height:5px;border-radius:9999px;background:{{ w.trackBg }};overflow:hidden"><span style="display:block;height:100%;width:{{ w.pct }};border-radius:9999px;background:{{ w.accent }}"></span></div>
+</div>
+</sc-if>
+<sc-if value="{{ w.isSplit }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:grid;grid-template-columns:minmax(0,1fr) 1px minmax(0,1fr);gap:14px;align-items:center">
+<div style="min-width:0"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ w.midSize }};font-weight:500;letter-spacing:-.03em;line-height:1.08;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</p><p style="margin:6px 0 0;font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p></div>
+<span style="height:62%;background:{{ w.rule }}"></span>
+<div style="min-width:0"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ w.midSize }};font-weight:500;letter-spacing:-.03em;line-height:1.08;color:{{ w.accent }};font-variant-numeric:tabular-nums">{{ w.value2 }}</p><p style="margin:6px 0 0;font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption2 }}</p></div>
+</div>
+</sc-if>
+<sc-if value="{{ w.isCard }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;align-items:flex-end;gap:14px">
+<span style="width:66px;height:42px;border-radius:8px;flex-shrink:0;background:{{ w.plastic }};box-shadow:inset 0 0 0 1px {{ w.rule }};position:relative;overflow:hidden">
+<span style="position:absolute;left:7px;top:13px;width:12px;height:9px;border-radius:2px;background:{{ w.chipGold }}"></span>
+<span style="position:absolute;right:7px;bottom:7px;font-size:8px;letter-spacing:.06em;color:{{ w.plasticFg }}">{{ w.value2 }}</span>
+</span>
+<div style="min-width:0">
+<p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ w.midSize }};font-weight:600;letter-spacing:-.02em;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</p>
+<p style="margin:5px 0 0;font-size:12px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ w.isText }}" hint-placeholder-val="{{ false }}">
+<p style="margin:13px 0 0;font-size:{{ w.textSize }};line-height:1.5;letter-spacing:-.012em;color:{{ w.fg }};text-wrap:pretty;overflow:hidden">{{ w.value }}</p>
+<p style="margin:auto 0 0;padding-top:10px;font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p>
+</sc-if>
+</article>
+</sc-for>
+</main>
+</sc-if>
+
+<sc-if value="{{ isCatalog }}" hint-placeholder-val="{{ false }}">
+<main style="position:relative;z-index:10;display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-auto-flow:row dense;grid-auto-rows:126px;gap:14px;min-width:1400px;max-width:1720px;margin:0 auto;padding:20px 28px 132px">
+<sc-for list="{{ catalogCards }}" as="w" hint-placeholder-count="16">
+<article data-screen-label="{{ w.name }} {{ w.designTag }}" style="position:relative;display:flex;flex-direction:column;overflow:hidden;grid-column:span {{ w.cols }};grid-row:span {{ w.rows }};padding:{{ w.pad }};border-radius:22px;background:{{ w.bg }};backdrop-filter:{{ w.blur }};box-shadow:{{ w.ring }}">
+<header style="display:flex;align-items:baseline;gap:10px;flex-shrink:0">
+<p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ w.label }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.name }}</p>
+<span style="margin-left:auto;font-size:10.5px;color:{{ w.mut }};flex-shrink:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.kicker }}</span>
+<span style="font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:{{ w.stamp }};flex-shrink:0">{{ w.designTag }}</span>
+</header>
+<sc-if value="{{ w.isBig }}" hint-placeholder-val="{{ true }}">
+<div style="margin-top:auto;display:flex;align-items:flex-end;gap:10px;min-width:0;overflow:hidden">
+<span style="font-family:'Hanken Grotesk',sans-serif;font-weight:500;letter-spacing:-.035em;line-height:1.08;font-size:{{ w.bigSize }};color:{{ w.fg }};font-variant-numeric:tabular-nums;white-space:nowrap">{{ w.value }}</span>
+<span style="padding-bottom:5px;font-size:12.5px;font-weight:500;color:{{ w.accent }};white-space:nowrap">{{ w.delta }}</span>
+</div>
+<p style="margin:7px 0 0;font-size:12.5px;line-height:1.4;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p>
+</sc-if>
+<sc-if value="{{ w.isRows }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:12px;display:flex;flex-direction:column;min-height:0;overflow:hidden">
+<sc-for list="{{ w.rowsData }}" as="r" hint-placeholder-count="3">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:9px 0">
+<span style="font-size:13px;color:{{ w.fg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.label }}</span>
+<span style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ w.mut }}">{{ r.value }}</span>
+</div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ w.isBars }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;align-items:flex-end;gap:{{ w.barGap }};height:{{ w.barH }}">
+<sc-for list="{{ w.bars }}" as="b" hint-placeholder-count="7">
+<span style="flex:1;border-radius:2px;height:{{ b.h }};background:{{ b.bg }}"></span>
+</sc-for>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:9px">
+<span style="font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</span>
+<span style="font-size:13px;font-weight:600;color:{{ w.fg }};font-variant-numeric:tabular-nums;flex-shrink:0">{{ w.value }}</span>
+</div>
+</sc-if>
+<sc-if value="{{ w.isProgress }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto">
+<div style="display:flex;align-items:baseline;gap:9px;margin-bottom:11px">
+<span style="font-family:'Hanken Grotesk',sans-serif;font-weight:500;letter-spacing:-.03em;font-size:{{ w.midSize }};line-height:1.08;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</span>
+<span style="font-size:12.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</span>
+</div>
+<div style="height:5px;border-radius:9999px;background:{{ w.trackBg }};overflow:hidden"><span style="display:block;height:100%;width:{{ w.pct }};border-radius:9999px;background:{{ w.accent }}"></span></div>
+</div>
+</sc-if>
+<sc-if value="{{ w.isSplit }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:grid;grid-template-columns:minmax(0,1fr) 1px minmax(0,1fr);gap:14px;align-items:center">
+<div style="min-width:0"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ w.midSize }};font-weight:500;letter-spacing:-.03em;line-height:1.08;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</p><p style="margin:6px 0 0;font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p></div>
+<span style="height:62%;background:{{ w.rule }}"></span>
+<div style="min-width:0"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ w.midSize }};font-weight:500;letter-spacing:-.03em;line-height:1.08;color:{{ w.accent }};font-variant-numeric:tabular-nums">{{ w.value2 }}</p><p style="margin:6px 0 0;font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption2 }}</p></div>
+</div>
+</sc-if>
+<sc-if value="{{ w.isCard }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;align-items:flex-end;gap:14px">
+<span style="width:66px;height:42px;border-radius:8px;flex-shrink:0;background:{{ w.plastic }};box-shadow:inset 0 0 0 1px {{ w.rule }};position:relative;overflow:hidden">
+<span style="position:absolute;left:7px;top:13px;width:12px;height:9px;border-radius:2px;background:{{ w.chipGold }}"></span>
+<span style="position:absolute;right:7px;bottom:7px;font-size:8px;letter-spacing:.06em;color:{{ w.plasticFg }}">{{ w.value2 }}</span>
+</span>
+<div style="min-width:0">
+<p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ w.midSize }};font-weight:600;letter-spacing:-.02em;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</p>
+<p style="margin:5px 0 0;font-size:12px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ w.isText }}" hint-placeholder-val="{{ false }}">
+<p style="margin:13px 0 0;font-size:{{ w.textSize }};line-height:1.5;letter-spacing:-.012em;color:{{ w.fg }};text-wrap:pretty;overflow:hidden">{{ w.value }}</p>
+<p style="margin:auto 0 0;padding-top:10px;font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p>
+</sc-if>
+</article>
+</sc-for>
+</main>
+</sc-if>
+
+<sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+<main style="position:relative;z-index:10;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:16px;min-width:1400px;max-width:1720px;margin:0 auto;padding:20px 28px 132px;animation:bk-rise .7s cubic-bezier(.22,1,.36,1) both">
+<section style="display:flex;flex-direction:column;gap:14px">
+<div style="padding:24px;border-radius:24px;background:{{ heroBg }};backdrop-filter:{{ heroBlur }};box-shadow:{{ heroRing }}">
+<p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ labelFg }}">Open banking</p>
+<h2 style="margin:10px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:26px;font-weight:600;letter-spacing:-.03em">Connect a bank</h2>
+<p style="margin:8px 0 0;font-size:13.5px;line-height:1.5;color:{{ mutFg }};max-width:62ch">Atlas connects through your bank's own consent screen. It receives read-only access to balances and transactions — never your credentials, and never permission to move money.</p>
+<div style="display:flex;align-items:center;gap:10px;margin-top:16px;height:40px;padding:0 8px 0 16px;border-radius:9999px;background:{{ fieldBg }};box-shadow:inset 0 0 0 1px {{ fieldRing }}">
+<input placeholder="Search 2,400 banks and card issuers" style="flex:1;min-width:0;border:0;outline:0;background:transparent;font-size:13.5px;color:{{ pageFg }}"/>
+<button style="height:30px;padding:0 14px;border-radius:9999px;border:0;cursor:pointer;background:#3461f2;color:#fff;font-size:12.5px;font-weight:500" style-hover="background:#5b7cff">Add bank</button>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-top:14px">
+<sc-for list="{{ suggested }}" as="b" hint-placeholder-count="6">
+<button style="border:none;display:flex;align-items:center;gap:10px;padding:12px 13px;border-radius:14px;cursor:pointer;text-align:left;background:{{ tileBg }}" style-hover="">
+<span style="width:26px;height:26px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:{{ b.mark }};color:#fffdfa;font-size:11px;font-weight:700;font-family:'Hanken Grotesk',sans-serif">{{ b.initial }}</span>
+<span style="min-width:0">
+<span style="display:block;font-size:12.5px;font-weight:500;color:{{ pageFg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ b.name }}</span>
+<span style="display:block;margin-top:2px;font-size:11px;color:{{ mutFg }}">{{ b.meta }}</span>
+</span>
+</button>
+</sc-for>
+</div>
+</div>
+
+<div style="padding:24px;border-radius:24px;background:{{ heroBg }};backdrop-filter:{{ heroBlur }};box-shadow:{{ heroRing }}">
+<div style="display:flex;align-items:baseline;gap:12px">
+<p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ labelFg }}">Connected</p>
+<span style="margin-left:auto;font-size:12px;color:{{ mutFg }}">{{ connectedMeta }}</span>
+</div>
+<div style="display:flex;flex-direction:column;margin-top:8px">
+<sc-for list="{{ banks }}" as="b" hint-placeholder-count="5">
+<div style="display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:14px;align-items:center;padding:15px 0">
+<span style="width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:{{ b.mark }};color:#fffdfa;font-size:12.5px;font-weight:700;font-family:'Hanken Grotesk',sans-serif">{{ b.initial }}</span>
+<div style="min-width:0">
+<p style="margin:0;font-size:13.5px;font-weight:500;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ b.name }}<span style="margin-left:8px;font-size:11px;font-weight:400;color:{{ b.kindFg }}">{{ b.kind }}</span></p>
+<p style="margin:3px 0 0;font-size:11.5px;color:{{ mutFg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ b.accounts }}</p>
+</div>
+<div style="text-align:right">
+<p style="margin:0;font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;color:{{ pageFg }}">{{ b.balance }}</p>
+<p style="margin:3px 0 0;font-size:11px;color:{{ b.consentFg }};white-space:nowrap">{{ b.consent }}</p>
+</div>
+<button style="border:none;height:30px;padding:0 13px;border-radius:9999px;cursor:pointer;background:transparent;color:{{ pageFg }};font-size:12px;font-weight:500" style-hover="">{{ b.action }}</button>
+</div>
+</sc-for>
+</div>
+</div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:14px">
+<div style="padding:24px;border-radius:24px;background:{{ syncBg }}">
+<p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ syncLabel }}">Entities</p>
+<h2 style="margin:10px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:23px;font-weight:600;letter-spacing:-.03em;color:{{ syncFg }}">Personal and business, kept apart</h2>
+<p style="margin:8px 0 0;font-size:13px;line-height:1.5;color:{{ syncMut }}">Each entity has its own accounts, its own rules and its own view. Atlas never nets one against the other, and business figures stay out of personal answers.</p>
+<div style="display:flex;flex-direction:column;margin-top:8px">
+<sc-for list="{{ entities }}" as="e" hint-placeholder-count="3">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:13px 0">
+<div style="min-width:0">
+<p style="margin:0;font-size:13px;font-weight:500;color:{{ syncFg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ e.name }}</p>
+<p style="margin:3px 0 0;font-size:11.5px;color:{{ syncMut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ e.meta }}</p>
+</div>
+<span style="font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums;color:{{ syncFg }}">{{ e.value }}</span>
+</div>
+</sc-for>
+</div>
+<button style="border:none;width:100%;margin-top:14px;height:38px;border-radius:9999px;background:transparent;color:{{ syncFg }};font-size:12.5px;font-weight:500;cursor:pointer">Add an entity</button>
+</div>
+
+<div style="padding:24px;border-radius:24px;background:{{ heroBg }};backdrop-filter:{{ heroBlur }};box-shadow:{{ heroRing }}">
+<p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:{{ labelFg }}">What Atlas may do</p>
+<div style="display:flex;flex-direction:column;margin-top:10px">
+<sc-for list="{{ perms }}" as="p" hint-placeholder-count="5">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:13px 0">
+<div style="min-width:0">
+<p style="margin:0;font-size:13px;font-weight:500;letter-spacing:-.01em">{{ p.name }}</p>
+<p style="margin:3px 0 0;font-size:11.5px;line-height:1.45;color:{{ mutFg }}">{{ p.note }}</p>
+</div>
+<span data-id="{{ p.id }}" onClick="{{ togglePerm }}" style="width:46px;height:27px;border-radius:9999px;flex-shrink:0;padding:3px;cursor:pointer;display:flex;align-items:center;justify-content:{{ p.knob }};background:{{ p.switchBg }}"><span style="width:21px;height:21px;border-radius:50%;background:{{ p.knobBg }};box-shadow:0 2px 6px -2px rgba(30,30,36,.6)"></span></span>
+</div>
+</sc-for>
+</div>
+</div>
+</section>
+</main>
+</sc-if>
+
+<nav style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:92;display:flex;align-items:center;gap:3px;padding:5px;border-radius:9999px;background:#22222b;box-shadow:inset 0 0 0 1px rgba(247,245,242,.16),0 20px 46px -18px rgba(0,0,0,.6)">
+<a href="Atlas Dashboard (Current).dc.html" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:9999px;color:rgba(249,247,244,.8);font-size:13px;font-weight:500;text-decoration:none" style-hover="color:#fff;background:rgba(249,247,244,.12)">Dashboard</a>
+<a href="Atlas Smart Home.dc.html" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:9999px;color:rgba(249,247,244,.8);font-size:13px;font-weight:500;text-decoration:none" style-hover="color:#fff;background:rgba(249,247,244,.12)">Smart home</a>
+<a href="Atlas Health.dc.html" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:9999px;color:rgba(249,247,244,.8);font-size:13px;font-weight:500;text-decoration:none" style-hover="color:#fff;background:rgba(249,247,244,.12)">Health</a>
+<span style="display:flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:9999px;background:rgba(249,247,244,.14);color:#fff;font-size:13px;font-weight:500">Money</span>
+<a href="Atlas Widget Catalog.dc.html" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 14px;border-radius:9999px;background:#3461f2;color:#fff;font-size:13px;font-weight:500;text-decoration:none" style-hover="background:#5b7cff">Widgets</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1720,&quot;height&quot;:1000},&quot;view&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;money&quot;,&quot;options&quot;:[&quot;money&quot;,&quot;catalog&quot;,&quot;settings&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;View&quot},&quot;dark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;View&quot}}">
+class Component extends DCLogic {
+  ACC = { balance:'#2f7d5e', spend:'#c2661a', card:'#2f4bbd', save:'#5b3ce0', biz:'#8b6f3f', risk:'#c2483d' };
+  W = [
+    ['Total balance','balance','big',{v:'€84,120',d:'+2.1%',c:'Across 7 accounts, 3 banks',k:'Net position'}],
+    ['Current account','balance','big',{v:'€6,412',d:'−€340',c:'Revolut · main',k:'Personal'}],
+    ['Savings','balance','big',{v:'€24,800',d:'+€600',c:'2.9% AER · instant access',k:'Personal'}],
+    ['Joint account','balance','big',{v:'€3,180',d:'−€120',c:'Household bills',k:'Shared'}],
+    ['Accounts','balance','rows',{r:[['Revolut · Current','€6,412'],['N26 · Savings','€24,800'],['Danske · Joint','€3,180'],['Wise · Multi-currency','€2,940']],v:'7 accounts',c:'Three banks connected',k:'All personal'}],
+    ['Balance trend','balance','bars',{b:[46,52,49,58,63,60,68,72,70,76,80,84],v:'€84.1k',c:'Twelve months',k:'Net worth'}],
+    ['Cash flow','balance','split',{v:'€7,240',c:'In this month',v2:'€4,905',c2:'Out',k:'July'}],
+    ['Runway','balance','progress',{v:'8.4 mo',c:'at current burn',p:'70%',k:'Personal'}],
+    ['Spending','spend','bars',{b:[24,40,32,58,44,70,52],v:'€1,284',c:'This month by week',k:'All cards'}],
+    ['Categories','spend','rows',{r:[['Groceries','€412'],['Transport','€236'],['Eating out','€198'],['Subscriptions','€184']],v:'€1,284',c:'Top four of eleven',k:'July'}],
+    ['Budget','spend','progress',{v:'68%',c:'of €1,900 used',p:'68%',k:'Monthly'}],
+    ['Largest purchase','spend','big',{v:'€389',d:'Tue',c:'Flight to Lisbon · TAP',k:'This month'}],
+    ['Merchants','spend','rows',{r:[['Netto','€212'],['TAP Air','€389'],['Apple','€74'],['Spotify','€12']],v:'34 merchants',c:'Ranked by spend',k:'July'}],
+    ['Subscriptions','spend','rows',{r:[['Adobe CC','€62/mo'],['Spotify','€12/mo'],['iCloud','€10/mo'],['Notion','€8/mo']],v:'€184/mo',c:'11 active · 2 unused',k:'Recurring'}],
+    ['Upcoming bills','spend','rows',{r:[['Rent · 1 Aug','€1,450'],['Insurance · 3 Aug','€96'],['Phone · 5 Aug','€29']],v:'€1,575',c:'Due within 10 days',k:'Scheduled'}],
+    ['Direct debits','spend','big',{v:'9 active',d:'—',c:'Next: rent, 1 August',k:'Mandates'}],
+    ['Main card','card','card',{v:'€1,284',v2:'4471',c:'Visa · spent this cycle',k:'Revolut Metal'}],
+    ['Business card','card','card',{v:'€3,908',v2:'8820',c:'Mastercard · company',k:'Pleo'}],
+    ['Card controls','card','rows',{r:[['Online payments','on'],['Contactless','on'],['ATM abroad','off'],['Gambling','blocked']],v:'3 of 4 on',c:'Applies to all cards',k:'Limits'}],
+    ['Pending','card','rows',{r:[['TAP Air Portugal','€389'],['Netto','€41'],['Uber','€18']],v:'€448',c:'Not yet settled',k:'Authorisations'}],
+    ['FX','card','split',{v:'€1',c:'Euro',v2:'$1.09',c2:'US dollar',k:'Live mid-market'}],
+    ['Multi-currency','card','rows',{r:[['EUR','€2,940'],['USD','$1,120'],['GBP','£340'],['DKK','kr 4,200']],v:'4 wallets',c:'Wise · no conversion fees',k:'Balances'}],
+    ['Savings goal','save','progress',{v:'€24.8k',c:'of €30k · house deposit',p:'82%',k:'Goal'}],
+    ['Emergency fund','save','progress',{v:'5.2 mo',c:'of 6 months target',p:'87%',k:'Buffer'}],
+    ['Investments','save','big',{v:'€48,200',d:'+1.8%',c:'Index funds and ETFs',k:'Portfolio'}],
+    ['Pension','save','big',{v:'€112k',d:'+4.2%',c:'Employer 8% · you 6%',k:'Retirement'}],
+    ['Interest earned','save','big',{v:'€612',d:'YTD',c:'2.9% average across savings',k:'This year'}],
+    ['Round-ups','save','progress',{v:'€48',c:'saved this month',p:'40%',k:'Automatic'}],
+    ['Mortgage','risk','progress',{v:'€218k',c:'of €340k remaining',p:'36%',k:'Repaid'}],
+    ['Loans','risk','rows',{r:[['Car finance','€8,400'],['Student loan','€3,100']],v:'€11,500',c:'Two active loans',k:'Outstanding'}],
+    ['Credit score','risk','big',{v:'812',d:'+14',c:'Excellent · updated Monday',k:'Experian'}],
+    ['Debt ratio','risk','progress',{v:'22%',c:'of gross income',p:'22%',k:'Healthy'}],
+    ['Unusual activity','risk','text',{v:'A €389 charge from TAP Air Portugal is larger than your usual travel spend. It matches your Lisbon booking, so Atlas let it through.',c:'One flag today',k:'Monitoring'}],
+    ['Business balance','biz','big',{v:'€142,600',d:'+8.4%',c:'Kern Studio ApS · operating',k:'Business'}],
+    ['Receivables','biz','rows',{r:[['Northwind','€12,400'],['Ledgerline','€86,000'],['Studio Kern','€3,200']],v:'€101.6k',c:'Two overdue by 14 days',k:'Outstanding'}],
+    ['Payables','biz','rows',{r:[['AWS · 28 Jul','€1,840'],['Contractors · 31 Jul','€6,200'],['Office · 1 Aug','€2,100']],v:'€10.1k',c:'Due within seven days',k:'Owed'}],
+    ['VAT set aside','biz','progress',{v:'€18.4k',c:'of €21.2k due 1 Sep',p:'87%',k:'Ring-fenced'}],
+    ['Payroll','biz','big',{v:'€41,200',d:'monthly',c:'14 people · runs in 3 days',k:'Business'}],
+    ['Corporation tax','biz','progress',{v:'€26.8k',c:'accrued this year',p:'62%',k:'Estimated'}],
+    ['Business runway','biz','big',{v:'14 mo',d:'+2',c:'At current burn and pipeline',k:'Kern Studio'}],
+    ['Invoices sent','biz','bars',{b:[30,42,38,56,62,48,70],v:'€214k',c:'Last seven months',k:'Billed'}],
+    ['Expenses','biz','rows',{r:[['Software','€3,410'],['Travel','€2,180'],['Office','€2,100'],['Contractors','€6,200']],v:'€13.9k',c:'This month',k:'Business'}],
+    ['Reconciliation','biz','progress',{v:'92%',c:'of July matched',p:'92%',k:'Bookkeeping'}],
+    ['Atlas said','balance','text',{v:'Rent clears Friday and leaves €4,962. Ledgerline is 14 days late — I have a reminder drafted and waiting for you.',c:'Spoken aloud · 08:20',k:'Voice'}]
+  ];
+  SIZES = [
+    { id:'s', label:'S', dim:'2×1', cols:2, rows:1 },
+    { id:'m', label:'M', dim:'3×1', cols:3, rows:1 },
+    { id:'l', label:'L', dim:'3×2', cols:3, rows:2 },
+    { id:'xl', label:'XL', dim:'6×2', cols:6, rows:2 },
+    { id:'hero', label:'Hero', dim:'6×3', cols:6, rows:3 }
+  ];
+  DESIGNS = [{ id:'both', label:'Both' }, { id:'glass', label:'Glass' }, { id:'ink', label:'Ink' }];
+  MONEY = [
+    ['Accounts', 3, 2], ['Current account', 3, 1], ['Savings', 3, 1],
+    ['Balance trend', 3, 2], ['Cash flow', 3, 1], ['Main card', 3, 1], ['Spending', 3, 1], ['Budget', 3, 1],
+    ['Upcoming bills', 3, 2], ['Receivables', 3, 2], ['Atlas said', 6, 1],
+    ['Business balance', 3, 1], ['VAT set aside', 3, 1], ['Runway', 3, 1], ['Credit score', 3, 1]
+  ];
+  SCOPES = [{ id:'all', label:'Everything', dot:'#3461f2' }, { id:'personal', label:'Personal', dot:'#2f7d5e' }, { id:'business', label:'Kern Studio ApS', dot:'#8b6f3f' }];
+  state = { view:'money', size:'l', design:'both', dark:false, scope:'all', perms:{ p1:1, p2:1, p3:0, p4:1, p5:0 } };
+  rgbOf(h) { h = h.replace('#',''); return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)]; }
+  lighten(h, f) { const c = this.rgbOf(h).map(v => Math.round(v + (255 - v)*f)); return 'rgb(' + c.join(',') + ')'; }
+  skin(design, accent) {
+    if (design === 'ink') return { bg:'#1e1e24', blur:'none', ring:'none', fg:'#f7f5f2', mut:'rgba(247,245,242,.5)', label:'rgba(247,245,242,.72)', accent:this.lighten(accent, 0.46), rule:'rgba(247,245,242,.13)', trackBg:'rgba(247,245,242,.14)', barBase:'rgba(247,245,242,.2)', stamp:'rgba(247,245,242,.45)', plastic:'rgba(247,245,242,.12)', plasticFg:'rgba(247,245,242,.7)', chipGold:'#c9a227', designTag:'Ink' };
+    return { bg:'rgba(255,253,250,.62)', blur:'blur(16px) saturate(1.1)', ring:'inset 0 0 0 1px rgba(255,253,250,.9),0 18px 40px -40px rgba(30,30,36,.5)', fg:'#1e1e24', mut:'#8b8681', label:'#55524f', accent, rule:'#e8e4dd', trackBg:'#eae6df', barBase:'rgba(30,30,36,.1)', stamp:'#8b8681', plastic:'#1e1e24', plasticFg:'rgba(247,245,242,.75)', chipGold:'#d8b34a', designTag:'Glass' };
+  }
+  card(w, cols, rows, design) {
+    const [name, cat, kind, o] = w;
+    const sk = this.skin(design, this.ACC[cat]);
+    const tall = rows >= 2, huge = rows >= 3, wide = cols >= 6;
+    const rowCap = huge ? 5 : (tall ? 3 : 0);
+    const canRows = kind === 'rows' && rowCap > 0;
+    const asBig = kind === 'big' || (kind === 'rows' && !canRows) || (kind === 'text' && !tall && cols < 4);
+    return Object.assign({}, sk, {
+      name, cols, rows, kicker:o.k || '',
+      pad: huge ? '22px' : (tall ? '18px' : '15px'),
+      bigSize: (huge ? 58 : (tall ? (wide ? 48 : 36) : (cols >= 3 ? 28 : 23))) + 'px',
+      midSize: (huge ? 32 : (tall ? 23 : 17)) + 'px',
+      textSize: (huge ? 21 : (tall ? 15.5 : 13)) + 'px',
+      barH: (huge ? 132 : (tall ? 68 : 34)) + 'px',
+      barGap: wide ? '5px' : '3px',
+      value:o.v || '', value2:o.v2 || '', caption:o.c || '', caption2:o.c2 || '', delta:o.d || '', pct:o.p || '50%',
+      isBig: asBig, isRows: canRows, isBars: kind === 'bars', isProgress: kind === 'progress',
+      isSplit: kind === 'split', isCard: kind === 'card', isText: kind === 'text' && !asBig,
+      rowsData:(o.r || []).slice(0, rowCap).map(r => ({ label:r[0], value:r[1] })),
+      bars:(o.b || []).slice(0, wide ? 12 : 7).map((h, i, arr) => ({ h:Math.round(h) + '%', bg:i === arr.length - 1 ? sk.accent : sk.barBase }))
+    });
+  }
+  renderVals() {
+    const S = this.state, dark = S.dark;
+    const size = this.SIZES.find(z => z.id === S.size) || this.SIZES[2];
+    const designs = S.design === 'both' ? ['glass', 'ink'] : [S.design];
+    const chipOn = (on) => ({ bg: on ? (dark ? '#f4f2ef' : '#1e1e24') : (dark ? 'rgba(244,242,239,.06)' : 'rgba(249,247,244,.8)'), fg: on ? (dark ? '#1e1e24' : '#f9f7f4') : (dark ? '#f4f2ef' : '#1e1e24'), bd: on ? (dark ? '#f4f2ef' : '#1e1e24') : (dark ? 'rgba(244,242,239,.16)' : '#e6e2db') });
+    const byName = (n) => this.W.find(w => w[0] === n) || this.W[0];
+    const cat = [];
+    this.W.forEach(w => designs.forEach(d => cat.push(this.card(w, size.cols, size.rows, d))));
+    const heroBy = { all:['Net position','€226,720','Personal and business together. Rent clears Friday, Ledgerline is 14 days late, and VAT is 87% set aside.'],
+      personal:['Personal','€84,120','Across seven accounts at three banks. Spending is 68% of budget with five days of July left.'],
+      business:['Kern Studio ApS','€142,600','Fourteen months of runway. €101.6k receivable, €10.1k payable this week, payroll in three days.'] }[S.scope];
+    return {
+      rootRef: (el) => { this.root = el; },
+      orbRef: (el) => { if (el && window.AtlasSphere) window.AtlasSphere.mount(el, () => ({ state:'idle', dark: this.state.dark })); },
+      pageBg: dark ? '#15151a' : '#f9f7f4', pageFg: dark ? '#f4f2ef' : '#1e1e24',
+      mutFg: dark ? 'rgba(244,242,239,.6)' : '#6d6a67', labelFg: dark ? 'rgba(244,242,239,.72)' : '#55524f',
+      ruleFg: dark ? 'rgba(244,242,239,.12)' : '#e8e4dd',
+      washA: dark ? 'linear-gradient(180deg,rgba(47,125,94,.16),rgba(21,21,26,0) 44%)' : 'linear-gradient(180deg,rgba(214,236,222,.7),rgba(249,247,244,0) 42%)',
+      washB: dark ? 'radial-gradient(closest-side,rgba(139,111,63,.2),transparent 74%)' : 'radial-gradient(closest-side,rgba(255,190,120,.26),transparent 74%)',
+      washC: dark ? 'radial-gradient(closest-side,rgba(122,140,255,.2),transparent 74%)' : 'radial-gradient(closest-side,rgba(140,190,255,.2),transparent 74%)',
+      barBg: dark ? 'rgba(244,242,239,.05)' : 'rgba(255,253,250,.5)', barRing: dark ? 'rgba(244,242,239,.1)' : 'rgba(255,253,250,.7)',
+      heroBg: dark ? '#1e1e24' : 'rgba(255,253,250,.62)', heroBlur: dark ? 'none' : 'blur(16px) saturate(1.1)',
+      heroRing: dark ? 'none' : 'inset 0 0 0 1px rgba(255,253,250,.9),0 18px 40px -40px rgba(30,30,36,.5)',
+      tileBg: dark ? 'rgba(244,242,239,.05)' : 'rgba(249,247,244,.7)', tileRing: dark ? 'rgba(244,242,239,.14)' : '#e6e2db',
+      fieldBg: dark ? 'rgba(244,242,239,.06)' : '#f9f7f4', fieldRing: dark ? 'rgba(244,242,239,.14)' : '#e6e2db',
+      syncBg: dark ? '#f4f2ef' : '#1e1e24', syncFg: dark ? '#1e1e24' : '#f7f5f2',
+      syncMut: dark ? '#6d6a67' : 'rgba(247,245,242,.55)', syncLabel: dark ? '#8b8681' : 'rgba(247,245,242,.6)',
+      syncRule: dark ? 'rgba(30,30,36,.12)' : 'rgba(247,245,242,.16)',
+      views: [{ id:'money', label:'Money' }, { id:'catalog', label:'Widget set' }, { id:'settings', label:'Settings' }].map(v => Object.assign(v, chipOn(v.id === S.view))),
+      chipRow: S.view === 'catalog'
+        ? this.SIZES.map(z => Object.assign({ k:'size', id:z.id, label:z.label, meta:z.dim }, chipOn(z.id === S.size))).concat(this.DESIGNS.map(d => Object.assign({ k:'design', id:d.id, label:d.label, meta:'' }, chipOn(d.id === S.design))))
+        : [{ k:'dark', id:'toggle', label: dark ? 'Light' : 'Dark', meta:'', bg: dark ? '#f4f2ef' : '#1e1e24', fg: dark ? '#1e1e24' : '#f9f7f4', bd: dark ? '#f4f2ef' : '#1e1e24' }],
+      navZ: S.navOpen ? 80 : 2,
+      launcherShow: S.view === 'money' ? 'none' : 'flex',
+      navHintOp: S.navOpen ? '0' : '1',
+      navRing: [{ id:'money', label:'Money' }, { id:'catalog', label:'Widget set' }, { id:'settings', label:'Settings' }, { href:'Atlas Smart Home.dc.html', label:'Home', dot:'#c98a2b' }, { href:'Atlas Health.dc.html', label:'Health', dot:'#c2483d' }, { href:'Atlas Dashboard (Current).dc.html', label:'Dashboard', dot:'#3461f2' }].map((n, i, arr) => {
+        const a = (4 + i*(104/Math.max(1, arr.length - 1)))*Math.PI/180;
+        const R = 132;
+        const on = n.id && n.id === S.view;
+        return Object.assign({}, n, {
+          href: n.href || '#',
+          x: (S.navOpen ? 132 : 0) + 'px',
+          y: (S.navOpen ? (i - (arr.length - 1)/2)*38 : 0) + 'px',
+          scale: S.navOpen ? '1' : '.7',
+          op: S.navOpen ? '1' : '0',
+          pe: S.navOpen ? 'auto' : 'none',
+          lx: (S.navOpen ? 76 : 0) + 'px',
+          ly: (S.navOpen ? (48 + i*38) : 0) + 'px',
+          delay: (i*26) + 'ms',
+          bg: on ? (dark ? '#f4f2ef' : '#1e1e24') : (dark ? 'rgba(34,34,43,.95)' : 'rgba(255,253,250,.96)'),
+          fg: on ? (dark ? '#1e1e24' : '#f9f7f4') : (dark ? '#f4f2ef' : '#1e1e24'),
+          ring: dark ? 'inset 0 0 0 1px rgba(247,245,242,.16),0 18px 34px -20px rgba(0,0,0,.7)' : 'inset 0 0 0 1px #e8e4dd,0 18px 34px -22px rgba(30,30,36,.45)',
+          dot: n.dot || (on ? '#3461f2' : (dark ? 'rgba(247,245,242,.35)' : '#c9c3ba'))
+        });
+      }),
+      openNav: () => this.setState({ navOpen: true }),
+      closeNav: () => this.setState({ navOpen: false }),
+      navGo: (e) => { const id = e.currentTarget.dataset.id; if (id) { e.preventDefault(); this.setState({ view: id, navOpen: false }); } },
+      isMoney: S.view === 'money', isCatalog: S.view === 'catalog', isSettings: S.view === 'settings',
+      heroLabel: heroBy[0], heroValue: heroBy[1], heroLine: heroBy[2],
+      scopes: this.SCOPES.map(s => Object.assign({}, s, chipOn(s.id === S.scope))),
+      moneyCards: this.MONEY.map(m => this.card(byName(m[0]), m[1], m[2], dark ? 'ink' : 'glass')),
+      catalogCards: cat,
+      connectedMeta: '3 banks · 7 accounts · 2 entities',
+      suggested: [
+        { name:'Revolut', initial:'R', meta:'Personal + business', mark:'#1e1e24' },
+        { name:'N26', initial:'N', meta:'Personal', mark:'#2f7d5e' },
+        { name:'Danske Bank', initial:'D', meta:'Personal + joint', mark:'#2f4bbd' },
+        { name:'Wise', initial:'W', meta:'Multi-currency', mark:'#5b3ce0' },
+        { name:'Nordea', initial:'N', meta:'Mortgage', mark:'#8b6f3f' },
+        { name:'Pleo', initial:'P', meta:'Company cards', mark:'#c2483d' }
+      ],
+      banks: [
+        { name:'Revolut', initial:'R', kind:'personal', accounts:'Current · Savings pocket · Metal card', balance:'€6,412', consent:'Consent renews 12 Sep', action:'Manage', mark:'#1e1e24' },
+        { name:'N26', initial:'N', kind:'personal', accounts:'Savings · 2.9% AER', balance:'€24,800', consent:'Consent renews 4 Oct', action:'Manage', mark:'#2f7d5e' },
+        { name:'Danske Bank', initial:'D', kind:'joint', accounts:'Joint account · household bills', balance:'€3,180', consent:'Renew within 11 days', action:'Renew', mark:'#2f4bbd' },
+        { name:'Wise', initial:'W', kind:'personal', accounts:'EUR, USD, GBP, DKK wallets', balance:'€2,940', consent:'Consent renews 30 Aug', action:'Manage', mark:'#5b3ce0' },
+        { name:'Pleo', initial:'P', kind:'business', accounts:'Kern Studio ApS · 6 company cards', balance:'€142,600', consent:'Consent renews 21 Nov', action:'Manage', mark:'#c2483d' }
+      ].map(b => Object.assign(b, { kindFg: dark ? 'rgba(244,242,239,.45)' : '#b6b1aa', consentFg: b.action === 'Renew' ? '#c2661a' : (dark ? 'rgba(244,242,239,.45)' : '#b6b1aa') })),
+      entities: [
+        { name:'Personal', meta:'4 accounts · Revolut, N26, Wise', value:'€84,120' },
+        { name:'Joint · household', meta:'1 account · Danske Bank', value:'€3,180' },
+        { name:'Kern Studio ApS', meta:'2 accounts · 6 cards · VAT registered', value:'€142,600' }
+      ],
+      perms: [
+        { id:'p1', name:'Read balances and transactions', note:'Read-only, through your bank\u2019s consent screen.' },
+        { id:'p2', name:'Categorise and forecast', note:'On device. Nothing leaves for analysis.' },
+        { id:'p3', name:'Move money', note:'Never. Atlas can draft a transfer, you send it.' },
+        { id:'p4', name:'Draft invoice reminders', note:'Held for approval like any other mail.' },
+        { id:'p5', name:'Mention money in general answers', note:'Off — figures stay inside this view.' }
+      ].map(p => { const on = !!S.perms[p.id]; return Object.assign(p, { knob: on ? 'flex-end' : 'flex-start', switchBg: on ? '#3461f2' : (dark ? 'rgba(244,242,239,.16)' : '#ddd8d0'), knobBg: dark ? '#1e1e24' : '#fffdfa' }); }),
+      pickView: (e) => this.setState({ view: e.currentTarget.dataset.id }),
+      pickChip: (e) => { const k = e.currentTarget.dataset.k, id = e.currentTarget.dataset.id; if (k === 'size') this.setState({ size:id }); else if (k === 'design') this.setState({ design:id }); else this.setState({ dark: !this.state.dark }); },
+      pickScope: (e) => this.setState({ scope: e.currentTarget.dataset.id }),
+      togglePerm: (e) => { const id = e.currentTarget.dataset.id; this.setState({ perms: Object.assign({}, S.perms, { [id]: S.perms[id] ? 0 : 1 }) }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<style>
+button,input,textarea,select{border:none}@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Hanken+Grotesk:wght@500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap');
+html,body{margin:0;padding:0;background:#f9f7f4}
+a{color:#3461f2;text-decoration:none}a:hover{color:#5b7cff}
+*{box-sizing:border-box}
+input{font:inherit}
+@keyframes br-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes br-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes br-pulse{0%,100%{opacity:1}50%{opacity:.4}}
+</style>
+<script src="https://unpkg.com/lucide@0.462.0/dist/umd/lucide.min.js"></script>
+<script src="atlas-sphere.js"></script>
+<script src="./image-slot.js"></script>
+<script src="atlas-transition.js"></script>
+</helmet>
+<div ref="{{ rootRef }}" data-screen-label="Atlas Browser" style="position:relative;height:100vh;overflow-x:auto;overflow-y:hidden;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased">
+<div style="position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none">
+<div style="position:absolute;inset:0;background:linear-gradient(160deg,rgba(237,235,231,.92),rgba(249,247,244,0) 46%)"></div>
+<div style="position:absolute;bottom:-300px;left:50%;transform:translateX(-50%);width:1000px;height:600px;border-radius:50%;filter:blur(72px);background:radial-gradient(closest-side,rgba(122,140,255,.24),transparent 72%)"></div>
+<div style="position:absolute;inset:0;opacity:.4;mix-blend-mode:multiply;background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E&quot;)"></div>
+</div>
+
+<div style="position:relative;z-index:10;display:grid;grid-template-columns:250px minmax(0,1fr);gap:0;height:100vh;min-width:1400px">
+
+<aside style="display:flex;flex-direction:column;gap:14px;padding:18px 14px 18px 18px;min-height:0">
+<div style="display:flex;align-items:center;gap:10px;padding:2px 6px 0">
+<span style="display:flex;gap:6px"><span style="width:11px;height:11px;border-radius:50%;background:#e0a2a2"></span><span style="width:11px;height:11px;border-radius:50%;background:#e3cb9a"></span><span style="width:11px;height:11px;border-radius:50%;background:#a8ceb3"></span></span>
+<span style="margin-left:6px;font-family:'Hanken Grotesk',sans-serif;font-size:15px;font-weight:600;letter-spacing:-.02em">atlas <span style="font-weight:400;color:#8b8681">browse</span></span>
+<button onClick="{{ newTab }}" title="New tab" style="margin-left:auto;width:26px;height:26px;border-radius:8px;border:0;background:transparent;color:#6d6a67;cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="background:#edebe7;color:#1e1e24"><i data-lucide="plus" style="width:14px;height:14px"></i></button>
+</div>
+
+<div style="display:flex;flex-direction:column;justify-content:center;gap:0;flex:1;min-height:0;overflow:auto;padding:2px">
+<p style="margin:0 6px 10px;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#b6b1aa">Open</p>
+<sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+<div data-id="{{ t.id }}" onClick="{{ pickTab }}" style="position:relative;height:{{ t.h }};margin-top:{{ t.lift }};border-radius:18px;overflow:hidden;cursor:pointer;transform:scale({{ t.scale }});transform-origin:left center;opacity:{{ t.op }};box-shadow:{{ t.ring }};transition:height .5s cubic-bezier(.22,1,.36,1),margin-top .5s cubic-bezier(.22,1,.36,1),transform .5s cubic-bezier(.22,1,.36,1),opacity .4s ease,box-shadow .4s ease;z-index:{{ t.z }}">
+<span style="position:absolute;inset:0;background:{{ t.pvBg }}">
+<span style="position:absolute;left:0;right:0;top:0;height:{{ t.pvBarH }};background:{{ t.pvBar }};display:flex;align-items:center;padding:0 8px"><span style="font-family:{{ t.pvFont }};font-size:9px;font-weight:700;letter-spacing:{{ t.pvTrack }};color:{{ t.pvMarkFg }}">{{ t.pvMark }}</span></span>
+<span style="position:absolute;left:9px;right:9px;top:{{ t.pvTop }};height:34%;border-radius:4px;background:{{ t.pvHero }}"></span>
+<span style="position:absolute;left:9px;right:34%;bottom:34%;height:5px;border-radius:2px;background:{{ t.pvInk }}"></span>
+<span style="position:absolute;left:9px;right:46%;bottom:27%;height:5px;border-radius:2px;background:{{ t.pvInk }};opacity:.6"></span>
+<span style="position:absolute;left:9px;right:22%;bottom:20%;height:4px;border-radius:2px;background:{{ t.pvInk }};opacity:.34"></span>
+</span>
+<image-slot id="atlas-tab-{{ t.id }}" shape="rect" placeholder=" " style="position:absolute;inset:0;width:100%;height:100%"></image-slot>
+<span style="position:absolute;inset:0;pointer-events:none;background:{{ t.veil }}"></span>
+<span style="position:absolute;left:9px;top:9px;right:9px;display:flex;align-items:center;gap:8px;padding:6px 9px 6px 7px;border-radius:11px;background:rgba(255,253,250,.93);backdrop-filter:blur(10px);box-shadow:0 6px 16px -12px rgba(30,30,36,.7);pointer-events:none">
+<img src="{{ t.favicon }}" alt="" style="width:16px;height:16px;border-radius:4px;flex-shrink:0;display:block"/>
+<span style="flex:1;min-width:0">
+<span style="display:block;font-size:11.5px;font-weight:600;letter-spacing:-.015em;color:#1e1e24;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ t.title }}</span>
+<span style="display:block;margin-top:1px;font-size:10px;color:#8b8681;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ t.host }}</span>
+</span>
+<span style="font-size:9.5px;font-variant-numeric:tabular-nums;color:#b6b1aa;flex-shrink:0">{{ t.idx }}</span>
+</span>
+<span style="position:absolute;right:9px;bottom:11px;display:{{ t.noteShow }};align-items:center;gap:6px;max-width:82%;padding:5px 10px;border-radius:9999px;background:rgba(30,30,36,.82);backdrop-filter:blur(8px);pointer-events:none">
+<span style="width:5px;height:5px;border-radius:50%;background:{{ t.mark }};flex-shrink:0"></span>
+<span style="font-size:10px;line-height:1.2;color:#f7f5f2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ t.note }}</span>
+</span>
+<span style="position:absolute;left:0;right:0;bottom:0;height:3px;display:{{ t.noteShow }};background:rgba(30,30,36,.14)"><span style="display:block;height:100%;width:{{ t.read }};background:{{ t.mark }}"></span></span>
+</div>
+</sc-for>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:6px;padding:2px">
+<p style="margin:6px 6px 2px;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#b6b1aa">Atlas kept</p>
+<sc-for list="{{ kept }}" as="k" hint-placeholder-count="3">
+<div style="display:flex;align-items:center;gap:9px;padding:8px 12px;border-radius:12px;cursor:pointer" style-hover="background:rgba(255,253,250,.6)">
+<i data-lucide="{{ k.icon }}" style="width:13px;height:13px;color:#8b8681;flex-shrink:0"></i>
+<span style="flex:1;min-width:0;font-size:12px;color:#3f3d3a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ k.label }}</span>
+<span style="font-size:10.5px;color:#b6b1aa">{{ k.meta }}</span>
+</div>
+</sc-for>
+</div>
+
+<div style="margin-top:auto;display:flex;align-items:center;gap:9px;padding:11px 12px;border-radius:14px;background:rgba(255,253,250,.55)">
+<span style="width:7px;height:7px;border-radius:50%;background:#0fae76"></span>
+<span style="flex:1;font-size:11.5px;color:#55524f">{{ privacyLine }}</span>
+</div>
+</aside>
+
+<main style="position:relative;min-width:0;padding:18px 18px 0 4px;min-height:0">
+<div style="position:absolute;top:30px;right:34px;z-index:40;display:flex;align-items:center;gap:4px;padding:5px;border-radius:9999px;background:rgba(255,253,250,.82);backdrop-filter:blur(14px) saturate(1.1);box-shadow:inset 0 0 0 1px rgba(255,253,250,.9),0 14px 34px -28px rgba(30,30,36,.5)">
+<button onClick="{{ goBack }}" title="Back" style="width:30px;height:30px;border-radius:9999px;border:0;background:transparent;color:#3f3d3a;cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="background:#f1eeea"><i data-lucide="arrow-left" style="width:15px;height:15px"></i></button>
+<button onClick="{{ reload }}" title="Reload" style="width:30px;height:30px;border-radius:9999px;border:0;background:transparent;color:#3f3d3a;cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="background:#f1eeea"><i data-lucide="{{ reloadIcon }}" style="width:15px;height:15px"></i></button>
+<span style="width:1px;height:18px;background:#e6e2db;margin:0 3px"></span>
+<button onClick="{{ toggleReader }}" title="Reader view" style="width:30px;height:30px;border-radius:9999px;border:0;cursor:pointer;background:{{ readerBg }};color:{{ readerFg }};display:flex;align-items:center;justify-content:center" style-hover="background:#f1eeea"><i data-lucide="book-open" style="width:15px;height:15px"></i></button>
+<button title="Save" style="width:30px;height:30px;border-radius:9999px;border:0;background:transparent;color:#3f3d3a;cursor:pointer;display:flex;align-items:center;justify-content:center" style-hover="background:#f1eeea"><i data-lucide="bookmark" style="width:15px;height:15px"></i></button>
+<button onClick="{{ toggleSide }}" style="display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 12px;border-radius:9999px;border:0;cursor:pointer;background:{{ sideBg }};color:{{ sideFg }};font-size:12.5px;font-weight:500"><i data-lucide="panel-right" style="width:14px;height:14px"></i>Atlas</button>
+</div>
+
+<div style="display:grid;grid-template-columns:{{ shellCols }};gap:14px;height:100%;min-height:0;animation:br-rise .7s cubic-bezier(.22,1,.36,1) both">
+<div style="min-width:0;overflow:auto;border-radius:24px;background:#fffdfa;box-shadow:inset 0 0 0 1px #e8e4dd;padding:0 0 300px">
+<div style="max-width:{{ colWidth }};margin:0 auto;padding:64px 40px 0">
+<p style="margin:0 0 18px;font-size:11.5px;letter-spacing:.2em;text-transform:uppercase;color:#a29c94">Field Notes · Interfaces</p>
+<h1 style="margin:0;font-family:'Newsreader',Georgia,serif;font-size:{{ h1Size }};line-height:1.08;letter-spacing:-.02em;font-weight:500;text-wrap:pretty">The quiet interface: what happens when software stops asking for attention</h1>
+<p style="margin:20px 0 0;font-family:'Newsreader',Georgia,serif;font-size:20px;line-height:1.5;color:#55524f">A decade of notifications taught us to interrupt. The next decade of assistants will be judged on how rarely they need to.</p>
+<div style="display:flex;align-items:center;gap:12px;margin:26px 0 0;padding:14px 0">
+<span style="width:30px;height:30px;border-radius:50%;background:#e8e4dd;color:#55524f;font-size:11.5px;font-weight:600;display:flex;align-items:center;justify-content:center">SR</span>
+<div><p style="margin:0;font-size:12.5px;font-weight:500">Sonia Reyes</p><p style="margin:2px 0 0;font-size:11.5px;color:#8b8681">24 July 2026 · 9 min read</p></div>
+<span style="margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:#8b8681"><i data-lucide="eye-off" style="width:12px;height:12px"></i>14 trackers blocked</span>
+</div>
+<sc-for list="{{ body }}" as="b" hint-placeholder-count="3">
+<p style="margin:22px 0 0;font-family:'Newsreader',Georgia,serif;font-size:{{ bodySize }};line-height:1.66;color:#2c2a28;text-wrap:pretty">{{ b }}</p>
+</sc-for>
+<figure style="margin:34px 0 0">
+<div style="height:280px;border-radius:16px;background:linear-gradient(150deg,#efe9df,#dfd8cc 60%,#cfd6dd);box-shadow:inset 0 0 0 1px #e2ded7"></div>
+<figcaption style="margin:10px 0 0;font-size:11.5px;color:#6d6a67">Figure 1 — Latency of assistive interfaces against perceived helpfulness, 2021–2026.</figcaption>
+</figure>
+<sc-for list="{{ body2 }}" as="b" hint-placeholder-count="2">
+<p style="margin:22px 0 0;font-family:'Newsreader',Georgia,serif;font-size:{{ bodySize }};line-height:1.66;color:#2c2a28;text-wrap:pretty">{{ b }}</p>
+</sc-for>
+</div>
+</div>
+
+<sc-if value="{{ sideOpen }}" hint-placeholder-val="{{ true }}">
+<aside style="min-width:0;display:flex;flex-direction:column;gap:12px;overflow:auto;padding:62px 18px 300px;border-radius:24px;background:rgba(255,253,250,.66);backdrop-filter:blur(12px) saturate(1.06);box-shadow:inset 0 0 0 1px rgba(255,253,250,.9);animation:br-in .4s cubic-bezier(.22,1,.36,1) both">
+<header style="display:flex;align-items:center;gap:9px">
+<span style="width:7px;height:7px;border-radius:50%;background:#3461f2;animation:br-pulse 2s ease-in-out infinite"></span>
+<p style="margin:0;font-size:12.5px;font-weight:600;letter-spacing:-.01em">On this page</p>
+<span style="margin-left:auto;font-size:11px;color:#b6b1aa">read as you scrolled</span>
+</header>
+<div style="padding:15px 16px;border-radius:18px;background:#fffdfa;box-shadow:inset 0 0 0 1px #e8e4dd">
+<p style="margin:0;font-size:13.5px;line-height:1.6;color:#33312f;text-wrap:pretty">{{ summary }}</p>
+</div>
+<sc-for list="{{ points }}" as="p" hint-placeholder-count="3">
+<div style="display:flex;gap:11px;padding:13px 15px;border-radius:16px;background:rgba(249,247,244,.7)">
+<span style="width:22px;height:22px;flex-shrink:0;border-radius:7px;display:flex;align-items:center;justify-content:center;background:{{ p.bg }};color:{{ p.fg }}"><i data-lucide="{{ p.icon }}" style="width:12px;height:12px"></i></span>
+<div style="min-width:0">
+<p style="margin:0;font-size:12.5px;font-weight:600;letter-spacing:-.01em">{{ p.title }}</p>
+<p style="margin:4px 0 0;font-size:12px;line-height:1.5;color:#6d6a67">{{ p.body }}</p>
+</div>
+</div>
+</sc-for>
+</aside>
+</sc-if>
+</div>
+</main>
+</div>
+
+<div style="position:fixed;left:0;right:0;bottom:80px;z-index:70;display:flex;flex-direction:column;align-items:center;gap:0;pointer-events:none">
+<sc-if value="{{ suggestOpen }}" hint-placeholder-val="{{ true }}">
+<div style="width:min(760px,84%);margin-bottom:12px;padding:8px;border-radius:22px;background:rgba(255,253,250,.9);backdrop-filter:blur(16px) saturate(1.1);box-shadow:inset 0 0 0 1px rgba(255,253,250,.95),0 26px 60px -40px rgba(30,30,36,.6);pointer-events:auto;animation:br-in .32s cubic-bezier(.22,1,.36,1) both">
+<sc-for list="{{ suggestions }}" as="s" hint-placeholder-count="3">
+<button data-i="{{ s.i }}" onClick="{{ pickSuggest }}" style="display:flex;align-items:center;gap:11px;width:100%;padding:10px 12px;border:0;border-radius:15px;background:transparent;cursor:pointer;text-align:left" style-hover="background:#f1eeea">
+<span style="width:24px;height:24px;flex-shrink:0;border-radius:8px;display:flex;align-items:center;justify-content:center;background:{{ s.bg }};color:{{ s.fg }}"><i data-lucide="{{ s.icon }}" style="width:13px;height:13px"></i></span>
+<span style="flex:1;min-width:0;font-size:13px;color:#1e1e24;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ s.label }}</span>
+<span style="font-size:11px;color:#b6b1aa;flex-shrink:0">{{ s.meta }}</span>
+</button>
+</sc-for>
+</div>
+</sc-if>
+
+<div style="position:relative;display:flex;align-items:center;justify-content:center;width:124px;height:124px;margin-bottom:-16px">
+<div style="position:absolute;inset:-26px;border-radius:50%;background:radial-gradient(closest-side,rgba(249,247,244,.85),rgba(249,247,244,0) 74%)"></div>
+<canvas ref="{{ orbRef }}" onClick="{{ cycleMode }}" title="Switch between going somewhere and asking Atlas" style="position:relative;width:124px;height:124px;display:block;pointer-events:auto;cursor:pointer"></canvas>
+</div>
+
+<div style="width:min(760px,84%);display:flex;align-items:center;gap:10px;padding:8px 8px 8px 10px;border-radius:9999px;background:rgba(255,253,250,.88);backdrop-filter:blur(16px) saturate(1.1);box-shadow:inset 0 0 0 1px {{ omniRing }},0 24px 54px -34px rgba(30,30,36,.6);pointer-events:auto">
+<button onClick="{{ cycleMode }}" title="Switch mode" style="position:relative;overflow:hidden;display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 15px;border-radius:9999px;border:0;cursor:pointer;background:{{ modeBg }};color:{{ modeFg }};font-size:12.5px;font-weight:600;letter-spacing:-.01em;flex-shrink:0">
+<canvas ref="{{ flowRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block;opacity:{{ flowOpacity }};pointer-events:none"></canvas>
+<i data-lucide="{{ modeIcon }}" style="width:14px;height:14px;position:relative"></i><span style="position:relative">{{ modeLabel }}</span>
+</button>
+<span style="display:{{ scopeShow }};align-items:center;gap:7px;height:30px;padding:0 11px;border-radius:9999px;background:#f1eeea;color:#55524f;font-size:12px;flex-shrink:0;max-width:230px"><i data-lucide="file-text" style="width:12px;height:12px;flex-shrink:0"></i><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ scopeLabel }}</span><button onClick="{{ clearScope }}" style="width:16px;height:16px;border:0;border-radius:50%;background:transparent;color:#b6b1aa;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0" style-hover="color:#1e1e24"><i data-lucide="x" style="width:10px;height:10px"></i></button></span>
+<input ref="{{ omniRef }}" placeholder="{{ omniPlaceholder }}" onFocus="{{ openSuggest }}" onInput="{{ onOmni }}" onKeyDown="{{ onOmniKey }}" spellcheck="false" style="flex:1;min-width:0;border:0;outline:0;background:transparent;font-size:14px;letter-spacing:-.01em;color:#1e1e24"/>
+<span style="display:{{ metaShow }};font-size:11.5px;color:#b6b1aa;flex-shrink:0">{{ omniMeta }}</span>
+<button onClick="{{ submitOmni }}" title="{{ goTitle }}" style="position:relative;display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 6px 0 14px;flex-shrink:0;border-radius:13px;border:0;cursor:pointer;background:{{ goBg }};color:#fffdfa;font-size:12.5px;font-weight:600;letter-spacing:-.01em;box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 10px 22px -14px rgba(30,30,36,.8)">
+{{ goLabel }}<span style="width:26px;height:26px;border-radius:9px;background:rgba(255,253,250,.16);display:flex;align-items:center;justify-content:center"><i data-lucide="{{ goIcon }}" style="width:14px;height:14px"></i></span>
+</button>
+</div>
+<p style="margin:9px 0 0;font-size:11px;color:#b6b1aa;pointer-events:none">{{ hintLine }}</p>
+</div>
+
+<nav style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:92;display:flex;align-items:center;gap:3px;padding:5px;border-radius:9999px;background:#22222b;box-shadow:inset 0 0 0 1px rgba(247,245,242,.16),0 20px 46px -18px rgba(0,0,0,.6)">
+<a href="Atlas Dashboard (Current).dc.html" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 11px;border-radius:9999px;color:rgba(249,247,244,.8);font-size:13px;font-weight:500;text-decoration:none" style-hover="color:#fff;background:rgba(249,247,244,.12)"><i data-lucide="layout-grid" style="width:16px;height:16px"></i>Dashboard</a>
+<a href="Atlas Mail.dc.html" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 11px;border-radius:9999px;color:rgba(249,247,244,.8);font-size:13px;font-weight:500;text-decoration:none" style-hover="color:#fff;background:rgba(249,247,244,.12)"><i data-lucide="mail" style="width:16px;height:16px"></i>Mail</a>
+<span style="display:flex;align-items:center;gap:7px;height:32px;padding:0 11px;border-radius:9999px;background:rgba(249,247,244,.14);color:#fff;font-size:13px;font-weight:500"><i data-lucide="compass" style="width:16px;height:16px"></i>Browser</span>
+<a href="Atlas Widget Catalog.dc.html" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 11px;border-radius:9999px;color:rgba(249,247,244,.8);font-size:13px;font-weight:500;text-decoration:none" style-hover="color:#fff;background:rgba(249,247,244,.12)"><i data-lucide="layout-dashboard" style="width:16px;height:16px"></i>Widgets</a>
+<span style="width:32px;height:32px;border-radius:50%;background:rgba(249,247,244,.14);box-shadow:inset 0 0 0 1px rgba(249,247,244,.25);color:#f9f7f4;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center">MK</span>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1512,&quot;height&quot;:940},&quot;showAtlasPanel&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Layout&quot},&quot;readerMode&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Layout&quot}}">
+class Component extends DCLogic {
+  TABS = [
+    { id:'t1', title:'The quiet interface', host:'fieldnotes.press', initial:'F', mark:'#c2551e', note:'Summarised · 3 claims checked', read:'62%',
+      favicon:'https://www.google.com/s2/favicons?domain=fieldnotes.press&sz=64', pvBg:'#fffdfa', pvBar:'#1e1e24', pvBarH:'17px', pvMark:'FIELD NOTES', pvMarkFg:'#f7f5f2', pvFont:"'Geist',sans-serif", pvTrack:'.16em', pvTop:'26%', pvHero:'linear-gradient(150deg,#efe9df,#dfd8cc 60%,#cfd6dd)', pvInk:'#2c2a28' },
+    { id:'t2', title:'BBC News — Home', host:'bbc.com/news', initial:'B', mark:'#bb1919', note:'Live blog · updating every 2 min', read:'24%',
+      favicon:'https://www.google.com/s2/favicons?domain=bbc.com&sz=64', pvBg:'#ffffff', pvBar:'#000000', pvBarH:'19px', pvMark:'B B C', pvMarkFg:'#ffffff', pvFont:"'Geist',sans-serif", pvTrack:'.08em', pvTop:'28%', pvHero:'linear-gradient(140deg,#c9d3dd,#9fb0c0)', pvInk:'#141414' },
+    { id:'t3', title:'Apple — MacBook Pro', host:'apple.com/macbook-pro', initial:'A', mark:'#0071e3', note:'Atlas priced your config: €2,899', read:'46%',
+      favicon:'https://www.google.com/s2/favicons?domain=apple.com&sz=64', pvBg:'#fbfbfd', pvBar:'#f5f5f7', pvBarH:'15px', pvMark:'', pvMarkFg:'#1d1d1f', pvFont:"'Geist',sans-serif", pvTrack:'0', pvTop:'24%', pvHero:'linear-gradient(160deg,#2b2b2f,#4a4a52 55%,#1d1d1f)', pvInk:'#1d1d1f' },
+    { id:'t4', title:'Anthropic — Research', host:'anthropic.com/research', initial:'A', mark:'#d97757', note:'2 papers saved to Reading', read:'80%',
+      favicon:'https://www.google.com/s2/favicons?domain=anthropic.com&sz=64', pvBg:'#f0eee6', pvBar:'#f0eee6', pvBarH:'18px', pvMark:'ANTHROPIC', pvMarkFg:'#141413', pvFont:"'Hanken Grotesk',sans-serif", pvTrack:'.02em', pvTop:'27%', pvHero:'linear-gradient(150deg,#d97757,#e8d5c4 70%)', pvInk:'#141413' },
+    { id:'t5', title:'The Washington Post', host:'washingtonpost.com', initial:'W', mark:'#1a1a1a', note:'Paywall bypassed via your account', read:'12%',
+      favicon:'https://www.google.com/s2/favicons?domain=washingtonpost.com&sz=64', pvBg:'#ffffff', pvBar:'#ffffff', pvBarH:'20px', pvMark:'The Washington Post', pvMarkFg:'#000000', pvFont:'Georgia,serif', pvTrack:'0', pvTop:'30%', pvHero:'linear-gradient(140deg,#d8d4cd,#b9b3a9)', pvInk:'#000000' }
+  ];
+  MODES = ['go', 'ask', 'find'];
+  state = { tab:'t1', sideOpen:true, reader:false, mode:'ask', scope:true, suggest:true, loading:false, typed:'', url:'fieldnotes.press/2026/the-quiet-interface' };
+  flow(el) {
+    if (!el || el.__flow) return;
+    el.__flow = 1;
+    const ctx = el.getContext('2d');
+    const P = Array.from({ length: 46 }, () => ({ x: Math.random(), y: Math.random(), v: 0.12 + Math.random()*0.5, r: 0.4 + Math.random()*1.1, a: 0.2 + Math.random()*0.7 }));
+    const tick = (t) => {
+      if (!el.isConnected) { el.__flow = 0; return; }
+      const d = Math.min(1.5, devicePixelRatio || 1), w = el.clientWidth, h = el.clientHeight;
+      if (!w || !h) { requestAnimationFrame(tick); return; }
+      if (el.width !== Math.round(w*d)) { el.width = Math.round(w*d); el.height = Math.round(h*d); }
+      const W = el.width, H = el.height;
+      ctx.clearRect(0, 0, W, H);
+      for (const p of P) {
+        p.x += p.v*0.004;
+        if (p.x > 1.08) { p.x = -0.08; p.y = Math.random(); }
+        const yy = (p.y + Math.sin(t*0.001 + p.y*9)*0.06)*H;
+        const a = p.a*(0.35 + 0.65*Math.sin(Math.min(1, Math.max(0, p.x))*Math.PI));
+        ctx.fillStyle = 'rgba(255,255,255,' + a.toFixed(3) + ')';
+        ctx.beginPath(); ctx.arc(p.x*W, yy, p.r*d, 0, 6.2832); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,' + (a*0.22).toFixed(3) + ')';
+        ctx.fillRect(p.x*W - p.v*22*d, yy - 0.4*d, p.v*22*d, 0.8*d);
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+  componentDidMount() { this.icons(); }
+  componentDidUpdate() { this.icons(); }
+  icons() { clearTimeout(this._it); this._it = setTimeout(() => { if (window.lucide && window.lucide.createIcons) { try { window.lucide.createIcons(); } catch (e) {} } }, 30); }
+  submit() {
+    const v = (this._omni && this._omni.value.trim()) || '';
+    if (!v) return;
+    if (this.state.mode === 'go') {
+      const url = v.replace(/^https?:\/\//, '');
+      const host = url.split('/')[0];
+      const title = (url.split('/').filter(Boolean).pop() || host).replace(/[-_]/g, ' ').replace(/\.[a-z]+$/, '');
+      const tabs = this.TABS.map(t => t.id === this.state.tab ? Object.assign({}, t, { host, title: title.charAt(0).toUpperCase() + title.slice(1), note: 'Loaded just now', read: '0%' }) : t);
+      this.TABS = tabs;
+      this.setState({ url, loading: true, suggest: false });
+    } else {
+      this.setState({ loading: true, suggest: false });
+    }
+    if (this._omni) this._omni.value = '';
+    clearTimeout(this._sb);
+    this._sb = setTimeout(() => this.setState({ loading: false }), 1200);
+  }
+  renderVals() {
+    const S = this.state;
+    const reader = S.reader || !!this.props.readerMode;
+    const sideOpen = this.props.showAtlasPanel === false ? false : S.sideOpen;
+    const mode = S.mode;
+    const modeMap = {
+      go:   { label:'Go', icon:'compass', ph:'Type a site, or paste a link', meta:'⌘L', goIcon:'arrow-right', bg:'#1e1e24', fg:'#f9f7f4', ring:'rgba(255,253,250,.95)' },
+      ask:  { label:'Ask Atlas', icon:'sparkles', ph:'Ask anything about this page', meta:'⌘K', goIcon:'arrow-up', bg:'#3461f2', fg:'#ffffff', ring:'rgba(52,97,242,.3)' },
+      find: { label:'Find', icon:'search', ph:'Find on page', meta:'0 of 0', goIcon:'chevron-down', bg:'#8b6f3f', fg:'#fffdfa', ring:'rgba(255,253,250,.95)' }
+    };
+    const m = modeMap[mode];
+    const suggestions = mode === 'ask' ? [
+      { i:0, icon:'list', label:'Summarise this in three lines', meta:'on this page', bg:'rgba(52,97,242,.1)', fg:'#2f4bbd' },
+      { i:1, icon:'scale', label:'What would the strongest counter-argument be?', meta:'reasons over sources', bg:'rgba(109,75,255,.1)', fg:'#5b3ce0' },
+      { i:2, icon:'quote', label:'Who is quoted, and what do they actually claim?', meta:'4 quotes found', bg:'rgba(224,122,31,.12)', fg:'#a2540c' },
+      { i:3, icon:'mail', label:'Send this to Rosa with a note', meta:'action', bg:'rgba(15,174,118,.12)', fg:'#0a7a53' }
+    ] : mode === 'go' ? [
+      { i:0, icon:'clock', label:'fieldnotes.press/2026/the-quiet-interface', meta:'visited today', bg:'rgba(30,30,36,.06)', fg:'#55524f' },
+      { i:1, icon:'star', label:'voyage.co/lisbon', meta:'pinned', bg:'rgba(224,122,31,.12)', fg:'#a2540c' },
+      { i:2, icon:'search', label:'ambient assistant benchmarks 2026', meta:'search', bg:'rgba(52,97,242,.1)', fg:'#2f4bbd' }
+    ] : [
+      { i:0, icon:'search', label:'“restraint”', meta:'3 matches', bg:'rgba(139,111,63,.14)', fg:'#8b6f3f' },
+      { i:1, icon:'search', label:'“pause”', meta:'5 matches', bg:'rgba(139,111,63,.14)', fg:'#8b6f3f' }
+    ];
+    return {
+      rootRef: (el) => { this.root = el; },
+      orbRef: (el) => { if (el && window.AtlasSphere) window.AtlasSphere.mount(el, () => { const st = this.state; return { state: st.loading ? 'thinking' : (st.mode === 'ask' ? 'listening' : (st.mode === 'find' ? 'working' : 'idle')) }; }); },
+      tabs: this.TABS.map((t, i) => { const on = t.id === S.tab; const ai = this.TABS.findIndex(x => x.id === S.tab); const dist = Math.abs(i - ai); return Object.assign({}, t, {
+        h: on ? '132px' : '86px',
+        lift: i === 0 ? '0px' : (on ? '10px' : (dist === 1 ? '-6px' : '-16px')),
+        scale: on ? '1' : (dist === 1 ? '0.965' : '0.93'),
+        op: on ? '1' : (dist === 1 ? '0.9' : '0.72'),
+        z: on ? 30 : 20 - dist,
+        ring: on ? '0 22px 44px -26px rgba(30,30,36,.7), inset 0 0 0 1px rgba(255,253,250,.55)' : '0 12px 26px -22px rgba(30,30,36,.6), inset 0 0 0 1px rgba(255,253,250,.4)',
+        veil: on ? 'linear-gradient(180deg,rgba(249,247,244,.04),rgba(249,247,244,0))' : 'linear-gradient(180deg,rgba(249,247,244,.5),rgba(249,247,244,.36))',
+        idx: String(i + 1).padStart(2, '0'),
+        read: t.read || '0%', noteIcon: t.noteIcon || 'sparkles',
+        noteShow: on ? 'flex' : 'none', note: t.note || 'Open · nothing to report' }); }),
+      kept: [
+        { icon:'bookmark', label:'Reading · Interfaces', meta:'6' },
+        { icon:'clock', label:'Yesterday', meta:'23' },
+        { icon:'sparkles', label:'Answers Atlas saved', meta:'11' }
+      ],
+      privacyLine: '14 trackers blocked here',
+      reloadIcon: S.loading ? 'loader' : 'rotate-cw',
+      readerBg: reader ? '#1e1e24' : 'transparent', readerFg: reader ? '#f9f7f4' : '#3f3d3a',
+      sideOpen, sideBg: sideOpen ? '#3461f2' : 'transparent', sideFg: sideOpen ? '#ffffff' : '#3f3d3a',
+      shellCols: sideOpen ? 'minmax(0,1fr) 340px' : 'minmax(0,1fr)',
+      colWidth: reader ? '680px' : '740px', h1Size: reader ? '46px' : '42px', bodySize: reader ? '19px' : '17.5px',
+      body: [
+        'For twenty years the dominant metric of a consumer interface was engagement: minutes held, sessions started, notifications opened. The assistants arriving now are being measured against a stranger yardstick — how much of a person\u2019s day they can quietly remove.',
+        'The shift is not cosmetic. An assistant that acts on your behalf has to earn a different kind of trust than one that merely answers. It must show its work without demanding you read it, and it must know the precise moment to stop and ask.',
+        'In interviews with fourteen teams building agentic software this spring, the same design problem surfaced repeatedly: the hardest state to design is not the answer. It is the pause.'
+      ],
+      body2: [
+        'Where earlier products treated a hand-off to a human as a failure, the teams furthest along treat it as a feature with its own craft — a written brief, the sources consulted, and an explicit statement of what the system chose not to do.',
+        'That restraint is expensive to build and almost invisible when it works. Which may be the point: the quiet interface is the one you stop noticing, right up until the moment it decides you should.'
+      ],
+      summary: 'The piece argues agentic assistants should be judged on restraint rather than engagement, and that the hardest design problem is the pause before acting — not the answer itself. Based on interviews with fourteen teams.',
+      points: [
+        { icon:'quote', title:'The claim', body:'Engagement metrics are the wrong yardstick for software that acts on your behalf.', bg:'rgba(52,97,242,.1)', fg:'#2f4bbd' },
+        { icon:'link', title:'Related to your work', body:'Overlaps with the escalation rules you set on hello@atlas.app three weeks ago.', bg:'rgba(15,174,118,.12)', fg:'#0a7a53' },
+        { icon:'triangle-alert', title:'Unsourced', body:'The “fourteen teams” figure has no methodology note. Treat it as anecdotal.', bg:'rgba(208,69,58,.11)', fg:'#a3352c' }
+      ],
+      modeLabel: m.label, modeIcon: m.icon, modeBg: m.bg, modeFg: m.fg, omniPlaceholder: m.ph, omniMeta: m.meta, goIcon: m.goIcon,
+      goBg: mode === 'ask' ? 'linear-gradient(135deg,#3461f2,#6d4bff)' : (mode === 'find' ? '#8b6f3f' : '#1e1e24'),
+      goLabel: mode === 'ask' ? 'Ask' : (mode === 'find' ? 'Next' : 'Open'),
+      goTitle: mode === 'ask' ? 'Ask Atlas about this page' : (mode === 'find' ? 'Next match' : 'Open this address'),
+      flowOpacity: mode === 'ask' ? '.85' : '.28',
+      flowRef: (el) => this.flow(el),
+      omniRef: (el) => { if (el && !el.__seed) { el.__seed = 1; el.value = ''; this._omni = el; } if (el) this._omni = el; },
+      onOmni: (e) => { this._typed = e.target.value; },
+      onOmniKey: (e) => { if (e.key === 'Enter') { e.preventDefault(); this.submit(); } },
+      submitOmni: () => this.submit(),
+      omniRingCss: m.ring,
+      metaShow: 'inline', scopeShow: (mode === 'ask' && S.scope) ? 'inline-flex' : 'none',
+      scopeLabel: 'The quiet interface',
+      suggestOpen: S.suggest, suggestions,
+      hintLine: mode === 'ask' ? 'Tap the sphere to switch modes · ⌘K to ask, ⌘L to go, ⌘F to find' : 'Tap the sphere to switch modes · type ? to ask Atlas instead',
+      pickTab: (e) => this.setState({ tab: e.currentTarget.dataset.id }),
+      newTab: () => this.setState({ mode:'go', suggest:true }),
+      toggleSide: () => this.setState({ sideOpen: !S.sideOpen }),
+      toggleReader: () => this.setState({ reader: !S.reader }),
+      cycleMode: () => this.setState({ mode: this.MODES[(this.MODES.indexOf(S.mode) + 1) % this.MODES.length], suggest: true }),
+      clearScope: (e) => { e.stopPropagation(); this.setState({ scope: false }); },
+      openSuggest: () => this.setState({ suggest: true }),
+      pickSuggest: () => { this.setState({ loading: true, suggest: false }); clearTimeout(this._sg); this._sg = setTimeout(() => this.setState({ loading: false }), 1400); },
+      goBack: () => this.setState({ tab: this.TABS[0].id }),
+      reload: () => { this.setState({ loading: true }); clearTimeout(this._rl); this._rl = setTimeout(() => this.setState({ loading: false }), 1100); }
+    };
+  }
+}
+</script>
+</body>
+</html>

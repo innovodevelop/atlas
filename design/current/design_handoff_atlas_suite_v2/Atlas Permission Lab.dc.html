@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="design_doc_mode" content="canvas"/>
+<style>
+button,input,textarea,select{border:none}@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Hanken+Grotesk:wght@500;600;700&display=swap');
+html,body{margin:0;padding:0;background:#f9f7f4}
+a{color:#3461f2;text-decoration:none}a:hover{color:#5b7cff}
+@keyframes pl-breathe{0%,100%{transform:scale(1);opacity:.35}50%{transform:scale(1.05);opacity:.7}}
+</style>
+<script src="atlas-sphere.js"></script>
+<script src="atlas-transition.js"></script>
+</helmet>
+<section data-screen-label="Grounded permission set" style="position:relative;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;padding:40px 44px 10px">
+<header style="display:flex;align-items:baseline;gap:16px;margin-bottom:26px">
+<h1 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:30px;font-weight:500;letter-spacing:-.03em">Grounded set</h1>
+<p style="margin:0;font-size:13px;color:#8b8681">Six calmer takes — familiar controls with Atlas manners. All live.</p>
+</header>
+<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:stretch">
+
+<article id="2a" data-screen-label="2a Quiet switches" style="flex:1;min-width:380px;max-width:560px;display:flex;flex-direction:column;padding:22px 24px;border-radius:26px;background:rgba(255,253,250,.72);box-shadow:inset 0 0 0 1px rgba(255,253,250,.95)">
+<header style="display:flex;align-items:baseline;gap:10px">
+<span style="display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:9999px;background:#1e1e24;color:#f7f5f2;font-size:11px;font-weight:600">2a</span>
+<h2 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:18px;font-weight:600;letter-spacing:-.02em">Quiet switches</h2>
+<span style="margin-left:auto;font-size:11px;color:#8b8681">{{ gCount }}</span>
+</header>
+<p style="margin:7px 0 12px;font-size:12px;color:#8b8681">The classic pill, stripped to hairlines and ink.</p>
+<sc-for list="{{ gRows }}" as="r" hint-placeholder-count="6">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;padding:11px 4px">
+<span style="min-width:0"><span style="display:block;font-size:13.5px;font-weight:550;letter-spacing:-.01em;color:{{ r.fg }};transition:color .25s">{{ r.name }}</span><span style="display:block;margin-top:2px;font-size:11px;color:#a8a29a">{{ r.why }}</span></span>
+<button data-k="{{ r.k }}" onClick="{{ gToggle }}" style="position:relative;width:44px;height:26px;border-radius:9999px;border:0;cursor:pointer;background:{{ r.track }};transition:background .25s">
+<span style="position:absolute;top:3px;left:{{ r.knob }};width:20px;height:20px;border-radius:50%;background:#fffdfa;transition:left .3s cubic-bezier(.22,1,.36,1)"></span>
+</button>
+</div>
+</sc-for>
+</article>
+
+<article id="2b" data-screen-label="2b Checklist" style="flex:1;min-width:380px;max-width:560px;display:flex;flex-direction:column;padding:22px 24px;border-radius:26px;background:rgba(255,253,250,.72);box-shadow:inset 0 0 0 1px rgba(255,253,250,.95)">
+<header style="display:flex;align-items:baseline;gap:10px">
+<span style="display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:9999px;background:#1e1e24;color:#f7f5f2;font-size:11px;font-weight:600">2b</span>
+<h2 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:18px;font-weight:600;letter-spacing:-.02em">Checklist</h2>
+<span style="margin-left:auto;font-size:11px;color:#8b8681">{{ hCount }}</span>
+</header>
+<p style="margin:7px 0 12px;font-size:12px;color:#8b8681">A grant is a checkmark — nothing more ceremonial.</p>
+<sc-for list="{{ hRows }}" as="r" hint-placeholder-count="6">
+<div data-k="{{ r.k }}" onClick="{{ hToggle }}" style="display:grid;grid-template-columns:auto minmax(0,1fr);gap:13px;align-items:center;padding:11px 4px;cursor:pointer;border-radius:8px" style-hover="background:rgba(30,30,36,.03)">
+<span style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:{{ r.bg }};box-shadow:{{ r.ring }};transition:background .25s,box-shadow .25s">
+<span style="width:6px;height:10px;margin-top:-2px;transform:rotate(45deg);opacity:{{ r.tickOp }};transition:opacity .2s"></span>
+</span>
+<span style="min-width:0"><span style="display:block;font-size:13.5px;font-weight:550;letter-spacing:-.01em;color:{{ r.fg }};transition:color .25s">{{ r.name }}</span><span style="display:block;margin-top:2px;font-size:11px;color:#a8a29a">{{ r.why }}</span></span>
+</div>
+</sc-for>
+</article>
+
+<article id="2c" data-screen-label="2c Three stops" style="flex:1;min-width:400px;max-width:600px;display:flex;flex-direction:column;padding:22px 24px;border-radius:26px;background:rgba(255,253,250,.72);box-shadow:inset 0 0 0 1px rgba(255,253,250,.95)">
+<header style="display:flex;align-items:baseline;gap:10px">
+<span style="display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:9999px;background:#1e1e24;color:#f7f5f2;font-size:11px;font-weight:600">2c</span>
+<h2 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:18px;font-weight:600;letter-spacing:-.02em">Three stops</h2>
+<span style="margin-left:auto;font-size:11px;color:#8b8681">{{ iCount }}</span>
+</header>
+<p style="margin:7px 0 12px;font-size:12px;color:#8b8681">Off, a careful middle, or everything — segmented per permission.</p>
+<sc-for list="{{ iRows }}" as="r" hint-placeholder-count="6">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 4px">
+<span style="min-width:0"><span style="display:block;font-size:13.5px;font-weight:550;letter-spacing:-.01em;color:{{ r.fg }};transition:color .25s">{{ r.name }}</span><span style="display:block;margin-top:2px;font-size:11px;color:#a8a29a">{{ r.why }}</span></span>
+<span style="display:flex;gap:3px;padding:3px;border-radius:9999px;background:rgba(30,30,36,.05)">
+<sc-for list="{{ r.segs }}" as="s" hint-placeholder-count="3">
+<button data-k="{{ s.k }}" data-v="{{ s.v }}" onClick="{{ iSet }}" style="height:22px;padding:0 10px;border-radius:9999px;border:0;cursor:pointer;font:inherit;font-size:10.5px;font-weight:550;background:{{ s.bg }};color:{{ s.fg }};transition:background .2s,color .2s;white-space:nowrap">{{ s.t }}</button>
+</sc-for>
+</span>
+</div>
+</sc-for>
+</article>
+
+<article id="2d" data-screen-label="2d Tap tiles" style="flex:1;min-width:380px;max-width:560px;display:flex;flex-direction:column;padding:22px 24px;border-radius:26px;background:rgba(255,253,250,.72);box-shadow:inset 0 0 0 1px rgba(255,253,250,.95)">
+<header style="display:flex;align-items:baseline;gap:10px">
+<span style="display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:9999px;background:#1e1e24;color:#f7f5f2;font-size:11px;font-weight:600">2d</span>
+<h2 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:18px;font-weight:600;letter-spacing:-.02em">Tap tiles</h2>
+<span style="margin-left:auto;font-size:11px;color:#8b8681">{{ jCount }}</span>
+</header>
+<p style="margin:7px 0 0;font-size:12px;color:#8b8681">Cards you light up — an amber ring marks what Atlas may see.</p>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:14px">
+<sc-for list="{{ jTiles }}" as="t" hint-placeholder-count="6">
+<button data-k="{{ t.k }}" onClick="{{ jToggle }}" style="display:flex;flex-direction:column;gap:4px;align-items:flex-start;padding:13px 14px;border-radius:16px;border:0;cursor:pointer;text-align:left;font:inherit;background:{{ t.bg }};box-shadow:{{ t.ring }};transition:background .25s,box-shadow .25s">
+<span style="display:flex;align-items:center;gap:7px;width:100%"><span style="width:7px;height:7px;border-radius:50%;background:{{ t.dot }};transition:background .25s"></span><span style="font-size:12.5px;font-weight:550;color:{{ t.fg }};transition:color .25s">{{ t.name }}</span><span style="margin-left:auto;font-size:9.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:{{ t.state }}">{{ t.tag }}</span></span>
+<span style="font-size:10.5px;color:#a8a29a">{{ t.why }}</span>
+</button>
+</sc-for>
+</div>
+</article>
+
+<article id="2g" data-screen-label="2g Tap tiles, filled" style="flex:1;min-width:380px;max-width:560px;display:flex;flex-direction:column;padding:22px 24px;border-radius:26px;background:rgba(255,253,250,.72);box-shadow:inset 0 0 0 1px rgba(255,253,250,.95)">
+<header style="display:flex;align-items:baseline;gap:10px">
+<span style="display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:9999px;background:#1e1e24;color:#f7f5f2;font-size:11px;font-weight:600">2g</span>
+<h2 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:18px;font-weight:600;letter-spacing:-.02em">Tap tiles, filled</h2>
+<span style="margin-left:auto;font-size:11px;color:#8b8681">{{ mCount }}</span>
+</header>
+<p style="margin:7px 0 0;font-size:12px;color:#8b8681">2d without borders — the whole surface changes instead: faint wash off, ink on.</p>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:14px">
+<sc-for list="{{ mTiles }}" as="t" hint-placeholder-count="6">
+<button data-k="{{ t.k }}" onClick="{{ mToggle }}" style="display:flex;flex-direction:column;gap:4px;align-items:flex-start;padding:13px 14px;border-radius:16px;border:0;cursor:pointer;text-align:left;font:inherit;background:{{ t.bg }};transition:background .3s" style-hover="background:{{ t.hover }}">
+<span style="display:flex;align-items:center;gap:7px;width:100%"><span style="width:7px;height:7px;border-radius:50%;background:{{ t.dot }};box-shadow:{{ t.glow }};transition:background .3s,box-shadow .3s"></span><span style="font-size:12.5px;font-weight:550;color:{{ t.fg }};transition:color .3s">{{ t.name }}</span><span style="margin-left:auto;font-size:9.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:{{ t.state }}">{{ t.tag }}</span></span>
+<span style="font-size:10.5px;color:{{ t.mut }};transition:color .3s">{{ t.why }}</span>
+</button>
+</sc-for>
+</div>
+</article>
+
+<article id="2h" data-screen-label="2h Tap tiles, inverted" style="flex:1;min-width:380px;max-width:560px;display:flex;flex-direction:column;padding:22px 24px;border-radius:26px;background:#1e1e24;color:#f7f5f2;box-shadow:inset 0 0 0 1px rgba(247,245,242,.09)">
+<header style="display:flex;align-items:baseline;gap:10px">
+<span style="display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:9999px;background:#f7f5f2;color:#1e1e24;font-size:11px;font-weight:600">2h</span>
+<h2 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:18px;font-weight:600;letter-spacing:-.02em">Tap tiles, inverted</h2>
+<span style="margin-left:auto;font-size:11px;color:rgba(247,245,242,.5)">{{ nCount }}</span>
+</header>
+<p style="margin:7px 0 0;font-size:12px;color:rgba(247,245,242,.55)">2g on ink — one accent, amber. Granted tiles fill; nothing carries a border.</p>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:14px">
+<sc-for list="{{ nTiles }}" as="t" hint-placeholder-count="6">
+<button data-k="{{ t.k }}" onClick="{{ nToggle }}" style="display:flex;flex-direction:column;gap:4px;align-items:flex-start;padding:13px 14px;border-radius:16px;border:0;cursor:pointer;text-align:left;font:inherit;background:{{ t.bg }};transition:background .3s" style-hover="background:{{ t.hover }}">
+<span style="display:flex;align-items:center;gap:7px;width:100%"><span style="width:7px;height:7px;border-radius:50%;background:{{ t.dot }};box-shadow:{{ t.glow }};transition:background .3s,box-shadow .3s"></span><span style="font-size:12.5px;font-weight:550;color:{{ t.fg }};transition:color .3s">{{ t.name }}</span><span style="margin-left:auto;font-size:9.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:{{ t.state }};transition:color .3s">{{ t.tag }}</span></span>
+<span style="font-size:10.5px;color:{{ t.mut }};transition:color .3s">{{ t.why }}</span>
+</button>
+</sc-for>
+</div>
+</article>
+
+<article id="2i" data-screen-label="2i Tap tiles, inverted blue" style="flex:1;min-width:380px;max-width:560px;display:flex;flex-direction:column;padding:22px 24px;border-radius:26px;background:#1e1e24;color:#f7f5f2;box-shadow:inset 0 0 0 1px rgba(247,245,242,.09)">
+<header style="display:flex;align-items:baseline;gap:10px">
+<span style="display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:9999px;background:#f7f5f2;color:#1e1e24;font-size:11px;font-weight:600">2i</span>
+<h2 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:18px;font-weight:600;letter-spacing:-.02em">Tap tiles, inverted blue</h2>
+<span style="margin-left:auto;font-size:11px;color:rgba(247,245,242,.5)">{{ oCount }}</span>
+</header>
+<p style="margin:7px 0 0;font-size:12px;color:rgba(247,245,242,.55)">The same pattern in Atlas blue — cooler, reads as system rather than alert.</p>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:14px">
+<sc-for list="{{ oTiles }}" as="t" hint-placeholder-count="6">
+<button data-k="{{ t.k }}" onClick="{{ oToggle }}" style="display:flex;flex-direction:column;gap:4px;align-items:flex-start;padding:13px 14px;border-radius:16px;border:0;cursor:pointer;text-align:left;font:inherit;background:{{ t.bg }};transition:background .3s" style-hover="background:{{ t.hover }}">
+<span style="display:flex;align-items:center;gap:7px;width:100%"><span style="width:7px;height:7px;border-radius:50%;background:{{ t.dot }};box-shadow:{{ t.glow }};transition:background .3s,box-shadow .3s"></span><span style="font-size:12.5px;font-weight:550;color:{{ t.fg }};transition:color .3s">{{ t.name }}</span><span style="margin-left:auto;font-size:9.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:{{ t.state }};transition:color .3s">{{ t.tag }}</span></span>
+<span style="font-size:10.5px;color:{{ t.mut }};transition:color .3s">{{ t.why }}</span>
+</button>
+</sc-for>
+</div>
+</article>
+
+<article id="2j" data-screen-label="2j Filled tiles on light, amber" style="flex:1;min-width:380px;max-width:560px;display:flex;flex-direction:column;padding:22px 24px;border-radius:26px;background:rgba(255,253,250,.72);box-shadow:inset 0 0 0 1px rgba(255,253,250,.95)">
+<header style="display:flex;align-items:baseline;gap:10px">
+<span style="display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:9999px;background:#1e1e24;color:#f7f5f2;font-size:11px;font-weight:600">2j</span>
+<h2 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:18px;font-weight:600;letter-spacing:-.02em">Filled tiles, amber on light</h2>
+<span style="margin-left:auto;font-size:11px;color:#8b8681">{{ pCount }}</span>
+</header>
+<p style="margin:7px 0 0;font-size:12px;color:#8b8681">2h's single accent on the cream card — granted tiles fill amber, off tiles rest in a faint wash.</p>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:14px">
+<sc-for list="{{ pTiles }}" as="t" hint-placeholder-count="6">
+<button data-k="{{ t.k }}" onClick="{{ pToggle }}" style="display:flex;flex-direction:column;gap:4px;align-items:flex-start;padding:13px 14px;border-radius:16px;border:0;cursor:pointer;text-align:left;font:inherit;background:{{ t.bg }};transition:background .3s" style-hover="background:{{ t.hover }}">
+<span style="display:flex;align-items:center;gap:7px;width:100%"><span style="width:7px;height:7px;border-radius:50%;background:{{ t.dot }};transition:background .3s"></span><span style="font-size:12.5px;font-weight:550;color:{{ t.fg }};transition:color .3s">{{ t.name }}</span><span style="margin-left:auto;font-size:9.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:{{ t.state }};transition:color .3s">{{ t.tag }}</span></span>
+<span style="font-size:10.5px;color:{{ t.mut }};transition:color .3s">{{ t.why }}</span>
+</button>
+</sc-for>
+</div>
+</article>
+
+<article id="2k" data-screen-label="2k Filled tiles on light, blue" style="flex:1;min-width:380px;max-width:560px;display:flex;flex-direction:column;padding:22px 24px;border-radius:26px;background:rgba(255,253,250,.72);box-shadow:inset 0 0 0 1px rgba(255,253,250,.95)">
+<header style="display:flex;align-items:baseline;gap:10px">
+<span style="display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:9999px;background:#1e1e24;color:#f7f5f2;font-size:11px;font-weight:600">2k</span>
+<h2 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:18px;font-weight:600;letter-spacing:-.02em">Filled tiles, blue on light</h2>
+<span style="margin-left:auto;font-size:11px;color:#8b8681">{{ qCount }}</span>
+</header>
+<p style="margin:7px 0 0;font-size:12px;color:#8b8681">The blue accent on cream — quieter than amber, and it never reads as a warning.</p>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:14px">
+<sc-for list="{{ qTiles }}" as="t" hint-placeholder-count="6">
+<button data-k="{{ t.k }}" onClick="{{ qToggle }}" style="display:flex;flex-direction:column;gap:4px;align-items:flex-start;padding:13px 14px;border-radius:16px;border:0;cursor:pointer;text-align:left;font:inherit;background:{{ t.bg }};transition:background .3s" style-hover="background:{{ t.hover }}">
+<span style="display:flex;align-items:center;gap:7px;width:100%"><span style="width:7px;height:7px;border-radius:50%;background:{{ t.dot }};transition:background .3s"></span><span style="font-size:12.5px;font-weight:550;color:{{ t.fg }};transition:color .3s">{{ t.name }}</span><span style="margin-left:auto;font-size:9.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:{{ t.state }};transition:color .3s">{{ t.tag }}</span></span>
+<span style="font-size:10.5px;color:{{ t.mut }};transition:color .3s">{{ t.why }}</span>
+</button>
+</sc-for>
+</div>
+</article>
+
+<article id="2e" data-screen-label="2e Profiles" style="flex:1;min-width:380px;max-width:560px;display:flex;flex-direction:column;padding:22px 24px;border-radius:26px;background:rgba(255,253,250,.72);box-shadow:inset 0 0 0 1px rgba(255,253,250,.95)">
+<header style="display:flex;align-items:baseline;gap:10px">
+<span style="display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:9999px;background:#1e1e24;color:#f7f5f2;font-size:11px;font-weight:600">2e</span>
+<h2 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:18px;font-weight:600;letter-spacing:-.02em">Profiles</h2>
+<span style="margin-left:auto;font-size:11px;color:#8b8681">one decision</span>
+</header>
+<p style="margin:7px 0 0;font-size:12px;color:#8b8681">Pick a posture; Atlas fills in the details. Adjust later, per permission.</p>
+<div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
+<sc-for list="{{ kCards }}" as="c" hint-placeholder-count="3">
+<button data-k="{{ c.id }}" onClick="{{ kPick }}" style="display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:13px 15px;border-radius:16px;border:0;cursor:pointer;text-align:left;font:inherit;background:{{ c.bg }};box-shadow:{{ c.ring }};transition:background .25s,box-shadow .25s">
+<span style="width:16px;height:16px;border-radius:50%;background:{{ c.radioBg }};box-shadow:{{ c.radio }};transition:background .25s,box-shadow .25s"></span>
+<span style="min-width:0"><span style="font-size:13px;font-weight:600;letter-spacing:-.01em;color:{{ c.fg }}">{{ c.name }}</span><span style="display:block;margin-top:2px;font-size:11px;color:#a8a29a">{{ c.line }}</span></span>
+<span style="font-size:10.5px;color:#8b8681;font-variant-numeric:tabular-nums">{{ c.n }}</span>
+</button>
+</sc-for>
+</div>
+<p style="margin:14px 0 0;padding-top:11px;font-size:11px;line-height:1.5;color:#8b8681;text-wrap:pretty">{{ kSummary }}</p>
+</article>
+
+<article id="2f" data-screen-label="2f Chip cloud" style="flex:1;min-width:380px;max-width:560px;display:flex;flex-direction:column;padding:22px 24px;border-radius:26px;background:rgba(255,253,250,.72);box-shadow:inset 0 0 0 1px rgba(255,253,250,.95)">
+<header style="display:flex;align-items:baseline;gap:10px">
+<span style="display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:9999px;background:#1e1e24;color:#f7f5f2;font-size:11px;font-weight:600">2f</span>
+<h2 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:18px;font-weight:600;letter-spacing:-.02em">Chip cloud</h2>
+<span style="margin-left:auto;font-size:11px;color:#8b8681">{{ lCount }}</span>
+</header>
+<p style="margin:7px 0 0;font-size:12px;color:#8b8681">Tap what Atlas may touch — filled ink means granted.</p>
+<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:16px;align-content:flex-start">
+<sc-for list="{{ lChips }}" as="c" hint-placeholder-count="6">
+<button data-k="{{ c.k }}" onClick="{{ lToggle }}" style="height:32px;padding:0 15px;border-radius:9999px;border:0;cursor:pointer;font:inherit;font-size:12.5px;font-weight:550;background:{{ c.bg }};color:{{ c.fg }};box-shadow:{{ c.ring }};transition:background .25s,color .25s,box-shadow .25s">{{ c.name }}</button>
+</sc-for>
+</div>
+<p style="margin:auto 0 0;padding-top:12px;font-size:11px;color:#a8a29a">Scope shows once granted — tap again to revoke</p>
+</article>
+
+</div>
+</section>
+
+<section data-screen-label="Permission experiments" style="position:relative;min-height:100vh;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;padding:40px 44px 80px">
+<div style="position:absolute;inset:0;pointer-events:none;overflow:hidden">
+<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,231,200,.6),rgba(249,247,244,0) 40%)"></div>
+</div>
+<header style="position:relative;display:flex;align-items:baseline;gap:16px;margin-bottom:26px">
+<h1 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:30px;font-weight:500;letter-spacing:-.03em">Permission Lab</h1>
+<p style="margin:0;font-size:13px;color:#8b8681">Three experimental grant experiences — all live, all in the Atlas vocabulary.</p>
+</header>
+<div style="position:relative;display:flex;gap:18px;align-items:stretch;flex-wrap:wrap">
+
+<article id="1a" data-screen-label="1a Orbit intake" style="flex:1;min-width:430px;display:flex;flex-direction:column;padding:22px 24px;border-radius:26px;background:rgba(255,253,250,.72);backdrop-filter:blur(20px);box-shadow:inset 0 0 0 1px rgba(255,253,250,.95)">
+<header style="display:flex;align-items:baseline;gap:10px">
+<span style="display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:9999px;background:#1e1e24;color:#f7f5f2;font-size:11px;font-weight:600">1a</span>
+<h2 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:18px;font-weight:600;letter-spacing:-.02em">Orbit intake</h2>
+<span style="margin-left:auto;font-size:11px;color:#8b8681">{{ aCount }}</span>
+</header>
+<p style="margin:7px 0 0;font-size:12px;line-height:1.5;color:#8b8681;text-wrap:pretty">Granting pulls a permission into the sphere's orbit; revoking lets it drift back out. What Atlas may see literally circles it.</p>
+<div style="position:relative;height:400px;margin-top:8px;flex-shrink:0">
+<span style="position:absolute;left:50%;top:50%;width:196px;height:196px;margin:-98px 0 0 -98px;border-radius:50%;box-shadow:inset 0 0 0 1.5px rgba(232,134,46,.35);animation:pl-breathe 5s ease-in-out infinite"></span>
+<span style="position:absolute;left:50%;top:50%;width:320px;height:320px;margin:-160px 0 0 -160px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(30,30,36,.07)"></span>
+<div style="position:absolute;left:50%;top:50%;width:88px;height:88px;margin:-44px 0 0 -44px"><canvas ref="{{ orbRef }}" style="width:100%;height:100%;display:block"></canvas></div>
+<sc-for list="{{ aChips }}" as="c" hint-placeholder-count="6">
+<button data-k="{{ c.k }}" onClick="{{ aToggle }}" style="position:absolute;left:{{ c.x }};top:{{ c.y }};transform:translate(-50%,-50%);height:30px;padding:0 13px;border-radius:9999px;border:0;cursor:pointer;font:inherit;font-size:12px;font-weight:550;background:{{ c.bg }};color:{{ c.fg }};box-shadow:{{ c.ring }};transition:left .7s cubic-bezier(.22,1,.36,1),top .7s cubic-bezier(.22,1,.36,1),background .3s,color .3s,box-shadow .3s;white-space:nowrap">{{ c.name }}</button>
+</sc-for>
+</div>
+<p style="margin:auto 0 0;font-size:11px;color:#a8a29a">Inner ring — granted · outer ring — kept away</p>
+</article>
+
+<article id="1b" data-screen-label="1b Scope dial" style="flex:1;min-width:430px;display:flex;flex-direction:column;padding:22px 24px;border-radius:26px;background:rgba(255,253,250,.72);backdrop-filter:blur(20px);box-shadow:inset 0 0 0 1px rgba(255,253,250,.95)">
+<header style="display:flex;align-items:baseline;gap:10px">
+<span style="display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:9999px;background:#1e1e24;color:#f7f5f2;font-size:11px;font-weight:600">1b</span>
+<h2 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:18px;font-weight:600;letter-spacing:-.02em">Scope dial</h2>
+<span style="margin-left:auto;font-size:11px;color:#8b8681">{{ bCount }}</span>
+</header>
+<p style="margin:7px 0 0;font-size:12px;line-height:1.5;color:#8b8681;text-wrap:pretty">Permission isn't binary — each tap steps the depth of access. Off, a careful middle, or everything, per capability.</p>
+<div style="display:flex;flex-direction:column;margin-top:14px">
+<sc-for list="{{ bRows }}" as="r" hint-placeholder-count="6">
+<div data-k="{{ r.k }}" onClick="{{ bStep }}" style="display:grid;grid-template-columns:minmax(0,1fr) 150px 74px;gap:14px;align-items:center;padding:13px 6px;cursor:pointer;transition:background .25s;border-radius:10px" style-hover="background:rgba(30,30,36,.035)">
+<span style="min-width:0">
+<span style="display:block;font-size:13.5px;font-weight:550;letter-spacing:-.01em;color:{{ r.fg }};transition:color .3s">{{ r.name }}</span>
+<span style="display:block;margin-top:2px;font-size:11px;color:#a8a29a">{{ r.why }}</span>
+</span>
+<span style="position:relative;height:22px">
+<span style="position:absolute;left:0;right:0;top:10px;height:2px;border-radius:2px;background:rgba(30,30,36,.08)"></span>
+<span style="position:absolute;left:0;top:10px;height:2px;border-radius:2px;background:{{ r.fill }};width:{{ r.fillW }};transition:width .45s cubic-bezier(.22,1,.36,1),background .3s"></span>
+<span style="position:absolute;left:0;top:8px;width:6px;height:6px;border-radius:50%;background:rgba(30,30,36,.18)"></span>
+<span style="position:absolute;left:calc(50% - 3px);top:8px;width:6px;height:6px;border-radius:50%;background:rgba(30,30,36,.18)"></span>
+<span style="position:absolute;right:0;top:8px;width:6px;height:6px;border-radius:50%;background:rgba(30,30,36,.18)"></span>
+<span style="position:absolute;top:2px;left:{{ r.knobL }};width:18px;height:18px;border-radius:50%;background:#fffdfa;box-shadow:0 1px 5px rgba(30,30,36,.35),0 0 0 4px {{ r.halo }};transition:left .45s cubic-bezier(.22,1,.36,1),box-shadow .3s"></span>
+</span>
+<span style="font-size:11px;font-weight:550;color:{{ r.stopFg }};text-align:right;font-variant-numeric:tabular-nums;transition:color .3s">{{ r.stop }}</span>
+</div>
+</sc-for>
+</div>
+<p style="margin:auto 0 0;padding-top:12px;font-size:11px;color:#a8a29a">Tap a row to step its scope · three stops per permission</p>
+</article>
+
+<article id="1c" data-screen-label="1c Constellation" style="flex:1;min-width:430px;display:flex;flex-direction:column;padding:22px 24px;border-radius:26px;background:#1e1e24;color:#f7f5f2;box-shadow:inset 0 0 0 1px rgba(247,245,242,.09)">
+<header style="display:flex;align-items:baseline;gap:10px">
+<span style="display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:9999px;background:#f7f5f2;color:#1e1e24;font-size:11px;font-weight:600">1c</span>
+<h2 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:18px;font-weight:600;letter-spacing:-.02em">Constellation</h2>
+<span style="margin-left:auto;font-size:11px;color:rgba(247,245,242,.5)">{{ cCount }}</span>
+</header>
+<p style="margin:7px 0 0;font-size:12px;line-height:1.5;color:rgba(247,245,242,.55);text-wrap:pretty">Each grant draws a thread from Atlas to that part of your life. Your permissions form a constellation — revoke and the thread goes dark.</p>
+<div style="position:relative;height:400px;margin-top:8px;flex-shrink:0">
+<sc-for list="{{ cLines }}" as="l" hint-placeholder-count="6">
+<span style="position:absolute;left:{{ l.x }};top:{{ l.y }};width:{{ l.w }};height:1.5px;transform:rotate({{ l.ang }});transform-origin:left center;background:linear-gradient(90deg,rgba(232,134,46,.75),rgba(232,134,46,.12));transition:width .6s cubic-bezier(.22,1,.36,1)"></span>
+</sc-for>
+<span style="position:absolute;left:{{ cCx }};top:{{ cCy }};width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:#e8862e;box-shadow:0 0 18px rgba(232,134,46,.8)"></span>
+<sc-for list="{{ cNodes }}" as="n" hint-placeholder-count="6">
+<button data-k="{{ n.k }}" onClick="{{ cToggle }}" style="position:absolute;left:{{ n.x }};top:{{ n.y }};transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:6px;background:none;border:0;cursor:pointer;font:inherit;padding:6px">
+<span style="width:13px;height:13px;border-radius:50%;background:{{ n.dotBg }};box-shadow:{{ n.dotRing }};transition:background .35s,box-shadow .35s"></span>
+<span style="font-size:11px;font-weight:550;color:{{ n.fg }};transition:color .35s;white-space:nowrap">{{ n.name }}</span>
+<span style="font-size:9.5px;color:rgba(247,245,242,.35);white-space:nowrap">{{ n.scope }}</span>
+</button>
+</sc-for>
+</div>
+<p style="margin:auto 0 0;font-size:11px;color:rgba(247,245,242,.4)">Tap a star to connect or sever it</p>
+</article>
+
+</div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    a: { mic:true, mail:true, home:false, health:true, bank:false, loc:false },
+    b: { mic:2, mail:1, home:2, health:1, bank:0, loc:1 },
+    c: { mic:true, mail:true, home:true, health:false, bank:false, loc:true },
+    g: { mic:true, mail:true, home:false, health:true, bank:false, loc:true },
+    h: { mic:true, mail:false, home:true, health:true, bank:false, loc:false },
+    i: { mic:1, mail:2, home:0, health:1, bank:0, loc:1 },
+    j: { mic:true, mail:false, home:true, health:false, bank:false, loc:true },
+    k: 'rec',
+    l: { mic:true, mail:true, home:true, health:false, bank:false, loc:false },
+    m: { mic:true, mail:false, home:true, health:false, bank:false, loc:true },
+    n: { mic:true, mail:true, home:false, health:true, bank:false, loc:false },
+    o: { mic:true, mail:true, home:false, health:true, bank:false, loc:false },
+    p: { mic:true, mail:true, home:false, health:true, bank:false, loc:false },
+    q: { mic:true, mail:true, home:false, health:true, bank:false, loc:false }
+  };
+  HUE = { mic:'#e8862e', mail:'#3461f2', home:'#0fae76', health:'#d4494f', bank:'#8a5a1e', loc:'#7a5af5' };
+  P = [
+    ['mic','Voice','Wake word only', ['Off','Wake word','Always on']],
+    ['mail','Mail','Triage and drafting', ['Off','Headers','Full text']],
+    ['home','Smart home','Lights, locks, climate', ['Off','Read state','Operate']],
+    ['health','Health','Trends on-device', ['Off','Trends','Raw signals']],
+    ['bank','Banking','Read-only money', ['Off','Balances','Transactions']],
+    ['loc','Location','Presence and scenes', ['Off','Coarse','Precise']]
+  ];
+  NODE = { mic:[214,54], mail:[366,120], home:[352,296], health:[196,352], bank:[62,282], loc:[64,120] };
+  CTR = [215, 200];
+
+  renderVals() {
+    const S = this.state;
+    const n = this.P.length;
+
+    const aChips = this.P.map((p, i) => {
+      const on = S.a[p[0]];
+      const ang = (i / n) * Math.PI * 2 - Math.PI / 2;
+      const r = on ? 98 : 160;
+      return {
+        k: p[0], name: p[1],
+        x: 'calc(50% + ' + Math.round(Math.cos(ang) * r) + 'px)',
+        y: 'calc(50% + ' + Math.round(Math.sin(ang) * r) + 'px)',
+        bg: on ? '#1e1e24' : 'rgba(249,247,244,.9)',
+        fg: on ? '#f7f5f2' : '#8b8681',
+        ring: on ? '0 0 16px rgba(232,134,46,.45)' : 'inset 0 0 0 1px rgba(30,30,36,.1)'
+      };
+    });
+
+    const LV_FG = ['#c0bab1', '#e8862e', '#0a7a53'];
+    const bRows = this.P.map(p => {
+      const lv = S.b[p[0]];
+      return {
+        k: p[0], name: p[1], why: p[2],
+        stop: p[3][lv],
+        stopFg: LV_FG[lv],
+        fg: lv ? '#1e1e24' : '#a8a29a',
+        knobL: lv === 0 ? '0px' : (lv === 1 ? 'calc(50% - 9px)' : 'calc(100% - 18px)'),
+        fillW: lv === 0 ? '0%' : (lv === 1 ? '50%' : '100%'),
+        fill: LV_FG[lv],
+        halo: lv ? 'rgba(232,134,46,.14)' : 'rgba(30,30,36,.05)'
+      };
+    });
+
+    const [cx, cy] = this.CTR;
+    const cNodes = [], cLines = [];
+    this.P.forEach(p => {
+      const on = S.c[p[0]];
+      const [x, y] = this.NODE[p[0]];
+      const dx = x - cx, dy = y - cy;
+      const len = Math.round(Math.sqrt(dx * dx + dy * dy)) - 26;
+      const ang = Math.round(Math.atan2(dy, dx) * 180 / Math.PI * 10) / 10;
+      cLines.push({ x: cx + 'px', y: cy + 'px', ang: ang + 'deg', w: (on ? len : 0) + 'px' });
+      cNodes.push({
+        k: p[0], name: p[1], scope: p[2],
+        x: x + 'px', y: y + 'px',
+        dotBg: on ? '#f7f5f2' : 'transparent',
+        dotRing: on ? '0 0 14px rgba(232,134,46,.7)' : 'inset 0 0 0 1.5px rgba(247,245,242,.3)',
+        fg: on ? '#f7f5f2' : 'rgba(247,245,242,.42)'
+      });
+    });
+
+    const count = (o) => Object.values(o).filter(Boolean).length;
+    const ink = '#1e1e24';
+    const gRows = this.P.map(p => { const on = S.g[p[0]]; return {
+      k: p[0], name: p[1], why: p[2], fg: on ? ink : '#8b8681',
+      track: on ? ink : '#e2ddd5', knob: on ? '21px' : '3px' }; });
+    const hRows = this.P.map(p => { const on = S.h[p[0]]; return {
+      k: p[0], name: p[1], why: p[2], fg: on ? ink : '#8b8681',
+      bg: on ? ink : 'transparent',
+      ring: on ? 'none' : 'inset 0 0 0 1.5px rgba(30,30,36,.18)',
+      tickOp: on ? '1' : '0' }; });
+    const iRows = this.P.map(p => { const lv = S.i[p[0]]; return {
+      k: p[0], name: p[1], why: p[2], fg: lv ? ink : '#8b8681',
+      segs: p[3].map((t, v) => ({ t, v, k: p[0],
+        bg: v === lv ? (v === 0 ? '#8b8681' : ink) : 'transparent',
+        fg: v === lv ? '#f7f5f2' : '#8b8681' })) }; });
+    const jTiles = this.P.map(p => { const on = S.j[p[0]]; return {
+      k: p[0], name: p[1], why: p[2],
+      bg: on ? 'rgba(255,253,250,.95)' : 'rgba(249,247,244,.5)',
+      ring: on ? 'inset 0 0 0 1.5px #e8862e' : 'inset 0 0 0 1px rgba(30,30,36,.08)',
+      dot: on ? '#e8862e' : 'rgba(30,30,36,.15)',
+      fg: on ? ink : '#8b8681', tag: on ? 'granted' : 'off',
+      state: on ? '#e8862e' : '#c0bab1' }; });
+    const PROF = [
+      ['min', 'Minimal', 'Voice only — everything else stays closed.', ['mic']],
+      ['rec', 'Recommended', 'Mail, home and presence — the daily set.', ['mic','mail','home','loc']],
+      ['all', 'Everything', 'Full context, including money and body.', this.P.map(p => p[0])]
+    ];
+    const kSet = PROF.find(pr => pr[0] === S.k)[3];
+    const kCards = PROF.map(pr => { const on = S.k === pr[0]; return {
+      id: pr[0], name: pr[1], line: pr[2], n: pr[3].length + ' of 6',
+      fg: on ? ink : '#8b8681',
+      bg: on ? 'rgba(255,253,250,.95)' : 'transparent',
+      ring: on ? 'inset 0 0 0 1.5px ' + ink : 'inset 0 0 0 1px rgba(30,30,36,.08)',
+      radioBg: on ? ink : 'transparent',
+      radio: on ? 'none' : 'inset 0 0 0 1.5px rgba(30,30,36,.2)' }; });
+    const lChips = this.P.map(p => { const on = S.l[p[0]]; return {
+      k: p[0], name: on ? p[1] + ' · ' + p[3][1].toLowerCase() : p[1],
+      bg: on ? ink : 'transparent', fg: on ? '#f7f5f2' : '#8b8681',
+      ring: on ? 'none' : 'inset 0 0 0 1px rgba(30,30,36,.14)' }; });
+    return {
+      gRows, hRows, iRows, jTiles, kCards, lChips,
+      gCount: count(S.g) + ' of 6 on',
+      hCount: count(S.h) + ' of 6 checked',
+      iCount: this.P.filter(p => S.i[p[0]] > 0).length + ' of 6 open',
+      jCount: count(S.j) + ' of 6 granted',
+      lCount: count(S.l) + ' of 6 allowed',
+      mCount: count(S.m) + ' of 6 granted',
+      mTiles: this.P.map(p => { const on = S.m[p[0]]; return {
+        k: p[0], name: p[1], why: p[2],
+        bg: on ? ink : 'rgba(30,30,36,.045)',
+        hover: on ? '#33302c' : 'rgba(30,30,36,.08)',
+        fg: on ? '#f7f5f2' : '#8b8681',
+        mut: on ? 'rgba(247,245,242,.55)' : '#a8a29a',
+        dot: on ? '#e8862e' : 'rgba(30,30,36,.15)',
+        glow: on ? '0 0 10px rgba(232,134,46,.5)' : 'none',
+        tag: on ? 'granted' : 'off',
+        state: on ? '#e8862e' : '#c0bab1' }; }),
+      mToggle: (e) => { const k = e.currentTarget.dataset.k; this.setState({ m: Object.assign({}, S.m, { [k]: !S.m[k] }) }); },
+      nCount: count(S.n) + ' of 6 granted',
+      nTiles: this.P.map(p => { const on = S.n[p[0]], hue = '#e8862e'; return {
+        k: p[0], name: p[1], why: p[2],
+        bg: on ? hue : 'rgba(247,245,242,.05)',
+        hover: on ? '#f0932f' : 'rgba(247,245,242,.1)',
+        fg: on ? '#1e1e24' : 'rgba(247,245,242,.62)',
+        mut: on ? 'rgba(30,30,36,.9)' : 'rgba(247,245,242,.35)',
+        dot: on ? '#1e1e24' : 'rgba(247,245,242,.2)',
+        glow: on ? '0 0 10px rgba(232,134,46,.55)' : 'none',
+        tag: on ? 'granted' : 'off',
+        state: on ? 'rgba(30,30,36,.9)' : 'rgba(247,245,242,.3)' }; }),
+      nToggle: (e) => { const k = e.currentTarget.dataset.k; this.setState({ n: Object.assign({}, S.n, { [k]: !S.n[k] }) }); },
+      oCount: count(S.o) + ' of 6 granted',
+      oTiles: this.P.map(p => { const on = S.o[p[0]], hue = '#2a4fd0'; return {
+        k: p[0], name: p[1], why: p[2],
+        bg: on ? hue : 'rgba(247,245,242,.05)',
+        hover: on ? '#3a63ea' : 'rgba(247,245,242,.1)',
+        fg: on ? '#fffdfa' : 'rgba(247,245,242,.62)',
+        mut: on ? 'rgba(255,253,250,.95)' : 'rgba(247,245,242,.35)',
+        dot: on ? '#fffdfa' : 'rgba(247,245,242,.2)',
+        glow: on ? '0 0 10px rgba(255,253,250,.7)' : 'none',
+        tag: on ? 'granted' : 'off',
+        state: on ? 'rgba(255,253,250,.95)' : 'rgba(247,245,242,.3)' }; }),
+      oToggle: (e) => { const k = e.currentTarget.dataset.k; this.setState({ o: Object.assign({}, S.o, { [k]: !S.o[k] }) }); },
+      pCount: count(S.p) + ' of 6 granted',
+      /* ink type on amber (6.2:1) — cream on amber only reaches 2.6:1 */
+      pTiles: this.P.map(x => { const on = S.p[x[0]]; return {
+        k: x[0], name: x[1], why: x[2],
+        bg: on ? '#e8862e' : 'rgba(30,30,36,.045)',
+        hover: on ? '#f0932f' : 'rgba(30,30,36,.08)',
+        fg: on ? '#1e1e24' : '#8b8681',
+        mut: on ? 'rgba(30,30,36,.9)' : '#a8a29a',
+        dot: on ? '#1e1e24' : 'rgba(30,30,36,.15)',
+        tag: on ? 'granted' : 'off',
+        state: on ? 'rgba(30,30,36,.9)' : '#c0bab1' }; }),
+      pToggle: (e) => { const k = e.currentTarget.dataset.k; this.setState({ p: Object.assign({}, S.p, { [k]: !S.p[k] }) }); },
+      qCount: count(S.q) + ' of 6 granted',
+      qTiles: this.P.map(x => { const on = S.q[x[0]]; return {
+        k: x[0], name: x[1], why: x[2],
+        bg: on ? '#2a4fd0' : 'rgba(30,30,36,.045)',
+        hover: on ? '#3a63ea' : 'rgba(30,30,36,.08)',
+        fg: on ? '#fffdfa' : '#8b8681',
+        mut: on ? 'rgba(255,253,250,.95)' : '#a8a29a',
+        dot: on ? '#fffdfa' : 'rgba(30,30,36,.15)',
+        tag: on ? 'granted' : 'off',
+        state: on ? 'rgba(255,253,250,.95)' : '#c0bab1' }; }),
+      qToggle: (e) => { const k = e.currentTarget.dataset.k; this.setState({ q: Object.assign({}, S.q, { [k]: !S.q[k] }) }); },
+      kSummary: 'Atlas may touch: ' + this.P.filter(p => kSet.includes(p[0])).map(p => p[1].toLowerCase()).join(', ') + '. Everything else stays closed until you open it.',
+      gToggle: (e) => { const k = e.currentTarget.dataset.k; this.setState({ g: Object.assign({}, S.g, { [k]: !S.g[k] }) }); },
+      hToggle: (e) => { const k = e.currentTarget.dataset.k; this.setState({ h: Object.assign({}, S.h, { [k]: !S.h[k] }) }); },
+      iSet: (e) => { const k = e.currentTarget.dataset.k, v = +e.currentTarget.dataset.v; this.setState({ i: Object.assign({}, S.i, { [k]: v }) }); },
+      jToggle: (e) => { const k = e.currentTarget.dataset.k; this.setState({ j: Object.assign({}, S.j, { [k]: !S.j[k] }) }); },
+      kPick: (e) => { this.setState({ k: e.currentTarget.dataset.k }); },
+      lToggle: (e) => { const k = e.currentTarget.dataset.k; this.setState({ l: Object.assign({}, S.l, { [k]: !S.l[k] }) }); },
+      orbRef: (el) => {
+        if (!el) return;
+        const t = setInterval(() => { if (window.AtlasSphere) { window.AtlasSphere.mount(el, () => ({ state: 'listening' })); clearInterval(t); } }, 120);
+      },
+      aChips, bRows, cNodes, cLines,
+      cCx: cx + 'px', cCy: cy + 'px',
+      aCount: count(S.a) + ' of 6 in orbit',
+      bCount: this.P.filter(p => S.b[p[0]] > 0).length + ' of 6 open',
+      cCount: count(S.c) + ' of 6 connected',
+      aToggle: (e) => { const k = e.currentTarget.dataset.k; this.setState({ a: Object.assign({}, S.a, { [k]: !S.a[k] }) }); },
+      bStep: (e) => { const k = e.currentTarget.dataset.k; this.setState({ b: Object.assign({}, S.b, { [k]: (S.b[k] + 1) % 3 }) }); },
+      cToggle: (e) => { const k = e.currentTarget.dataset.k; this.setState({ c: Object.assign({}, S.c, { [k]: !S.c[k] }) }); }
+    };
+  }
+}
+</script>
+</body>
+</html>
