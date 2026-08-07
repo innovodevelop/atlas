@@ -10,35 +10,64 @@ import AtlasDashboard from "./pages/atlas/AtlasDashboard";
 import NotFound from "./pages/NotFound";
 import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
 import { useRealtimePauseOnInactivity } from "./hooks/useRealtimePauseOnInactivity";
+
+// Only the default route (AtlasDashboard) is eager — everything else is
+// code-split so the entry chunk stays small and the startup paint is instant.
+// The parse-and-eval cost of a page's JS lands on every launch regardless of
+// whether it was fetched over the network or read from disk, so lazy() still
+// buys something for a local desktop app: only the chunk needed on this
+// screen's first render has to be parsed. The legacy Dashboard especially
+// must stay lazy: it drags 9 realtime hooks and the whole legacy card stack
+// into whatever chunk it lands in.
+const AtlasHome = lazy(() => import("./pages/atlas/AtlasHome"));
+const AtlasCoreScreen = lazy(() => import("./pages/atlas/AtlasCoreScreen"));
+// Mail is a full route, not the dashboard's `expanded === 'email'` overlay —
+// the overlay stays as the glanceable card, this is the supervision surface.
+const AtlasMail = lazy(() => import("./pages/atlas/AtlasMail"));
+// Settings was overlay-only (rendered inside AtlasDashboard behind
+// `settingsOpen`), so nothing could link to it and it was unreachable from any
+// other screen. It is a route AS WELL now — the dock button and the account
+// menu still open the overlay. See AtlasSettingsRoute for why both.
+const AtlasSettingsRoute = lazy(() => import("./pages/atlas/AtlasSettingsRoute"));
+const Auth = lazy(() => import("./pages/Auth"));
 import { OnboardingGate } from "./components/OnboardingGate";
+// Statically imported (not lazy): this is the first screen a new user sees, so
+// it must not depend on a runtime chunk fetch that could fail in the webview.
 import AtlasPermissions from "./pages/AtlasPermissions";
-
-// Static imports — local desktop app loads from disk, so the async boundary
-// from lazy() is pure latency for no gain on chunks under 100KB. Only truly
-// heavy pages (AtlasTeach 542KB with mermaid) stay lazy.
-import AtlasHome from "./pages/atlas/AtlasHome";
-import AtlasCoreScreen from "./pages/atlas/AtlasCoreScreen";
-import AtlasMail from "./pages/atlas/AtlasMail";
-import AtlasSettingsRoute from "./pages/atlas/AtlasSettingsRoute";
-import Auth from "./pages/Auth";
-import AtlasArchitecture from "./pages/AtlasArchitecture";
-import AtlasSphereGallery from "./pages/AtlasSphereGallery";
-import AtlasOnboarding from "./pages/atlas/AtlasOnboarding";
-import AtlasWidgetCatalog from "./pages/atlas/AtlasWidgetCatalog";
-import AtlasWidgetSheet from "./pages/atlas/AtlasWidgetSheet";
-import AtlasAnswerViews from "./pages/atlas/AtlasAnswerViews";
-import AtlasModelLab from "./pages/atlas/AtlasModelLab";
-import AtlasSmartHome from "./pages/atlas/AtlasSmartHome";
-import AtlasHealth from "./pages/atlas/AtlasHealth";
-import AtlasBanking from "./pages/atlas/AtlasBanking";
-import AtlasBrowser from "./pages/atlas/AtlasBrowser";
-import AtlasVersions from "./pages/atlas/AtlasVersions";
-import AtlasAgentView from "./pages/atlas/AtlasAgentView";
-import AtlasDesignSync from "./pages/atlas/AtlasDesignSync";
-import AtlasTests from "./pages/atlas/AtlasTests";
-
-// Lazy only for genuinely heavy pages (500KB+) that pull mermaid/katex/cytoscape
+// `/atlas-demo` used to be lazy-loaded here. It was a 1133-line particle
+// tuning lab for the three.js sphere — the largest page in the repo, linked
+// from nowhere, and the only importer of src/components/atlas-demo/. Both are
+// deleted with the renderer they tuned. The tuning surface that survives is
+// /atlas-sphere, which drives the renderer the app actually uses.
+// Both are reachable from the account menu (dock avatar → "Teach Atlas" /
+// "How Atlas works"). Before T4 part 3 they were routes with no link anywhere.
 const AtlasTeach = lazy(() => import("./pages/AtlasTeach"));
+const AtlasArchitecture = lazy(() => import("./pages/AtlasArchitecture"));
+// Internal QA surface for the sphere — a design tool, not a product screen, so
+// it is deliberately NOT on the dock. It is linked from the account menu in DEV
+// builds only, which is where it gets used; in a shipped build it stays
+// URL-only on purpose.
+const AtlasSphereGallery = lazy(() => import("./pages/AtlasSphereGallery"));
+// T3 surfaces. Built in parallel, wired here in one pass — each page owns its
+// own route, mock module and stylesheet, and exports a `surface` descriptor
+// naming the path and where it belongs. All eight are account-menu entries
+// rather than dock items: a surface with no live data source has not earned a
+// primary slot, and the dock stays the set of places you actually live.
+const AtlasOnboarding = lazy(() => import("./pages/atlas/AtlasOnboarding"));
+const AtlasWidgetCatalog = lazy(() => import("./pages/atlas/AtlasWidgetCatalog"));
+const AtlasWidgetSheet = lazy(() => import("./pages/atlas/AtlasWidgetSheet"));
+const AtlasAnswerViews = lazy(() => import("./pages/atlas/AtlasAnswerViews"));
+const AtlasModelLab = lazy(() => import("./pages/atlas/AtlasModelLab"));
+const AtlasSmartHome = lazy(() => import("./pages/atlas/AtlasSmartHome"));
+const AtlasHealth = lazy(() => import("./pages/atlas/AtlasHealth"));
+const AtlasBanking = lazy(() => import("./pages/atlas/AtlasBanking"));
+const AtlasBrowser = lazy(() => import("./pages/atlas/AtlasBrowser"));
+// Version tracking + admin surfaces — same reasoning as the T3 surfaces above:
+// account-menu entries, lazy like every other non-default route.
+const AtlasVersions = lazy(() => import("./pages/atlas/AtlasVersions"));
+const AtlasAgentView = lazy(() => import("./pages/atlas/AtlasAgentView"));
+const AtlasDesignSync = lazy(() => import("./pages/atlas/AtlasDesignSync"));
+const AtlasTests = lazy(() => import("./pages/atlas/AtlasTests"));
 
 
 // Instant startup: dashboard data (weather, stocks, news, tasks…) is
@@ -143,7 +172,10 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <RouteErrorBoundary>
+        {/* One suspense boundary for every lazy route */}
+        <Suspense fallback={<PageLoader />}>
         <Routes>
+          {/* Atlas screens */}
           <Route path="/" element={<OnboardingGate><AtlasDashboard /></OnboardingGate>} />
           <Route path="/dashboard" element={<OnboardingGate><AtlasDashboard /></OnboardingGate>} />
           <Route path="/home" element={<AtlasHome />} />
@@ -160,16 +192,37 @@ const App = () => (
           <Route path="/health" element={<AtlasHealth />} />
           <Route path="/money" element={<AtlasBanking />} />
           <Route path="/browser" element={<AtlasBrowser />} />
+          {/* First-run consent. Genuinely revisitable now, via Settings →
+              Permissions (AtlasSettings.tsx). The comment that used to sit here
+              claimed that was already true; it was not — before T4 part 2 this
+              route was referenced only by OnboardingGate and Auth, which made
+              AtlasPermissions' own "you can change it later" a broken promise. */}
           <Route path="/permissions" element={<AtlasPermissions />} />
+
+          {/* `/atlas-core-legacy` used to sit here, pointing at pages/AtlasCore
+              and the 34-file src/components/atlas-health tree behind it. Both
+              are deleted (T4 part 3). Nothing linked to the route; the panels
+              worth keeping were absorbed first — Agent CRUD, schedules, tool
+              calls and the run timeline into Atlas Core's Agent tab, usage and
+              cost into Settings → Budget, the memory tab and the error log into
+              Atlas Core. The five settings panels that were always live still
+              live in atlas-health/ and are mounted from AtlasSettings.
+              An older comment here sent readers to docs/ROADMAP.md "before
+              reviving or deleting any of it"; that cross-reference resolved to
+              nothing — the roadmap's one do-not-clean-up rule is about
+              supabase/functions/_shared, not this tree. */}
           <Route path="/atlas-sphere" element={<AtlasSphereGallery />} />
           <Route path="/atlas-architecture" element={<AtlasArchitecture />} />
-          <Route path="/atlas-teach" element={<Suspense fallback={<PageLoader />}><AtlasTeach /></Suspense>} />
+          <Route path="/atlas-teach" element={<AtlasTeach />} />
           <Route path="/versions" element={<AtlasVersions />} />
           <Route path="/agent-view" element={<AtlasAgentView />} />
           <Route path="/design-sync" element={<AtlasDesignSync />} />
           <Route path="/tests" element={<AtlasTests />} />
+
+          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </Suspense>
         </RouteErrorBoundary>
       </BrowserRouter>
     </TooltipProvider>

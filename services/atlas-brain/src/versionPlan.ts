@@ -27,6 +27,38 @@ const STATUS_MAP: Record<string, Version['status']> = {
   'archived': 'archived',
 };
 
+const FEATURE_STATUS_MAP: Record<string, VersionFeature['status']> = {
+  'planned': 'planned',
+  'in-progress': 'in-progress',
+  'blocked': 'blocked',
+  'done': 'done',
+};
+
+// A checkbox is binary (`- [ ]` / `- [x]`), so it can only ever tell us
+// "not done" vs "done" — it has no way to express 'in-progress' or 'blocked'.
+// Those two states must come from an explicit `status:` key in the metadata
+// suffix; a checked box always wins over metadata (it's the more recent,
+// more visible signal), and an unchecked box with no metadata defaults to
+// 'planned'.
+function featureStatus(done: boolean, metaStatus: string | undefined): VersionFeature['status'] {
+  if (done) return 'done';
+  if (metaStatus) {
+    const mapped = FEATURE_STATUS_MAP[metaStatus.toLowerCase()];
+    if (mapped && mapped !== 'done') return mapped;
+  }
+  return 'planned';
+}
+
+// Slugify a feature title into an id fragment: lowercase, non-alphanumeric
+// runs collapsed to single hyphens, trimmed. Deterministic and stable across
+// reorderings of the file (unlike a features.length index).
+function slugify(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 export function parseVersionPlan(md: string): Version[] {
   const versions: Version[] = [];
   const lines = md.split('\n');
@@ -68,6 +100,7 @@ export function parseVersionPlan(md: string): Version[] {
       let id = '';
       let agent: string | undefined;
       let design: string | undefined;
+      let metaStatus: string | undefined;
 
       const metaMatch = title.match(/\{([^}]+)\}$/);
       if (metaMatch) {
@@ -79,14 +112,20 @@ export function parseVersionPlan(md: string): Version[] {
         if (agentM) agent = agentM[1];
         const designM = meta.match(/design:\s*([\w-]+)/);
         if (designM) design = designM[1];
+        const statusM = meta.match(/status:\s*([\w-]+)/);
+        if (statusM) metaStatus = statusM[1];
       }
 
-      if (!id) id = `feat-auto-${current.features.length}`;
+      // Fall back to a slug of the version + title rather than a features[]
+      // index — an index renumbers every later feature when one is inserted
+      // in the middle, and since sync upserts by id, that renumber silently
+      // rewrites the wrong DB rows instead of adding a new one.
+      if (!id) id = `${current.id}-${slugify(title)}`;
 
       current.features.push({
         id,
         title,
-        status: done ? 'done' : (current.status === 'in-progress' ? 'planned' : 'planned'),
+        status: featureStatus(done, metaStatus),
         agent,
         design,
       });

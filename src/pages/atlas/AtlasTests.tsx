@@ -40,7 +40,7 @@ export default function AtlasTests() {
             size="block"
             icon={<TestTube2 className="i20" />}
             title="No test suites discovered"
-            body="Test suites will be auto-discovered from tests/ and services/atlas-brain/src/*.test.ts. Run the brain's /admin/tests/discover endpoint to populate."
+            body="No test suites are discovered yet. Auto-discovery from tests/ and services/atlas-brain/src/*.test.ts is planned but not built."
           />
         </Panel>
 

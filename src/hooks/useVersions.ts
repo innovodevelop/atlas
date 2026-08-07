@@ -1,5 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { localClient as supabase } from '@/integrations/local/localClient';
+import { getToken } from '@/lib/authClient';
+import { getBrainEndpoint } from '@/lib/brainClient';
+
+// The brain never emits db:changed for its own writes — it hits atlas.db
+// directly through bun:sqlite, bypassing the Rust db_* commands that are the
+// only source of that event. So there is no realtime channel to subscribe to
+// here; polling is the only way this surface learns the brain changed rows
+// out from under it. Keep the interval modest — these are admin surfaces,
+// not something a user stares at waiting for updates.
+const ADMIN_REFETCH_INTERVAL_MS = 30_000;
 
 export interface VersionRow {
   id: string;
@@ -47,6 +57,7 @@ export function useVersions() {
       return (data ?? []) as unknown as VersionRow[];
     },
     staleTime: 30_000,
+    refetchInterval: ADMIN_REFETCH_INTERVAL_MS,
   });
   return { versions: data ?? [], isLoading, error, refetch };
 }
@@ -73,6 +84,7 @@ export function useVersionDetail(versionId: string | null) {
     },
     enabled: !!versionId,
     staleTime: 10_000,
+    refetchInterval: ADMIN_REFETCH_INTERVAL_MS,
   });
   return { features: data?.features ?? [], changelog: data?.changelog ?? [], isLoading };
 }
@@ -81,8 +93,21 @@ export function useSyncVersionPlan() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      const port = 4830;
-      const res = await fetch(`http://127.0.0.1:${port}/admin/versions/sync`, { method: 'POST' });
+      const token = getToken();
+      if (!token) {
+        throw new Error('Not authenticated');
+      }
+      const brain = await getBrainEndpoint();
+      if (!brain) {
+        throw new Error('Atlas brain is only available in the desktop app.');
+      }
+      const res = await fetch(`${brain.baseUrl}/admin/versions/sync`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'x-sidecar-token': brain.token,
+        },
+      });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },

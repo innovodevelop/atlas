@@ -7,7 +7,7 @@
 import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GitBranch, RefreshCw, CheckCircle2, Clock, Circle, AlertTriangle } from 'lucide-react';
-import { Card, Panel, Row, Empty, StatTile, Button } from '@/components/atlas-ui/primitives';
+import { Card, Panel, Row, Empty, Button } from '@/components/atlas-ui/primitives';
 import { useVersions, useVersionDetail, useSyncVersionPlan, type VersionRow, type FeatureRow } from '@/hooks/useVersions';
 import '@/styles/surfaces/versions.css';
 

@@ -118,8 +118,10 @@ const proactive = createProactiveHandlers({ db: localDb, requireUser, json });
 // only — never the Cloudflare mail worker, never sends (see mailDraft.ts).
 const mailDraft = createMailDraftHandlers({ db: localDb, requireUser, json });
 
-// Admin routes: version tracking, agent sessions, design sync, tests.
-const admin = createAdminHandlers(localDb._db);
+// Admin routes: version tracking, agent sessions, design sync, tests. Same
+// requireUser as every other route — these read and write the whole admin
+// surface of atlas.db, so they are not exempt from auth (see adminRoutes.ts).
+const admin = createAdminHandlers({ db: localDb._db, requireUser });
 
 // POST /chat-with-memory — full orchestrator: memory recall, tools, streaming.
 async function handleChatWithMemory(req: Request): Promise<Response> {
@@ -415,16 +417,16 @@ const server = Bun.serve({
       if (req.method === "POST" && url.pathname === "/memory/forget") return await handleMemoryForget(req);
       if (req.method === "POST" && url.pathname === "/memory/erase-all") return await handleMemoryEraseAll(req);
       // Admin routes
-      if (url.pathname === "/admin/versions/sync" && req.method === "POST") return admin.syncVersionPlan();
-      if (url.pathname === "/admin/versions" && req.method === "GET") return admin.getVersions();
-      if (url.pathname.startsWith("/admin/versions/") && req.method === "GET") return admin.getVersionDetail(url.pathname.split("/")[3]);
-      if (url.pathname === "/admin/changelog" && req.method === "GET") return admin.getChangelog(url.searchParams.get("version_id") ?? undefined);
-      if (url.pathname === "/admin/agent-sessions" && req.method === "GET") return admin.getAgentSessions(url.searchParams.get("status") ?? undefined);
-      if (url.pathname.startsWith("/admin/agent-events/") && req.method === "GET") return admin.getAgentEvents(url.pathname.split("/")[3]);
-      if (url.pathname === "/admin/tests/suites" && req.method === "GET") return admin.getTestSuites();
-      if (url.pathname === "/admin/tests/runs" && req.method === "GET") return admin.getTestRuns(url.searchParams.get("suite_id") ?? undefined);
-      if (url.pathname.startsWith("/admin/tests/run/") && req.method === "POST") return admin.runTest(url.pathname.split("/")[4]);
-      if (url.pathname === "/admin/design-syncs" && req.method === "GET") return admin.getDesignSyncs();
+      if (url.pathname === "/admin/versions/sync" && req.method === "POST") return admin.syncVersionPlan(req);
+      if (url.pathname === "/admin/versions" && req.method === "GET") return admin.getVersions(req);
+      if (url.pathname.startsWith("/admin/versions/") && req.method === "GET") return admin.getVersionDetail(req, url.pathname.split("/")[3]);
+      if (url.pathname === "/admin/changelog" && req.method === "GET") return admin.getChangelog(req, url.searchParams.get("version_id") ?? undefined);
+      if (url.pathname === "/admin/agent-sessions" && req.method === "GET") return admin.getAgentSessions(req, url.searchParams.get("status") ?? undefined);
+      if (url.pathname.startsWith("/admin/agent-events/") && req.method === "GET") return admin.getAgentEvents(req, url.pathname.split("/")[3]);
+      if (url.pathname === "/admin/tests/suites" && req.method === "GET") return admin.getTestSuites(req);
+      if (url.pathname === "/admin/tests/runs" && req.method === "GET") return admin.getTestRuns(req, url.searchParams.get("suite_id") ?? undefined);
+      if (url.pathname.startsWith("/admin/tests/run/") && req.method === "POST") return admin.runTest(req, url.pathname.split("/")[4]);
+      if (url.pathname === "/admin/design-syncs" && req.method === "GET") return admin.getDesignSyncs(req);
     } catch (e) {
       if (e instanceof AuthError) return json({ error: e.message }, e.status);
       console.error("[brain] error:", e);
