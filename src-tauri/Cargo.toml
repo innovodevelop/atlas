@@ -61,6 +61,16 @@ uuid = { version = "1", features = ["v4"] }
 # minisign signature against plugins.updater.pubkey in tauri.conf.json BEFORE
 # installing anything. The private key lives in CI secrets / Keychain only.
 tauri-plugin-updater = "2.10.1"
+# Local control port (src/control): a token-authed loopback HTTP surface so the
+# out-of-process brain can call desktop ops — Tauri IPC only exists inside the
+# webview, and the proactive scheduler runs headless. tiny_http over axum on
+# purpose: its tree is 4 crates (ascii, chunked_transfer, httpdate, log) that
+# share nothing with the graph above, where axum would add ~30 overlapping
+# http/hyper/tower/tokio crates against a lockfile pinned by librespot's vergen
+# requirement. Being a blocking server also keeps it structurally off the main
+# thread — it runs on threads we own instead of on an attribute someone must
+# remember to write. Adding this only APPENDS to Cargo.lock; never `cargo update`.
+tiny_http = "0.12"
 
 # Download-size trim: strip symbols and thin-LTO the release binary. Deliberately
 # NOT setting panic = "abort" — unwind behaviour must stay unchanged. Profile

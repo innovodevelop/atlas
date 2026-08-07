@@ -10,11 +10,38 @@ use serde_json::{json, Value};
 
 use crate::secrets::core_key;
 
+/// Turn a ureq failure into a message that CANNOT contain the request URL.
+///
+/// THIS IS A SECRET-REDACTION BOUNDARY, NOT TIDINESS. Every provider in this
+/// file authenticates by query parameter — OpenWeather `appid=`, Finnhub
+/// `token=`, NewsAPI `apiKey=` — so the API key is part of the URL. And ureq's
+/// `Display` prints that URL: `Error::Status` writes `response.get_url()` and
+/// `Transport` writes `self.url` (ureq-2.12.1 src/error.rs:210-232). So the
+/// obvious `.map_err(|e| e.to_string())` converts any 401, rate-limit or
+/// timeout directly into a string containing a live credential.
+///
+/// That string does not stay local. `fetch_weather`/`fetch_stocks`/`fetch_news`
+/// return it to the webview, and the control port now hands it to the AI brain
+/// as `op_failed` — whose contract is to forward the op's own message verbatim
+/// — which puts the key in a model's context, where it can be echoed to the
+/// user, written into a note, or sent to the inference provider.
+///
+/// So: status code and transport kind only. Both are what you actually need to
+/// debug a provider outage; neither can carry the secret.
+fn safe_err(e: ureq::Error) -> String {
+    match e {
+        ureq::Error::Status(code, _) => format!("provider returned HTTP {code}"),
+        ureq::Error::Transport(t) => format!("provider unreachable ({:?})", t.kind()),
+    }
+}
+
 fn get_json(url: &str) -> Result<Value, String> {
     crate::http::agent()
         .get(url)
         .call()
-        .map_err(|e| e.to_string())?
+        .map_err(safe_err)?
+        // serde's parse errors describe the payload, never the request, so this
+        // one is safe to surface as-is.
         .into_json::<Value>()
         .map_err(|e| e.to_string())
 }
@@ -75,7 +102,9 @@ pub fn fetch_weather(city: Option<String>, lat: Option<f64>, lon: Option<f64>) -
             .query("units", "imperial")
             .query("q", &city)
             .call()
-            .map_err(|e| e.to_string())?
+            // safe_err, not e.to_string(): `appid` is on this request too, and
+            // ureq would print the whole URL. See safe_err's comment.
+            .map_err(safe_err)?
             .into_json::<Value>()
             .map_err(|e| e.to_string())?,
     };
@@ -289,4 +318,40 @@ pub fn fetch_news(category: Option<String>) -> Result<Value, String> {
     }).unwrap_or_default();
 
     Ok(json!({"articles": articles}))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The regression test for the credential leak.
+    ///
+    /// Every provider here authenticates by query parameter, so the API key is
+    /// part of the request URL — and ureq's Display prints that URL. Before
+    /// `safe_err`, `.map_err(|e| e.to_string())` turned any provider failure
+    /// into a string containing a live key, which `fetch_*` returns to the
+    /// webview and the control port forwards to the AI brain verbatim.
+    ///
+    /// Uses a REAL ureq error rather than a hand-built one: loopback port 1
+    /// refuses immediately, so this needs no network and cannot flake.
+    #[test]
+    fn safe_err_never_leaks_the_api_key_from_the_url() {
+        let secret = "SUPERSECRET_PROVIDER_KEY";
+        let url = format!("http://127.0.0.1:1/data/2.5/weather?appid={secret}&q=Copenhagen");
+        let err = ureq::get(&url).call().expect_err("loopback port 1 must refuse");
+
+        // Guard the guard. If ureq ever stops printing the URL, this test would
+        // pass for the wrong reason — so first assert the raw Display DOES leak.
+        let raw = err.to_string();
+        assert!(
+            raw.contains(secret),
+            "ureq no longer prints the URL — re-check whether safe_err is still needed. Got: {raw}"
+        );
+
+        let redacted = safe_err(err);
+        assert!(!redacted.contains(secret), "secret survived redaction: {redacted}");
+        assert!(!redacted.contains("appid"), "query string survived redaction: {redacted}");
+        assert!(!redacted.contains("127.0.0.1"), "host survived redaction: {redacted}");
+        assert!(redacted.contains("unreachable"), "lost the diagnostic: {redacted}");
+    }
 }

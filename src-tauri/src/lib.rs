@@ -18,6 +18,7 @@ mod datafetch;
 mod mail;
 mod scheduler;
 mod integrity;
+mod control;
 
 /// Outcome of a sidecar spawn attempt. `integrity_error` is set when the
 /// binary failed integrity verification (and was therefore NOT spawned) — it
@@ -121,7 +122,7 @@ struct AtlasBrain {
     integrity_error: Mutex<Option<String>>,
 }
 
-fn spawn_atlas_brain(token: &str) -> SidecarSpawn {
+fn spawn_atlas_brain(token: &str, control: Option<(u16, &str)>) -> SidecarSpawn {
     let none = SidecarSpawn { child: None, integrity_error: None };
     let Some(exe) = std::env::current_exe().ok() else { return none };
     let Some(dir) = exe.parent() else { return none };
@@ -149,6 +150,15 @@ fn spawn_atlas_brain(token: &str) -> SidecarSpawn {
     let mut cmd = Command::new(&bin);
     cmd.env("SIDECAR_TOKEN", token)
         .env("ATLAS_BRAIN_PORT", ATLAS_BRAIN_PORT.to_string());
+    // Control port credentials: lets the brain call back into the app's
+    // #[tauri::command] surface (read-only ops this milestone). Absent when
+    // the control port failed to bind — the brain degrades to chat-only,
+    // it never fabricates tool access it doesn't have.
+    if let Some((port, control_token)) = control {
+        cmd.env("ATLAS_CONTROL_PORT", port.to_string())
+            .env("ATLAS_CONTROL_TOKEN", control_token)
+            .env("ATLAS_CONTROL_PROFILE", "interactive");
+    }
     // AI key from the Keychain (never in env files / git). Anthropic is the
     // only chat provider on the app path — the Gemini key is deliberately NOT
     // injected: a silent fallback would send prompts (which embed the user's
@@ -432,6 +442,40 @@ pub fn run() {
       mail::mail_ingest_errors,
     ])
     .setup(|app| {
+      // Control port + DbState MUST be up before the brain sidecar spawn
+      // thread below is started, even though both look like they belong
+      // further down with the rest of setup. The spawn thread reads
+      // AtlasBrain.token and injects ATLAS_CONTROL_* env vars for the child
+      // process at the moment it launches; env vars are captured at process
+      // creation, not read live. If the control port were started in its
+      // natural reading position (after the spawn block), the brain process
+      // would already be running with those vars unset — silently, with no
+      // error, and the brain's tools would simply never appear. Both of these
+      // are fast and purely local (no Keychain access, no integrity hashing),
+      // so moving them earlier does not reintroduce the blank-window stall
+      // the background-thread split above was written to avoid.
+      let control_creds: Option<(u16, String)> = match control::start(&app.handle().clone()) {
+        Ok(cp) => {
+          let creds = (cp.port, cp.token.clone());
+          app.manage(cp);
+          Some(creds)
+        }
+        Err(e) => {
+          log::error!("[control] port unavailable: {e}"); // degrade, never panic
+          None
+        }
+      };
+
+      // Local app database (Supabase migration). Open once at startup under the
+      // app-data dir; register the WAL connection for all db commands.
+      {
+        let dir = app.path().app_data_dir()?;
+        std::fs::create_dir_all(&dir)?;
+        let db_path = dir.join("atlas.db");
+        app.manage(db::DbState::open(&db_path)?);
+        log::info!("[db] local SQLite opened at {}", db_path.display());
+      }
+
       // Sidecars come up in the BACKGROUND so the window is interactive at
       // once. Integrity hashing (~0.8s for both binaries) and the Keychain read
       // used to run before the Tauri builder existed, which is what made the
@@ -444,7 +488,10 @@ pub fn run() {
         std::thread::spawn(move || {
           let token = handle.state::<AtlasBrain>().token.clone();
           let brain_token = token.clone();
-          let brain_thread = std::thread::spawn(move || spawn_atlas_brain(&brain_token));
+          let brain_thread = std::thread::spawn(move || {
+            let control = control_creds.as_ref().map(|(p, t)| (*p, t.as_str()));
+            spawn_atlas_brain(&brain_token, control)
+          });
 
           let gw = spawn_voice_gateway(&token);
           {
@@ -465,16 +512,6 @@ pub fn run() {
             let _ = brain_state.integrity_error.lock().map(|mut e| *e = brain.integrity_error);
           }
         });
-      }
-
-      // Local app database (Supabase migration). Open once at startup under the
-      // app-data dir; register the WAL connection for all db commands.
-      {
-        let dir = app.path().app_data_dir()?;
-        std::fs::create_dir_all(&dir)?;
-        let db_path = dir.join("atlas.db");
-        app.manage(db::DbState::open(&db_path)?);
-        log::info!("[db] local SQLite opened at {}", db_path.display());
       }
 
       if cfg!(debug_assertions) {
