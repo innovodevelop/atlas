@@ -14,6 +14,7 @@
 
 import { Database } from "bun:sqlite";
 import { parseVersionPlan, type Version } from "./versionPlan.ts";
+import { readFileSync } from "node:fs";
 import { resolve } from "path";
 
 type Json = Record<string, unknown>;
@@ -179,7 +180,7 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
     const planPath = resolve(PROJECT_ROOT, "docs/VERSION-PLAN.md");
     let md: string;
     try {
-      md = require("fs").readFileSync(planPath, "utf8");
+      md = readFileSync(planPath, "utf8");
     } catch {
       return json({ error: "VERSION-PLAN.md not found" }, 404);
     }
