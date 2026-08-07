@@ -413,18 +413,58 @@ const DESIGNED: DesignedWidget[] = [
   { id: 'call', name: 'Call', category: 'comms', designShape: 'big', built: false, needs: 'Conferencing details on calendar events. The local calendar stores none.' },
 
   // --- health
-  { id: 'steps', name: 'Steps', category: 'health', designShape: 'bars', built: false, needs: 'A health source. Atlas has no HealthKit bridge.' },
-  { id: 'sleep', name: 'Sleep', category: 'health', designShape: 'big', built: false, needs: 'A health source. Atlas has no HealthKit bridge.' },
-  { id: 'heart', name: 'Heart', category: 'health', designShape: 'big', built: false, needs: 'A health source. Atlas has no HealthKit bridge.' },
-  { id: 'workout', name: 'Workout', category: 'health', designShape: 'progress', built: false, needs: 'A health source. Atlas has no HealthKit bridge.' },
-  { id: 'nutrition', name: 'Nutrition', category: 'health', designShape: 'split', built: false, needs: 'A health source. Atlas has no HealthKit bridge.' },
+  //
+  // THESE FIVE ARE A PLATFORM WALL, NOT UNWRITTEN CODE. Read this before
+  // estimating any of them.
+  //
+  // HealthKit *links* natively on macOS — the framework is in the SDK, the
+  // headers carry `macos(13.0)` availability, and `HKHealthStore()` constructs.
+  // That is source compatibility for Catalyst and cross-platform builds; it is
+  // not a health store. Probed on 2026-08-04, compiled against the macOS 26.5
+  // SDK and run natively on macOS 26.3:
+  //
+  //     isHealthDataAvailable(): false
+  //
+  // There is no Health app on macOS and iPhone health data does not sync to a
+  // Mac, which is consistent with that result. The probe was unsigned and
+  // carried no HealthKit entitlement, but `isHealthDataAvailable()` is a device
+  // *capability* check rather than a permission check — it is what returns
+  // false on iPad — so this is the platform answering, not the signing.
+  //
+  // Consequence: an iOS companion app is not the convenient route to health
+  // data, it is the only one. Do not spend time on entitlements, provisioning
+  // profiles or a Mac Catalyst helper for these five.
+  { id: 'steps', name: 'Steps', category: 'health', designShape: 'bars', built: false, needs: 'macOS serves no health data at all — see the note above. Needs the iOS companion.' },
+  { id: 'sleep', name: 'Sleep', category: 'health', designShape: 'big', built: false, needs: 'macOS serves no health data at all — see the note above. Needs the iOS companion.' },
+  { id: 'heart', name: 'Heart', category: 'health', designShape: 'big', built: false, needs: 'macOS serves no health data at all — see the note above. Needs the iOS companion.' },
+  { id: 'workout', name: 'Workout', category: 'health', designShape: 'progress', built: false, needs: 'macOS serves no health data at all — see the note above. Needs the iOS companion.' },
+  { id: 'nutrition', name: 'Nutrition', category: 'health', designShape: 'split', built: false, needs: 'macOS serves no health data at all — see the note above. Needs the iOS companion.' },
 
   // --- home
-  { id: 'climate', name: 'Climate', category: 'home', designShape: 'big', built: false, needs: 'A smart-home bridge. No Apple Home, no Matter fabric, no hub.' },
-  { id: 'energy', name: 'Energy', category: 'home', designShape: 'bars', built: false, needs: 'A smart-home bridge or utility integration. Neither exists.' },
-  { id: 'security', name: 'Security', category: 'home', designShape: 'big', built: false, needs: 'A smart-home bridge. No Apple Home, no Matter fabric, no hub.' },
+  //
+  // ALSO A PLATFORM WALL, and a different one from health.
+  //
+  // HomeKit is **Mac Catalyst only**. Apple does not ship it as a native macOS
+  // framework, and Atlas is a Tauri app — native AppKit + WKWebView, not
+  // Catalyst — so there is no API to call. This is not "nobody wrote the
+  // bridge"; it is a different app architecture. (Catalyst + HomeKit also has
+  // a history of tooling breakage: Xcode 14 silently stripped the HomeKit
+  // entitlement from Catalyst builds.)
+  //
+  // Do NOT reach for a direct HomeKit Accessory Protocol controller either. It
+  // looks ideal — local, no phone, no Apple gatekeeping — but a HAP accessory
+  // must be **unpaired from Apple Home** before a third-party controller can
+  // pair with it. That is why Home Assistant requires it, and no user will tear
+  // down their Apple Home for a desktop app.
+  //
+  // What actually works: the Home Assistant local API (REST + WebSocket over
+  // the LAN, long-lived token) — local-first, no entitlement, shipping now. The
+  // iOS companion covers HomeKit proper later, behind the same adapter trait.
+  { id: 'climate', name: 'Climate', category: 'home', designShape: 'big', built: false, needs: 'HomeKit cannot be reached from a Mac app — see the note above. Home Assistant works today.' },
+  { id: 'energy', name: 'Energy', category: 'home', designShape: 'bars', built: false, needs: 'A bridge or a utility integration. Home Assistant can supply this once connected.' },
+  { id: 'security', name: 'Security', category: 'home', designShape: 'big', built: false, needs: 'HomeKit cannot be reached from a Mac app — see the note above. Home Assistant works today.' },
   { id: 'groceries', name: 'Groceries', category: 'home', designShape: 'rows', built: false, needs: 'A shopping list. Could ride on the local task store; nothing does.' },
-  { id: 'lights', name: 'Lights', category: 'home', designShape: 'progress', built: false, needs: 'A smart-home bridge. No Apple Home, no Matter fabric, no hub.' },
+  { id: 'lights', name: 'Lights', category: 'home', designShape: 'progress', built: false, needs: 'HomeKit cannot be reached from a Mac app — see the note above. Home Assistant works today.' },
 
   // --- media
   { id: 'podcast', name: 'Podcast', category: 'media', designShape: 'progress', built: false, needs: 'A podcast source. The Spotify scope Atlas requests does not cover shows.' },
