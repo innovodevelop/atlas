@@ -1,0 +1,56 @@
+/* Agent View surface — /agent-view */
+
+.av-surface {
+  padding: 48px 40px 80px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.av-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+.av-back {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  cursor: pointer;
+  padding: 6px 0;
+}
+.av-title {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 34px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+.av-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink3);
+  background: var(--wash);
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+}
+.av-live {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--grn);
+  animation: pls 2s infinite;
+}
+.av-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+@media (max-width: 800px) {
+  .av-layout { grid-template-columns: 1fr; }
+}

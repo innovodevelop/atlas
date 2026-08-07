@@ -10,7 +10,9 @@
  * 127.0.0.1, optional SIDECAR_TOKEN) or standalone in dev: `bun run dev`.
  *
  * Env (sidecar: injected by Tauri; dev: shell env):
- *   ANTHROPIC_API_KEY                             (required: completions + native web search; from Keychain)
+ *   ATLAS_AI_PROVIDER                             ("bedrock" or unset; from Keychain)
+ *   AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY     (required when provider=bedrock; from Keychain)
+ *   ANTHROPIC_API_KEY                             (required when provider=anthropic, optional bridge for web search on bedrock; from Keychain)
  *   ATLAS_BRAIN_PORT (default 4830)
  *   SIDECAR_TOKEN (optional — checked when set)
  *
@@ -34,6 +36,7 @@ import {
 import { createLearningHandlers } from "./learningRoutes.ts";
 import { createProactiveHandlers } from "./proactive.ts";
 import { createMailDraftHandlers } from "./mailDraft.ts";
+import { createAdminHandlers } from "./adminRoutes.ts";
 import { embedText } from "./localEmbed.ts";
 import { AUTO_EMBED_BATCH, embedPending, scheduleAutoEmbed } from "./autoEmbed.ts";
 
@@ -114,6 +117,9 @@ const proactive = createProactiveHandlers({ db: localDb, requireUser, json });
 // Atlas Mail draft composer (Stage 6D): one AI pass per call, reads atlas.db
 // only — never the Cloudflare mail worker, never sends (see mailDraft.ts).
 const mailDraft = createMailDraftHandlers({ db: localDb, requireUser, json });
+
+// Admin routes: version tracking, agent sessions, design sync, tests.
+const admin = createAdminHandlers(localDb._db);
 
 // POST /chat-with-memory — full orchestrator: memory recall, tools, streaming.
 async function handleChatWithMemory(req: Request): Promise<Response> {
@@ -304,7 +310,7 @@ async function handlePersonality(req: Request): Promise<Response> {
 async function handleChat(req: Request): Promise<Response> {
   requireUser(req);
   const { messages } = await req.json();
-  if (!hasAIKey()) return json({ error: "No AI key configured (ANTHROPIC_API_KEY)" }, 500);
+  if (!hasAIKey()) return json({ error: "No AI key configured — set ATLAS_AI_PROVIDER=bedrock with AWS credentials, or ANTHROPIC_API_KEY" }, 500);
 
   const response = await aiChatCompletion({
     // Logical id — mapModel() resolves it per provider (Claude: Sonnet 5).
@@ -408,6 +414,17 @@ const server = Bun.serve({
       if (req.method === "POST" && url.pathname === "/memory/list") return await handleMemoryList(req);
       if (req.method === "POST" && url.pathname === "/memory/forget") return await handleMemoryForget(req);
       if (req.method === "POST" && url.pathname === "/memory/erase-all") return await handleMemoryEraseAll(req);
+      // Admin routes
+      if (url.pathname === "/admin/versions/sync" && req.method === "POST") return admin.syncVersionPlan();
+      if (url.pathname === "/admin/versions" && req.method === "GET") return admin.getVersions();
+      if (url.pathname.startsWith("/admin/versions/") && req.method === "GET") return admin.getVersionDetail(url.pathname.split("/")[3]);
+      if (url.pathname === "/admin/changelog" && req.method === "GET") return admin.getChangelog(url.searchParams.get("version_id") ?? undefined);
+      if (url.pathname === "/admin/agent-sessions" && req.method === "GET") return admin.getAgentSessions(url.searchParams.get("status") ?? undefined);
+      if (url.pathname.startsWith("/admin/agent-events/") && req.method === "GET") return admin.getAgentEvents(url.pathname.split("/")[3]);
+      if (url.pathname === "/admin/tests/suites" && req.method === "GET") return admin.getTestSuites();
+      if (url.pathname === "/admin/tests/runs" && req.method === "GET") return admin.getTestRuns(url.searchParams.get("suite_id") ?? undefined);
+      if (url.pathname.startsWith("/admin/tests/run/") && req.method === "POST") return admin.runTest(url.pathname.split("/")[4]);
+      if (url.pathname === "/admin/design-syncs" && req.method === "GET") return admin.getDesignSyncs();
     } catch (e) {
       if (e instanceof AuthError) return json({ error: e.message }, e.status);
       console.error("[brain] error:", e);
@@ -417,5 +434,5 @@ const server = Bun.serve({
   },
 });
 
-if (!hasAIKey()) console.log("[brain] no AI key (ANTHROPIC_API_KEY) — completions will 500 until a key is set");
+if (!hasAIKey()) console.log("[brain] no AI key — set ATLAS_AI_PROVIDER=bedrock with AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY, or ANTHROPIC_API_KEY");
 console.log(`[brain] Atlas brain on http://127.0.0.1:${server.port} (/chat, /chat-with-memory) — local DB`);

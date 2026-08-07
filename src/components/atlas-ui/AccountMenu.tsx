@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   LogOut, Settings as SettingsIcon, ShieldX, BadgeCheck,
   GraduationCap, Network, Orbit, Mic,
+  GitBranch, Monitor, Palette, TestTube2,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -98,6 +99,20 @@ export function AccountMenu({ onClose, onOpenSettings }: Props) {
       <button className="acctitem" role="menuitem" onClick={() => go('/widget-sheet')}>Widget sheet</button>
       <button className="acctitem" role="menuitem" onClick={() => go('/answer-views')}>Answer views</button>
       <button className="acctitem" role="menuitem" onClick={() => go('/model-lab')}>Model lab</button>
+
+      <div className="acctsep" />
+      <button className="acctitem" role="menuitem" onClick={() => go('/versions')}>
+        <GitBranch className="i16" /><span>Versions</span>
+      </button>
+      <button className="acctitem" role="menuitem" onClick={() => go('/agent-view')}>
+        <Monitor className="i16" /><span>Agent view</span>
+      </button>
+      <button className="acctitem" role="menuitem" onClick={() => go('/design-sync')}>
+        <Palette className="i16" /><span>Design sync</span>
+      </button>
+      <button className="acctitem" role="menuitem" onClick={() => go('/tests')}>
+        <TestTube2 className="i16" /><span>Tests</span>
+      </button>
       <button className="acctitem" role="menuitem" onClick={() => go('/smart-home')}>Smart home</button>
       <button className="acctitem" role="menuitem" onClick={() => go('/health')}>Health</button>
       <button className="acctitem" role="menuitem" onClick={() => go('/money')}>Money</button>

@@ -41,10 +41,9 @@ const DEFAULT_REGION = "eu-central-1";
  * Per-tier env override names. Every tier stays overridable so an entitlement
  * change is a config change, not a deploy — see the entitlement note below.
  *
- * NB: `src-tauri/src/lib.rs` currently forwards only AWS_* + ATLAS_AI_PROVIDER
- * to the brain sidecar, and a Finder-launched .app inherits no shell env, so
- * these overrides are a dev/CI lever today, NOT a knob a shipped desktop build
- * can turn. For the Fable entry that is the desired property, not a gap.
+ * `src-tauri/src/lib.rs` forwards these from the Keychain (e.g.
+ * `bedrock_model_haiku` → `BEDROCK_MODEL_HAIKU`), so a shipped desktop build
+ * can reach non-default profiles via Keychain entries alone.
  */
 const TIER_ENV: Record<string, string> = {
   "claude-haiku-4-5": "BEDROCK_MODEL_HAIKU",

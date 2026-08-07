@@ -1,0 +1,161 @@
+/* Versions surface — /versions */
+
+.vr-surface {
+  padding: 48px 40px 80px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Header */
+.vr-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+.vr-back {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  cursor: pointer;
+  padding: 6px 0;
+}
+.vr-title {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 34px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+.vr-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink3);
+  background: var(--wash);
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+}
+.vr-header .abtn { margin-left: auto; }
+
+/* Timeline strip */
+.vr-timeline {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+/* Version card content */
+.vr-semver {
+  font-family: 'Geist', monospace;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.vr-codename {
+  font-size: 13px;
+  color: var(--ink2);
+  margin-bottom: 12px;
+}
+.vr-status {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  background: var(--sk);
+  color: var(--ink2);
+}
+.vr-status-released { background: color-mix(in srgb, var(--grn) 12%, transparent); color: var(--grn); }
+.vr-status-in-progress { background: var(--wash); color: var(--acc); }
+.vr-status-planned { background: var(--sk); color: var(--ink3); }
+
+/* Progress bar */
+.vr-progress-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--sk);
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.vr-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--acc);
+  transition: width 0.6s var(--ease-spring);
+}
+.vr-progress-label {
+  font-size: 12px;
+  color: var(--ink3);
+  font-variant-numeric: tabular-nums;
+}
+.vr-target {
+  font-size: 11px;
+  color: var(--ink3);
+  margin-top: 4px;
+}
+
+/* Detail section */
+.vr-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.vr-features {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Feature status dots */
+.vr-dot { display: flex; align-items: center; justify-content: center; }
+.vr-dot-ok { color: var(--grn); }
+.vr-dot-warn { color: var(--amber); }
+.vr-dot-neutral { color: var(--ink3); }
+
+/* Feature badges */
+.vr-badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  background: var(--sk);
+  color: var(--ink2);
+}
+.vr-badge-done { background: color-mix(in srgb, var(--grn) 12%, transparent); color: var(--grn); }
+.vr-badge-in-progress { background: var(--wash); color: var(--acc); }
+.vr-badge-blocked { background: color-mix(in srgb, var(--amber) 12%, transparent); color: var(--amber); }
+
+/* Changelog category pills */
+.vr-cat {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: var(--r-pill);
+  background: var(--sk);
+  color: var(--ink2);
+}
+.vr-cat-added { background: color-mix(in srgb, var(--grn) 12%, transparent); color: var(--grn); }
+.vr-cat-fixed { background: color-mix(in srgb, var(--acc) 12%, transparent); color: var(--acc); }
+.vr-cat-removed { background: color-mix(in srgb, var(--red) 12%, transparent); color: var(--red); }
+.vr-cat-security { background: color-mix(in srgb, var(--amber) 12%, transparent); color: var(--amber); }
+
+/* Animation: stagger cards */
+.vr-timeline .cardB { animation: rise 0.8s var(--ease-spring) both; }
+.vr-timeline .cardB:nth-child(1) { animation-delay: 0.05s; }
+.vr-timeline .cardB:nth-child(2) { animation-delay: 0.1s; }
+.vr-timeline .cardB:nth-child(3) { animation-delay: 0.15s; }
+.vr-timeline .cardB:nth-child(4) { animation-delay: 0.2s; }
+.vr-timeline .cardB:nth-child(5) { animation-delay: 0.25s; }
+.vr-timeline .cardB:nth-child(6) { animation-delay: 0.3s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .vr-timeline .cardB { animation-duration: 0.01ms; }
+  .vr-progress-fill { transition-duration: 0.01ms; }
+}

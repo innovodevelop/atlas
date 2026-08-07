@@ -72,7 +72,7 @@ export function createMailDraftHandlers({ db, requireUser, json }: Deps) {
       .get(threadId, userId) as { id: string; subject: string | null; participants: string } | null;
     if (!thread) return json({ error: "Thread not found" }, 404);
 
-    if (!hasAIKey()) return json({ error: "No AI key configured (ANTHROPIC_API_KEY)" }, 500);
+    if (!hasAIKey()) return json({ error: "No AI key configured — set ATLAS_AI_PROVIDER=bedrock with AWS credentials, or ANTHROPIC_API_KEY" }, 500);
 
     // Oldest first — the model needs to read the exchange in the order it
     // happened to reply in context, the same order MailReadingPane renders.

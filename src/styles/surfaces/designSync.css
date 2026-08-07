@@ -1,0 +1,38 @@
+/* Design Sync surface — /design-sync */
+
+.ds-surface {
+  padding: 48px 40px 80px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.ds-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+.ds-back {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  cursor: pointer;
+  padding: 6px 0;
+}
+.ds-title {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 34px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+.ds-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink3);
+  background: var(--wash);
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+}

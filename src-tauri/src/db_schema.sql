@@ -952,3 +952,133 @@ CREATE TRIGGER IF NOT EXISTS trg_atlas_budget_settings_updated AFTER UPDATE ON a
 CREATE TRIGGER IF NOT EXISTS trg_atlas_research_queue_updated AFTER UPDATE ON atlas_research_queue
   FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
   BEGIN UPDATE atlas_research_queue SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+
+-- ---------------------------------------------------------------------------
+-- Admin: Version tracking + release planning
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS atlas_versions (
+  id              TEXT PRIMARY KEY,
+  semver          TEXT NOT NULL UNIQUE,
+  codename        TEXT,
+  status          TEXT NOT NULL DEFAULT 'planned'
+                    CHECK (status IN ('planned','in-progress','released','archived')),
+  target_date     TEXT,
+  released_at     TEXT,
+  notes           TEXT,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+CREATE TABLE IF NOT EXISTS atlas_version_features (
+  id              TEXT PRIMARY KEY,
+  version_id      TEXT NOT NULL REFERENCES atlas_versions(id) ON DELETE CASCADE,
+  title           TEXT NOT NULL,
+  description     TEXT,
+  status          TEXT NOT NULL DEFAULT 'planned'
+                    CHECK (status IN ('planned','in-progress','blocked','done')),
+  assigned_agent  TEXT,
+  design_ref      TEXT,
+  priority        INTEGER NOT NULL DEFAULT 5,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_version_features_version ON atlas_version_features(version_id, priority);
+
+-- Admin: Agent sessions (live coding view)
+CREATE TABLE IF NOT EXISTS atlas_agent_sessions (
+  id              TEXT PRIMARY KEY,
+  session_type    TEXT NOT NULL CHECK (session_type IN ('claude-code','ci-pipeline','autonomous')),
+  source_id       TEXT,
+  version_id      TEXT REFERENCES atlas_versions(id) ON DELETE SET NULL,
+  feature_id      TEXT REFERENCES atlas_version_features(id) ON DELETE SET NULL,
+  status          TEXT NOT NULL DEFAULT 'active'
+                    CHECK (status IN ('active','paused','completed','failed','cancelled')),
+  task_summary    TEXT,
+  started_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  ended_at        TEXT,
+  metadata        TEXT DEFAULT '{}',
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_agent_sessions_status ON atlas_agent_sessions(status, started_at DESC);
+
+CREATE TABLE IF NOT EXISTS atlas_agent_events (
+  id              TEXT PRIMARY KEY,
+  session_id      TEXT NOT NULL REFERENCES atlas_agent_sessions(id) ON DELETE CASCADE,
+  event_type      TEXT NOT NULL CHECK (event_type IN ('file_edit','tool_call','milestone','question','discovery','error','log')),
+  payload         TEXT NOT NULL DEFAULT '{}',
+  ts              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_agent_events_session ON atlas_agent_events(session_id, ts DESC);
+
+-- Admin: Design sync tracking
+CREATE TABLE IF NOT EXISTS atlas_design_syncs (
+  id              TEXT PRIMARY KEY,
+  bundle_name     TEXT NOT NULL,
+  sha256          TEXT NOT NULL,
+  version_id      TEXT REFERENCES atlas_versions(id) ON DELETE SET NULL,
+  status          TEXT NOT NULL DEFAULT 'received'
+                    CHECK (status IN ('received','auditing','implementing','complete','rejected')),
+  surfaces        TEXT DEFAULT '[]',
+  audit_notes     TEXT,
+  synced_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  completed_at    TEXT,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+-- Admin: Test suites and run results
+CREATE TABLE IF NOT EXISTS atlas_test_suites (
+  id              TEXT PRIMARY KEY,
+  name            TEXT NOT NULL,
+  description     TEXT,
+  ci_job          TEXT,
+  version_id      TEXT REFERENCES atlas_versions(id) ON DELETE SET NULL,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+CREATE TABLE IF NOT EXISTS atlas_test_runs (
+  id              TEXT PRIMARY KEY,
+  suite_id        TEXT NOT NULL REFERENCES atlas_test_suites(id) ON DELETE CASCADE,
+  version_id      TEXT REFERENCES atlas_versions(id) ON DELETE SET NULL,
+  status          TEXT NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('pending','running','passed','failed','skipped')),
+  duration_ms     INTEGER,
+  output          TEXT,
+  error_message   TEXT,
+  triggered_by    TEXT DEFAULT 'manual',
+  run_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_test_runs_suite ON atlas_test_runs(suite_id, run_at DESC);
+
+-- Admin: Changelog entries
+CREATE TABLE IF NOT EXISTS atlas_changelog (
+  id              TEXT PRIMARY KEY,
+  version_id      TEXT REFERENCES atlas_versions(id) ON DELETE SET NULL,
+  category        TEXT NOT NULL DEFAULT 'added'
+                    CHECK (category IN ('added','changed','fixed','removed','security','infrastructure')),
+  title           TEXT NOT NULL,
+  description     TEXT,
+  related_feature TEXT REFERENCES atlas_version_features(id) ON DELETE SET NULL,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_changelog_version ON atlas_changelog(version_id, created_at DESC);
+
+-- Updated_at triggers for admin tables
+CREATE TRIGGER IF NOT EXISTS trg_atlas_versions_updated AFTER UPDATE ON atlas_versions
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE atlas_versions SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_atlas_version_features_updated AFTER UPDATE ON atlas_version_features
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE atlas_version_features SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_atlas_agent_sessions_updated AFTER UPDATE ON atlas_agent_sessions
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE atlas_agent_sessions SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_atlas_design_syncs_updated AFTER UPDATE ON atlas_design_syncs
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE atlas_design_syncs SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_atlas_test_suites_updated AFTER UPDATE ON atlas_test_suites
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE atlas_test_suites SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;

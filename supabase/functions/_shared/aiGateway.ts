@@ -1,13 +1,10 @@
 // Unified AI gateway abstraction.
 //
-// Historically every function called the Lovable AI gateway directly
-// (https://ai.gateway.lovable.dev) with LOVABLE_API_KEY. After ejecting from
-// Lovable Cloud that gateway is unavailable, so this module routes chat
-// completions to whichever provider is configured:
-//   1. ANTHROPIC_API_KEY -> Claude, via claudeAdapter.ts (current target)
-//   2. LOVABLE_API_KEY   -> Lovable gateway (unchanged behavior, works pre-eject)
-//   3. GEMINI_API_KEY    -> Google AI Studio's OpenAI-compatible endpoint
-// The Lovable/Gemini branches stay live so the migration can land in pieces.
+// Routes chat completions to the configured provider:
+//   1. ATLAS_AI_PROVIDER=bedrock + AWS creds -> Bedrock, via bedrockAdapter.ts (primary)
+//      Web-search turns bridge to first-party Anthropic (ANTHROPIC_API_KEY) if present.
+//   2. ANTHROPIC_API_KEY -> Claude first-party, via claudeAdapter.ts
+//   3. LOVABLE_API_KEY / GEMINI_API_KEY -> legacy (dev-only, behind ATLAS_ALLOW_LEGACY_PROVIDERS)
 // Model ids are translated automatically (callers use "google/gemini-2.5-flash"
 // style logical ids; Google uses bare "gemini-2.5-flash", Claude uses tiers).
 //
@@ -141,7 +138,7 @@ export function aiChatCompletion(body: Record<string, unknown>): Promise<Respons
   const config = getAIConfig();
   if (!config) {
     return Promise.reject(
-      new Error("No AI key configured: set ANTHROPIC_API_KEY (or GEMINI_API_KEY / LOVABLE_API_KEY)"),
+      new Error("No AI key configured: set ATLAS_AI_PROVIDER=bedrock with AWS credentials, or ANTHROPIC_API_KEY"),
     );
   }
 
