@@ -1,0 +1,51 @@
+name: Rust core
+
+# Added 2026-08-04. Until then there was NO Rust job anywhere, so the
+# #[cfg(test)] modules in db.rs, music.rs and integrity.rs — 20 tests covering
+# the SQLite CRUD identifier guards, the ai_memory migration, hybrid recall and
+# the sidecar integrity gate — had never run in CI. Verified green locally
+# before this workflow was added.
+#
+# WHY ITS OWN FILE, not a job in ci.yml: `paths` is only available on the
+# workflow trigger, never per job. Running a macOS runner on every
+# frontend-only push is the kind of cost nobody notices until the bill. A
+# separate workflow is the dependency-free way to get the filter — the
+# alternative is a third-party paths-filter action and a `needs:` edge.
+on:
+  push:
+    branches: [atlas-redesign, "ws-*"]
+    paths:
+      - 'src-tauri/**'
+      - '.github/workflows/rust.yml'
+  pull_request:
+    paths:
+      - 'src-tauri/**'
+      - '.github/workflows/rust.yml'
+
+jobs:
+  rust:
+    name: Rust core (cargo test)
+    # macos, not ubuntu: Tauri needs webkit2gtk and librespot needs ALSA on
+    # Linux, and this crate only ever ships for macOS.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+      # NEVER `cargo update` here. The build pins vergen 9.0.6 / vergen-gitcl
+      # 1.0.5 transitively via librespot-core 0.8 and a bump breaks it, so
+      # --locked is load-bearing: it fails loudly if Cargo.lock would move
+      # rather than silently resolving something new.
+      #
+      # --lib skips the binary target and doc-tests (both empty here), keeping
+      # the job to unit tests without linking the full app bundle.
+      - name: Test
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib --locked

@@ -3,7 +3,7 @@
 #
 # Same commands, same order, one section per CI job:
 #   frontend        bun install --frozen-lockfile; bunx tsc -b --force;
-#                   bunx eslint .; bun run build; bun test tests/
+#                   bunx eslint .; bun run build; bun test tests/ ./src
 #   atlas-brain     (services/atlas-brain) bun install --frozen-lockfile;
 #                   bunx tsc --noEmit; bun test
 #   voice-gateway   (services/voice-gateway) bun install --frozen-lockfile;
@@ -13,6 +13,12 @@
 # Collect-all semantics: every job runs even after a failure; a per-job
 # PASS/FAIL table prints at the end and the exit code is non-zero if any
 # job failed. Per-step logs land in .ci-logs/ (gitignored-safe, untracked).
+#
+# NOT covered here: .github/workflows/rust.yml (`cargo test --manifest-path
+# src-tauri/Cargo.toml --lib --locked`). It is a separate workflow so it can
+# carry a `paths: src-tauri/**` filter, and it is deliberately left out of this
+# script — a cold Rust build is ~15 minutes and would make the local gate
+# useless as a habit. Run it yourself when you touch src-tauri/.
 #
 # Usage:  bun run ci          (this script)
 #         bun run ci:quick    (eslint + tsc only — the pre-push gate)
@@ -57,7 +63,7 @@ job_frontend() {
   run_step frontend "Typecheck (tsc -b --force)"    "$ROOT" bunx tsc -b --force            || failed+="typecheck "
   run_step frontend "Lint (eslint .)"               "$ROOT" bunx eslint .                  || failed+="lint "
   run_step frontend "Build (bun run build)"         "$ROOT" bun run build                  || failed+="build "
-  run_step frontend "Tests (bun test tests/)"       "$ROOT" bun test tests/                || failed+="tests "
+  run_step frontend "Tests (bun test tests/ ./src)" "$ROOT" bun test tests/ ./src          || failed+="tests "
   [ -z "$failed" ] && record frontend PASS || record frontend FAIL "$failed"
 }
 

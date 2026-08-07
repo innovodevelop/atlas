@@ -23,8 +23,17 @@ jobs:
         run: bunx eslint .
       - name: Build
         run: bun run build
-      - name: Tests (auth suite — static checks; live tests are opt-in via RUN_LIVE_AUTH_TESTS=1 and skip here)
-        run: bun test tests/
+      # `tests/` is the auth suite (static checks; live tests are opt-in via
+      # RUN_LIVE_AUTH_TESTS=1 and skip here). `./src` is every co-located
+      # frontend test — 7 files, 119 tests, NONE of which ran in CI before
+      # 2026-08-04: the filter was `tests/` alone, which matched one file.
+      #
+      # `./src` and not `src/`: bun treats a bare `src/` as a path SUBSTRING,
+      # so it also matches services/atlas-brain/src and services/voice-gateway/
+      # src — which have their own jobs below. A brain regression failing the
+      # frontend job would point at the wrong place.
+      - name: Tests (auth suite + frontend units)
+        run: bun test tests/ ./src
 
   atlas-brain:
     name: Brain sidecar (typecheck, tests)
