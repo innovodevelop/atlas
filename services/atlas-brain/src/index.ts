@@ -37,6 +37,7 @@ import { createLearningHandlers } from "./learningRoutes.ts";
 import { createProactiveHandlers } from "./proactive.ts";
 import { createMailDraftHandlers } from "./mailDraft.ts";
 import { createAdminHandlers } from "./adminRoutes.ts";
+import { createControlClient } from "./control.ts";
 import { embedText } from "./localEmbed.ts";
 import { AUTO_EMBED_BATCH, embedPending, scheduleAutoEmbed } from "./autoEmbed.ts";
 
@@ -108,6 +109,17 @@ function requireUser(req: Request): { userId: string; email: string; token: stri
 // service-role client for the orchestrator — there's no RLS locally.
 const localDb = createLocalDb();
 
+// The desktop control port. Created ONCE per process, not per request: the
+// capability list is fetched lazily and cached, and a client per request would
+// re-probe the port on every chat turn.
+//
+// Absent whenever the brain runs standalone (`bun run dev`) rather than as a
+// Tauri sidecar, because Rust only injects ATLAS_CONTROL_PORT/TOKEN at spawn.
+// In that case `available()` is false, `capabilities()` is [], and
+// buildAtlasTools declares no desktop tools at all — the model is never offered
+// a capability that cannot run.
+const control = createControlClient();
+
 // Learning / research / maintenance routes (see learningRoutes.ts).
 const learning = createLearningHandlers({ db: localDb, requireUser, json });
 
@@ -154,6 +166,10 @@ async function handleChatWithMemory(req: Request): Promise<Response> {
       // Persisted trait/lexicon state — composed into the system prompt by the
       // orchestrator (personality.ts). Absent for other callers ⇒ defaults.
       personality: getPersonality(localDb._db, userId),
+      // Desktop reads. `controlCaps` decides which domain tools get declared,
+      // so an unreachable port simply means no desktop tools this turn.
+      control: control.available() ? control : undefined,
+      controlCaps: control.available() ? await control.capabilities() : undefined,
     },
     { messages, source, enableTools, teachingMode, systemPromptOverride, conversationId },
   );

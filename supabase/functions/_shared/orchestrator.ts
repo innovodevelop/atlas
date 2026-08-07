@@ -84,6 +84,16 @@ export interface ChatDeps {
   /** The caller's verified JWT — forwarded to internal function calls. */
   userToken: string;
   supabaseUrl: string;
+  /**
+   * The Rust control port, when this process was handed one.
+   *
+   * Absent whenever the brain runs standalone rather than as a Tauri sidecar,
+   * and absent in the voice gateway. When absent, no desktop tools are declared
+   * at all — the model is never shown a capability it cannot exercise.
+   */
+  control?: ToolContext["control"];
+  /** Op names the port advertises; drives which desktop tools get declared. */
+  controlCaps?: string[];
   /** Working-memory session id (edge fn: x-session-id header). */
   sessionId?: string;
   /**
@@ -163,8 +173,28 @@ export function hasNativeWebSearch(): boolean {
   }
 }
 
+/**
+ * One OpenAI-shaped function declaration.
+ *
+ * Declared explicitly rather than inferred: without it TypeScript narrows
+ * `ATLAS_TOOLS` to a union of the three literal shapes it happens to contain,
+ * and `buildAtlasTools` cannot then append a tool with different parameters.
+ */
+export interface ToolDecl {
+  type: string;
+  function: {
+    name: string;
+    description: string;
+    parameters: {
+      type: string;
+      properties: Record<string, unknown>;
+      required: string[];
+    };
+  };
+}
+
 // Available tools that Atlas can use
-export const ATLAS_TOOLS = [
+export const ATLAS_TOOLS: ToolDecl[] = [
   {
     type: "function",
     function: {
@@ -246,6 +276,163 @@ export const ATLAS_TOOLS = [
     },
   },
 ];
+
+// ---------------------------------------------------------------------------
+// Desktop tools (the Rust control port)
+//
+// FIVE DOMAIN TOOLS, NOT TWENTY OPS. The control port exposes 20 read ops, and
+// declaring one tool each would be the obvious translation and the wrong one:
+//
+//   - Cost. Twenty verbose schemas is roughly 4k prompt tokens on EVERY turn,
+//     against ~1.2k for five.
+//   - Selection quality, which matters more. Twenty similarly-shaped names
+//     measurably degrade a model's tool choice — it deliberates, burns output
+//     tokens, and picks badly. Five domains, then a short action enum INSIDE
+//     one domain, is a much easier decision.
+//
+// Schema shape is a FLAT object: `action` plus a union of optional params. Not
+// oneOf — it inflates the schema and Anthropic's tool handling deals with it
+// poorly. Rust validates and returns an error naming what was missing, so the
+// model self-corrects in one iteration. Cheap prompt, strict validator.
+//
+// PROGRESSIVE DISCLOSURE: only domains whose ops the port actually advertises
+// are declared. A user with no Spotify connected never sees atlas_music, which
+// is both cheaper and honest — a tool that cannot run is a lie the model will
+// act on.
+
+/** (tool, action) -> control-port op. The ONLY place this mapping lives. */
+const ATLAS_TOOL_OPS: Record<string, Record<string, string>> = {
+  atlas_music: {
+    status: "music.status",
+    search: "music.search",
+    library: "music.library_tracks",
+    playlists: "music.playlists",
+    playlist_tracks: "music.playlist_tracks",
+    now_playing: "music.now_playing",
+  },
+  atlas_mail: {
+    list_threads: "mail.list_threads",
+    read_thread: "mail.read_thread",
+  },
+  atlas_finance: {
+    status: "portfolio.status",
+    summary: "portfolio.summary",
+    holdings: "portfolio.holdings",
+    history: "portfolio.history",
+    allocation: "portfolio.allocation",
+  },
+  atlas_data: {
+    weather: "data.weather",
+    stocks: "data.stocks",
+    news: "data.news",
+  },
+  atlas_lists: {
+    tasks: "tasks.list",
+    notes: "notes.list",
+    events: "events.list",
+    watchlist: "watchlist.list",
+  },
+};
+
+const ATLAS_TOOL_DESCRIPTIONS: Record<string, string> = {
+  atlas_music: "Read what is playing and search the user's own music library. Read-only: this cannot start, stop or change playback.",
+  atlas_mail: "Read the user's mail that Atlas has already synced locally. Read-only: this cannot send, archive or change anything.",
+  atlas_finance: "Read the user's linked brokerage portfolio — value, holdings, history, allocation. Read-only.",
+  atlas_data: "Look up current weather, stock quotes or news headlines.",
+  atlas_lists: "Read the user's own tasks, notes, calendar events or stock watchlist from the local database.",
+};
+
+/** Extra params per domain, beyond `action`. Kept minimal on purpose. */
+const ATLAS_TOOL_PARAMS: Record<string, Record<string, unknown>> = {
+  atlas_music: {
+    query: { type: "string", description: "Search text. Only for action=search." },
+    playlist_id: { type: "string", description: "Only for action=playlist_tracks." },
+    limit: { type: "number", description: "Maximum items to return." },
+  },
+  atlas_mail: {
+    thread_id: { type: "string", description: "Only for action=read_thread." },
+    limit: { type: "number", description: "Maximum threads to list." },
+  },
+  atlas_finance: {},
+  atlas_data: {
+    city: { type: "string", description: "Only for action=weather." },
+    symbols: { type: "array", items: { type: "string" }, description: "Only for action=stocks." },
+    category: { type: "string", description: "Only for action=news." },
+  },
+  atlas_lists: {
+    limit: { type: "number", description: "Maximum items to return." },
+  },
+};
+
+/**
+ * Tool declarations for the desktop capabilities that are actually reachable.
+ *
+ * `caps` is the op-name list from the control port's /v1/capabilities. Pass
+ * null or [] — the standalone-brain case, where there is no Tauri sidecar and
+ * therefore no port — and NO desktop tools are declared at all.
+ */
+export function buildAtlasTools(caps: string[] | null): ToolDecl[] {
+  const base = [...ATLAS_TOOLS];
+  if (!caps || caps.length === 0) return base;
+
+  const available = new Set(caps);
+  for (const [tool, actions] of Object.entries(ATLAS_TOOL_OPS)) {
+    const usable = Object.entries(actions).filter(([, op]) => available.has(op));
+    if (usable.length === 0) continue;
+
+    base.push({
+      type: "function",
+      function: {
+        name: tool,
+        description: ATLAS_TOOL_DESCRIPTIONS[tool],
+        parameters: {
+          type: "object",
+          properties: {
+            action: {
+              type: "string",
+              enum: usable.map(([a]) => a),
+              description: "Which operation to perform.",
+            },
+            ...ATLAS_TOOL_PARAMS[tool],
+          },
+          required: ["action"],
+        },
+      },
+    });
+  }
+  return base;
+}
+
+/** Resolve a desktop tool call to its op, or explain precisely why it cannot. */
+export function resolveAtlasOp(
+  tool: string,
+  action: unknown,
+): { op: string } | { error: string } {
+  const actions = ATLAS_TOOL_OPS[tool];
+  if (!actions) return { error: `Unknown tool: ${tool}` };
+  if (typeof action !== "string") {
+    return { error: `${tool} requires an "action" — one of: ${Object.keys(actions).join(", ")}` };
+  }
+  const op = actions[action];
+  // Name the valid actions rather than just refusing: the model corrects in one
+  // iteration instead of guessing, which is the whole reason the schema is
+  // permissive and the validator strict.
+  if (!op) {
+    return { error: `${tool} has no action "${action}". Valid actions: ${Object.keys(actions).join(", ")}` };
+  }
+  return { op };
+}
+
+/**
+ * Wall-clock budget for ALL tool work in one turn, in ms.
+ *
+ * Iteration count alone is a poor bound: six iterations of a slow op is still a
+ * hung stream. Voice gets far less because a spoken turn that stalls for twenty
+ * seconds is a broken conversation, where a text turn merely feels slow.
+ */
+export function toolTimeBudgetMs(source?: string): number {
+  return source === "voice" ? 8_000 : 20_000;
+}
 
 // ---------------------------------------------------------------------------
 // Prompt building
@@ -404,11 +591,34 @@ Be genuine, warm, and emotionally attentive. You're not just storing data - you'
 // ---------------------------------------------------------------------------
 // Tools
 
+/**
+ * What `executeTool` needs from its host.
+ *
+ * INJECTED, NOT IMPORTED. This file is deliberately runtime-neutral — the brain
+ * sidecar and the voice gateway both import it — so it must not reach for the
+ * brain's control client directly. `control` is structurally typed here for the
+ * same reason: this module never learns which implementation it got.
+ */
+export interface ToolContext {
+  userId: string | null;
+  supabase: any;
+  /** The desktop control port, when one is reachable. Absent = no desktop tools. */
+  control?: {
+    call(
+      op: string,
+      args: unknown,
+      opts: { deadline: number },
+    ): Promise<{ ok: true; data: unknown } | { ok: false; error: { code: string; message: string; retryable: boolean } }>;
+  };
+  /** Absolute epoch-ms ceiling for ALL tool work in this turn. */
+  deadline: number;
+}
+
 export async function executeTool(
   toolCall: ToolCall,
-  userId: string | null,
-  supabase: any
+  ctx: ToolContext,
 ): Promise<{ name: string; result: unknown }> {
+  const { userId, supabase } = ctx;
   const { name, arguments: argsStr } = toolCall.function;
   // Arguments can be missing or malformed when a retired tool replays from a
   // stored transcript — the adapter re-declares such names with an empty
@@ -422,6 +632,34 @@ export async function executeTool(
   }
 
   console.log(`[orchestrator] Executing tool: ${name}`, args);
+
+  // Desktop tools go to the control port. Handled before the switch because
+  // they are dispatched by PREFIX rather than by exact name — the switch below
+  // stays the list of tools this module implements itself.
+  if (name.startsWith("atlas_")) {
+    if (!ctx.control) {
+      // Should be unreachable: buildAtlasTools only declares these when the
+      // port advertised the ops. Answer honestly rather than throwing, because
+      // an exception here discards the whole turn.
+      return {
+        name,
+        result: { error: "The desktop is not reachable from this process, so that cannot be checked right now." },
+      };
+    }
+
+    const resolved = resolveAtlasOp(name, args.action);
+    if ("error" in resolved) return { name, result: { error: resolved.error } };
+
+    // Strip `action` — it selected the op and is not a parameter of it.
+    const { action: _action, ...opArgs } = args;
+
+    const r = await ctx.control.call(resolved.op, opArgs, { deadline: ctx.deadline });
+    if (r.ok) return { name, result: r.data };
+    return {
+      name,
+      result: { error: r.error.message, retryable: r.error.retryable },
+    };
+  }
 
   switch (name) {
     // Search runs inside the model (web_search_20260209), so these are declared
@@ -716,7 +954,7 @@ async function getSessionContext(
 // Main orchestration
 
 export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatResult> {
-  const { supabase, systemDb, userId, userToken, supabaseUrl } = deps;
+  const { supabase, systemDb, userId, userToken, supabaseUrl, control, controlCaps } = deps;
   const {
     messages,
     source = "text_chat",
@@ -887,7 +1125,12 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
     : systemPrompt;
 
   const allToolResults: Array<{ name: string; result: unknown; citations?: string[] }> = [];
-  let maxToolIterations = teachingMode ? 0 : 3;
+  // 3 -> 6 now that desktop tools exist. A realistic sequence needs three by
+  // itself (search -> read the result -> answer), and one malformed-args
+  // correction eats another; three left no room to recover from a single
+  // mistake. The real safety bound is the wall clock below, not this count.
+  let maxToolIterations = teachingMode ? 0 : 6;
+  const turnDeadline = Date.now() + toolTimeBudgetMs(source);
   const currentMessages = [...conversationMessages];
 
   // Detect learning intent once — it drives both the model tier below and the
@@ -907,10 +1150,13 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
   // a duplicate "web_search" name would be rejected by the Messages API. Without
   // an Anthropic key the function tools stay, and executeTool degrades.
   const nativeSearch = hasNativeWebSearch();
+  // buildAtlasTools, not ATLAS_TOOLS: desktop tools are added only for ops the
+  // control port actually advertised. No port -> identical to before.
+  const declaredTools = buildAtlasTools(controlCaps ?? null);
   const chatTools = hasTools
     ? nativeSearch
-      ? ATLAS_TOOLS.filter((t) => !NATIVE_SEARCH_TOOLS.has(t.function.name))
-      : ATLAS_TOOLS
+      ? declaredTools.filter((t) => !NATIVE_SEARCH_TOOLS.has(t.function.name))
+      : declaredTools
     : undefined;
   const anthropicTools = hasTools && nativeSearch ? [ANTHROPIC_WEB_SEARCH_TOOL] : undefined;
   console.log("[orchestrator] Model:", chatModel, "native web_search:", nativeSearch);
@@ -1041,7 +1287,18 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
 
     for (const toolCall of toolCalls) {
       console.log("[orchestrator] Executing tool:", toolCall.function.name);
-      const result = await executeTool(toolCall, userId, supabase);
+      // Refuse client-side rather than hang. The model reads this as a result
+      // and narrates it ("I ran out of time checking that"), which is a far
+      // better turn than a stream that stalls until something upstream gives
+      // up. executeTool re-checks the deadline too — belt and braces, since a
+      // long-running earlier call in this same batch can consume it.
+      const result =
+        Date.now() >= turnDeadline
+          ? {
+              name: toolCall.function.name,
+              result: { error: "The turn's time budget ran out before this could be checked.", retryable: false },
+            }
+          : await executeTool(toolCall, { userId, supabase, control, deadline: turnDeadline });
 
       if (result.result && typeof result.result === "object" && "citations" in result.result) {
         const citations = (result.result as any).citations;
