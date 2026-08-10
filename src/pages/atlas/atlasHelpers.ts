@@ -23,13 +23,6 @@ export function atlasStateLabel(
   }
 }
 
-export function timeOfDayGreeting(d = new Date()): string {
-  const h = d.getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 18) return 'Good afternoon';
-  return 'Good evening';
-}
-
 /** Build an SVG polyline `points` string from a sparkline number series. */
 export function sparklinePoints(
   values: number[],
