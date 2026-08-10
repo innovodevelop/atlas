@@ -61,6 +61,7 @@ export const surface = {
   icon: 'Sparkles',
   entry: 'menu' as const,
   mock: true,
+  edition: 'admin' as const,
 };
 
 type Availability = 'checking' | 'ready' | 'no-desktop' | 'signed-out';

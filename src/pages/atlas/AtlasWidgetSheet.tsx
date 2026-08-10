@@ -51,6 +51,9 @@ export const surface = {
   icon: 'Layers',
   entry: 'menu',
   mock: true,
+  // Binding tables, source wiring and the six states a widget can be in —
+  // written for whoever builds the widgets, not for whoever uses them.
+  edition: 'admin',
 } as const;
 
 /** Which cells of a 2×2 slice each size occupies. Purely a diagram. */

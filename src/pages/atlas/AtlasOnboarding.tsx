@@ -79,6 +79,7 @@ export const surface = {
   // Bound to the real capability list, the real OS prompts and the real stored
   // consent record. Nothing on this surface is mocked.
   mock: false,
+  edition: 'consumer',
 } as const;
 
 type Stage = 'intro' | 'permissions' | 'asking' | 'welcome';

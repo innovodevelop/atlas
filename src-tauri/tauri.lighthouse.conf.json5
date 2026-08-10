@@ -1,0 +1,148 @@
+// Lighthouse — the admin edition of Atlas, as a bundle of its own.
+//
+//   bun run tauri:lighthouse
+//
+// Merged over `tauri.conf.json` by `tauri build --config` (later keys win).
+// Only the differences live here; everything unnamed — the CSP, the sidecars,
+// the entitlements, the minimum macOS version — is inherited, which is the
+// point: Lighthouse is the same application looking at the same machine, not a
+// fork that can drift.
+//
+// JSON5 so this can be explained where it is decided. The Tauri CLI takes
+// "JSON, JSON5 or TOML files" for --config.
+//
+// WHY A SEPARATE BUNDLE AT ALL. The operator surfaces — agent CRUD with
+// editable system prompts, per-tier model pickers, risky-tool flags, raw
+// tool-call JSON, the cost analytics, the global AI kill-switch — are not
+// features a consumer has switched off. They are not in Atlas.app: the
+// consumer build does not contain their code (see src/surfaces.ts and
+// src/editionSplit.test.ts). Shipping an admin screen to a consumer therefore
+// stops being a review question and becomes a build impossibility. Inspecting
+// live consumer state is most of what Lighthouse is for, so the two are
+// installed side by side and expected to run at the same time.
+//
+// RUNNING BOTH AT ONCE. The three blockers this header used to list are fixed,
+// in Rust, outside this file. What each one now does:
+//   • THE DATABASE IS SHARED ON PURPOSE. `app_data_dir()` is still derived from
+//     `identifier`, so it is no longer what decides where the database lives:
+//     `src-tauri/src/appdata.rs` pins that to the constant
+//     `~/Library/Application Support/com.magnuspilegaard.atlas/atlas.db` — Atlas'
+//     existing directory, chosen because the user's real data is already there
+//     and no copy of it can therefore go wrong. A Lighthouse that accumulated an
+//     atlas.db of its own before this change is copied INTO the shared slot, but
+//     only while that slot is empty; nothing ever overwrites a database that
+//     exists, and no source file is ever deleted.
+//   • ONE PAIR OF SIDECARS PER MACHINE. The ports are still the constants 4820
+//     and 4830, and exactly one instance binds them: launches elect an owner
+//     through a claim file (`src-tauri/src/instance.rs`) and everyone else adopts
+//     the owner's ports and token instead of spawning a second pair. Reuse rather
+//     than dynamic ports because the ports were the small half of the problem —
+//     two brains on one SQLite file means two writers and two proactive
+//     schedulers billing the same background inference twice. An adopter takes
+//     the sidecars over if the owner quits.
+//   • THE AUDIT SWEEP KNOWS WHO IS ALIVE. `reconcile_in_flight` no longer expires
+//     everything older than this process; it expires only what predates EVERY
+//     live instance, read from a heartbeat registry. A row another running app is
+//     working on is left alone.
+//
+// ⚠️ STILL TRUE, and worth knowing before both are open:
+//   • An approval can only be EXECUTED by the instance whose process queued it —
+//     the executable payload never touches the database (see control/mod.rs's
+//     `PENDING`, which is the reason the queue is not an injection vector).
+//     Answering Atlas' card inside Lighthouse therefore runs nothing: it fails
+//     closed and closes the card with a "restarted" message, which is safe but
+//     misleading. Answer a card in the app that raised it.
+//   • `portfolio.duckdb` is still per-bundle (`src-tauri/src/portfolio.rs` uses
+//     `app_data_dir()` directly), so Lighthouse shows an empty portfolio rather
+//     than the consumer's.
+//   • None of the above has been exercised with two bundles actually running —
+//     it is verified by unit tests over the decisions, not by a live launch.
+{
+  productName: "Lighthouse",
+
+  // A distinct identifier is what lets both bundles be installed and launched
+  // at once — macOS treats same-identifier apps as the same app.
+  identifier: "com.magnuspilegaard.lighthouse",
+
+  build: {
+    // The admin edition's output. `bun run build` writes the consumer bundle to
+    // dist/ for Atlas.app; the two never share a directory, so neither build
+    // can overwrite the other's frontend.
+    frontendDist: "../dist-admin",
+    beforeBuildCommand: "bun run build:admin && bun run build:sidecar && bun run build:brain",
+
+    // THE HOMEKIT CONTROLLER IS COMPILED ONLY HERE. `src-tauri/src/home/hap/`
+    // speaks the HomeKit Accessory Protocol directly to accessories on the LAN
+    // — pair-setup, pair-verify, encrypted sessions — and the whole module,
+    // its two Tauri commands and its `home.discover` control-port op are behind
+    // the `homekit` cargo feature. This one line is what turns it on.
+    //
+    // WHY THIS FILE AND NOT THE FRONTEND SPLIT. The edition split is Vite-only
+    // (VITE_ATLAS_EDITION → src/surfaces.ts): it decides which React screens
+    // exist and has no opinion about Rust. Both bundles are built from the one
+    // crate, and the control port (src/control) is a REGISTRY rather than a
+    // webview — whatever is registered is reachable by the model regardless of
+    // which screens shipped. Gating on the frontend would leave a working
+    // accessory controller inside Atlas.app and expose it to the brain. A cargo
+    // feature makes the absence a build fact, which is the same standard
+    // src/editionSplit.test.ts already holds the frontend to.
+    //
+    // `tauri.conf.json` sets no `features`, so the config merge (later keys
+    // win, arrays REPLACE) has nothing to collide with: Atlas.app keeps the
+    // crate's `default = []`.
+    features: ["homekit"],
+  },
+
+  app: {
+    // Repeated in full because Tauri's config merge REPLACES arrays rather than
+    // merging their elements — an object with only `title` would drop the size
+    // and title-bar settings.
+    windows: [
+      {
+        title: "Lighthouse",
+        width: 1440,
+        height: 900,
+        minWidth: 1024,
+        minHeight: 700,
+        resizable: true,
+        fullscreen: false,
+        titleBarStyle: "Overlay",
+        hiddenTitle: true,
+      },
+    ],
+  },
+
+  plugins: {
+    updater: {
+      // NOT Atlas's feed. The Tauri updater replaces the running bundle, so
+      // pointing Lighthouse at `latest.json` would install Atlas.app over
+      // Lighthouse.app the first time a user pressed "check for updates".
+      // Until a Lighthouse release feed exists this URL 404s and the check
+      // fails closed, which is the correct failure.
+      endpoints: [
+        "https://github.com/HelloAtlasAI/helloatlas/releases/latest/download/lighthouse-latest.json",
+      ],
+    },
+  },
+
+  bundle: {
+    // Lighthouse is an internal tool built on this machine, not a release, so
+    // it does not produce updater artifacts — which also means it builds
+    // without TAURI_SIGNING_PRIVATE_KEY, i.e. without the `--no-sign` dance
+    // that Atlas needs (CLAUDE.md).
+    createUpdaterArtifacts: false,
+
+    // Generated from design/brand-icons/lighthouse-appicon-C-blend-padded.svg,
+    // which already existed alongside the Atlas mark: the same particle sphere
+    // inverted — dark points on a cream tile against Atlas's cream-on-blue. Two
+    // apps in the same dock have to be told apart at 32px. Regenerate with
+    // `bun run icons:lighthouse`; never hand-edit the PNGs.
+    icon: [
+      "icons-lighthouse/32x32.png",
+      "icons-lighthouse/128x128.png",
+      "icons-lighthouse/128x128@2x.png",
+      "icons-lighthouse/icon.icns",
+      "icons-lighthouse/icon.ico",
+    ],
+  },
+}

@@ -280,6 +280,9 @@ export const surface = {
   icon: 'Landmark',
   entry: 'menu',
   mock: true,
+  // Admin for the same reason `entry` is `'menu'`: there is no bank adapter, so
+  // there is no consumer product here yet. Both flip together when one lands.
+  edition: 'admin',
 } as const;
 
 export default AtlasBanking;

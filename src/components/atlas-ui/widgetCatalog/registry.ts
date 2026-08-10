@@ -451,20 +451,28 @@ const DESIGNED: DesignedWidget[] = [
   // a history of tooling breakage: Xcode 14 silently stripped the HomeKit
   // entitlement from Catalyst builds.)
   //
-  // Do NOT reach for a direct HomeKit Accessory Protocol controller either. It
-  // looks ideal — local, no phone, no Apple gatekeeping — but a HAP accessory
-  // must be **unpaired from Apple Home** before a third-party controller can
-  // pair with it. That is why Home Assistant requires it, and no user will tear
-  // down their Apple Home for a desktop app.
+  // THE PROTOCOL IS NOT THE FRAMEWORK, and that distinction is now shipping
+  // code. Atlas speaks the HomeKit Accessory Protocol itself over the LAN —
+  // src-tauri/src/home/hap/ — which needs no Catalyst target and no
+  // entitlement. It is Lighthouse-only, behind the optional `homekit` cargo
+  // feature, so none of it is in the consumer binary.
   //
-  // What actually works: the Home Assistant local API (REST + WebSocket over
-  // the LAN, long-lived token) — local-first, no entitlement, shipping now. The
-  // iOS companion covers HomeKit proper later, behind the same adapter trait.
-  { id: 'climate', name: 'Climate', category: 'home', designShape: 'big', built: false, needs: 'HomeKit cannot be reached from a Mac app — see the note above. Home Assistant works today.' },
+  // The real cost is still real: a HAP accessory holds ONE pairing owner, so a
+  // physical accessory must be removed from Apple Home before Atlas can pair
+  // with it. That is no longer a reason not to build — it is a state the UI
+  // reports. `PairingStatus::PairedElsewhere` reads the Bonjour `sf` flag and
+  // says so in words, and never offers a setup-code field for an accessory
+  // that could only refuse it.
+  //
+  // What ships for everyone: the Home Assistant local API (REST + WebSocket
+  // over the LAN, long-lived token) — local-first, no entitlement. See
+  // docs/decisions/008-healthkit-homekit-platform-wall.md, which is superseded
+  // in part on exactly this point.
+  { id: 'climate', name: 'Climate', category: 'home', designShape: 'big', built: false, needs: 'A connected bridge. Home Assistant works today; HomeKit accessories work in the Lighthouse build — see the note above.' },
   { id: 'energy', name: 'Energy', category: 'home', designShape: 'bars', built: false, needs: 'A bridge or a utility integration. Home Assistant can supply this once connected.' },
-  { id: 'security', name: 'Security', category: 'home', designShape: 'big', built: false, needs: 'HomeKit cannot be reached from a Mac app — see the note above. Home Assistant works today.' },
+  { id: 'security', name: 'Security', category: 'home', designShape: 'big', built: false, needs: 'A connected bridge. Home Assistant works today; HomeKit accessories work in the Lighthouse build — see the note above.' },
   { id: 'groceries', name: 'Groceries', category: 'home', designShape: 'rows', built: false, needs: 'A shopping list. Could ride on the local task store; nothing does.' },
-  { id: 'lights', name: 'Lights', category: 'home', designShape: 'progress', built: false, needs: 'HomeKit cannot be reached from a Mac app — see the note above. Home Assistant works today.' },
+  { id: 'lights', name: 'Lights', category: 'home', designShape: 'progress', built: false, needs: 'A connected bridge. Home Assistant works today; HomeKit accessories work in the Lighthouse build — see the note above.' },
 
   // --- media
   { id: 'podcast', name: 'Podcast', category: 'media', designShape: 'progress', built: false, needs: 'A podcast source. The Spotify scope Atlas requests does not cover shows.' },

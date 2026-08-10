@@ -269,6 +269,10 @@ export const surface = {
   icon: 'LayoutGrid',
   entry: 'menu',
   mock: false,
+  // A specification browser for the 51 widgets — 41 of them unbuilt, each with
+  // the reason it does not exist. That is a document about the product, not
+  // part of it.
+  edition: 'admin',
 } as const;
 
 export default AtlasWidgetCatalog;

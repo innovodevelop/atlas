@@ -63,6 +63,8 @@ job_frontend() {
   run_step frontend "Typecheck (tsc -b --force)"    "$ROOT" bunx tsc -b --force            || failed+="typecheck "
   run_step frontend "Lint (eslint .)"               "$ROOT" bunx eslint .                  || failed+="lint "
   run_step frontend "Build (bun run build)"         "$ROOT" bun run build                  || failed+="build "
+  # The admin edition is a different Rollup graph — see .github/workflows/ci.yml.
+  run_step frontend "Build admin (build:admin)"     "$ROOT" bun run build:admin            || failed+="build:admin "
   run_step frontend "Tests (bun test tests/ ./src)" "$ROOT" bun test tests/ ./src          || failed+="tests "
   [ -z "$failed" ] && record frontend PASS || record frontend FAIL "$failed"
 }

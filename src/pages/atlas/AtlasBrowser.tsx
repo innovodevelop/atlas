@@ -57,6 +57,9 @@ export const surface = {
   // primary slot. It becomes a dock candidate the day a real adapter lands.
   entry: 'menu',
   mock: true,
+  // Permanently admin, unlike Money and Smart home: those were waiting for an
+  // adapter, this one has no engine and none is planned.
+  edition: 'admin' as const,
 };
 
 /** Exact lucide exports the mock names for suggestion rows. */

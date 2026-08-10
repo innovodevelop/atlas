@@ -1,6 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Cpu, LayoutGrid, Mic, ArrowUp } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useUnifiedChat } from '@/hooks/useUnifiedChat';
 import { useVoiceSession } from '@/hooks/useVoiceSession';
@@ -8,7 +9,24 @@ import { useAtlasSettings } from '@/hooks/useAtlasSettings';
 import { toVoiceSettings } from '@/lib/voiceTuning';
 import { AtlasSphereCanvas } from '@/components/atlas-ui/AtlasSphereCanvas';
 import { Button } from '@/components/atlas-ui/primitives';
-import { timeOfDayGreeting } from './atlasHelpers';
+import { greetingPhrase } from '@/lib/greetingGate';
+
+/**
+ * Registration data. Mirrored in `src/surfaces.ts`, which is what the router,
+ * the dock and the account menu are built from; `surfaces.test.ts` fails if the
+ * two ever disagree.
+ *
+ * `menu`, not `dock`: this is the voice-first landing, a real consumer surface,
+ * but the dock is full and the dashboard is where people start.
+ */
+export const surface = {
+  path: '/home',
+  label: 'Voice home',
+  icon: 'Mic',
+  entry: 'menu' as const,
+  mock: false,
+  edition: 'consumer' as const,
+};
 
 const CHIPS = [
   { label: 'Check emails', q: 'Check my emails' },
@@ -20,8 +38,15 @@ const CHIPS = [
 // Voice-first landing (design: Atlas — Home / Voice).
 const AtlasHome = () => {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const { profile } = useUserProfile();
   const [input, setInput] = useState('');
+
+  // Same gate as AtlasDashboard.tsx:107-109. AtlasHome had none, despite being
+  // the app's voice-first landing screen — reachable signed out.
+  useEffect(() => {
+    if (!authLoading && !user) navigate('/auth');
+  }, [user, authLoading, navigate]);
 
   const { messages, isLoading, sendMessage } = useUnifiedChat({
     enableMemory: true, source: 'voice_chat',
@@ -88,7 +113,7 @@ const AtlasHome = () => {
         </header>
 
         <div className="homemid">
-          <h2 className="homehi">{timeOfDayGreeting()}, {name}</h2>
+          <h2 className="homehi">{greetingPhrase(Date.now(), profile?.timezone)}, {name}</h2>
           <p className="homesub">I'm <span className="hl">Atlas</span>, your neural interface — ask me anything.</p>
         </div>
 

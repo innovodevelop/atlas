@@ -9,6 +9,9 @@ lerna-debug.log*
 
 node_modules
 dist
+# The admin (Lighthouse) frontend build — `bun run build:admin`. Same class of
+# artifact as dist/, just the other edition.
+dist-admin
 dist-ssr
 *.local
 

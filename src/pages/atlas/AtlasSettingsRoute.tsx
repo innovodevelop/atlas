@@ -2,6 +2,25 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AtlasSettings, type SettingsTab } from './AtlasSettings';
 
 /**
+ * Registration data. Mirrored in `src/surfaces.ts`, which is what the router,
+ * the dock and the account menu are built from; `surfaces.test.ts` fails if the
+ * two ever disagree.
+ *
+ * `entry: 'none'` is deliberate. Settings already has two doors — the dock
+ * button and the account menu, both opening the overlay — and this route exists
+ * so a deep link has somewhere to land. A generated third link would be a
+ * second entry to one room.
+ */
+export const surface = {
+  path: '/settings',
+  label: 'Settings',
+  icon: 'Settings',
+  entry: 'none' as const,
+  mock: false,
+  edition: 'consumer' as const,
+};
+
+/**
  * Settings as a real route.
  *
  * Before this, Settings existed ONLY as an overlay inside the dashboard

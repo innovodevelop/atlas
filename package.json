@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b --force && vite build",
-    "build:dev": "vite build --mode development",
+    "build": "tsc -b --force && VITE_ATLAS_EDITION=consumer vite build",
+    "build:admin": "tsc -b --force && VITE_ATLAS_EDITION=admin vite build",
+    "build:editions": "bun run build && bun run build:admin",
+    "build:dev": "VITE_ATLAS_EDITION=consumer vite build --mode development",
     "typecheck": "tsc -b --force",
     "lint": "eslint .",
     "ci": "bash scripts/ci/run.sh",
@@ -16,7 +18,9 @@
     "build:sidecar": "cd services/voice-gateway && bun install --frozen-lockfile && bun run fetch-models && bun build --compile --minify src/index.ts --outfile ../../src-tauri/binaries/atlas-voice-gateway-aarch64-apple-darwin && cd ../.. && bun run gen:sidecar-manifest",
     "build:brain": "cd services/atlas-brain && bun install --frozen-lockfile && bun run fetch-models && bun build --compile --minify src/index.ts --outfile ../../src-tauri/binaries/atlas-brain-aarch64-apple-darwin && cd ../.. && bun run gen:sidecar-manifest",
     "gen:sidecar-manifest": "bun scripts/gen-sidecar-manifest.ts",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "tauri:lighthouse": "tauri build --config src-tauri/tauri.lighthouse.conf.json5",
+    "icons:lighthouse": "tauri icon design/brand-icons/lighthouse-appicon-C-blend-padded.svg -o src-tauri/icons-lighthouse"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

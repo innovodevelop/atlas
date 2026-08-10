@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { dockableItems } from './dockEdition';
 
 /**
  * The bottom dock.
@@ -20,6 +21,13 @@ import { useNavigate } from 'react-router-dom';
  * The CTA is the documented exception: Mail's sync button reports its own
  * progress in the dock label ("Sync" -> "Syncing…"), and that is the only
  * feedback a sync has. `.dockcta .dockl` keeps it visible.
+ *
+ * EDITION. Any item whose `to` names a path this build does not route is
+ * dropped before render (`dockableItems`). In an admin build every registered
+ * path is routable and nothing changes; in a consumer build it is what stops a
+ * dock button from being a live link to a screen the bundle does not contain —
+ * a 404 dressed up as navigation. The registry is the source of the answer, so
+ * the dock cannot disagree with the router about what exists.
  */
 export type DockItemKind = 'nav' | 'action' | 'toggle' | 'cta' | 'avatar';
 
@@ -55,10 +63,15 @@ interface DockProps {
   current?: string;
 }
 
-export const Dock = ({ items, current }: DockProps) => {
+export const Dock = ({ items: allItems, current }: DockProps) => {
   const navigate = useNavigate();
+  const items = dockableItems(allItems);
 
   if (import.meta.env.DEV) {
+    const dropped = allItems.filter((i) => !items.includes(i)).map((i) => i.to);
+    if (dropped.length) {
+      console.warn(`[atlas] dock items hidden — not in this edition: ${dropped.join(', ')}`);
+    }
     const ctas = items.filter((i) => i.kind === 'cta').length;
     const avatars = items.filter((i) => i.kind === 'avatar');
     if (ctas > 1) console.error('[atlas] <Dock> takes at most one kind="cta" item');

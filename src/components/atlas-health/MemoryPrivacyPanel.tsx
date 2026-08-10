@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { deleteAccount, getToken, LOCAL_DATA_DIR } from '@/lib/authClient';
 import { getBrainEndpoint } from '@/lib/brainClient';
-import { clearPersistedCache } from '@/App';
+import { clearPersistedCache } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 
 // Memory management & erasure ("the right to be forgotten", Phase 3). Lists the

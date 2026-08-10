@@ -1,140 +1,40 @@
-import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
-import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import AtlasDashboard from "./pages/atlas/AtlasDashboard";
-import NotFound from "./pages/NotFound";
+import { queryClient, persistOptions } from "@/lib/queryClient";
+import { BrowserRouter } from "react-router-dom";
 import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
 import { useRealtimePauseOnInactivity } from "./hooks/useRealtimePauseOnInactivity";
-
-// Only the default route (AtlasDashboard) is eager — everything else is
-// code-split so the entry chunk stays small and the startup paint is instant.
-// The parse-and-eval cost of a page's JS lands on every launch regardless of
-// whether it was fetched over the network or read from disk, so lazy() still
-// buys something for a local desktop app: only the chunk needed on this
-// screen's first render has to be parsed. The legacy Dashboard especially
-// must stay lazy: it drags 9 realtime hooks and the whole legacy card stack
-// into whatever chunk it lands in.
-const AtlasHome = lazy(() => import("./pages/atlas/AtlasHome"));
-const AtlasCoreScreen = lazy(() => import("./pages/atlas/AtlasCoreScreen"));
-// Mail is a full route, not the dashboard's `expanded === 'email'` overlay —
-// the overlay stays as the glanceable card, this is the supervision surface.
-const AtlasMail = lazy(() => import("./pages/atlas/AtlasMail"));
-// Settings was overlay-only (rendered inside AtlasDashboard behind
-// `settingsOpen`), so nothing could link to it and it was unreachable from any
-// other screen. It is a route AS WELL now — the dock button and the account
-// menu still open the overlay. See AtlasSettingsRoute for why both.
-const AtlasSettingsRoute = lazy(() => import("./pages/atlas/AtlasSettingsRoute"));
-const Auth = lazy(() => import("./pages/Auth"));
+import { AppRoutes, type RouteOverride } from "./AppRoutes";
 import { OnboardingGate } from "./components/OnboardingGate";
-// Statically imported (not lazy): this is the first screen a new user sees, so
-// it must not depend on a runtime chunk fetch that could fail in the webview.
-import AtlasPermissions from "./pages/AtlasPermissions";
-// `/atlas-demo` used to be lazy-loaded here. It was a 1133-line particle
-// tuning lab for the three.js sphere — the largest page in the repo, linked
-// from nowhere, and the only importer of src/components/atlas-demo/. Both are
-// deleted with the renderer they tuned. The tuning surface that survives is
-// /atlas-sphere, which drives the renderer the app actually uses.
-// Both are reachable from the account menu (dock avatar → "Teach Atlas" /
-// "How Atlas works"). Before T4 part 3 they were routes with no link anywhere.
-const AtlasTeach = lazy(() => import("./pages/AtlasTeach"));
-const AtlasArchitecture = lazy(() => import("./pages/AtlasArchitecture"));
-// Internal QA surface for the sphere — a design tool, not a product screen, so
-// it is deliberately NOT on the dock. It is linked from the account menu in DEV
-// builds only, which is where it gets used; in a shipped build it stays
-// URL-only on purpose.
-const AtlasSphereGallery = lazy(() => import("./pages/AtlasSphereGallery"));
-// T3 surfaces. Built in parallel, wired here in one pass — each page owns its
-// own route, mock module and stylesheet, and exports a `surface` descriptor
-// naming the path and where it belongs. All eight are account-menu entries
-// rather than dock items: a surface with no live data source has not earned a
-// primary slot, and the dock stays the set of places you actually live.
-const AtlasOnboarding = lazy(() => import("./pages/atlas/AtlasOnboarding"));
-const AtlasWidgetCatalog = lazy(() => import("./pages/atlas/AtlasWidgetCatalog"));
-const AtlasWidgetSheet = lazy(() => import("./pages/atlas/AtlasWidgetSheet"));
-const AtlasAnswerViews = lazy(() => import("./pages/atlas/AtlasAnswerViews"));
-const AtlasModelLab = lazy(() => import("./pages/atlas/AtlasModelLab"));
-const AtlasSmartHome = lazy(() => import("./pages/atlas/AtlasSmartHome"));
-const AtlasHealth = lazy(() => import("./pages/atlas/AtlasHealth"));
-const AtlasBanking = lazy(() => import("./pages/atlas/AtlasBanking"));
-const AtlasBrowser = lazy(() => import("./pages/atlas/AtlasBrowser"));
-// Version tracking + admin surfaces — same reasoning as the T3 surfaces above:
-// account-menu entries, lazy like every other non-default route.
-const AtlasVersions = lazy(() => import("./pages/atlas/AtlasVersions"));
-const AtlasAgentView = lazy(() => import("./pages/atlas/AtlasAgentView"));
-const AtlasDesignSync = lazy(() => import("./pages/atlas/AtlasDesignSync"));
-const AtlasTests = lazy(() => import("./pages/atlas/AtlasTests"));
-
-
-// Instant startup: dashboard data (weather, stocks, news, tasks…) is
-// persisted to disk-backed localStorage, so the app paints with last-known
-// data immediately and refetches in the background. Bump `buster` when the
-// cached shape changes.
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      // Evict inactive queries after 30 min. 24h let the in-memory cache grow
-      // unbounded across a long-open desktop session.
-      gcTime: 30 * 60 * 1000,
-      // A desktop window flaps focus constantly (cmd-tab, display wake) —
-      // the default refetch-on-focus refired EVERY mounted query each time,
-      // hammering the WKWebView Networking process. Cards stay fresh via
-      // their own activity-gated refetchIntervals instead.
-      refetchOnWindowFocus: false,
-      staleTime: 60 * 1000,
-      retry: 2,
-    },
-  },
-});
-
-const persister = createSyncStoragePersister({
-  storage: typeof window !== "undefined" ? window.localStorage : undefined,
-  key: "atlas-query-cache",
-});
-
-// Only persist the small, stable "instant startup" queries. Volatile/large
-// payloads (stock sparklines, news, realtime health) would bloat localStorage
-// and get replayed into memory on every launch.
-const PERSIST_ALLOWLIST = ["weather", "profile", "tasks", "notes", "calendar", "user"];
-const persistOptions = {
-  persister,
-  maxAge: 24 * 60 * 60 * 1000,
-  buster: "v2",
-  dehydrateOptions: {
-    shouldDehydrateQuery: (query: { queryKey: readonly unknown[] }) => {
-      const head = String(query.queryKey?.[0] ?? "").toLowerCase();
-      return PERSIST_ALLOWLIST.some((k) => head.includes(k));
-    },
-  },
-};
-
-// Drops the account-scoped query cache — used by sign-out, a dead session and
-// the "delete all my data" control.
+// The two `eager: true` surfaces in the registry, and the only page modules
+// this file still names. Everything else is code-split so the entry chunk stays
+// small and the startup paint is instant: the parse-and-eval cost of a page's
+// JS lands on every launch whether the chunk came over the network or off
+// disk, so lazy() still buys something for a local desktop app.
 //
-// Order matters. Removing only the storage key is not a clear: the QueryClient
-// still holds the pre-erase snapshots in memory, and PersistQueryClientProvider
-// re-serialises them into the same key on the very next cache event — so rows
-// erased under a right-to-erasure control would be back on disk seconds later.
-// Dropping the in-memory cache FIRST leaves nothing to re-persist; only then is
-// the key removed.
-export const clearPersistedCache = () => {
-  queryClient.clear();
-  try {
-    // The persister is a no-op when there's no `window` (see above), so this is
-    // safe outside the browser too.
-    persister.removeClient();
-  } catch {
-    /* storage unavailable */
-  }
-  // createSyncStoragePersister throttles writes behind a 1s trailing timer, so a
-  // write scheduled just before this call can still land right after it. By then
-  // the cache is empty, so the worst case is the key reappearing holding an
-  // empty dehydrated state — never user data.
-};
+// These two are static because they are the FIRST paint of a cold start —
+// the desk you land on, and the consent screen a new user is sent to — so
+// neither may depend on a runtime chunk fetch that can fail in the webview.
+import AtlasDashboard from "./pages/atlas/AtlasDashboard";
+import AtlasPermissions from "./pages/AtlasPermissions";
+
+// The twenty-odd `const X = lazy(() => import("./pages/…"))` lines that used to
+// sit here are gone, and their absence is the point rather than tidiness.
+// While this file named the admin pages, every consumer page transitively named
+// them too — and a consumer build emitted all twelve admin chunks (plus
+// mermaid's 28) no matter what VITE_ATLAS_EDITION said. Generating the table
+// from `routableSurfaces`, whose admin half Rollup deletes outright in a
+// consumer build, is what makes the split real instead of cosmetic. See
+// src/AppRoutes.tsx and src/surfaces.ts.
+//
+// The query client and `clearPersistedCache` used to live here too, which put
+// App.tsx on EVERY page's import graph (authClient, useAuth and the
+// memory/privacy panel all need the teardown) and left a permanent import cycle
+// through the two eager pages above. They now live in `@/lib/queryClient`,
+// which imports nothing of ours — see that file for what the cycle actually
+// broke.
 
 // Loading fallback for lazy routes
 const PageLoader = () => (
@@ -161,6 +61,28 @@ const GlobalEffects = () => {
   return null;
 };
 
+// The registry's `eager` surfaces, supplied to the generated table.
+//
+// ADDING A ROUTE IS NOT DONE HERE ANY MORE. A new screen is a new entry in
+// src/surfaces.ts and a `surface` export on the page; the route, the dock slot
+// and the account-menu row all follow from that one edit. This map exists only
+// for the two things the registry cannot express as data: which component to
+// use instead of the lazy one, and the dashboard's first-run gate.
+const ROUTE_OVERRIDES: Readonly<Record<string, RouteOverride>> = {
+  "/": {
+    Component: AtlasDashboard,
+    // Applies to `/dashboard` too — they are one entry with an alias now, so
+    // the two routes cannot drift into different wrappers the way hand-written
+    // duplicates could.
+    wrap: (el) => <OnboardingGate>{el}</OnboardingGate>,
+  },
+  // First-run consent. Genuinely revisitable, via Settings → Permissions
+  // (AtlasSettings.tsx) — before T4 part 2 this route was referenced only by
+  // OnboardingGate and Auth, which made AtlasPermissions' own "you can change
+  // it later" a broken promise.
+  "/permissions": { Component: AtlasPermissions },
+};
+
 const App = () => (
   <PersistQueryClientProvider
     client={queryClient}
@@ -172,57 +94,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <RouteErrorBoundary>
-        {/* One suspense boundary for every lazy route */}
-        <Suspense fallback={<PageLoader />}>
-        <Routes>
-          {/* Atlas screens */}
-          <Route path="/" element={<OnboardingGate><AtlasDashboard /></OnboardingGate>} />
-          <Route path="/dashboard" element={<OnboardingGate><AtlasDashboard /></OnboardingGate>} />
-          <Route path="/home" element={<AtlasHome />} />
-          <Route path="/atlas-core" element={<AtlasCoreScreen />} />
-          <Route path="/mail" element={<AtlasMail />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/settings" element={<AtlasSettingsRoute />} />
-          <Route path="/onboarding" element={<AtlasOnboarding />} />
-          <Route path="/widgets" element={<AtlasWidgetCatalog />} />
-          <Route path="/widget-sheet" element={<AtlasWidgetSheet />} />
-          <Route path="/answer-views" element={<AtlasAnswerViews />} />
-          <Route path="/model-lab" element={<AtlasModelLab />} />
-          <Route path="/smart-home" element={<AtlasSmartHome />} />
-          <Route path="/health" element={<AtlasHealth />} />
-          <Route path="/money" element={<AtlasBanking />} />
-          <Route path="/browser" element={<AtlasBrowser />} />
-          {/* First-run consent. Genuinely revisitable now, via Settings →
-              Permissions (AtlasSettings.tsx). The comment that used to sit here
-              claimed that was already true; it was not — before T4 part 2 this
-              route was referenced only by OnboardingGate and Auth, which made
-              AtlasPermissions' own "you can change it later" a broken promise. */}
-          <Route path="/permissions" element={<AtlasPermissions />} />
-
-          {/* `/atlas-core-legacy` used to sit here, pointing at pages/AtlasCore
-              and the 34-file src/components/atlas-health tree behind it. Both
-              are deleted (T4 part 3). Nothing linked to the route; the panels
-              worth keeping were absorbed first — Agent CRUD, schedules, tool
-              calls and the run timeline into Atlas Core's Agent tab, usage and
-              cost into Settings → Budget, the memory tab and the error log into
-              Atlas Core. The five settings panels that were always live still
-              live in atlas-health/ and are mounted from AtlasSettings.
-              An older comment here sent readers to docs/ROADMAP.md "before
-              reviving or deleting any of it"; that cross-reference resolved to
-              nothing — the roadmap's one do-not-clean-up rule is about
-              supabase/functions/_shared, not this tree. */}
-          <Route path="/atlas-sphere" element={<AtlasSphereGallery />} />
-          <Route path="/atlas-architecture" element={<AtlasArchitecture />} />
-          <Route path="/atlas-teach" element={<AtlasTeach />} />
-          <Route path="/versions" element={<AtlasVersions />} />
-          <Route path="/agent-view" element={<AtlasAgentView />} />
-          <Route path="/design-sync" element={<AtlasDesignSync />} />
-          <Route path="/tests" element={<AtlasTests />} />
-
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-        </Suspense>
+          <AppRoutes overrides={ROUTE_OVERRIDES} fallback={<PageLoader />} />
         </RouteErrorBoundary>
       </BrowserRouter>
     </TooltipProvider>

@@ -54,9 +54,10 @@ export const surface: {
   icon: string;
   entry: 'dock' | 'menu';
   mock: boolean;
+  edition: 'consumer' | 'admin';
 } = {
   path: '/model-lab',
-  label: 'Model Lab',
+  label: 'Model lab',
   icon: 'FlaskConical',
   // The handoff's own eyebrow reads "Model lab · admin". It is an inspection
   // surface for one person, not one of the five things Atlas is for, so it
@@ -66,6 +67,9 @@ export const surface: {
   // a live read. The Providers tab is real. `true` is the honest answer for the
   // page as a whole.
   mock: true,
+  // Model ids, the provider key inventory and 30-day spend. Nothing here is a
+  // consumer's business even once every panel is live.
+  edition: 'admin',
 };
 
 type Tab = 'routing' | 'compare' | 'providers';

@@ -9,7 +9,29 @@
  import MemoryArchitectureSection from '@/components/architecture/MemoryArchitectureSection';
  import LearningPipelineSection from '@/components/architecture/LearningPipelineSection';
  import SphereDocumentation from '@/components/architecture/SphereDocumentation';
- 
+
+/**
+ * Registration data. Mirrored in `src/surfaces.ts`, which is what the router,
+ * the dock and the account menu are built from; `surfaces.test.ts` fails if the
+ * two ever disagree.
+ *
+ * Admin: this is documentation ABOUT Atlas — provider tables, the memory
+ * pipeline, the sphere's states — written for whoever builds it. Nothing here
+ * is a thing a user does.
+ *
+ * (This block is deliberately not indented like the rest of the file. Every
+ * other line carries a stray leading space from an old patch; matching it would
+ * spread the mistake.)
+ */
+export const surface = {
+  path: '/atlas-architecture',
+  label: 'How Atlas works',
+  icon: 'Network',
+  entry: 'menu' as const,
+  mock: false,
+  edition: 'admin' as const,
+};
+
  const AtlasArchitecture = () => {
    const [activeTab, setActiveTab] = useState('overview');
  

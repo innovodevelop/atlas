@@ -23,6 +23,14 @@ jobs:
         run: bunx eslint .
       - name: Build
         run: bun run build
+      # Both editions, because they are different Rollup graphs: `bun run build`
+      # is the consumer one, and a bundling failure confined to Lighthouse —
+      # an admin-only lazy import that does not resolve, say — would otherwise
+      # only show up when someone tried to ship it. Type errors are already
+      # covered (tsc -b spans all of src regardless of edition); this covers the
+      # graph. Writes to dist-admin/, so it cannot clobber the consumer output.
+      - name: Build (admin edition)
+        run: bun run build:admin
       # `tests/` is the auth suite (static checks; live tests are opt-in via
       # RUN_LIVE_AUTH_TESTS=1 and skip here). `./src` is every co-located
       # frontend test — 7 files, 119 tests, NONE of which ran in CI before

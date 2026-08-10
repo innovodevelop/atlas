@@ -30,6 +30,25 @@ import { PRESET, STATES, type RGB, type SphereOpts, type SphereState } from '@/l
 import { ATLAS_STATES } from '@/hooks/useAtlasPresence';
 import { Button, Card, Panel } from '@/components/atlas-ui/primitives';
 
+/**
+ * Registration data. Mirrored in `src/surfaces.ts`, which is what the router,
+ * the dock and the account menu are built from; `surfaces.test.ts` fails if the
+ * two ever disagree.
+ *
+ * Admin, and `devOnly` on top of that — the registry entry preserves the
+ * `import.meta.env.DEV` gate the account menu applied by hand. Twenty raw
+ * renderer sliders are a tuning instrument; in a shipped build this stays
+ * URL-only on purpose.
+ */
+export const surface = {
+  path: '/atlas-sphere',
+  label: 'Sphere gallery',
+  icon: 'Orbit',
+  entry: 'menu' as const,
+  mock: false,
+  edition: 'admin' as const,
+};
+
 type EditorKey =
   | 'count' | 'dens' | 'size' | 'soft' | 'whiten' | 'alphaGain'
   | 'morph' | 'amp' | 'pulse' | 'fieldSpread' | 'sphereFrac'

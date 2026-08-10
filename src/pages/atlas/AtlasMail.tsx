@@ -38,6 +38,20 @@ import { MailRulesEditor } from '@/components/atlas-ui/mail/MailRulesEditor';
 import { senderDomain } from '@/components/atlas-ui/mail/mailFormat';
 import '@/styles/mail.css';
 
+/**
+ * Registration data. Mirrored in `src/surfaces.ts`, which is what the router,
+ * the dock and the account menu are built from; `surfaces.test.ts` fails if the
+ * two ever disagree.
+ */
+export const surface = {
+  path: '/mail',
+  label: 'Mail',
+  icon: 'Mail',
+  entry: 'dock' as const,
+  mock: false,
+  edition: 'consumer' as const,
+};
+
 /** True when a keystroke belongs to whatever the user is typing into. */
 const isTyping = (target: EventTarget | null): boolean => {
   const el = target as HTMLElement | null;

@@ -1,13 +1,12 @@
-import { memo, useState } from 'react';
+import { Suspense, lazy, memo, useState } from 'react';
 import { Search, Database, FileText, BookOpen, Loader, Clock, Zap, CheckCircle2, Radio, Brain, Sparkles, Play, Pause, Plus } from 'lucide-react';
 import { useBrainSearch, type SearchMode } from '@/hooks/useBrainSearch';
 import { useAtlasKnowledge } from '@/hooks/useAtlasKnowledge';
 import { useAtlasResearch } from '@/hooks/useAtlasResearch';
-import { useAtlasLearning } from '@/hooks/useAtlasLearning';
-import { useAtlasProviderStatus } from '@/hooks/useAtlasProviderStatus';
 import { useAtlasMemory } from '@/hooks/useAtlasMemory';
-import { AgentTab } from './AtlasAgentTab';
+import { EDITION } from '@/surfaces';
 import { Button, Empty, Panel, Row } from './primitives';
+import { fmtAgo } from './coreTabsShared';
 
 // Atlas Core tab panels — Workshop design's 8-view Core, wired to real data.
 // Each tab was a dead button showing the same static overview; these render
@@ -18,15 +17,6 @@ import { Button, Empty, Panel, Row } from './primitives';
 // seed of the shared primitives and are now imported from ./primitives. The
 // `hue` prop went with them — it drove a coloured panel ring that the
 // borderless rule deletes, and it was passed as a raw HSL triplet.
-
-const fmtAgo = (iso?: string | null) => {
-  if (!iso) return '';
-  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 60) return `${s}s ago`;
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return `${Math.floor(s / 86400)}d ago`;
-};
 
 const SEARCH_MODES: { value: SearchMode; label: string; hint: string }[] = [
   { value: 'keyword', label: 'Exact words', hint: 'Matches the words you typed, locally and instantly.' },
@@ -121,32 +111,6 @@ function SearchTab() {
   );
 }
 
-function LiveTab() {
-  const { providers } = useAtlasProviderStatus();
-  const rows = providers ?? [];
-  return (
-    <div className="coregrid">
-      <Panel icon={<Radio className="i16" />} title="Live connections">
-        {rows.map((p: { provider: string; status?: string; is_available?: boolean }) => {
-          const ok = p.is_available ?? p.status === 'active';
-          return (
-            <Row
-              key={p.provider}
-              lead={<span className="flowdot" style={{ color: ok ? 'var(--grn)' : 'var(--red)' }}><CheckCircle2 className="i16" /></span>}
-              title={<span style={{ textTransform: 'capitalize' }}>{p.provider}</span>}
-              meta={ok ? 'connected' : (p.status || 'offline')}
-              trail={<span className="flowbar" style={{ width: 120 }}><span className="flowfill" style={{ display: 'block', height: '100%', background: ok ? 'var(--grn)' : 'var(--red)', width: ok ? '99%' : '20%' }} /></span>}
-            />
-          );
-        })}
-        {rows.length === 0 && <Empty body="No providers reporting." />}
-      </Panel>
-      <Panel icon={<Zap className="i16" />} title="Ambient">
-        <Row lead={<span className="kbico"><Radio className="i16" /></span>} title={'Listening for "Hey Atlas"'} meta="wake word · ambient" />
-      </Panel>
-    </div>
-  );
-}
 
 // The Agent tab moved to ./AtlasAgentTab in T4 part 2. It was two read-only
 // lists here; it is now the home of the agent CRUD, schedules, tool-call log and
@@ -337,45 +301,43 @@ function MemoryTab() {
   );
 }
 
-function LearningTab() {
-  const { validationLogs, learningMetrics } = useAtlasLearning();
-  const logs = (validationLogs ?? []).slice(0, 6);
-  const m = learningMetrics;
-  return (
-    <div className="coregrid">
-      <Panel icon={<Zap className="i16" />} title="Learning metrics">
-        <Row
-          lead={<span className="flowdot" style={{ color: 'var(--grn)' }}><CheckCircle2 className="i16" /></span>}
-          title="Validation success"
-          meta={`${m.successRate}% pass`}
-          trail={<span className="flowbar" style={{ width: 120 }}><span className="flowfill" style={{ display: 'block', height: '100%', background: 'var(--grn)', width: `${m.successRate}%` }} /></span>}
-        />
-        <Row lead={<span className="flowdot"><Database className="i16" /></span>} title="Knowledge velocity" meta={`${m.knowledgeVelocity}/period`} />
-        <Row lead={<span className="flowdot"><BookOpen className="i16" /></span>} title="Queue depth" meta={`${m.queueDepth} queued`} />
-      </Panel>
-      <Panel icon={<CheckCircle2 className="i16" />} title="Recent validations">
-        {logs.map((v: { id: string; verdict: string; created_at: string; grounding?: string }) => (
-          <Row
-            key={v.id}
-            lead={<span className={`errsev ${v.verdict === 'valid' ? 'sev-i' : v.verdict === 'fake' ? 'sev-e' : 'sev-w'}`} />}
-            title={<span style={{ textTransform: 'capitalize' }}>{v.verdict}{v.grounding ? ` · ${v.grounding}` : ''}</span>}
-            meta={fmtAgo(v.created_at)}
-          />
-        ))}
-        {logs.length === 0 && <Empty body="No validations yet." />}
-      </Panel>
-    </div>
-  );
-}
+
+/**
+ * The agent editor, the tool-call log, the run timeline and the approval queue.
+ *
+ * LAZY, AND ONLY IN ADMIN. Hiding the Agent tab from the consumer tab strip
+ * (AtlasCoreScreen's `visibleTabs`) hides the UI; it does not remove the code —
+ * a static import here pulled AtlasAgentTab into the AtlasCoreScreen chunk
+ * regardless, and `system_prompt`, "No agents yet" and "Run timeline" all
+ * grepped out of a consumer build. `EDITION` is substituted by Vite as a string
+ * literal, so Rollup folds this ternary and the `import()` in the dead branch
+ * emits no chunk at all — the same trick as ADMIN_LOADERS in surfaces.ts.
+ */
+const isAdmin = EDITION === 'admin';
+const AgentTab = isAdmin
+  ? lazy(() => import('./AtlasAgentTab').then((m) => ({ default: m.AgentTab })))
+  : null;
+const LiveTab = isAdmin
+  ? lazy(() => import('./AtlasCoreAdminTabs').then((m) => ({ default: m.LiveTab })))
+  : null;
+const LearningTab = isAdmin
+  ? lazy(() => import('./AtlasCoreAdminTabs').then((m) => ({ default: m.LearningTab })))
+  : null;
+
+/** `null` on a consumer build, and the tab that would render it is not on the
+ *  strip either — the screen's `visibleTabs()` and this table are the two
+ *  halves of one decision, and neither on its own removes any code. */
+const adminOnly = (Tab: React.LazyExoticComponent<() => JSX.Element> | null) =>
+  (Tab ? <Suspense fallback={<Empty body="Loading…" />}><Tab /></Suspense> : null);
 
 export const AtlasCoreTabs = memo(({ tab }: { tab: string }) => {
   switch (tab) {
     case 'search': return <SearchTab />;
-    case 'live': return <LiveTab />;
-    case 'agent': return <AgentTab />;
+    case 'live': return adminOnly(LiveTab);
+    case 'agent': return adminOnly(AgentTab);
     case 'knowledge': return <KnowledgeTab />;
     case 'research': return <ResearchTab />;
-    case 'learning': return <LearningTab />;
+    case 'learning': return adminOnly(LearningTab);
     case 'memory': return <MemoryTab />;
     default: return null;
   }

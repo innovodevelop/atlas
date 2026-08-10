@@ -11,6 +11,28 @@ import { useAtlasHealth } from '@/hooks/useAtlasHealth';
 import { useAtlasKnowledge } from '@/hooks/useAtlasKnowledge';
 import { useAtlasResearch } from '@/hooks/useAtlasResearch';
 import { errorSeverityGlyph, useAtlasErrorLog } from '@/hooks/useAtlasErrorLog';
+import { EDITION, surfaceByPath } from '@/surfaces';
+
+/**
+ * Registration data. Mirrored in `src/surfaces.ts`, which is what the router,
+ * the dock and the account menu are built from; `surfaces.test.ts` fails if the
+ * two ever disagree.
+ *
+ * Consumer, but not wholly: the registry entry carries a `consumerTabs` list,
+ * because `TABS` below mixes "what Atlas knows about me" with operator
+ * instrumentation (Live, Agent, Learning). `visibleTabs()` applies it — until
+ * it did, `consumerTabs` was declared by the registry and read by nothing, and
+ * a consumer build shipped the raw event stream, the agent editor and the
+ * pipeline metrics with the tab strip intact.
+ */
+export const surface = {
+  path: '/atlas-core',
+  label: 'Core',
+  icon: 'Cpu',
+  entry: 'dock' as const,
+  mock: false,
+  edition: 'consumer' as const,
+};
 
 // `badge: 3` was a hardcoded literal on the Agent tab — it never counted
 // anything. The Agent tab's own pending-approvals count is real
@@ -27,12 +49,36 @@ const TABS = [
   { key: 'memory', label: 'Memory', icon: Database },
 ];
 
+/**
+ * The tabs this edition shows.
+ *
+ * Admin (Lighthouse) gets all eight. Consumer gets the five the registry
+ * names — Live is a raw event stream, Agent is agent CRUD plus the tool-call
+ * log and the approval queue, Learning is validation-success rates and
+ * pipeline metrics. None of the three is a thing a person asks Atlas about;
+ * all three were shipping.
+ *
+ * An unfiltered fallback would be wrong in the fail-open direction, so a
+ * registry entry with no `consumerTabs` yields NO tabs rather than every tab —
+ * but `surfaces.test.ts` asserts the entry exists and that every key in it is
+ * real, so the empty case is unreachable rather than merely unlikely.
+ */
+export function visibleTabs(edition: string = EDITION): typeof TABS {
+  if (edition !== 'consumer') return TABS;
+  const allowed = surfaceByPath('/atlas-core')?.consumerTabs ?? [];
+  return TABS.filter((t) => allowed.includes(t.key));
+}
+
 // Atlas Atlas Core — Intelligence Center (design: Atlas — Atlas Core).
 // Top stats are wired to useAtlasHealth; the overview panels use the design's
 // curated content.
 const AtlasCoreScreen = () => {
   const navigate = useNavigate();
   const [tab, setTab] = useState('overview');
+  const tabs = visibleTabs();
+  // A tab hidden by the edition must not be reachable by having been selected:
+  // `tab` is state, and nothing else validates it against what is on screen.
+  const shownTab = tabs.some((t) => t.key === tab) ? tab : (tabs[0]?.key ?? 'overview');
   const { stats } = useAtlasHealth();
 
   return (
@@ -80,10 +126,10 @@ const AtlasCoreScreen = () => {
         </div>
 
         <div className="coretabs">
-          {TABS.map((t) => {
+          {tabs.map((t) => {
             const Icon = t.icon;
             return (
-              <button key={t.key} className={`ctab ${tab === t.key ? 'on' : ''}`} onClick={() => setTab(t.key)}>
+              <button key={t.key} className={`ctab ${shownTab === t.key ? 'on' : ''}`} onClick={() => setTab(t.key)}>
                 <Icon className="i14" />{t.label}
                 {t.live && <span className="live" />}
               </button>
@@ -91,9 +137,9 @@ const AtlasCoreScreen = () => {
           })}
         </div>
 
-        {tab !== 'overview' && <AtlasCoreTabs tab={tab} />}
+        {shownTab !== 'overview' && <AtlasCoreTabs tab={shownTab} />}
 
-        {tab === 'overview' && <OverviewTab knowledgeCount={stats?.knowledgeCount ?? 0} />}
+        {shownTab === 'overview' && <OverviewTab knowledgeCount={stats?.knowledgeCount ?? 0} />}
       </div>
     </div>
   );
@@ -181,16 +227,12 @@ function OverviewTab({ knowledgeCount }: { knowledgeCount: number }) {
 // class whose only job was a 1px divider, plus a `last` prop feeding the
 // matching `.last{border:none}` rule. They are <Row> slots now, and `last` is
 // gone from all four signatures.
-function FlowRow({ icon, title, meta, width }: { icon: React.ReactNode; title: string; meta: string; width: string }) {
-  return (
-    <Row
-      lead={<span className="flowdot">{icon}</span>}
-      title={title}
-      meta={meta}
-      trail={<span className="flowbar" style={{ width: 120 }}><span className="flowfill" style={{ display: 'block', height: '100%', width }} /></span>}
-    />
-  );
-}
+//
+// `FlowRow` itself is gone: it rendered the invented throughput bar
+// (`width` was a fabricated percentage) and lost its only caller when
+// `OverviewTab`'s indexing panel switched to the honest one-number-plus-Empty
+// version above. Kept as dead code it would have been the next screen's
+// temptation to fake a bar width again.
 function KbRow({ title, meta }: { title: string; meta: string }) {
   return <Row lead={<span className="kbico"><FileText className="i16" /></span>} title={title} meta={meta} />;
 }

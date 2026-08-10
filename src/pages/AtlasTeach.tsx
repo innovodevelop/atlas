@@ -10,6 +10,30 @@ import { getBrainEndpoint } from '@/lib/brainClient';
 import { useToast } from '@/hooks/use-toast';
 import { AtlasSphereCanvas } from '@/components/atlas-ui/AtlasSphereCanvas';
 
+/**
+ * Registration data. Mirrored in `src/surfaces.ts`, which is what the router,
+ * the dock and the account menu are built from; `surfaces.test.ts` fails if the
+ * two ever disagree.
+ *
+ * Consumer. The account menu filed this next to the dev surfaces by its own
+ * admission ("the dock is full and neither is a daily surface"), but teaching
+ * Atlas about yourself is the product, not instrumentation: it writes to
+ * `ai_memory`, which is what every other surface recalls from.
+ *
+ * Unrelated and still true: this page has not been ported to atlas-ui — it
+ * still imports shadcn `@/components/ui/button` and uses bordered Tailwind
+ * classes, and its structure does not match `Atlas Teach.dc.html`. Classifying
+ * it consumer is a statement about what it is FOR, not that it is finished.
+ */
+export const surface = {
+  path: '/atlas-teach',
+  label: 'Teach Atlas',
+  icon: 'GraduationCap',
+  entry: 'menu' as const,
+  mock: false,
+  edition: 'consumer' as const,
+};
+
 interface Memory {
   id: string;
   key: string;
@@ -93,7 +117,6 @@ const AtlasTeach = () => {
     onPlaybackEnd: () => {
       // Stay in active mode after speaking - user doesn't need to say wake word again
       setAtlasState('listening');
-      console.log('[Teach] Atlas done speaking, staying in active listening mode');
     },
     onError: (error) => {
       console.error('TTS error:', error);
@@ -209,7 +232,6 @@ const AtlasTeach = () => {
       // In passive mode, check for wake word
       if (listeningMode === 'passive' && !isAwakeRef.current) {
         if (containsWakeWord(text)) {
-          console.log('[Teach] Wake word detected in partial:', text);
           isAwakeRef.current = true;
           setListeningMode('active');
           pendingMessageRef.current = extractMessageAfterWakeWord(text);
@@ -225,7 +247,6 @@ const AtlasTeach = () => {
       }
     },
     onFinalTranscript: async (text) => {
-      console.log('[Teach] Final transcript:', text, 'Mode:', listeningMode, 'isAwake:', isAwakeRef.current);
       setLiveTranscript("");
       
       if (!text.trim()) return;
@@ -238,15 +259,11 @@ const AtlasTeach = () => {
           : text;
         
         if (message.trim()) {
-          console.log('[Teach] Sending to Atlas:', message);
           await sendToAtlas(message);
-        } else {
-          // Wake word only, wait for next utterance
-          console.log('[Teach] Wake word only, waiting for command...');
         }
+        // else: wake word only, wait for next utterance
       } else if (containsWakeWord(text)) {
         // Wake word detected in final transcript
-        console.log('[Teach] Wake word in final transcript');
         isAwakeRef.current = true;
         setListeningMode('active');
         
@@ -263,11 +280,8 @@ const AtlasTeach = () => {
         stopPlayback();
       }
     },
-    onSpeechEnd: () => {
-      console.log('[Teach] Speech ended');
-    },
+    onSpeechEnd: () => {},
     onConnectionChange: (connected) => {
-      console.log('[Teach] Connection changed:', connected);
       if (connected) {
         setVoiceStatus('connected');
         setVoiceError(null);
@@ -330,12 +344,9 @@ const AtlasTeach = () => {
       // Small delay to ensure component is ready
       await new Promise(r => setTimeout(r, 500));
       if (!mounted) return;
-      
-      console.log('[Teach] Auto-connecting Scribe for wake word detection...');
+
       const success = await connect();
-      if (success) {
-        console.log('[Teach] Scribe connected - listening for "Atlas"');
-      } else {
+      if (!success) {
         console.error('[Teach] Scribe auto-connect failed');
       }
     };

@@ -8,7 +8,10 @@ export default tseslint.config(
   // supabase/functions run on Deno (not the browser) and are typechecked
   // separately with `deno check`; linting them with the React/browser config
   // is incorrect. src-tauri is Rust. scripts are one-off Node utilities.
-  { ignores: ["dist", "supabase/functions", "src-tauri", "scripts"] },
+  // `dist-admin` is the Lighthouse (admin edition) frontend build — the same
+  // kind of output as `dist`, produced by `bun run build:admin`. Linting a
+  // minified bundle reports rules that are not configured and fails the gate.
+  { ignores: ["dist", "dist-admin", "supabase/functions", "src-tauri", "scripts"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],

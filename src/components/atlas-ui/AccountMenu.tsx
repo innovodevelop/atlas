@@ -11,15 +11,28 @@
  * Deliberately thin: it routes to things that already exist rather than
  * duplicating them. Account deletion lives in Settings → Memory & Privacy,
  * which owns the typed confirmation and the opt-in local erase.
+ *
+ * ── THE ROWS ARE GENERATED ──────────────────────────────────────────────────
+ *
+ * Every navigation row comes from `menuSurfaces` in src/surfaces.ts. The
+ * hand-written list this replaces is the reason the registry exists: it had
+ * drifted from the pages it linked (`Design Sync` vs `Design sync`,
+ * `Model Lab` vs `Model lab`), and `/home` sat routed-but-unlinked for weeks
+ * because adding a route and adding a link were two separate edits. They are
+ * one edit now — a `surface` export plus a registry entry — and
+ * `surfaces.test.ts` fails if the two disagree.
+ *
+ * It is also the second half of the edition split. `menuSurfaces` contains no
+ * admin entry in a consumer build, so this menu cannot offer a door to a screen
+ * that is not in the bundle; there is no `edition === 'admin' &&` conditional
+ * here to forget, because there is nothing to hide.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  LogOut, Settings as SettingsIcon, ShieldX, BadgeCheck,
-  GraduationCap, Network, Orbit, Mic,
-  GitBranch, Monitor, Palette, TestTube2,
-} from 'lucide-react';
+import { LogOut, Settings as SettingsIcon, ShieldX, BadgeCheck } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { menuSurfaces } from '@/surfaces';
+import { surfaceIcon } from './surfaceIcons';
 
 interface Props {
   onClose: () => void;
@@ -53,6 +66,23 @@ export function AccountMenu({ onClose, onOpenSettings }: Props) {
   const plan = entitlement?.plan ?? 'free';
   const status = entitlement?.status;
 
+  // Two groups, one separator between them. In a consumer build the admin group
+  // is empty and the separator is not drawn — a menu that ends in a rule with
+  // nothing under it is how a hidden section announces itself.
+  const [personal, operator] = useMemo(() => [
+    menuSurfaces.filter((s) => s.edition === 'consumer'),
+    menuSurfaces.filter((s) => s.edition === 'admin'),
+  ], []);
+
+  const row = (path: string, label: string, icon: string) => {
+    const Icon = surfaceIcon(icon);
+    return (
+      <button key={path} className="acctitem" role="menuitem" onClick={() => go(path)}>
+        <Icon className="i16" /><span>{label}</span>
+      </button>
+    );
+  };
+
   return (
     <div className="acctmenu" ref={ref} role="menu" aria-label="Account">
       <div className="acctid">
@@ -75,67 +105,10 @@ export function AccountMenu({ onClose, onOpenSettings }: Props) {
 
       <div className="acctsep" />
 
-      {/* /atlas-teach and /atlas-architecture were routed but linked from
-          nowhere — you could only reach them by typing the URL. The dock is
-          full (eight items) and neither is a daily surface, so they land here
-          rather than crowding it. */}
-      <button className="acctitem" role="menuitem" onClick={() => go('/atlas-teach')}>
-        <GraduationCap className="i16" /><span>Teach Atlas</span>
-      </button>
+      {personal.map((s) => row(s.path, s.label, s.icon))}
 
-      <button className="acctitem" role="menuitem" onClick={() => go('/atlas-architecture')}>
-        <Network className="i16" /><span>How Atlas works</span>
-      </button>
-
-      {/* The T3 surfaces. Menu, not dock — four of them (Smart home, Health,
-          Money, Widget sheet) run on clearly-labelled sample data because no
-          adapter exists yet, and a surface with nothing behind it should not
-          take a primary slot. They move to the dock the day real data lands.
-          Routed AND linked together: `/atlas-teach` and `/atlas-architecture`
-          above were routed-but-unreachable for weeks, which is the exact
-          regression this menu exists to prevent. */}
-      <button className="acctitem" role="menuitem" onClick={() => go('/onboarding')}>Onboarding</button>
-      <button className="acctitem" role="menuitem" onClick={() => go('/widgets')}>Widget catalog</button>
-      <button className="acctitem" role="menuitem" onClick={() => go('/widget-sheet')}>Widget sheet</button>
-      <button className="acctitem" role="menuitem" onClick={() => go('/answer-views')}>Answer views</button>
-      <button className="acctitem" role="menuitem" onClick={() => go('/model-lab')}>Model lab</button>
-
-      <div className="acctsep" />
-      <button className="acctitem" role="menuitem" onClick={() => go('/versions')}>
-        <GitBranch className="i16" /><span>Versions</span>
-      </button>
-      <button className="acctitem" role="menuitem" onClick={() => go('/agent-view')}>
-        <Monitor className="i16" /><span>Agent view</span>
-      </button>
-      <button className="acctitem" role="menuitem" onClick={() => go('/design-sync')}>
-        <Palette className="i16" /><span>Design sync</span>
-      </button>
-      <button className="acctitem" role="menuitem" onClick={() => go('/tests')}>
-        <TestTube2 className="i16" /><span>Tests</span>
-      </button>
-      <button className="acctitem" role="menuitem" onClick={() => go('/smart-home')}>Smart home</button>
-      <button className="acctitem" role="menuitem" onClick={() => go('/health')}>Health</button>
-      <button className="acctitem" role="menuitem" onClick={() => go('/money')}>Money</button>
-      <button className="acctitem" role="menuitem" onClick={() => go('/browser')}>Browser</button>
-
-      {/* `/home` — the voice-first landing — was routed in App.tsx and linked
-          from nowhere: a whole product surface (its own chat session, voice
-          session and sphere) that no user could reach without typing the URL.
-          Exactly the regression the two items above record being fixed; this
-          one was missed. It lands here rather than in the dock for the same
-          reason they did — the dock is full and this is not a daily surface. */}
-      <button className="acctitem" role="menuitem" onClick={() => go('/home')}>
-        <Mic className="i16" /><span>Voice home</span>
-      </button>
-
-      {/* The sphere gallery is a design/QA tool, not a product screen, so it is
-          exposed in development builds only. In a shipped build it stays
-          URL-only by choice — see App.tsx. */}
-      {import.meta.env.DEV && (
-        <button className="acctitem" role="menuitem" onClick={() => go('/atlas-sphere')}>
-          <Orbit className="i16" /><span>Sphere gallery (dev)</span>
-        </button>
-      )}
+      {operator.length > 0 && <div className="acctsep" />}
+      {operator.map((s) => row(s.path, s.label, s.icon))}
 
       <div className="acctsep" />
 

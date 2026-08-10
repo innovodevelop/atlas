@@ -4,7 +4,7 @@ import {
   Play, Wrench, ChevronDown, ChevronUp, ListTree, X, Check,
 } from 'lucide-react';
 import { useAgents, type Agent, type AgentFormData } from '@/hooks/useAgents';
-import { useApprovals } from '@/hooks/useApprovals';
+import { useApprovals, describeOutcome } from '@/hooks/useApprovals';
 import { useSchedules } from '@/hooks/useSchedules';
 import { useToolCalls } from '@/hooks/useToolCalls';
 import { useAgentRuns } from '@/hooks/useAgentRuns';
@@ -431,26 +431,33 @@ function AgentsPanel() {
 // waiting on consent and never able to grant or refuse one — the highest-
 // severity capability loss in the tree.
 //
-// Reject takes a mandatory reason (the hook's signature requires it, and the
-// reason is what the agent gets told), so rejecting opens the inline confirm
-// rather than firing on one click. Approving is one click: it is the
-// non-destructive direction and the row already states what it is approving.
+// Rejecting still takes a second click, because refusing is the direction that
+// throws work away — but it no longer collects a REASON. The old inline form
+// promised "the agent is told the reason" and then delivered that promise by
+// UPDATE-ing `approvals.reason` from the webview; that direct row write is
+// precisely the defect (see the header comment in useApprovals.ts) and
+// `approval_resolve` has no `reason` argument to carry it instead. Rather than
+// keep a control whose stated effect the code cannot produce, the confirm now
+// says only what is true. Restoring it needs the parameter added in Rust.
+//
+// WHAT THE USER SEES AFTERWARDS: the pending card leaves the list the moment
+// Rust settles the row, so the outcome is rendered in its own block below —
+// ran / failed / rejected / expired, each dismissible. Before this, an approved
+// action that failed to execute simply vanished along with the card, which made
+// "did it actually happen?" unanswerable on the one screen whose job is to
+// answer it.
 // ---------------------------------------------------------------------------
 
 function ApprovalsPanel() {
-  const { approvals, approveRequest, rejectRequest } = useApprovals();
+  const { approvals, approveRequest, rejectRequest, outcomes, dismissOutcome, resolvingId } = useApprovals();
   const pending = (approvals ?? []).filter((a) => a.status === 'pending');
   const [rejecting, setRejecting] = useState<string | null>(null);
-  const [reason, setReason] = useState('');
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   const act = async (id: string, fn: () => Promise<unknown>) => {
-    setBusy(id);
-    setError(null);
-    try { await fn(); } catch (e) {
-      setError(e instanceof Error ? e.message : 'That did not go through.');
-    } finally { setBusy(null); }
+    // The hook never throws for a resolvable approval — an op that ran and
+    // failed comes back as a `failed` outcome, which is rendered, not swallowed.
+    await fn();
+    setRejecting((cur) => (cur === id ? null : cur));
   };
 
   return (
@@ -460,7 +467,16 @@ function ApprovalsPanel() {
           <Row
             lead={<span className="kbico"><AlertTriangle className="i16" /></span>}
             title={a.action_summary}
-            meta={`${a.risk_level || 'review'} · ${fmtAgo(a.created_at)}`}
+            // WHY confirmation is being asked for, not only what for. Rust
+            // computes the reason (`policy::ApprovalReason`) and, until this
+            // round, returned it to the caller without ever writing it to the row
+            // — so the one screen whose job is to justify the question showed only
+            // the action. `action_summary` now also carries what Atlas' local copy
+            // says about the object (subject, participants), because before that
+            // the whole card was an opaque local uuid the user has never seen.
+            meta={[a.risk_level || 'review', a.reason, fmtAgo(a.created_at)]
+              .filter(Boolean)
+              .join(' · ')}
             trail={
               <span className="fx ac gap6">
                 <Button
@@ -468,7 +484,11 @@ function ApprovalsPanel() {
                   variant="ghost"
                   aria-label={`Approve: ${a.action_summary}`}
                   title="Approve"
-                  loading={busy === a.id && rejecting !== a.id}
+                  // Both buttons go dead while THIS row is in flight: the Rust
+                  // side has a real race reachable from a double-click, and an
+                  // unclickable button is the cheap half of that fix.
+                  loading={resolvingId === a.id && rejecting !== a.id}
+                  disabled={resolvingId === a.id}
                   onClick={() => void act(a.id, () => approveRequest(a.id))}
                 >
                   <Check className="i14" />
@@ -478,7 +498,8 @@ function ApprovalsPanel() {
                   variant="danger"
                   aria-label={`Reject: ${a.action_summary}`}
                   title="Reject"
-                  onClick={() => { setRejecting(a.id); setReason(''); }}
+                  disabled={resolvingId === a.id}
+                  onClick={() => setRejecting(a.id)}
                 >
                   <X className="i14" />
                 </Button>
@@ -488,38 +509,42 @@ function ApprovalsPanel() {
           {rejecting === a.id && (
             <Panel tone="recessed" pad="sm" className="col gap10">
               <p className="fs12 m0" style={{ color: 'var(--ink2)', lineHeight: 1.5 }}>
-                Why are you refusing this? The agent is told the reason, so it can
-                pick a different route instead of retrying the same one.
+                Refuse this? Atlas is told you said no, and the queued action is
+                thrown away. It is not told why — say that in chat if it matters.
               </p>
-              <textarea
-                className="field"
-                rows={2}
-                value={reason}
-                aria-label="Reason for rejecting"
-                placeholder="Not this account / too broad / do it manually…"
-                onChange={(e) => setReason(e.target.value)}
-              />
               <div className="fx ac gap8">
                 <Button
                   variant="danger" size="sm" icon={<X className="i14" />}
-                  disabled={!reason.trim()}
-                  loading={busy === a.id}
-                  onClick={() => void act(a.id, async () => {
-                    await rejectRequest(a.id, reason.trim());
-                    setRejecting(null);
-                    setReason('');
-                  })}
+                  loading={resolvingId === a.id}
+                  disabled={resolvingId === a.id}
+                  onClick={() => void act(a.id, () => rejectRequest(a.id))}
                 >
                   Reject
                 </Button>
-                <Button size="sm" onClick={() => setRejecting(null)}>Cancel</Button>
+                <Button size="sm" disabled={resolvingId === a.id} onClick={() => setRejecting(null)}>Cancel</Button>
               </div>
             </Panel>
           )}
         </div>
       ))}
       {pending.length === 0 && <Empty body="Nothing waiting on you." status="resting" />}
-      {error && <p className="fs12" style={{ color: 'var(--negative)' }}>{error}</p>}
+      {outcomes.map((o) => {
+        const d = describeOutcome(o);
+        const color = d.tone === 'good' ? 'var(--positive)' : d.tone === 'bad' ? 'var(--negative)' : 'var(--ink2)';
+        return (
+          <Panel key={o.approvalId} tone="recessed" pad="sm" className="col gap6">
+            <div className="fx ac gap8">
+              <p className="fs12 m0" style={{ color, lineHeight: 1.5, flex: 1 }}>{d.title}</p>
+              <Button size="sm" aria-label="Dismiss" onClick={() => dismissOutcome(o.approvalId)}>Dismiss</Button>
+            </div>
+            {d.detail && (
+              <p className="fs12 m0" style={{ color: 'var(--ink2)', lineHeight: 1.5, wordBreak: 'break-word' }}>
+                {d.detail}
+              </p>
+            )}
+          </Panel>
+        );
+      })}
     </Panel>
   );
 }

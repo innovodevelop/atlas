@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Minimize2, Mic, Mail, Wallet, LineChart, Plus, Check, RefreshCw, Trash2, Link2, Brain, Sparkles, Download, Music, ShieldCheck } from 'lucide-react';
 import { VoiceSettingsPanel } from '@/components/atlas-health/VoiceSettingsPanel';
 import { MemoryPrivacyPanel } from '@/components/atlas-health/MemoryPrivacyPanel';
 import { PersonalityPanel } from '@/components/atlas-health/PersonalityPanel';
 import { SoftwareUpdatePanel } from '@/components/atlas-health/SoftwareUpdatePanel';
-import { AtlasBudgetTab } from '@/components/atlas-ui/AtlasBudgetTab';
+import { EDITION } from '@/surfaces';
 import { useMailIntelligence } from '@/hooks/useMailIntelligence';
 import { usePortfolio } from '@/hooks/usePortfolio';
 import { useMusicPlayer } from '@/hooks/useMusicPlayer';
@@ -62,10 +62,47 @@ const TABS: { key: SettingsTab; label: string; icon: typeof Mic }[] = [
  */
 export type SettingsMode = 'overlay' | 'route';
 
+/**
+ * Tabs the consumer edition does NOT show.
+ *
+ * Budget & AI is per-tier token accounting, spend history, provider health and
+ * an emergency kill switch — operator instrumentation for the person running
+ * the fleet, not a setting a person changes about their assistant. It was
+ * shipping in the consumer bundle with no gate of any kind: "Emergency Stop",
+ * "Spent (30d)", "Token usage by tier" and "Usage & cost analytics" all grepped
+ * out of dist/assets, on the entry chunk, reachable from first paint.
+ *
+ * A LIST OF WHAT TO REMOVE, not a list of what to keep, deliberately: a new
+ * tab added tomorrow ships to consumers unless someone decides otherwise, which
+ * is the right default for a settings screen and the wrong one for a
+ * capability gate. `budget` is the only capability here.
+ */
+const ADMIN_ONLY_TABS: readonly SettingsTab[] = ['budget'];
+
+/**
+ * LAZY, AND ONLY IN ADMIN. Dropping the tab from the strip hides the screen; a
+ * static import still ships every string in it — the whole spend/telemetry
+ * panel was landing in the consumer ENTRY chunk. `EDITION` is substituted by
+ * Vite as a literal, so Rollup folds this and the dead branch's `import()`
+ * emits nothing. Same device as ADMIN_LOADERS in surfaces.ts.
+ */
+const AtlasBudgetTab = EDITION === 'admin'
+  ? lazy(() => import('@/components/atlas-ui/AtlasBudgetTab').then((m) => ({ default: m.AtlasBudgetTab })))
+  : null;
+
+export function visibleSettingsTabs(edition: string = EDITION): typeof TABS {
+  if (edition !== 'consumer') return TABS;
+  return TABS.filter((t) => !ADMIN_ONLY_TABS.includes(t.key));
+}
+
 export const AtlasSettings = ({
   onClose, initialTab, mode = 'overlay',
 }: { onClose: () => void; initialTab?: SettingsTab; mode?: SettingsMode }) => {
   const [tab, setTab] = useState<SettingsTab>(initialTab ?? 'voice');
+  const tabs = visibleSettingsTabs();
+  // `initialTab` is a prop and deep links exist, so a hidden tab must not be
+  // reachable by being asked for — the strip and the body agree on one value.
+  const shownTab = tabs.some((t) => t.key === tab) ? tab : (tabs[0]?.key ?? 'voice');
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -86,7 +123,7 @@ export const AtlasSettings = ({
       <div className="ebody">
         <div className="col gap16" style={{ width: '28%', minWidth: 260 }}>
           <Panel pad="sm" className="col" style={{ gap: 4 }}>
-            {TABS.map((t) => {
+            {tabs.map((t) => {
               const Icon = t.icon;
               return (
                 <Button
@@ -94,12 +131,12 @@ export const AtlasSettings = ({
                   variant="text"
                   icon={<Icon className="i16" />}
                   onClick={() => setTab(t.key)}
-                  aria-current={tab === t.key ? 'true' : undefined}
+                  aria-current={shownTab === t.key ? 'true' : undefined}
                   style={{
                     justifyContent: 'flex-start', width: '100%', padding: '0 12px',
-                    background: tab === t.key ? 'var(--wash)' : 'transparent',
-                    color: tab === t.key ? 'var(--acc-text)' : 'var(--ink2)',
-                    fontWeight: tab === t.key ? 600 : 500,
+                    background: shownTab === t.key ? 'var(--wash)' : 'transparent',
+                    color: shownTab === t.key ? 'var(--acc-text)' : 'var(--ink2)',
+                    fontWeight: shownTab === t.key ? 600 : 500,
                   }}
                 >
                   {t.label}
@@ -110,15 +147,17 @@ export const AtlasSettings = ({
         </div>
         <div className="f1 col gap16" style={{ overflowY: 'auto' }}>
           <Panel nested fill>
-            {tab === 'voice' && <VoiceSettingsPanel />}
-            {tab === 'mail' && <MailSettings />}
-            {tab === 'portfolio' && <PortfolioSettings />}
-            {tab === 'music' && <MusicSettings />}
-            {tab === 'budget' && <AtlasBudgetTab />}
-            {tab === 'personality' && <PersonalityPanel />}
-            {tab === 'memory' && <MemoryPrivacyPanel />}
-            {tab === 'permissions' && <PermissionsSettings onClose={onClose} mode={mode} />}
-            {tab === 'updates' && <SoftwareUpdatePanel />}
+            {shownTab === 'voice' && <VoiceSettingsPanel />}
+            {shownTab === 'mail' && <MailSettings />}
+            {shownTab === 'portfolio' && <PortfolioSettings />}
+            {shownTab === 'music' && <MusicSettings />}
+            {shownTab === 'budget' && AtlasBudgetTab && (
+              <Suspense fallback={null}><AtlasBudgetTab /></Suspense>
+            )}
+            {shownTab === 'personality' && <PersonalityPanel />}
+            {shownTab === 'memory' && <MemoryPrivacyPanel />}
+            {shownTab === 'permissions' && <PermissionsSettings onClose={onClose} mode={mode} />}
+            {shownTab === 'updates' && <SoftwareUpdatePanel />}
           </Panel>
         </div>
       </div>
