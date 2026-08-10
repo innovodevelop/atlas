@@ -238,3 +238,64 @@ test("mail_accounts projection: encrypted_refresh_token cannot survive pickAccou
   expect("encrypted_refresh_token" in account).toBe(false);
   expect(JSON.stringify(account)).not.toContain("SECRET-TOKEN");
 });
+
+// ---------------------------------------------------------------------------
+// Boolean filters. SQLite stores flags as INTEGER 0/1, and this shim's job is
+// to let callers keep the old client's API — so `.eq('col', false)` must work.
+//
+// It did not. `0 === false` is false and `String(0) === String(false)` is
+// `"0" === "false"`, so a boolean filter matched NO ROW EVER, silently. Three
+// live call sites were dead because of it: useAtlasHealth.ts:39 (`resolved`)
+// and useMailIntelligence.ts:77,150 (`acknowledged`). Nothing threw and nothing
+// logged — an always-empty result is indistinguishable from "nothing to report",
+// which is why it survived a green suite.
+// ---------------------------------------------------------------------------
+
+test("eq matches a stored 0/1 flag against a JS boolean, in both directions", async () => {
+  await supabase.from("atlas_error_logs").insert([
+    { id: "e-open-1", user_id: "u-bool", error_type: "x", error_message: "still broken", resolved: false },
+    { id: "e-open-2", user_id: "u-bool", error_type: "x", error_message: "also broken", resolved: false },
+    { id: "e-done-1", user_id: "u-bool", error_type: "x", error_message: "fixed", resolved: true },
+  ]);
+
+  // This is the exact query useAtlasHealth.ts:39 makes.
+  const open = await supabase.from("atlas_error_logs").select().eq("user_id", "u-bool").eq("resolved", false);
+  expect(open.data?.length).toBe(2);
+
+  const closed = await supabase.from("atlas_error_logs").select().eq("user_id", "u-bool").eq("resolved", true);
+  expect(closed.data?.length).toBe(1);
+
+  // The integer spelling must keep working — callers use both.
+  const openAsInt = await supabase.from("atlas_error_logs").select().eq("user_id", "u-bool").eq("resolved", 0);
+  expect(openAsInt.data?.length).toBe(2);
+});
+
+test("neq and in agree with eq about booleans", async () => {
+  const notOpen = await supabase.from("atlas_error_logs").select().eq("user_id", "u-bool").neq("resolved", false);
+  expect(notOpen.data?.length).toBe(1);
+
+  // `in` compared with .includes(), which has the same identity problem.
+  const either = await supabase
+    .from("atlas_error_logs").select().eq("user_id", "u-bool").in("resolved", [true, false]);
+  expect(either.data?.length).toBe(3);
+});
+
+test("a boolean eq filter reaches Rust as 0/1, so update targets the right rows", async () => {
+  // eqFilterObj() is handed to db_update/db_delete, where the column is
+  // INTEGER. An un-normalised `false` there updates nothing at all — the
+  // dangerous half of this bug, because it fails silently and looks like a
+  // no-op rather than an error.
+  const { data } = await supabase
+    .from("atlas_error_logs")
+    .update({ error_message: "swept" })
+    .eq("user_id", "u-bool")
+    .eq("resolved", false)
+    .select();
+
+  expect(data?.length).toBe(2);
+  expect(data?.every((r: any) => r.error_message === "swept")).toBe(true);
+
+  // And the resolved row was left alone.
+  const untouched = await supabase.from("atlas_error_logs").select().eq("id", "e-done-1").single();
+  expect(untouched.data?.error_message).toBe("fixed");
+});

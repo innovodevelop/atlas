@@ -92,6 +92,39 @@ interface Filter {
   val: unknown;
 }
 
+/**
+ * A JS boolean as SQLite actually stores it.
+ *
+ * SQLite has no boolean type; every flag column in db_schema.sql is
+ * `INTEGER NOT NULL DEFAULT 0` and comes back as the number 0 or 1. This shim
+ * exists to let callers keep writing the old client's API, so a caller writing
+ * `.eq('resolved', false)` is not making a mistake — the shim owes them the
+ * translation.
+ *
+ * It did not provide it, and the failure was SILENT AND TOTAL. `0 === false` is
+ * false and `String(0) === String(false)` is `"0" === "false"`, so the old
+ * comparison matched NO ROW EVER. Three live call sites were affected:
+ * useAtlasHealth.ts:39 (`resolved`) reported zero unresolved errors forever, so
+ * the health signal could never fire; useMailIntelligence.ts:77,150
+ * (`acknowledged`) returned no alerts, so mail alerts never surfaced anywhere —
+ * including as a salience signal for the greeting. Nothing threw, nothing
+ * logged, and an empty result is indistinguishable from "nothing to report".
+ */
+const sqlBool = (v: unknown): unknown => (typeof v === "boolean" ? (v ? 1 : 0) : v);
+
+/**
+ * Compare a stored cell against a filter value the way the old client would.
+ *
+ * Booleans are normalised on BOTH sides, then the pre-existing string
+ * comparison is kept so `"1"` still matches `1` — that leniency was already
+ * relied upon and narrowing it here would be a separate, unrelated change.
+ */
+const sameCell = (cell: unknown, val: unknown): boolean => {
+  const a = sqlBool(cell);
+  const b = sqlBool(val);
+  return a === b || String(a) === String(b);
+};
+
 function likeToRegExp(pattern: string, flags: string): RegExp {
   const esc = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/%/g, ".*").replace(/_/g, ".");
   return new RegExp(`^${esc}$`, flags);
@@ -172,7 +205,10 @@ class QueryBuilder<T = any> implements PromiseLike<Result<T>> {
 
   private eqFilterObj(): Row {
     const o: Row = {};
-    for (const f of this.filters) if (f.op === "eq") o[f.col] = f.val;
+    // sqlBool, not f.val: this object is handed to Rust for db_select /
+    // db_update / db_delete, where the column is INTEGER. A raw `false` would
+    // be compared against 0 there and match nothing — see the note on sqlBool.
+    for (const f of this.filters) if (f.op === "eq") o[f.col] = sqlBool(f.val) as Row[string];
     return o;
   }
 
@@ -181,14 +217,14 @@ class QueryBuilder<T = any> implements PromiseLike<Result<T>> {
       this.filters.every((f) => {
         const cell = r[f.col];
         switch (f.op) {
-          case "eq": return cell === f.val || String(cell) === String(f.val);
-          case "neq": return cell !== f.val;
+          case "eq": return sameCell(cell, f.val);
+          case "neq": return !sameCell(cell, f.val);
           case "gt": return (cell as number) > (f.val as number);
           case "gte": return (cell as number) >= (f.val as number);
           case "lt": return (cell as number) < (f.val as number);
           case "lte": return (cell as number) <= (f.val as number);
-          case "in": return (f.val as unknown[]).includes(cell);
-          case "is": return cell === f.val || (f.val === null && cell == null);
+          case "in": return (f.val as unknown[]).some((v) => sameCell(cell, v));
+          case "is": return f.val === null ? cell == null : sameCell(cell, f.val);
           case "like": return likeToRegExp(f.val as string, "").test(String(cell));
           case "ilike": return likeToRegExp(f.val as string, "i").test(String(cell));
           default: return true;
