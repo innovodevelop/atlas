@@ -88,16 +88,11 @@ release exists, a rotation costs every user a manual reinstall.
    public key won't match any new keypair — and every user must manually
    reinstall.
 
-> ⚠️ **The updater endpoint points at a repo this machine cannot push to.**
-> `plugins.updater.endpoints` is
-> `https://github.com/HelloAtlasAI/helloatlas/releases/latest/download/latest.json`,
-> and `gh api repos/HelloAtlasAI/helloatlas` reports `push: false, admin: false`
-> for the signed-in account (`innovodevelop`) on a **public** repo. Whoever
-> controls that repo controls what every installed Atlas is offered as an
-> update; the signature check is the only thing standing behind it. Either
-> obtain admin on it or repoint the endpoint at a repo we do control, and do it
-> before the first release — not after. Tracked as the "release home repo"
-> decision.
+> **Resolved 2026-08-10.** Both updater endpoints previously named
+> `HelloAtlasAI/helloatlas`, a **public** repo the signed-in account has no push
+> or admin rights on — so the app trusted an update feed we could neither
+> publish to nor control. They now name `innovodevelop/helloatlas-1`. Details
+> and the guard that keeps them honest are in §5.
 
 | Secret | What it is | Value |
 |---|---|---|
@@ -195,26 +190,36 @@ the pipeline without burning a version number.
 
 ## 5. How the updater feed works
 
-> **⚠ Unresolved: which repo is the release home?** The endpoint below names
-> `HelloAtlasAI/helloatlas`, but the working branch is pushed to the fork
-> `innovodevelop/helloatlas-1`, and the authenticated account has **no push
-> access** to `HelloAtlasAI/helloatlas`. A tag pushed to the fork publishes the
-> release *on the fork*, while shipped apps would poll `HelloAtlasAI` — a feed
-> that 404s forever. Pick one before the first `v*` tag:
+> **Settled 2026-08-10: the release home is `innovodevelop/helloatlas-1`.**
+> Both updater endpoints now name it, and it is the remote the working branch
+> already tracks and the only one the authenticated account can push to
+> (`gh api repos/HelloAtlasAI/helloatlas` → `push: false, admin: false`).
+> `HelloAtlasAI/helloatlas` remains configured as `origin` but is **not** the
+> release home and nothing ships from it.
 >
-> - **Release from the fork** → change `plugins.updater.endpoints[0]` in
->   `src-tauri/tauri.conf.json` to
->   `https://github.com/innovodevelop/helloatlas-1/releases/latest/download/latest.json`.
-> - **Release from `HelloAtlasAI/helloatlas`** → get push access to that repo
->   and push tags there; the endpoint is already correct.
+> Trusting a repo you cannot push to was the actual risk here, not the
+> inconvenience: whoever controls the endpoint's repo controls what every
+> installed Atlas is offered as an update, and the minisign signature is the
+> only thing standing behind that.
 >
-> The `Verify updater endpoint points at this repo` step in `release.yml` fails
-> the build if these disagree, so this cannot ship wrong silently — but it also
-> means a tag pushed to the fork fails until one of the two is done.
+> The `Verify updater endpoint points at this repo` step in `release.yml`
+> compares `plugins.updater.endpoints[0]` against `$GITHUB_REPOSITORY` and
+> fails the build if they disagree, so a tag pushed to the wrong repo cannot
+> ship a feed nobody serves. Note it reads **only `tauri.conf.json`** —
+> `tauri.lighthouse.conf.json5` has its own endpoint and its own filename
+> (`lighthouse-latest.json`) and is not covered by that guard.
+
+> **The repo name is a fork artifact, and the URL is permanent.**
+> `helloatlas-1` is the name GitHub generated for the fork. That exact string
+> gets compiled into every shipped binary, and while GitHub 301-redirects a
+> renamed repo, the redirect dies the moment anything else claims the old path.
+> Renaming is nearly free until the first release and awkward forever after —
+> so if the release home should be called something else, do it before the
+> first `v*` tag.
 
 - The app's updater config (in `src-tauri/tauri.conf.json`, `plugins.updater`)
   points at the static URL
-  `https://github.com/HelloAtlasAI/helloatlas/releases/latest/download/latest.json`.
+  `https://github.com/innovodevelop/helloatlas-1/releases/latest/download/latest.json`.
   GitHub redirects that to the **latest published, non-prerelease, non-draft**
   release — which is why "publish the draft" is the go-live switch and drafts
   are invisible to users.

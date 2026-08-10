@@ -119,8 +119,14 @@
       // Lighthouse.app the first time a user pressed "check for updates".
       // Until a Lighthouse release feed exists this URL 404s and the check
       // fails closed, which is the correct failure.
+      //
+      // The HOST must track Atlas's endpoint in tauri.conf.json — only the
+      // filename differs. release.yml's endpoint guard only reads
+      // tauri.conf.json, so nothing fails the build if this one is left behind
+      // pointing at a repo we no longer release from; it would just keep
+      // 404ing for a second reason and look identical to the intended failure.
       endpoints: [
-        "https://github.com/HelloAtlasAI/helloatlas/releases/latest/download/lighthouse-latest.json",
+        "https://github.com/innovodevelop/helloatlas-1/releases/latest/download/lighthouse-latest.json",
       ],
     },
   },
