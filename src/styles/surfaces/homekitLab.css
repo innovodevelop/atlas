@@ -1,0 +1,242 @@
+/* HomeKit lab surface — /homekit-lab (admin, Lighthouse).
+ *
+ * Shape borrowed wholesale from designSync.css: same 48/40/80 page padding,
+ * same 34px Hanken headline, same admin eyebrow. A development tool should not
+ * invent a fifth page chrome.
+ *
+ * The one thing this file owns that the others do not is `.hkl-verbatim` — the
+ * block that prints an error EXACTLY as Rust worded it. It is monospaced and
+ * wraps rather than truncating, because a truncated protocol error is a
+ * paraphrase by other means. */
+
+.hkl-surface {
+  padding: 48px 40px 80px;
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.hkl-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.hkl-back {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  cursor: pointer;
+  padding: 6px 0;
+}
+.hkl-title {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 34px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+}
+.hkl-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink3);
+}
+
+/* The standing "this is a dev tool" note. Never dismissible: it is a fact
+   about the screen, not a notification about an event. */
+.hkl-standing-lead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 650;
+  font-size: 14px;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+.hkl-standing-body {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink2);
+}
+
+/* ── accessories ─────────────────────────────────────────────────────────── */
+
+.hkl-count {
+  font-size: 12px;
+  color: var(--ink3);
+  margin-bottom: 10px;
+}
+.hkl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.hkl-acc {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.hkl-acc-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.hkl-acc-title {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--ink);
+}
+.hkl-acc-addr {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: var(--ink3);
+  margin-top: 3px;
+  word-break: break-all;
+}
+.hkl-acc-detail {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink2);
+}
+.hkl-acc-problem {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--amber-text);
+}
+
+.hkl-chip {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.hkl-chip-ok      { background: color-mix(in srgb, var(--grn-text) 14%, transparent); color: var(--grn-text); }
+.hkl-chip-warn    { background: color-mix(in srgb, var(--amber-text) 14%, transparent); color: var(--amber-text); }
+.hkl-chip-blocked { background: color-mix(in srgb, var(--red-text) 14%, transparent); color: var(--red-text); }
+.hkl-chip-neutral { background: var(--rz); color: var(--ink2); }
+
+/* ── the setup code ──────────────────────────────────────────────────────── */
+
+.hkl-pair {
+  display: grid;
+  grid-template-columns: auto 150px auto;
+  align-items: center;
+  gap: 10px;
+}
+.hkl-pair-label {
+  font-size: 12px;
+  color: var(--ink2);
+}
+.hkl-pair-input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--bd);
+  background: var(--surface);
+  color: var(--ink);
+}
+.hkl-pair-help,
+.hkl-pair-blocked {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink3);
+}
+.hkl-pair-help code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+
+/* ── the empty state, which is the point of the screen ───────────────────── */
+
+.hkl-empty-head {
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.hkl-empty-body {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink2);
+  margin-bottom: 10px;
+}
+.hkl-steps {
+  margin: 0 0 12px 18px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink2);
+  list-style: decimal;
+}
+
+/* ── failure ─────────────────────────────────────────────────────────────── */
+
+.hkl-failure-head {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.hkl-verbatim {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--rz);
+  color: var(--ink);
+  /* Wrap, never scroll-and-hide: a clipped protocol error is a paraphrase. */
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.hkl-call {
+  margin-bottom: 10px;
+}
+.hkl-failure-hint,
+.hkl-failure-note,
+.hkl-ok,
+.hkl-note {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--ink2);
+  margin-top: 10px;
+}
+.hkl-note-warn { color: var(--amber-text); }
+.hkl-note code,
+.hkl-foot code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+.hkl-trail {
+  font-size: 11px;
+  color: var(--ink3);
+}
+
+.hkl-foot {
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--ink3);
+  padding-top: 8px;
+}
+
+@media (max-width: 720px) {
+  .hkl-surface { padding: 28px 18px 60px; }
+  .hkl-pair { grid-template-columns: 1fr; }
+  .hkl-pair-input { width: 100%; }
+}
