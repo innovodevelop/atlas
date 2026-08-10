@@ -73,25 +73,30 @@ release exists, a rotation costs every user a manual reinstall.
 > replace the pubkey in `tauri.conf.json`, and every already-installed copy of
 > Atlas stops accepting updates forever.
 
-**Two things you still owe (do them before the first `v*` tag):**
+**CI secrets — DONE 2026-08-10.** Both are set on `innovodevelop/atlas`:
 
-1. Put the private key into the GitHub secret `TAURI_SIGNING_PRIVATE_KEY` on
-   the release home (`innovodevelop/atlas`), and set
-   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` to an **empty string**:
+```bash
+gh secret set TAURI_SIGNING_PRIVATE_KEY --repo innovodevelop/atlas < ~/.tauri/atlas-updater.key
+printf '' | gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD --repo innovodevelop/atlas
+```
 
-   ```bash
-   gh secret set TAURI_SIGNING_PRIVATE_KEY --repo innovodevelop/atlas < ~/.tauri/atlas-updater.key
-   gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD --repo innovodevelop/atlas --body ""
-   ```
+**Pipe the file. Never `cat` it and paste.** Piping never puts the key on a
+screen, in a clipboard, or in a scrollback buffer — and a screen is exactly
+where the last one ended up.
 
-   **Pipe the file. Never `cat` it and paste.** Piping never puts the key on a
-   screen, in a clipboard, or in a scrollback buffer — and a screen is exactly
-   where the last one ended up.
-2. Back the private key file up somewhere outside this Mac (password manager /
-   encrypted backup). `~/.tauri/` is not backed up by anything. If the key is
-   lost, existing installs can never accept another update — their baked-in
-   public key won't match any new keypair — and every user must manually
-   reinstall.
+Note the second command: `--body ""` **hangs**. `gh` treats an empty `--body`
+as "read the value from stdin" and then blocks on the terminal, which looks
+exactly like a network stall. Pipe an empty string instead.
+
+**Still owed, and the last thing standing between a lost Mac and every install
+being stranded:**
+
+- Back the private key file up somewhere outside this Mac (password manager /
+  encrypted backup). `~/.tauri/` is not backed up by anything. GitHub Actions
+  secrets are **write-only** — the copy now in CI cannot be read back out, so it
+  is not a backup. If the local file is lost, existing installs can never accept
+  another update (their baked-in public key won't match any new keypair) and
+  every user must manually reinstall.
 
 > **Resolved 2026-08-10.** Both updater endpoints previously named
 > `HelloAtlasAI/helloatlas`, a **public** repo the signed-in account has no push
