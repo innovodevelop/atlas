@@ -1082,3 +1082,297 @@ CREATE TRIGGER IF NOT EXISTS trg_atlas_design_syncs_updated AFTER UPDATE ON atla
 CREATE TRIGGER IF NOT EXISTS trg_atlas_test_suites_updated AFTER UPDATE ON atlas_test_suites
   FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
   BEGIN UPDATE atlas_test_suites SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+
+-- ###########################################################################
+-- # SMART HOME — begin                                                       #
+-- #                                                                          #
+-- # Everything the smart-home backend (src-tauri/src/home/) owns lives        #
+-- # between this heading and the "SMART HOME — end" marker, in ONE            #
+-- # contiguous block. Other features append AFTER the end marker; nothing     #
+-- # here is interleaved with anything else, so two agents appending to this   #
+-- # file cannot tangle each other's statements.                               #
+-- #                                                                           #
+-- # NO MIGRATION IS NEEDED FOR THESE TABLES. `CREATE TABLE IF NOT EXISTS`     #
+-- # creates a table that does not exist yet, which is every one of these on   #
+-- # every machine — they have never shipped. Only a COLUMN added to an        #
+-- # ALREADY-SHIPPED table needs the `migrate_mail()` pattern in db.rs, since  #
+-- # IF NOT EXISTS silently skips the whole statement when the table is there. #
+-- # If a column is added below AFTER a build ships, that rule applies and a   #
+-- # migration is required.                                                    #
+-- #                                                                           #
+-- # WHAT IS DELIBERATELY NOT HERE: no autonomy/preferences table. The one     #
+-- # autonomy rule that has teeth ("Atlas can lock, but only you unlock") is   #
+-- # enforced by the control-port tier table in Rust, not by a row a caller    #
+-- # could flip. See src-tauri/src/home/mod.rs, `autonomy()`.                  #
+-- ###########################################################################
+
+-- One row per linked home bridge. `kind` is the adapter that serves it.
+CREATE TABLE IF NOT EXISTS home_bridges (
+  id            TEXT PRIMARY KEY,
+  user_id       TEXT NOT NULL,
+  kind          TEXT NOT NULL CHECK (kind IN ('home_assistant','homekit_companion')),
+  name          TEXT NOT NULL,
+  -- Where the bridge is, in whichever form its adapter can act on. Two
+  -- encodings today, and the column is unconstrained TEXT because they do not
+  -- share a grammar:
+  --   home_assistant     the LAN origin, e.g. http://homeassistant.local:8123
+  --   homekit_companion  hap://<AccessoryPairingID>@<host>:<port> — parsed by
+  --                      companion::lan::Target::parse, and the ONLY place the
+  --                      accessory id survives, which is what lets home_unlink
+  --                      name the Keychain item to delete.
+  -- (This said "NULL for the companion bridge, which has no URL to call" until
+  -- the HAP controller gave it one.)
+  base_url      TEXT,
+  -- Richer than the two states the UI type carries on purpose: "unreachable"
+  -- and "unauthorised" are different problems with different fixes, and
+  -- collapsing them at rest would mean the app could never tell the user which
+  -- one happened. The projection in home/store.rs maps this down to the UI's
+  -- connected/not-linked and puts the difference in `detail`, in words.
+  state         TEXT NOT NULL DEFAULT 'not-linked'
+                  CHECK (state IN ('connected','not-linked','unreachable','unauthorised','unavailable')),
+  -- Human sentence under the bridge name. Written by Rust from a real outcome;
+  -- never a guess about a bridge nobody has talked to.
+  detail        TEXT,
+  last_error    TEXT,
+  last_sync_at  TEXT,
+  created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+-- One bridge of each kind per user: linking Home Assistant twice is a mistake,
+-- not a feature, and the unique index makes the sync's upsert well-defined.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_home_bridges_user_kind ON home_bridges(user_id, kind);
+
+CREATE TABLE IF NOT EXISTS home_rooms (
+  id           TEXT PRIMARY KEY,
+  user_id      TEXT NOT NULL,
+  bridge_id    TEXT NOT NULL REFERENCES home_bridges(id) ON DELETE CASCADE,
+  -- The bridge's own id for the room (a Home Assistant area_id). Stable across
+  -- syncs, which is what makes the upsert idempotent.
+  external_id  TEXT NOT NULL,
+  name         TEXT NOT NULL,
+  sort_order   INTEGER NOT NULL DEFAULT 0,
+  created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_home_rooms_bridge_ext ON home_rooms(bridge_id, external_id);
+CREATE INDEX IF NOT EXISTS idx_home_rooms_user ON home_rooms(user_id, sort_order);
+
+-- A device's IDENTITY. What it is currently doing lives in home_device_state,
+-- so a state push rewrites one narrow row and never races the sync that owns
+-- names and rooms.
+CREATE TABLE IF NOT EXISTS home_devices (
+  id           TEXT PRIMARY KEY,
+  user_id      TEXT NOT NULL,
+  bridge_id    TEXT NOT NULL REFERENCES home_bridges(id) ON DELETE CASCADE,
+  room_id      TEXT REFERENCES home_rooms(id) ON DELETE SET NULL,
+  -- The Home Assistant entity_id, e.g. `lock.front_door`. This is what every
+  -- outbound service call addresses; the local uuid never leaves Atlas.
+  external_id  TEXT NOT NULL,
+  name         TEXT NOT NULL,
+  -- SmartDevice.kind in src/lib/mocks/smartHome.ts. `lock` and `garage` are the
+  -- two the control port treats as the lock domain (home/mod.rs LOCK_KINDS).
+  kind         TEXT NOT NULL,
+  control      TEXT NOT NULL CHECK (control IN ('slider','toggle','stepper','segmented','colour','status')),
+  created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_home_devices_bridge_ext ON home_devices(bridge_id, external_id);
+CREATE INDEX IF NOT EXISTS idx_home_devices_room ON home_devices(room_id);
+CREATE INDEX IF NOT EXISTS idx_home_devices_user ON home_devices(user_id, name);
+
+CREATE TABLE IF NOT EXISTS home_scenes (
+  id            TEXT PRIMARY KEY,
+  user_id       TEXT NOT NULL,
+  bridge_id     TEXT NOT NULL REFERENCES home_bridges(id) ON DELETE CASCADE,
+  external_id   TEXT NOT NULL,
+  label         TEXT NOT NULL,
+  -- Whether this scene is known to include a lock or garage entity.
+  --
+  -- DEFAULT 1 IS THE LOAD-BEARING PART: 1 also means "nobody has looked yet",
+  -- and the control port refuses to auto-run a scene whose membership it
+  -- cannot rule locks out of. A scene is a bundle of commands the approvals
+  -- card cannot enumerate, so "unknown" has to fail the same way "yes" does.
+  -- A sync that reads the scene's entity list writes 0 when it sees no lock.
+  touches_locks INTEGER NOT NULL DEFAULT 1 CHECK (touches_locks IN (0,1)),
+  created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_home_scenes_bridge_ext ON home_scenes(bridge_id, external_id);
+CREATE INDEX IF NOT EXISTS idx_home_scenes_user ON home_scenes(user_id, label);
+
+-- The volatile half: what the bridge last said about each device.
+CREATE TABLE IF NOT EXISTS home_device_state (
+  device_id    TEXT PRIMARY KEY REFERENCES home_devices(id) ON DELETE CASCADE,
+  user_id      TEXT NOT NULL,
+  -- NULL means the bridge reported no number. It is NOT 0 — a light Atlas has
+  -- never heard from is not a light at 0%, and storing it as one would be the
+  -- fabrication this product refuses. The projection marks it instead.
+  value        REAL,
+  -- The device's own words for its state ("Locked", "Heating idle"), taken
+  -- from the bridge. Never composed by Atlas.
+  state        TEXT,
+  colour       TEXT,
+  -- 0 when the bridge reports the device unavailable/unknown. The projection
+  -- carries this through so a stale value is shown as stale, not as current.
+  available    INTEGER NOT NULL DEFAULT 1 CHECK (available IN (0,1)),
+  last_changed TEXT,
+  updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+CREATE TRIGGER IF NOT EXISTS trg_home_bridges_updated AFTER UPDATE ON home_bridges
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE home_bridges SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_home_rooms_updated AFTER UPDATE ON home_rooms
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE home_rooms SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_home_devices_updated AFTER UPDATE ON home_devices
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE home_devices SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_home_scenes_updated AFTER UPDATE ON home_scenes
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE home_scenes SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+
+-- ###########################################################################
+-- # SMART HOME — end. Append new, unrelated tables BELOW this line.          #
+-- ###########################################################################
+
+-- ###########################################################################
+-- # HEALTH — begin                                                           #
+-- #                                                                          #
+-- # Everything the health module (src-tauri/src/health/) owns lives between   #
+-- # this heading and the "HEALTH — end" marker, in ONE contiguous block,      #
+-- # appended AFTER the smart-home block and interleaved with nothing.         #
+-- #                                                                          #
+-- # NO MIGRATION IS NEEDED FOR THESE TABLES. `CREATE TABLE IF NOT EXISTS`     #
+-- # creates a table that does not exist yet, which is every one of these on   #
+-- # every machine — they have never shipped. Only a COLUMN added to an        #
+-- # ALREADY-SHIPPED table needs the `migrate_mail()` pattern in db.rs, since  #
+-- # IF NOT EXISTS silently skips the whole statement when the table is there. #
+-- #                                                                          #
+-- # WHAT IS DELIBERATELY NOT HERE: A SAMPLE TABLE.                            #
+-- # There is no `health_samples`, and its absence is the design. An Apple     #
+-- # Health export is millions of Record elements — a night of sleep alone is  #
+-- # dozens of interval samples — and none of that is what any surface asks    #
+-- # for. The widgets ask "7h 12m, deep 1h 40m", which is six numbers, not     #
+-- # six hundred rows. Storing the raw stream would cost hundreds of MB, buy   #
+-- # nothing a card renders, and — the reason that actually decides it —       #
+-- # would put a minute-by-minute record of where a person's body was and      #
+-- # what it was doing into a file on disk. Atlas' published commitment is     #
+-- # that health data never leaves the device; keeping the smallest thing      #
+-- # that answers the question is the same commitment applied to the disk.     #
+-- # So the importer aggregates in memory and writes only derived values.      #
+-- # This is not reversible after the fact: once the export is parsed the      #
+-- # samples are gone, and re-deriving a metric nobody thought of needs the    #
+-- # user's export file again. That is the trade, taken deliberately.          #
+-- ###########################################################################
+
+-- ONE ROW PER (user, calendar day, metric). A derived value, never a sample.
+--
+-- `day` is the LOCAL calendar day the samples carry (Apple writes an explicit
+-- UTC offset on every record, so this is the day the user actually lived, not
+-- a UTC bucket that would split a European evening in two).
+CREATE TABLE IF NOT EXISTS health_metrics (
+  id           TEXT PRIMARY KEY,
+  user_id      TEXT NOT NULL,
+  day          TEXT NOT NULL,                 -- 'YYYY-MM-DD'
+  -- The Atlas metric name, not Apple's type identifier. The mapping lives in
+  -- src-tauri/src/health/import.rs (`METRICS`) and is the only place an
+  -- `HKQuantityTypeIdentifier…` string appears.
+  metric       TEXT NOT NULL,
+  value        REAL NOT NULL,
+  unit         TEXT NOT NULL,
+  -- HOW `value` was derived, stored alongside it because a number whose
+  -- derivation is unknown cannot be honestly described on a card: 8213 'sum'
+  -- is "you walked 8213 steps", 62 'avg' is "your heart averaged 62".
+  stat         TEXT NOT NULL CHECK (stat IN ('sum','avg','duration')),
+  -- How many samples went into it. A day with two heart-rate readings is not
+  -- the same claim as a day with nine hundred, and the surface may say so.
+  sample_count INTEGER NOT NULL DEFAULT 0,
+  -- The device or app the winning total came from ("Magnus' Apple Watch").
+  -- Recorded because the de-duplication rule in import.rs PICKS one source for
+  -- a cumulative metric, and a value whose provenance is hidden cannot be
+  -- checked by the person it is about.
+  source       TEXT,
+  -- Daily range, for an 'avg' metric that has one. NULL for 'sum'/'duration' —
+  -- the min and max of a day's step totals are not a thing that exists.
+  low          REAL,
+  high         REAL,
+  imported_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+-- The upsert key. A second import of an overlapping export REPLACES the day's
+-- derived value rather than adding to it — re-importing must be idempotent,
+-- because the obvious user action after "it worked" is to do it again.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_health_metrics_day ON health_metrics(user_id, day, metric);
+CREATE INDEX IF NOT EXISTS idx_health_metrics_series ON health_metrics(user_id, metric, day DESC);
+
+-- One row per workout. Already derived at the source: a workout IS a summary
+-- (duration, distance, energy), so nothing is being thrown away here.
+CREATE TABLE IF NOT EXISTS health_workouts (
+  id             TEXT PRIMARY KEY,
+  user_id        TEXT NOT NULL,
+  -- Content hash of (activity, start, end, source) — the export gives workouts
+  -- no id of their own, so identity has to be derived from what they are, or a
+  -- second import would duplicate every workout the user has ever done.
+  external_id    TEXT NOT NULL,
+  -- Atlas' name for the activity ('running'), mapped in import.rs from
+  -- HKWorkoutActivityType*. An unmapped type is stored as 'other' rather than
+  -- dropped: the workout happened.
+  activity       TEXT NOT NULL,
+  started_at     TEXT NOT NULL,
+  ended_at       TEXT NOT NULL,
+  day            TEXT NOT NULL,                -- local calendar day of the start
+  duration_min   REAL NOT NULL,
+  distance_km    REAL,
+  energy_kcal    REAL,
+  -- Present only when the export carried a <WorkoutStatistics> average for
+  -- heart rate. NULL means the export did not say — never a computed stand-in.
+  avg_heart_rate REAL,
+  source         TEXT,
+  imported_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_health_workouts_ext ON health_workouts(user_id, external_id);
+CREATE INDEX IF NOT EXISTS idx_health_workouts_day ON health_workouts(user_id, day DESC);
+
+-- What Atlas knows about each way health data could arrive, including the ways
+-- that do not work. `state='unavailable'` is a real, permanent answer on macOS
+-- (see docs/decisions/008): it is what lets the Sources screen say WHY there is
+-- no data instead of rendering an empty list that looks like a bug.
+CREATE TABLE IF NOT EXISTS health_sync_state (
+  id               TEXT PRIMARY KEY,
+  user_id          TEXT NOT NULL,
+  source_kind      TEXT NOT NULL CHECK (source_kind IN ('apple_export','ios_companion')),
+  state            TEXT NOT NULL DEFAULT 'never'
+                     CHECK (state IN ('never','ok','failed','unavailable')),
+  -- The sentence the user reads. Written by Rust from a real outcome.
+  detail           TEXT,
+  -- The export's own <ExportDate>, which is when the data was true — not when
+  -- the file was imported. Those differ by however long the file sat in
+  -- Downloads, and a card that shows the wrong one is lying about freshness.
+  export_date      TEXT,
+  file_name        TEXT,
+  file_bytes       INTEGER,
+  first_day        TEXT,
+  last_day         TEXT,
+  days             INTEGER NOT NULL DEFAULT 0,
+  records_read     INTEGER NOT NULL DEFAULT 0,
+  records_used     INTEGER NOT NULL DEFAULT 0,
+  -- Records that were a metric Atlas derives but could NOT be believed: an
+  -- unparseable date, a value outside the physically possible range, a unit
+  -- nobody mapped. Counted and surfaced rather than silently dropped, because
+  -- "we imported 2 of your 40000 step records" is the only way a user ever
+  -- finds out the parse went wrong.
+  records_rejected INTEGER NOT NULL DEFAULT 0,
+  workouts         INTEGER NOT NULL DEFAULT 0,
+  last_import_at   TEXT,
+  created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_health_sync_state_kind ON health_sync_state(user_id, source_kind);
+
+CREATE TRIGGER IF NOT EXISTS trg_health_sync_state_updated AFTER UPDATE ON health_sync_state
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE health_sync_state SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+
+-- ###########################################################################
+-- # HEALTH — end. Append new, unrelated tables BELOW this line.              #
+-- ###########################################################################

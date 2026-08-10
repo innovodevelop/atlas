@@ -166,6 +166,7 @@ fn allows(cap: &TableCap, col: &str) -> bool {
 /// live `AppHandle` and an open SQLite file cannot be unit-tested. Splitting it
 /// means the allowlist and the user-id injection are covered by tests that run
 /// on every `cargo test`, with no app.
+#[derive(Debug)]
 pub struct Query {
     pub filters: Map<String, Value>,
     pub order_by: String,
@@ -198,7 +199,16 @@ fn plan(
                 continue;
             }
             if !allows(cap, col) {
-                return Err(format!("'{col}' is not a readable column on '{}'", cap.table));
+                // `snippet`, not the raw key: this message goes back to the
+                // model verbatim, and the key came off the wire. An unbounded
+                // one turned a rejection into a bigger context payload than any
+                // success on this op — on a Read-tier path that writes no audit
+                // row and costs one rate-limit token.
+                return Err(format!(
+                    "'{}' is not a readable column on '{}'",
+                    ops_project::snippet(col),
+                    cap.table
+                ));
             }
             filters.insert(col.clone(), value.clone());
         }
@@ -209,7 +219,11 @@ fn plan(
     // future op cannot widen the matrix by naming a column nobody reviewed.
     for (col, value) in extra_filters {
         if !allows(cap, col) {
-            return Err(format!("'{col}' is not a readable column on '{}'", cap.table));
+            return Err(format!(
+                "'{}' is not a readable column on '{}'",
+                ops_project::snippet(col),
+                cap.table
+            ));
         }
         filters.insert((*col).to_string(), value.clone());
     }
@@ -224,7 +238,13 @@ fn plan(
 
     let order_by = match args.get("order_by").and_then(Value::as_str) {
         Some(col) if allows(cap, col) => col.to_string(),
-        Some(col) => return Err(format!("'{col}' is not a sortable column on '{}'", cap.table)),
+        Some(col) => {
+            return Err(format!(
+                "'{}' is not a sortable column on '{}'",
+                ops_project::snippet(col),
+                cap.table
+            ))
+        }
         None => cap.default_order.to_string(),
     };
     let ascending = args
@@ -240,16 +260,15 @@ fn plan(
     Ok(Query { filters, order_by, ascending, limit })
 }
 
-/// Run one allowlisted read and return the projected, capped list.
-pub fn read(
+/// Run the planned query. Everything untrusted was decided in `plan`; this is
+/// the I/O, and it is the only part of a read that cannot be unit-tested.
+fn fetch(
     app: &AppHandle,
-    table: &'static str,
+    cap: &TableCap,
     args: &Value,
     ctx: &Ctx,
     extra_filters: &[(&str, Value)],
 ) -> Result<Value, String> {
-    let cap = cap_for(table)
-        .ok_or_else(|| format!("'{table}' is not a table the control port can read"))?;
     let q = plan(cap, args, ctx, extra_filters)?;
 
     // The one long-lived WAL connection, from the same managed state the IPC
@@ -260,40 +279,81 @@ pub fn read(
         .try_state::<crate::db::DbState>()
         .ok_or_else(|| "the local database is not open yet".to_string())?;
 
-    let rows = crate::db::db_select(
+    crate::db::db_select(
         state,
         cap.table.to_string(),
         Some(q.filters),
         Some(q.order_by),
         Some(q.ascending),
         Some(q.limit),
-    )?;
+    )
+}
 
-    let projected: Vec<Value> = rows
-        .as_array()
+/// Project every returned row down to the table's readable columns.
+fn project(rows: &Value, cap: &TableCap) -> Vec<Value> {
+    rows.as_array()
         .map(|a| a.iter().map(|r| ops_project::pick(r, cap.columns)).collect())
-        .unwrap_or_default();
-    Ok(ops_project::capped(projected))
+        .unwrap_or_default()
+}
+
+/// What a LIST read hands back: projected rows under the size cap, with
+/// anything that did not fit reported as `truncated`.
+pub fn project_list(rows: &Value, cap: &TableCap) -> Value {
+    ops_project::capped(project(rows, cap))
+}
+
+/// What a SINGLE-ROW read hands back.
+///
+/// Deliberately NOT `project_list(..)["items"][0]`, and that is the entire
+/// reason this function exists. It used to be exactly that, and the size cap
+/// then answered a question it has no business answering: a row whose
+/// projection exceeded 4 KB was dropped, `first()` saw nothing, and the caller
+/// reported the row as non-existent. With one row `continue` and `break` are
+/// the same statement, so the earlier list-cap fix did nothing for this path.
+///
+/// `fit_one` shrinks the row instead of dropping it, so the answer to "does this
+/// exist" no longer depends on how long an attacker made a subject line.
+pub fn project_one(rows: &Value, cap: &TableCap) -> Option<Value> {
+    project(rows, cap).into_iter().next().map(ops_project::fit_one)
+}
+
+/// Run one allowlisted read and return the projected, capped list.
+pub fn read(
+    app: &AppHandle,
+    table: &'static str,
+    args: &Value,
+    ctx: &Ctx,
+    extra_filters: &[(&str, Value)],
+) -> Result<Value, String> {
+    let cap = cap_for(table)
+        .ok_or_else(|| format!("'{table}' is not a table the control port can read"))?;
+    let rows = fetch(app, cap, args, ctx, extra_filters)?;
+    Ok(project_list(&rows, cap))
 }
 
 /// Read exactly one row by id, already scoped to the Ctx user. `None` when the
 /// row does not exist OR belongs to somebody else — the two are deliberately
 /// indistinguishable to the caller, since telling them apart would confirm the
 /// existence of another account's records.
+///
+/// `None` means exactly those two things and nothing else. It must never mean
+/// "the row was too big to report", which is what it used to mean as well.
 pub fn read_one(
     app: &AppHandle,
     table: &'static str,
     id: &str,
     ctx: &Ctx,
 ) -> Result<Option<Value>, String> {
-    let out = read(
+    let cap = cap_for(table)
+        .ok_or_else(|| format!("'{table}' is not a table the control port can read"))?;
+    let rows = fetch(
         app,
-        table,
+        cap,
         &serde_json::json!({ "limit": 1 }),
         ctx,
         &[("id", Value::String(id.to_string()))],
     )?;
-    Ok(out["items"].as_array().and_then(|a| a.first().cloned()))
+    Ok(project_one(&rows, cap))
 }
 
 // ---------------------------------------------------------------------------
@@ -479,6 +539,85 @@ mod tests {
         ] {
             assert!(cap_for(table).is_none(), "{table} must not be readable");
         }
+    }
+
+    // -- the single-row lookup ---------------------------------------------
+
+    /// The defect, stated as the two calls it made disagree.
+    ///
+    /// `mail_threads.subject` is unbounded at ingest and is in the read
+    /// allowlist, so whoever emails the user chooses its length. `read_one`
+    /// took items[0] of a `capped()` list, so a ~5 KB subject dropped the only
+    /// row, `first()` returned `None`, and `mail.read_thread` answered "no such
+    /// thread in the local mail store" about a thread that exists — and
+    /// `confirm_thread` then made mail.archive and mail.mark_read refuse it too.
+    /// One inbound subject line made a thread permanently unreadable and
+    /// un-archivable, with Atlas asserting it did not exist.
+    #[test]
+    fn a_thread_with_a_hostile_subject_is_still_found_by_id() {
+        let cap = cap_for("mail_threads").expect("mail_threads is in the matrix");
+        let rows = json!([{
+            "id": "thread-1",
+            "subject": "x".repeat(5_000),
+            "status": "unhandled",
+            "user_id": "me",
+        }]);
+
+        // The LIST answer legitimately drops it — a list may be partial.
+        assert_eq!(project_list(&rows, cap)["returned"], json!(0));
+        assert_eq!(project_list(&rows, cap)["truncated"], json!(true));
+
+        // The SINGLE-ROW answer must not. This assertion was false.
+        let one = project_one(&rows, cap)
+            .expect("the thread exists; answering 'no such thread' is a fabrication");
+        assert_eq!(one["id"], json!("thread-1"));
+        assert_eq!(one["truncated"], json!(true), "the clipped subject must say so");
+        // The projection still applies: user_id is not a readable column.
+        assert!(one.get("user_id").is_none());
+    }
+
+    #[test]
+    fn project_one_still_returns_nothing_when_the_query_found_nothing() {
+        let cap = cap_for("mail_threads").expect("mail_threads is in the matrix");
+        // The genuine absent case must stay absent — the fix must not turn a
+        // missing row (or another account's row, which the query never returns)
+        // into a fabricated one.
+        assert!(project_one(&json!([]), cap).is_none());
+        assert!(project_one(&Value::Null, cap).is_none());
+    }
+
+    /// `fit_one` stamps `truncated` onto the row it shrank. If a readable column
+    /// were ever called that, the marker would overwrite real data and the model
+    /// would read a stored value as a size warning.
+    #[test]
+    fn no_readable_column_collides_with_the_truncation_marker() {
+        for cap in TABLES {
+            assert!(
+                !cap.columns.contains(&"truncated"),
+                "{}: a 'truncated' column would collide with the fit_one marker",
+                cap.table
+            );
+        }
+    }
+
+    /// The rejection message is echoed to the model verbatim, and the key comes
+    /// off the wire. Unbounded, it made a refusal a bigger context payload than
+    /// any success on the same op — for one rate-limit token and no audit row.
+    #[test]
+    fn a_rejected_column_name_is_bounded_before_it_is_echoed() {
+        let hostile = "a".repeat(50_000);
+        let err = plan(tasks(), &with_filter(&hostile, json!(1)), &ctx("me"), &[])
+            .expect_err("an unknown column is rejected");
+        assert!(err.len() < 200, "the error is {} bytes long", err.len());
+
+        // Same for ORDER BY, which builds its message the same way.
+        let err = plan(tasks(), &json!({ "order_by": hostile }), &ctx("me"), &[])
+            .expect_err("an unknown sort column is rejected");
+        assert!(err.len() < 200, "the error is {} bytes long", err.len());
+
+        // And a short name is still named, or the model cannot fix its call.
+        let err = plan(tasks(), &with_filter("nope", json!(1)), &ctx("me"), &[]).unwrap_err();
+        assert!(err.contains("nope"), "{err}");
     }
 
     #[test]

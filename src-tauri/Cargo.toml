@@ -72,6 +72,99 @@ tauri-plugin-updater = "2.10.1"
 # remember to write. Adding this only APPENDS to Cargo.lock; never `cargo update`.
 tiny_http = "0.12"
 
+# --- HomeKit Accessory Protocol controller (Lighthouse only) ----------------
+# All four are OPTIONAL and reached only through the `homekit` feature below.
+# Read that feature's comment before touching any of them.
+#
+# HAP does not let us pick a cipher suite: pair-setup and pair-verify name
+# Ed25519 for the identity proofs, Curve25519 ECDH for the session key, and
+# ChaCha20-Poly1305 for every encrypted frame. These are the reference
+# implementations of exactly those three primitives, at the versions whose
+# transitive deps were already resolved in Cargo.lock (subtle 2.6.1,
+# rand_core 0.6.4, sha2 0.10.9, cipher 0.4.4, zeroize 1.9.0) — adding them
+# moved no existing crate. NEVER `cargo update`; the vergen pin above is why.
+#
+# curve25519-dalek is deliberately NOT a direct dependency: both dalek crates
+# pull it and we need nothing from it that they do not re-export, so naming it
+# here would only add a version we must keep in step by hand.
+ed25519-dalek = { version = "2.2.0", optional = true }
+# Default features only. This line used to carry `features = ["getrandom"]`,
+# justified by EphemeralSecret::random() — an API verify.rs deliberately does
+# NOT use: `EphemeralSecret` cannot be built from fixed bytes, which would cost
+# the deterministic seam the loopback test needs, so verify.rs:39-46 uses the
+# bare `x25519` function and `X25519_BASEPOINT_BYTES` and takes its entropy
+# from the direct `getrandom` dependency below. Removing the feature left
+# Cargo.lock byte-identical (verified) — it bought nothing but a wrong comment.
+x25519-dalek = { version = "2.0.1", optional = true }
+# default-features = false drops the crate's `getrandom` default, which only
+# buys AeadCore::generate_nonce — useless here, because HAP fixes its nonces
+# ("PS-Msg05" and friends during setup, a 64-bit frame counter afterwards).
+# A generated nonce anywhere in this protocol would be a bug, so the feature
+# that offers one is off.
+chacha20poly1305 = { version = "0.10.1", default-features = false, features = ["alloc"], optional = true }
+# The raw CSPRNG for the two secrets the crates above will not mint for us: the
+# SRP client secret `a`, and the controller's long-term Ed25519 key (built with
+# SigningKey::from_bytes, which needs no rand_core feature). getrandom 0.2.17
+# was already in the lock — this line adds an edge, not a package.
+getrandom = { version = "0.2", optional = true }
+#
+# NOT HERE, ON PURPOSE: an SRP crate. HAP pair-setup needs SRP-6a/SHA-512 over
+# the RFC 5054 3072-bit group, and `srp` 0.6 (the only stable Rust option)
+# cannot speak it — verified by reading its source, not its README:
+#   • utils.rs computes M1 = H(A ‖ B ‖ K), with the comment "this doesn't
+#     follow the spec". HAP needs the real RFC 5054 M1.
+#   • compute_u hashes A ‖ B unpadded despite claiming PAD(); BigUint drops
+#     leading zeros, so ~1 pairing in 128 would fail at random rather than
+#     always — the worst possible failure mode to debug.
+#   • client.rs returns the raw premaster secret as `key`; HAP needs K = H(S).
+# Rewriting those three on top of the crate is the whole client anyway, so the
+# dependency would buy only `modpow` — which is num-bigint 0.4.8's, already in
+# the graph. Hand-rolled against num-bigint + sha2 it is, checkable against the
+# RFC 5054 Appendix B vectors. Same reasoning that made ws.rs a hand-written
+# RFC 6455 client. (num-bigint's modpow is not constant-time; `srp` uses the
+# same num-bigint, so this choice does not make that any worse.)
+
+[features]
+default = []
+
+# The HAP controller, compiled ONLY into Lighthouse.
+#
+# WHY A CARGO FEATURE AND NOT THE EXISTING SPLIT. The edition split is
+# Vite-only (VITE_ATLAS_EDITION → src/surfaces.ts): it decides which React
+# screens exist, and it has no opinion about Rust. Both bundles are built from
+# this one crate, so a `#[tauri::command]` written for HomeKit is present in
+# Atlas.app too — and worse, the control port (src/control) is a registry, not
+# a webview: whatever ops are registered are reachable by the model in BOTH
+# editions regardless of which screens shipped. Gating on the frontend would
+# leave the capability in the binary and expose it to the brain.
+#
+# Making the code conditional on a cargo feature that only the Lighthouse
+# build turns on moves this from a review question to a build fact, which is
+# the same standard src/editionSplit.test.ts already holds the frontend to:
+# the consumer build does not contain the code.
+#
+# HOW LIGHTHOUSE TURNS IT ON: `bun run tauri:lighthouse` is
+# `tauri build --config src-tauri/tauri.lighthouse.conf.json5`, and Tauri's
+# BuildConfig has a `features` key ("Features passed to `cargo` commands" —
+# verified against node_modules/@tauri-apps/cli/config.schema.json for the
+# installed CLI). So that file's existing `build` block gains one line:
+#
+#     build: {
+#       frontendDist: "../dist-admin",
+#       beforeBuildCommand: "...",
+#       features: ["homekit"],          // <— this
+#     },
+#
+# tauri.conf.json sets no `features`, so the config merge (later keys win,
+# arrays REPLACE) has nothing to collide with — Atlas.app keeps `default = []`.
+# Adding the key there is the adapter agent's change, not this one's.
+homekit = [
+    "dep:ed25519-dalek",
+    "dep:x25519-dalek",
+    "dep:chacha20poly1305",
+    "dep:getrandom",
+]
+
 # Download-size trim: strip symbols and thin-LTO the release binary. Deliberately
 # NOT setting panic = "abort" — unwind behaviour must stay unchanged. Profile
 # settings never touch Cargo.lock (the vergen pin above stays intact).

@@ -35,6 +35,7 @@ import {
 } from "./localDb.ts";
 import { createLearningHandlers } from "./learningRoutes.ts";
 import { createProactiveHandlers } from "./proactive.ts";
+import { createGreetingHandlers } from "./greeting.ts";
 import { createMailDraftHandlers } from "./mailDraft.ts";
 import { createAdminHandlers } from "./adminRoutes.ts";
 import { createControlClient } from "./control.ts";
@@ -125,6 +126,11 @@ const learning = createLearningHandlers({ db: localDb, requireUser, json });
 
 // Proactive digest (Phase 4): scheduler-driven insight generation (proactive.ts).
 const proactive = createProactiveHandlers({ db: localDb, requireUser, json });
+
+// Launch greeting stage 2: ONE cheap model call, and only when atlas.db already
+// holds real signal — the frontend's deterministic greeting is stage 1 and is
+// what the user sees whenever this route declines (see greeting.ts).
+const greeting = createGreetingHandlers({ db: localDb, requireUser, json });
 
 // Atlas Mail draft composer (Stage 6D): one AI pass per call, reads atlas.db
 // only — never the Cloudflare mail worker, never sends (see mailDraft.ts).
@@ -427,6 +433,7 @@ const server = Bun.serve({
       if (req.method === "POST" && url.pathname === "/learning/cycle") return await learning.cycle(req);
       if (req.method === "POST" && url.pathname === "/learning/intent") return await learning.intent(req);
       if (req.method === "POST" && url.pathname === "/research") return await learning.research(req);
+      if (req.method === "POST" && url.pathname === "/greeting") return await greeting.greeting(req);
       if (req.method === "POST" && url.pathname === "/mail/draft") return await mailDraft.draft(req);
       if (req.method === "POST" && url.pathname === "/memory/maintenance") return await learning.memoryMaintenance(req);
       if (req.method === "POST" && url.pathname === "/memory/list") return await handleMemoryList(req);
@@ -441,6 +448,7 @@ const server = Bun.serve({
       if (url.pathname.startsWith("/admin/agent-events/") && req.method === "GET") return admin.getAgentEvents(req, url.pathname.split("/")[3]);
       if (url.pathname === "/admin/tests/suites" && req.method === "GET") return admin.getTestSuites(req);
       if (url.pathname === "/admin/tests/runs" && req.method === "GET") return admin.getTestRuns(req, url.searchParams.get("suite_id") ?? undefined);
+      if (url.pathname === "/admin/tests/discover" && req.method === "POST") return admin.discoverTests(req);
       if (url.pathname.startsWith("/admin/tests/run/") && req.method === "POST") return admin.runTest(req, url.pathname.split("/")[4]);
       if (url.pathname === "/admin/design-syncs" && req.method === "GET") return admin.getDesignSyncs(req);
     } catch (e) {

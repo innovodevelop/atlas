@@ -149,6 +149,99 @@ mod tests {
         }
     }
 
+    // --- the cross-language wire contract ----------------------------------
+    //
+    // The brain is a separate process in another language, so nothing but a
+    // test holds the two ends together. This one encodes what
+    // services/atlas-brain/src/control.ts actually puts on the wire; its mirror
+    // there (a Bun.serve stub that reimplements rungs 1 and 4) encodes what
+    // this file accepts. Change one and the other must change with it.
+    //
+    // Written after the pairing shipped BROKEN: the client sent a custom
+    // `x-atlas-control-token` header and POSTed to both paths, so
+    // /v1/capabilities failed rung 1 and /v1/invoke failed rung 4. Every call
+    // 403'd, the brain concluded there was no desktop and declared zero tools,
+    // and Claude silently lost every capability this port exists to provide.
+    // Both suites were green the whole time, because each side only ever tested
+    // its own convention. Assertions on literals — not on constants shared
+    // within one language — are the point here.
+
+    /// The exact strings the TypeScript client sends. Spelled out rather than
+    /// built from `BEARER_PREFIX` so that renaming the constant cannot quietly
+    /// make this test agree with a client that no longer matches.
+    #[test]
+    fn the_literals_the_brain_client_sends_are_accepted() {
+        // POST /v1/invoke with `Authorization: Bearer <token>`.
+        let invoke = RequestHead {
+            method: "POST",
+            path: "/v1/invoke",
+            origin: None,
+            host: Some(HOST),
+            authorization: Some("Bearer 11111111-2222-3333-4444-555555555555"),
+            content_length: 42,
+        };
+        assert_eq!(inspect(&invoke, HOST, TOKEN), Ok(Route::Invoke));
+
+        // GET /v1/capabilities, same header, no body.
+        let caps = RequestHead {
+            method: "GET",
+            path: "/v1/capabilities",
+            origin: None,
+            host: Some(HOST),
+            authorization: Some("Bearer 11111111-2222-3333-4444-555555555555"),
+            content_length: 0,
+        };
+        assert_eq!(inspect(&caps, HOST, TOKEN), Ok(Route::Capabilities));
+    }
+
+    /// The two mistakes that actually shipped, pinned so they cannot return.
+    #[test]
+    fn the_two_shipped_mismatches_are_refused() {
+        // 1. POSTing to /v1/capabilities — the wrong method for the path.
+        let posted_caps = RequestHead {
+            method: "POST",
+            path: "/v1/capabilities",
+            authorization: Some("Bearer 11111111-2222-3333-4444-555555555555"),
+            ..good()
+        };
+        assert_eq!(
+            inspect(&posted_caps, HOST, TOKEN),
+            Err(Reject::Forbidden),
+            "a POST to /v1/capabilities must not resolve — this is how the \
+             capabilities call silently returned zero tools"
+        );
+
+        // 2. The token in a custom header, with no Authorization at all. Rust
+        //    reads only `authorization`, so this presents the empty string.
+        let custom_header_only = RequestHead {
+            authorization: None,
+            ..good()
+        };
+        assert_eq!(
+            inspect(&custom_header_only, HOST, TOKEN),
+            Err(Reject::Forbidden),
+            "a request carrying the token in some other header presents \"\" \
+             here and must be refused"
+        );
+    }
+
+    /// A GET to the invoke path, and a POST to neither — the near-misses a
+    /// future client is most likely to drift into.
+    #[test]
+    fn method_and_path_must_match_as_a_pair() {
+        let get_invoke = RequestHead {
+            method: "GET",
+            ..good()
+        };
+        assert_eq!(inspect(&get_invoke, HOST, TOKEN), Err(Reject::Forbidden));
+
+        let unlisted = RequestHead {
+            path: "/v1/ops",
+            ..good()
+        };
+        assert_eq!(inspect(&unlisted, HOST, TOKEN), Err(Reject::Forbidden));
+    }
+
     // --- ct_eq -------------------------------------------------------------
 
     #[test]

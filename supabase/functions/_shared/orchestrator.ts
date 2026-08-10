@@ -280,15 +280,19 @@ export const ATLAS_TOOLS: ToolDecl[] = [
 // ---------------------------------------------------------------------------
 // Desktop tools (the Rust control port)
 //
-// FIVE DOMAIN TOOLS, NOT TWENTY OPS. The control port exposes 20 read ops, and
-// declaring one tool each would be the obvious translation and the wrong one:
+// FIVE DOMAIN TOOLS, NOT THIRTY-ONE OPS. The control port exposes 31 ops (20
+// read, 6 write, 3 actuate, 2 approval), and declaring one tool each would be
+// the obvious translation and the wrong one:
 //
-//   - Cost. Twenty verbose schemas is roughly 4k prompt tokens on EVERY turn,
-//     against ~1.2k for five.
-//   - Selection quality, which matters more. Twenty similarly-shaped names
+//   - Cost. Thirty-one verbose schemas is several thousand prompt tokens on
+//     EVERY turn, against ~1.5k for five.
+//   - Selection quality, which matters more, and which is the reason the shape
+//     did NOT change when the write tier arrived. Thirty similarly-shaped names
 //     measurably degrade a model's tool choice — it deliberates, burns output
 //     tokens, and picks badly. Five domains, then a short action enum INSIDE
-//     one domain, is a much easier decision.
+//     one domain, is a much easier decision. Adding `atlas_tasks_create` and
+//     friends would have been the cheap way to add writes and the one that
+//     makes every OTHER tool call worse.
 //
 // Schema shape is a FLAT object: `action` plus a union of optional params. Not
 // oneOf — it inflates the schema and Anthropic's tool handling deals with it
@@ -309,10 +313,15 @@ const ATLAS_TOOL_OPS: Record<string, Record<string, string>> = {
     playlists: "music.playlists",
     playlist_tracks: "music.playlist_tracks",
     now_playing: "music.now_playing",
+    play: "music.play",
+    pause: "music.pause",
+    volume: "music.volume",
   },
   atlas_mail: {
     list_threads: "mail.list_threads",
     read_thread: "mail.read_thread",
+    archive: "mail.archive",
+    mark_read: "mail.mark_read",
   },
   atlas_finance: {
     status: "portfolio.status",
@@ -331,36 +340,157 @@ const ATLAS_TOOL_OPS: Record<string, Record<string, string>> = {
     notes: "notes.list",
     events: "events.list",
     watchlist: "watchlist.list",
+    create_task: "tasks.create",
+    update_task: "tasks.update",
+    create_note: "notes.create",
+    update_note: "notes.update",
+    create_event: "events.create",
+    add_to_watchlist: "watchlist.add",
   },
 };
 
-const ATLAS_TOOL_DESCRIPTIONS: Record<string, string> = {
-  atlas_music: "Read what is playing and search the user's own music library. Read-only: this cannot start, stop or change playback.",
-  atlas_mail: "Read the user's mail that Atlas has already synced locally. Read-only: this cannot send, archive or change anything.",
-  atlas_finance: "Read the user's linked brokerage portfolio — value, holdings, history, allocation. Read-only.",
-  atlas_data: "Look up current weather, stock quotes or news headlines.",
-  atlas_lists: "Read the user's own tasks, notes, calendar events or stock watchlist from the local database.",
-};
+/**
+ * Every op above that CHANGES something, listed rather than inferred.
+ *
+ * Two callers need this and neither can derive it safely. `buildAtlasTools`
+ * uses it to build a read-only tool set for the background digest, and
+ * `executeTool` uses it as a second, structural refusal so a hallucinated
+ * action name cannot reach a mutating op from a context that was never shown
+ * one. Guessing from the op name ("create/update/add/play/…") would work today
+ * and quietly stop working the first time somebody adds `tasks.bulk_apply`.
+ *
+ * `is_a_read_or_a_write_and_never_neither` in toolLoop.test.ts asserts the
+ * classification is TOTAL over ATLAS_TOOL_OPS, so a new op cannot be added
+ * without landing on one side of this line.
+ */
+const ATLAS_MUTATING_OPS: ReadonlySet<string> = new Set([
+  "tasks.create", "tasks.update",
+  "notes.create", "notes.update",
+  "events.create",
+  "watchlist.add",
+  "music.play", "music.pause", "music.volume",
+  "mail.archive", "mail.mark_read",
+]);
 
-/** Extra params per domain, beyond `action`. Kept minimal on purpose. */
-const ATLAS_TOOL_PARAMS: Record<string, Record<string, unknown>> = {
+/**
+ * Domain descriptions.
+ *
+ * TWO VARIANTS PER DOMAIN, chosen by what the port actually advertised. The
+ * read-only sentences ("this cannot start, stop or change playback") were true
+ * when 20 read ops were the whole surface and become a lie the moment
+ * `music.play` is reachable — but they are still true for a user whose port
+ * does not advertise it, and for the background digest, which is handed the
+ * read-only tool set on purpose. A single description could only be right for
+ * one of those two worlds.
+ */
+const ATLAS_TOOL_DESCRIPTIONS: Record<string, { read: string; write: string }> = {
   atlas_music: {
-    query: { type: "string", description: "Search text. Only for action=search." },
-    playlist_id: { type: "string", description: "Only for action=playlist_tracks." },
-    limit: { type: "number", description: "Maximum items to return." },
+    read: "Read what is playing and search the user's own music library. Read-only: this cannot start, stop or change playback.",
+    write: "Read what is playing, search the user's music library, and control playback (play, pause, volume).",
   },
   atlas_mail: {
-    thread_id: { type: "string", description: "Only for action=read_thread." },
-    limit: { type: "number", description: "Maximum threads to list." },
+    read: "Read the user's mail that Atlas has already synced locally. Read-only: this cannot send, archive or change anything.",
+    write: "Read the user's synced mail, and request to archive a thread or mark it read. Archiving and marking read ALWAYS require the user to confirm first — they never take effect from this tool call alone. This still cannot send or delete anything.",
+  },
+  atlas_finance: {
+    read: "Read the user's linked brokerage portfolio — value, holdings, history, allocation. Read-only.",
+    write: "Read the user's linked brokerage portfolio — value, holdings, history, allocation. Read-only.",
+  },
+  atlas_data: {
+    read: "Look up current weather, stock quotes or news headlines.",
+    write: "Look up current weather, stock quotes or news headlines.",
+  },
+  atlas_lists: {
+    read: "Read the user's own tasks, notes, calendar events or stock watchlist from the local database.",
+    write: "Read and edit the user's own tasks, notes, calendar events and stock watchlist in the local database. Creating and updating take effect immediately and are recorded; there is no delete here, so removing something is the user's own job.",
+  },
+};
+
+/**
+ * Extra params per domain, beyond `action`.
+ *
+ * `for` is the list of actions a parameter belongs to, and it is enforced:
+ * a parameter is declared only when at least one of its actions is reachable.
+ * Without it, adding the write params would show a read-only install a `symbol`
+ * and a `due_date` field for operations its port never advertised — the same
+ * dishonesty progressive disclosure exists to prevent, one level down. A param
+ * with no `for` belongs to the whole domain.
+ *
+ * FLAT, NOT oneOf, as before: Rust owns validation and its errors name the
+ * offending field, so the model self-corrects in one iteration. The `for` lists
+ * here are a prompt-side hint, never the check.
+ */
+interface AtlasParam { for?: string[]; schema: Record<string, unknown> }
+
+const ATLAS_TOOL_PARAMS: Record<string, Record<string, AtlasParam>> = {
+  atlas_music: {
+    query: { for: ["search"], schema: { type: "string", description: "Search text. Only for action=search." } },
+    playlist_id: { for: ["playlist_tracks"], schema: { type: "string", description: "Only for action=playlist_tracks." } },
+    limit: { schema: { type: "number", description: "Maximum items to return." } },
+    uri: {
+      for: ["play"],
+      schema: {
+        type: "string",
+        description: "Only for action=play. A single Spotify track or episode URI (spotify:track:… or spotify:episode:…). Album, artist and playlist URIs are refused — expand them with action=playlist_tracks or action=search first. Omit to resume what is already loaded.",
+      },
+    },
+    level: {
+      for: ["volume"],
+      schema: {
+        type: "number",
+        minimum: 0,
+        maximum: 1,
+        // Spelled out as well as bounded: the bound is a hint the model may
+        // ignore, and the specific mistake here — reading "50%" as 50 — is a
+        // refusal in Rust rather than a clamp, precisely because clamping 50
+        // would mean full volume at 3am.
+        description: "Only for action=volume. A FRACTION between 0 and 1 (0.5 is half volume), not a percentage. Values outside 0–1 are refused rather than clamped.",
+      },
+    },
+  },
+  atlas_mail: {
+    thread_id: { for: ["read_thread", "archive", "mark_read"], schema: { type: "string", description: "Which thread. Required for read_thread, archive and mark_read." } },
+    limit: { for: ["list_threads"], schema: { type: "number", description: "Maximum threads to list." } },
   },
   atlas_finance: {},
   atlas_data: {
-    city: { type: "string", description: "Only for action=weather." },
-    symbols: { type: "array", items: { type: "string" }, description: "Only for action=stocks." },
-    category: { type: "string", description: "Only for action=news." },
+    city: { for: ["weather"], schema: { type: "string", description: "Only for action=weather." } },
+    symbols: { for: ["stocks"], schema: { type: "array", items: { type: "string" }, description: "Only for action=stocks." } },
+    category: { for: ["news"], schema: { type: "string", description: "Only for action=news." } },
   },
   atlas_lists: {
-    limit: { type: "number", description: "Maximum items to return." },
+    limit: { for: ["tasks", "notes", "events", "watchlist"], schema: { type: "number", description: "Maximum items to return." } },
+    id: {
+      for: ["update_task", "update_note"],
+      schema: { type: "string", description: "Which row to change. Required for update_task and update_note. Get it from action=tasks or action=notes — never invent one." },
+    },
+    title: {
+      for: ["create_task", "update_task", "create_note", "update_note", "create_event"],
+      schema: { type: "string", description: "Up to 200 characters." },
+    },
+    content: {
+      for: ["create_note", "update_note"],
+      schema: { type: "string", description: "Note body, up to 5000 characters. Pass null on update_note to clear it." },
+    },
+    completed: { for: ["update_task"], schema: { type: "boolean", description: "Only for action=update_task." } },
+    priority: { for: ["create_task", "update_task"], schema: { type: "string", enum: ["low", "medium", "high"] } },
+    due_date: {
+      for: ["create_task", "update_task"],
+      schema: {
+        type: "string",
+        description: "A date (2026-08-10) or a datetime WITH an offset (2026-08-10T14:00:00+02:00 or …Z). A datetime without an offset is refused, because guessing the zone would move the deadline. Pass null on update_task to clear it.",
+      },
+    },
+    start_time: {
+      for: ["create_event"],
+      schema: { type: "string", description: "Required for action=create_event. Same format rule as due_date: a date, or a datetime carrying an offset." },
+    },
+    end_time: { for: ["create_event"], schema: { type: "string", description: "Optional. Same format rule as start_time." } },
+    location: { for: ["create_event"], schema: { type: "string", description: "Only for action=create_event. Up to 200 characters." } },
+    description: { for: ["create_event"], schema: { type: "string", description: "Only for action=create_event. Up to 2000 characters." } },
+    attendees: { for: ["create_event"], schema: { type: "array", items: { type: "string" }, description: "Only for action=create_event. Up to 25 names or addresses." } },
+    symbol: { for: ["add_to_watchlist"], schema: { type: "string", description: "Only for action=add_to_watchlist. A ticker such as AAPL or BRK.B." } },
+    name: { for: ["add_to_watchlist"], schema: { type: "string", description: "Only for action=add_to_watchlist. The company name, if known." } },
   },
 };
 
@@ -371,32 +501,49 @@ const ATLAS_TOOL_PARAMS: Record<string, Record<string, unknown>> = {
  * null or [] — the standalone-brain case, where there is no Tauri sidecar and
  * therefore no port — and NO desktop tools are declared at all.
  */
-export function buildAtlasTools(caps: string[] | null): ToolDecl[] {
+export function buildAtlasTools(
+  caps: string[] | null,
+  opts: { allowMutating?: boolean } = {},
+): ToolDecl[] {
   const base = [...ATLAS_TOOLS];
   if (!caps || caps.length === 0) return base;
 
+  // Default true: a chat turn has a human in it. The background digest passes
+  // false and gets a strictly read-only surface — not because Rust would let it
+  // through (writes are RunAudited on the background profile, so they WOULD
+  // run), but because a process that wakes on a timer with nobody watching has
+  // no business creating rows, and the cheapest way to guarantee that is never
+  // to describe the capability. executeTool refuses it again structurally.
+  const allowMutating = opts.allowMutating !== false;
+
   const available = new Set(caps);
   for (const [tool, actions] of Object.entries(ATLAS_TOOL_OPS)) {
-    const usable = Object.entries(actions).filter(([, op]) => available.has(op));
+    const usable = Object.entries(actions).filter(
+      ([, op]) => available.has(op) && (allowMutating || !ATLAS_MUTATING_OPS.has(op)),
+    );
     if (usable.length === 0) continue;
+
+    const usableActions = new Set(usable.map(([a]) => a));
+    const mutates = usable.some(([, op]) => ATLAS_MUTATING_OPS.has(op));
+
+    const properties: Record<string, unknown> = {
+      action: {
+        type: "string",
+        enum: usable.map(([a]) => a),
+        description: "Which operation to perform.",
+      },
+    };
+    for (const [param, decl] of Object.entries(ATLAS_TOOL_PARAMS[tool])) {
+      if (decl.for && !decl.for.some((a) => usableActions.has(a))) continue;
+      properties[param] = decl.schema;
+    }
 
     base.push({
       type: "function",
       function: {
         name: tool,
-        description: ATLAS_TOOL_DESCRIPTIONS[tool],
-        parameters: {
-          type: "object",
-          properties: {
-            action: {
-              type: "string",
-              enum: usable.map(([a]) => a),
-              description: "Which operation to perform.",
-            },
-            ...ATLAS_TOOL_PARAMS[tool],
-          },
-          required: ["action"],
-        },
+        description: ATLAS_TOOL_DESCRIPTIONS[tool][mutates ? "write" : "read"],
+        parameters: { type: "object", properties, required: ["action"] },
       },
     });
   }
@@ -421,6 +568,68 @@ export function resolveAtlasOp(
     return { error: `${tool} has no action "${action}". Valid actions: ${Object.keys(actions).join(", ")}` };
   }
   return { op };
+}
+
+/** True for any op that changes something. See ATLAS_MUTATING_OPS. */
+export function isMutatingAtlasOp(op: string): boolean {
+  return ATLAS_MUTATING_OPS.has(op);
+}
+
+/** Every op the tool layer can reach, for tests that assert totality. */
+export function atlasToolOpNames(): string[] {
+  return Object.values(ATLAS_TOOL_OPS).flatMap((actions) => Object.values(actions));
+}
+
+/**
+ * The tool result for a call the desktop parked in the approvals queue.
+ *
+ * THIS IS THE MOST IMPORTANT STRING IN THIS FILE. An approval-tier call returns
+ * HTTP 200 with `ok: true`, because queueing succeeded — and the single worst
+ * outcome of this whole milestone is Claude reading that success and telling the
+ * user "done, I archived it" about a thread that is still sitting in the inbox
+ * waiting for them to tap yes. The user then stops checking, and Atlas has lied
+ * about the state of their mailbox.
+ *
+ * So the payload is written to make that sentence hard to produce:
+ *   - `performed: false` and `changed_anything: false` are the first things the
+ *     model reads, before any prose it could skim as confirmation.
+ *   - the message OPENS with "NOT DONE." — a tool result whose first two words
+ *     are a negation is very hard to summarise as a completion.
+ *   - the forbidden verbs are named explicitly. Naming them beats "be careful",
+ *     because the failure is a specific word choice, not a vague attitude.
+ *   - it says not to call again. Without that, a model that reads the result as
+ *     a soft failure retries, and the user gets two identical cards to answer.
+ *
+ * There is no `retryable` key at all here: this is not an error, and marking it
+ * retryable in either direction invites the loop.
+ */
+export function approvalPendingResult(data: Record<string, unknown>): Record<string, unknown> {
+  const summary = typeof data.action_summary === "string" ? data.action_summary : "the requested action";
+  const expires = typeof data.expires_at === "string" ? data.expires_at : null;
+  return {
+    status: "awaiting_approval",
+    performed: false,
+    changed_anything: false,
+    message:
+      "NOT DONE. Nothing has happened yet and nothing will happen unless the user says yes. " +
+      `Atlas has put one request in front of the user for them to approve: ${summary}. ` +
+      "Tell the user what you are asking permission for and that it is waiting on them. " +
+      'Do NOT say it is done, archived, marked, sent, played, changed, updated or handled — none of that is true yet. ' +
+      "Do not call this tool again for the same thing; a second call only adds a second request for the user to answer." +
+      (expires ? ` The request expires at ${expires} if they do not answer.` : ""),
+    reason: typeof data.reason === "string" ? data.reason : undefined,
+    reason_code: typeof data.reason_code === "string" ? data.reason_code : undefined,
+    approval_id: typeof data.approval_id === "string" ? data.approval_id : undefined,
+  };
+}
+
+/** Shape-check on the port's success envelope: is this a queued approval? */
+function isAwaitingApproval(data: unknown): data is Record<string, unknown> {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    (data as { status?: unknown }).status === "awaiting_approval"
+  );
 }
 
 /**
@@ -607,11 +816,30 @@ export interface ToolContext {
     call(
       op: string,
       args: unknown,
-      opts: { deadline: number },
+      opts: {
+        deadline: number;
+        userId?: string;
+        userToken?: string;
+        profile?: "interactive" | "background";
+      },
     ): Promise<{ ok: true; data: unknown } | { ok: false; error: { code: string; message: string; retryable: boolean } }>;
   };
   /** Absolute epoch-ms ceiling for ALL tool work in this turn. */
   deadline: number;
+  /** The caller's own JWT. Only mail ops need it; forwarded uniformly. */
+  userToken?: string;
+  /**
+   * Which caller the desktop should assume. OMITTING IT IS NOT NEUTRAL: Rust
+   * reads an absent profile as `background`, which cannot actuate. Anything
+   * driven by a live human turn must say `interactive` or music will silently
+   * turn into approval cards.
+   */
+  profile?: "interactive" | "background";
+  /**
+   * Second, structural refusal of mutating ops. `false` for the background
+   * digest. Defaults to allowed, so every existing caller is unchanged.
+   */
+  allowMutating?: boolean;
 }
 
 export async function executeTool(
@@ -650,11 +878,40 @@ export async function executeTool(
     const resolved = resolveAtlasOp(name, args.action);
     if ("error" in resolved) return { name, result: { error: resolved.error } };
 
+    // Structural refusal, independent of what was declared. buildAtlasTools
+    // already withheld these actions from a read-only context, but a model can
+    // emit an action name it was never shown — from replayed history, or from
+    // guessing — and for the background digest "the schema did not mention it"
+    // is not a strong enough guarantee to rest a write on.
+    if (ctx.allowMutating === false && isMutatingAtlasOp(resolved.op)) {
+      return {
+        name,
+        result: {
+          error: "This runs in the background with nobody watching, so it can only read. Report what you found instead of changing anything.",
+          retryable: false,
+        },
+      };
+    }
+
     // Strip `action` — it selected the op and is not a parameter of it.
     const { action: _action, ...opArgs } = args;
 
-    const r = await ctx.control.call(resolved.op, opArgs, { deadline: ctx.deadline });
-    if (r.ok) return { name, result: r.data };
+    // Identity travels in the ENVELOPE, not in opArgs. Rust injects user_id into
+    // every query itself and rejects a caller-supplied one, which is what makes
+    // "the model picked whose tasks to edit" unreachable rather than merely
+    // validated. Nothing here may move it into the args.
+    const r = await ctx.control.call(resolved.op, opArgs, {
+      deadline: ctx.deadline,
+      userId: ctx.userId ?? undefined,
+      userToken: ctx.userToken,
+      profile: ctx.profile,
+    });
+    if (r.ok) {
+      // A queued approval arrives as a SUCCESS — queueing worked — and must not
+      // be narrated as the action having happened. See approvalPendingResult.
+      if (isAwaitingApproval(r.data)) return { name, result: approvalPendingResult(r.data) };
+      return { name, result: r.data };
+    }
     return {
       name,
       result: { error: r.error.message, retryable: r.error.retryable },
@@ -1298,7 +1555,19 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
               name: toolCall.function.name,
               result: { error: "The turn's time budget ran out before this could be checked.", retryable: false },
             }
-          : await executeTool(toolCall, { userId, supabase, control, deadline: turnDeadline });
+          : await executeTool(toolCall, {
+              userId,
+              supabase,
+              control,
+              deadline: turnDeadline,
+              userToken,
+              // A chat or voice turn is BY DEFINITION a human waiting for an
+              // answer, which is the whole content of the interactive claim.
+              // Omitting it would make Rust assume background and turn every
+              // "play this" into an approval card the user has to tap while
+              // already sitting in front of the app.
+              profile: "interactive",
+            });
 
       if (result.result && typeof result.result === "object" && "citations" in result.result) {
         const citations = (result.result as any).citations;

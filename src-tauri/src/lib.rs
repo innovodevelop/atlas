@@ -19,6 +19,18 @@ mod mail;
 mod scheduler;
 mod integrity;
 mod control;
+// Atlas.app and Lighthouse.app are two bundles over ONE database and ONE pair
+// of sidecars. `appdata` pins the database path so the identifier of the
+// running bundle cannot fork it; `instance` answers "who else is running right
+// now", which is what the audit sweep and the sidecar election both turn on.
+mod appdata;
+mod instance;
+// Smart home (Home Assistant on the LAN + a stubbed HomeKit companion).
+// See src/home/mod.rs for why the lock rule lives in Rust and not in a prompt.
+mod home;
+// Health. macOS serves no HealthKit data at all (ADR 008), so the only path
+// that works today is the Apple Health export importer. See src/health/mod.rs.
+mod health;
 
 /// Outcome of a sidecar spawn attempt. `integrity_error` is set when the
 /// binary failed integrity verification (and was therefore NOT spawned) — it
@@ -29,7 +41,63 @@ struct SidecarSpawn {
     integrity_error: Option<String>,
 }
 
+/// Atlas' own identifier. Used as the FALLBACK for the running bundle's id (a
+/// `tauri dev` binary is in no .app), and — as `appdata::SHARED_DIR_ID` — as the
+/// constant name of the directory both bundles share.
 const BUNDLE_ID: &str = "com.magnuspilegaard.atlas";
+
+/// Where a sidecar actually is, once this launch knows whether it owns them.
+///
+/// Two bundles can be open at once and both fixed ports have exactly one binder,
+/// so "the port is 4830 and the token is mine" stopped being true for every
+/// launch — see `instance::claim_sidecars`.
+#[derive(Clone)]
+struct Endpoint {
+    port: u16,
+    token: String,
+    /// We spawned it (and will reap it). False = another instance did.
+    owner: bool,
+    /// The run id holding the sidecar claim. For an adopted endpoint this is
+    /// what "still running?" is re-checked against.
+    owner_run_id: String,
+}
+
+/// The `*_info` answer for one sidecar. Shared by both because the only
+/// difference between them is which state they read.
+fn sidecar_info(
+    child: &Mutex<Option<Child>>,
+    token: &str,
+    integrity_error: &Mutex<Option<String>>,
+    endpoint: &Mutex<Option<Endpoint>>,
+    default_port: u16,
+) -> serde_json::Value {
+    let spawned_here = || child.lock().ok().map(|g| g.is_some()).unwrap_or(false);
+    // Cloned out in a statement of its own so the guard is dropped before the
+    // match body — which reads a file and takes the other lock.
+    let settled = endpoint.lock().ok().and_then(|g| g.clone());
+    let (port, token, owner, running) = match settled {
+        Some(ep) if ep.owner => (ep.port, ep.token, true, spawned_here()),
+        // Adopted: it runs for exactly as long as the instance that spawned it
+        // still holds the claim. One small file read — cheap enough that the
+        // frontend can keep polling this the way it always has.
+        Some(ep) => {
+            let running = instance::sidecar_claim_is(&ep.owner_run_id);
+            (ep.port, ep.token, false, running)
+        }
+        // Ownership is settled on the same background thread as the spawn, so
+        // for the first moments of a launch there is no answer yet. Report what
+        // the single-instance build always reported — our own port and token,
+        // not running — rather than blanking a field the webview reads.
+        None => (default_port, token.to_string(), true, spawned_here()),
+    };
+    serde_json::json!({
+        "port": port,
+        "token": token,
+        "running": running,
+        "owner": owner,
+        "integrity_error": integrity_error.lock().ok().and_then(|g| g.clone()),
+    })
+}
 
 // ---------------------------------------------------------------------------
 // Voice gateway sidecar (WS-B): a compiled Bun server running the duplex
@@ -41,11 +109,15 @@ const VOICE_GATEWAY_PORT: u16 = 4820;
 
 struct VoiceGateway {
     child: Mutex<Option<Child>>,
+    /// The token this launch would use if it owns the sidecars. Superseded by
+    /// `endpoint` once ownership is settled — an adopting instance has to
+    /// present the OWNER's token, not its own.
     token: String,
     /// Set when the bundled binary failed integrity verification (not spawned).
     /// Mutex because the spawn now happens on a background thread AFTER the
     /// window is up, so this is filled in later (see `run`).
     integrity_error: Mutex<Option<String>>,
+    endpoint: Mutex<Option<Endpoint>>,
 }
 
 fn spawn_voice_gateway(token: &str) -> SidecarSpawn {
@@ -97,13 +169,13 @@ fn spawn_voice_gateway(token: &str) -> SidecarSpawn {
 
 #[tauri::command]
 fn voice_gateway_info(state: tauri::State<VoiceGateway>) -> serde_json::Value {
-    let running = state.child.lock().ok().map(|g| g.is_some()).unwrap_or(false);
-    serde_json::json!({
-        "port": VOICE_GATEWAY_PORT,
-        "token": state.token,
-        "running": running,
-        "integrity_error": state.integrity_error.lock().ok().and_then(|g| g.clone()),
-    })
+    sidecar_info(
+        &state.child,
+        &state.token,
+        &state.integrity_error,
+        &state.endpoint,
+        VOICE_GATEWAY_PORT,
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -114,12 +186,20 @@ fn voice_gateway_info(state: tauri::State<VoiceGateway>) -> serde_json::Value {
 
 const ATLAS_BRAIN_PORT: u16 = 4830;
 
+/// How often an instance that adopted somebody else's sidecars re-asks whether
+/// they are still there. Only ever runs in the second app on the machine, and
+/// costs one small file read, so it can afford to be brisk — the user closing
+/// Atlas should get Lighthouse's chat back in seconds, not on a relaunch.
+const SIDECAR_WATCH_SECS: u64 = 20;
+
 struct AtlasBrain {
     child: Mutex<Option<Child>>,
+    /// See `VoiceGateway::token`.
     token: String,
     /// Set when the bundled binary failed integrity verification (not spawned).
     /// Mutex: filled in by the background spawn thread (see `run`).
     integrity_error: Mutex<Option<String>>,
+    endpoint: Mutex<Option<Endpoint>>,
 }
 
 fn spawn_atlas_brain(token: &str, control: Option<(u16, &str)>) -> SidecarSpawn {
@@ -226,13 +306,13 @@ fn spawn_atlas_brain(token: &str, control: Option<(u16, &str)>) -> SidecarSpawn 
 
 #[tauri::command]
 fn atlas_brain_info(state: tauri::State<AtlasBrain>) -> serde_json::Value {
-    let running = state.child.lock().ok().map(|g| g.is_some()).unwrap_or(false);
-    serde_json::json!({
-        "port": ATLAS_BRAIN_PORT,
-        "token": state.token,
-        "running": running,
-        "integrity_error": state.integrity_error.lock().ok().and_then(|g| g.clone()),
-    })
+    sidecar_info(
+        &state.child,
+        &state.token,
+        &state.integrity_error,
+        &state.endpoint,
+        ATLAS_BRAIN_PORT,
+    )
 }
 
 /// Map a provider slug to its Keychain account (service `atlas-core`). Covers
@@ -303,9 +383,17 @@ fn dir_size(path: &Path) -> u64 {
     size
 }
 
+/// THE ONE THING HERE THAT MUST NOT BE A CONSTANT. WKWebView caches under the
+/// RUNNING bundle's identifier, so with `BUNDLE_ID` hard-coded Lighthouse purged
+/// Atlas' cache and stamped Atlas' marker with its own executable's mtime —
+/// after which each app's launch looked like an update to the other and the two
+/// purged each other's caches forever, one of them while the other was using it.
+/// Unlike the database, which is deliberately shared, the webview cache is
+/// per-bundle and must stay that way.
 fn webkit_cache_dir() -> Option<std::path::PathBuf> {
     let home = std::env::var_os("HOME")?;
-    Some(Path::new(&home).join(format!("Library/Caches/{}/WebKit", BUNDLE_ID)))
+    let id = appdata::running_bundle_id(BUNDLE_ID);
+    Some(Path::new(&home).join(format!("Library/Caches/{id}/WebKit")))
 }
 
 // After an app UPDATE, WKWebView can keep serving the previous build's cached
@@ -370,15 +458,19 @@ pub fn run() {
     child: Mutex::new(None),
     token: gateway_token.clone(),
     integrity_error: Mutex::new(None),
+    endpoint: Mutex::new(None),
   };
   let gateway = VoiceGateway {
     child: Mutex::new(None),
     token: gateway_token.clone(),
     integrity_error: Mutex::new(None),
+    endpoint: Mutex::new(None),
   };
-  // Local proactive scheduler (Phase 4): periodically kicks the brain's
-  // /proactive/cycle. All judgement lives brain-side; this only ticks.
-  let proactive = scheduler::ProactiveScheduler::spawn(gateway_token.clone(), ATLAS_BRAIN_PORT);
+  // The proactive scheduler is NOT started here any more. It belongs to
+  // whichever instance owns the sidecars — two of them ticking one brain would
+  // run the digest cycle twice, billing the same background inference twice and
+  // racing two writers into one memory table. It is spawned and managed inside
+  // the ownership branch below.
 
   tauri::Builder::default()
     // Mail alerts -> macOS notifications; opener launches the OAuth consent
@@ -394,8 +486,8 @@ pub fn run() {
     .plugin(tauri_plugin_deep_link::init())
     .manage(gateway)
     .manage(brain)
-    .manage(proactive)
     .manage(music::MusicState::new())
+    .manage(home::HomeState::new())
     .invoke_handler(tauri::generate_handler![
       voice_gateway_info,
       atlas_brain_info,
@@ -440,8 +532,69 @@ pub fn run() {
       mail::mail_set_status,
       mail::mail_send_reply,
       mail::mail_ingest_errors,
+      // The webview's yes/no on a queued control-port action. Execution stays
+      // in Rust: this command takes an approval id and a boolean, and the
+      // arguments it would run with never leave the Rust process — the webview
+      // cannot choose what runs, only whether the thing already queued does.
+      control::approval_resolve,
+      // Smart home. Every one of these is `#[tauri::command(async)]` — they do
+      // LAN HTTP and SQLite work and must not touch the main thread.
+      home::home_snapshot,
+      home::home_link_home_assistant,
+      home::home_unlink,
+      home::home_sync,
+      home::home_device_set,
+      home::home_device_colour,
+      home::home_lock_set,
+      home::home_scene_run,
+      home::home_set_autonomy,
+      home::home_live_start,
+      home::home_live_stop,
+      // HomeKit over the LAN, Lighthouse only. WITHOUT THESE TWO LINES the
+      // HomeKit Lab screen is dead in the one build that compiles the feature:
+      // Tauri answers an unregistered command with "Command
+      // home_homekit_discover not found", which useHomeKitLab.ts matches as
+      // "this build lacks the homekit feature" and tells the user to run
+      // `bun run tauri:lighthouse` — which is what they already did. The
+      // control-port op is unaffected either way, because ops_home.rs calls
+      // the Rust function directly rather than through IPC, so nothing in the
+      // Rust suite covers this path and only the screen shows it.
+      #[cfg(feature = "homekit")]
+      home::home_homekit_discover,
+      #[cfg(feature = "homekit")]
+      home::home_homekit_pair,
+      // Health. Also all `#[tauri::command(async)]` — an import walks hundreds
+      // of megabytes of XML, which on the main thread is a frozen window.
+      // NOTE the split: the webview owns importing and forgetting (a person at
+      // a file picker), and the control port owns only the three READS — see
+      // control/ops_health.rs.
+      health::health_snapshot,
+      health::health_import,
+      health::health_series,
+      health::health_workouts,
+      health::health_forget,
     ])
     .setup(|app| {
+      // ONE DATABASE, AND THIS LAUNCH'S IDENTITY — both before anything else in
+      // setup, and in that order.
+      //
+      // `app_data_dir()` is derived from the bundle identifier, so Lighthouse
+      // would otherwise get its own tree and its own atlas.db; `resolve_db_path`
+      // pins it to the constant shared location and migrates a per-bundle
+      // database into it if one exists (appdata.rs explains which way round, and
+      // why the source is never deleted).
+      //
+      // Registration has to precede `control::start` below, because the sweep it
+      // spawns closes rows left behind by launches that are OVER — and the only
+      // thing that distinguishes those from another app's live rows is the
+      // register this line puts us on.
+      let db_path = appdata::resolve_db_path(&app.path().app_data_dir()?);
+      // The register lives beside the database, not beside the bundle: it is
+      // only useful if the OTHER app looks in the same place.
+      if let Some(dir) = appdata::shared_dir().or_else(|| db_path.parent().map(Path::to_path_buf)) {
+        instance::register(&dir);
+      }
+
       // Control port + DbState MUST be up before the brain sidecar spawn
       // thread below is started, even though both look like they belong
       // further down with the rest of setup. The spawn thread reads
@@ -466,12 +619,13 @@ pub fn run() {
         }
       };
 
-      // Local app database (Supabase migration). Open once at startup under the
-      // app-data dir; register the WAL connection for all db commands.
+      // Local app database (Supabase migration). Open once at startup at the
+      // shared path resolved above; register the WAL connection for all db
+      // commands.
       {
-        let dir = app.path().app_data_dir()?;
-        std::fs::create_dir_all(&dir)?;
-        let db_path = dir.join("atlas.db");
+        if let Some(dir) = db_path.parent() {
+          std::fs::create_dir_all(dir)?;
+        }
         app.manage(db::DbState::open(&db_path)?);
         log::info!("[db] local SQLite opened at {}", db_path.display());
       }
@@ -483,10 +637,82 @@ pub fn run() {
       // Both sidecars are verified+spawned in parallel here; each writes its
       // own result into the managed state, and the frontend's *_info polling
       // picks them up whenever they land.
+      //
+      // ONE PAIR PER MACHINE, NOT ONE PER APP. The ports are fixed constants, so
+      // only the first instance to start could bind them anyway — but ports are
+      // the smaller half. Both bundles now write to the same SQLite file, so a
+      // second brain would be a second writer AND a second proactive scheduler
+      // running the same digest, and a second voice gateway would be a second
+      // process holding the microphone. So instances elect an owner; everyone
+      // else adopts the owner's ports and token and spawns nothing.
       {
         let handle = app.handle().clone();
         std::thread::spawn(move || {
           let token = handle.state::<AtlasBrain>().token.clone();
+
+          // ONE KNOWN CONSEQUENCE, WRITTEN DOWN RATHER THAN FIXED. Only the
+          // Owner branch below spawns the brain, and only that spawn injects
+          // ATLAS_CONTROL_PORT/TOKEN — so one brain, holding ONE bundle's
+          // control credential, serves both windows. The model's reachable op
+          // table is therefore the OWNER's, not the one belonging to the app
+          // the user is typing in: with Lighthouse owning the sidecars, chat
+          // in Atlas.app can reach `home.discover`, which Atlas.app's own
+          // binary does not contain. (The containment itself is real and was
+          // checked at artifact level: a default-feature libapp_lib.rlib holds
+          // no `_hap._tcp`, no `Pair-Setup` and no `home.discover`.) Fixing it
+          // means per-request control credentials so ops execute in the bundle
+          // that asked — a redesign of the brain↔control-port relationship,
+          // and a larger risk than the exposure, which needs a developer build
+          // running alongside a consumer one on the same machine.
+          //
+          // Adopting is not permanent, and it must not be: the common case is
+          // the user quitting Atlas with Lighthouse still open, and an adopter
+          // that never looked again would spend the rest of its life with no
+          // chat and no voice. `claim_sidecars` is idempotent for the owner and
+          // takes over a claim whose owner is gone, so re-asking IS the watch.
+          let mut adopted_from: Option<String> = None;
+          loop {
+            match instance::claim_sidecars(&token, VOICE_GATEWAY_PORT, ATLAS_BRAIN_PORT) {
+              instance::Sidecars::Owner => break,
+              instance::Sidecars::Adopted(claim) => {
+                let adopt = |port| Endpoint {
+                  port,
+                  token: claim.token.clone(),
+                  owner: false,
+                  owner_run_id: claim.run_id.clone(),
+                };
+                let _ = handle
+                  .state::<VoiceGateway>()
+                  .endpoint
+                  .lock()
+                  .map(|mut e| *e = Some(adopt(claim.voice_port)));
+                let _ = handle
+                  .state::<AtlasBrain>()
+                  .endpoint
+                  .lock()
+                  .map(|mut e| *e = Some(adopt(claim.brain_port)));
+                if adopted_from.as_deref() != Some(claim.run_id.as_str()) {
+                  eprintln!(
+                    "[atlas] instance {} owns the sidecars (voice {}, brain {}) — adopted rather \
+                     than spawning a second pair",
+                    claim.run_id, claim.voice_port, claim.brain_port
+                  );
+                  adopted_from = Some(claim.run_id);
+                }
+                std::thread::sleep(std::time::Duration::from_secs(SIDECAR_WATCH_SECS));
+              }
+            }
+          }
+          if adopted_from.is_some() {
+            eprintln!("[atlas] the instance that owned the sidecars is gone — taking them over");
+          }
+
+          let mine = |port| Endpoint {
+            port,
+            token: token.clone(),
+            owner: true,
+            owner_run_id: instance::run_id().to_string(),
+          };
           let brain_token = token.clone();
           let brain_thread = std::thread::spawn(move || {
             let control = control_creds.as_ref().map(|(p, t)| (*p, t.as_str()));
@@ -500,6 +726,7 @@ pub fn run() {
             let gw_state = handle.state::<VoiceGateway>();
             let _ = gw_state.child.lock().map(|mut c| *c = gw.child);
             let _ = gw_state.integrity_error.lock().map(|mut e| *e = gw.integrity_error);
+            let _ = gw_state.endpoint.lock().map(|mut e| *e = Some(mine(VOICE_GATEWAY_PORT)));
           }
 
           let brain = brain_thread.join().unwrap_or(SidecarSpawn {
@@ -510,7 +737,13 @@ pub fn run() {
             let brain_state = handle.state::<AtlasBrain>();
             let _ = brain_state.child.lock().map(|mut c| *c = brain.child);
             let _ = brain_state.integrity_error.lock().map(|mut e| *e = brain.integrity_error);
+            let _ = brain_state.endpoint.lock().map(|mut e| *e = Some(mine(ATLAS_BRAIN_PORT)));
           }
+
+          // Local proactive scheduler (Phase 4): periodically kicks the brain's
+          // /proactive/cycle. All judgement lives brain-side; this only ticks —
+          // but it ticks a shared brain, so only the owner may run one.
+          handle.manage(scheduler::ProactiveScheduler::spawn(token, ATLAS_BRAIN_PORT));
         });
       }
 
@@ -568,6 +801,11 @@ pub fn run() {
         if let Some(sched) = app_handle.try_state::<scheduler::ProactiveScheduler>() {
           sched.stop();
         }
+        // The home push socket owns a thread of its own; close it before the
+        // process goes so an open WebSocket is not left to the OS.
+        if let Some(home) = app_handle.try_state::<home::HomeState>() {
+          home.stop();
+        }
         if let Some(gw) = app_handle.try_state::<VoiceGateway>() {
           if let Ok(mut guard) = gw.child.lock() {
             if let Some(mut child) = guard.take() {
@@ -586,6 +824,12 @@ pub fn run() {
             }
           }
         }
+        // Only AFTER the children are dead: while they live the ports are ours,
+        // and a second instance adopting a claim we had already dropped would
+        // point its webview at sidecars in the middle of exiting. Both calls are
+        // no-ops for an instance that owns neither.
+        instance::release_sidecars();
+        instance::unregister();
       }
     });
 }

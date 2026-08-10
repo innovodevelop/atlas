@@ -34,17 +34,46 @@ export type ControlResult =
   | { ok: true; data: unknown }
   | { ok: false; error: { code: ErrCode; message: string; retryable: boolean } };
 
+/**
+ * Which caller the port should assume. Mirrors Rust's `Profile`.
+ *
+ * `interactive` is a claim about the WORLD, not about this process: it means a
+ * human is in front of a window right now and can answer a question. Only a
+ * live chat or voice turn may claim it. The scheduler's digest must say
+ * `background`, and an omitted profile is read as `background` by Rust — the
+ * restrictive direction — so forgetting the field costs an actuation, never
+ * grants one.
+ */
+export type ControlProfile = "interactive" | "background";
+
+export interface CallOpts {
+  /** ABSOLUTE epoch-ms timestamp, not a duration. */
+  deadline: number;
+  /**
+   * The account every op is scoped to. Rust rejects a non-Read op outright
+   * without it, and `ops_db.rs` refuses to build a read query without it
+   * either, so this is required in practice for everything except `data.*`.
+   */
+  userId?: string;
+  /**
+   * The user's own CF-issued JWT. Only `mail.*` needs it — the mail worker
+   * authenticates the USER, not the desktop — but it is passed uniformly
+   * rather than special-cased at every call site.
+   */
+  userToken?: string;
+  profile?: ControlProfile;
+}
+
 export interface ControlClient {
   /** False when no port was handed to this process. Check before declaring tools. */
   available(): boolean;
   /** Op names the port advertises. Cached for the process; [] on any failure. */
   capabilities(): Promise<string[]>;
-  /** `deadline` is an ABSOLUTE epoch-ms timestamp, not a duration. */
-  call(op: string, args: unknown, opts: { deadline: number }): Promise<ControlResult>;
+  call(op: string, args: unknown, opts: CallOpts): Promise<ControlResult>;
 }
 
 /**
- * Rust's six codes -> ours, with the retry semantics the model will act on.
+ * Rust's seven codes -> ours, with the retry semantics the model will act on.
  *
  * `retryable` is not decoration: it is the difference between the model saying
  * "let me try that again" and "that will not work, here is why". Getting it
@@ -55,22 +84,36 @@ export interface ControlClient {
  * — Spotify is not connected, the weather provider 500'd. That is genuinely
  * worth one retry, unlike a rejected argument, which will be rejected the same
  * way forever.
+ *
+ * `rate_limited` is marked NOT retryable, and that is a deliberate lie about
+ * the long run in exchange for the truth about this turn. A token bucket does
+ * refill — eventually — but the smallest bucket is 10/min, so the wait is tens
+ * of seconds, while the whole turn budget is 8s (voice) to 20s (text). Every
+ * retry inside that window is guaranteed to fail, and each one costs a tool
+ * iteration and a model round trip that could have gone into an answer.
+ * `retryable: false` makes the model do the only useful thing available: stop,
+ * and tell the user it hit a limit. Rust's message carries `retry_after_ms`, so
+ * the model can even say how long. Retrying is the job of the NEXT turn, when
+ * the user has decided it is still worth doing.
  */
 const CODE_MAP: Record<string, { code: ErrCode; retryable: boolean }> = {
   forbidden: { code: "not_permitted", retryable: false },
   too_large: { code: "invalid_args", retryable: false },
   bad_request: { code: "invalid_args", retryable: false },
   unknown_op: { code: "invalid_args", retryable: false },
+  rate_limited: { code: "rate_limited", retryable: false },
   op_failed: { code: "unavailable", retryable: true },
   internal: { code: "internal", retryable: true },
 };
 
-// `timeout` and `rate_limited` have no Rust counterpart TODAY and that is not
-// an oversight: timeout is produced here, client-side, by the turn deadline,
-// and rate_limited is reserved for the write tier's token buckets, which do not
-// exist yet. When Rust starts emitting a rate-limit code, add it to CODE_MAP —
-// the fallback below will otherwise flatten it to `internal` and mark it
-// retryable, which for a rate limit is true but unhelpfully vague.
+// `timeout` is the one code with no Rust counterpart, and that is not an
+// oversight: it is produced here, client-side, by the turn deadline. Rust has
+// no view of the turn, so it could not emit it.
+//
+// (`rate_limited` used to sit in this note as "reserved". It is live now — the
+// write tier's per-tier token buckets emit it with HTTP 429 — so it has a real
+// CODE_MAP row above. Without one it would have fallen through to `internal`
+// and been marked retryable, which is exactly the loop described there.)
 const UNKNOWN_CODE = { code: "internal" as ErrCode, retryable: true };
 
 const err = (code: ErrCode, message: string, retryable: boolean): ControlResult => ({
@@ -88,7 +131,36 @@ export function createControlClient(env: Record<string, string | undefined> = pr
 
   let capsCache: string[] | null = null;
 
-  async function post(path: string, body: unknown, deadline: number): Promise<ControlResult> {
+  /**
+   * One request against the port.
+   *
+   * THE METHOD AND THE HEADER ARE PART OF A CROSS-LANGUAGE CONTRACT, and getting
+   * either wrong is silent: the port answers every auth failure with the same
+   * 403, so a mismatch does not look like a bug, it looks like "no desktop".
+   *
+   * The contract, as enforced by src-tauri/src/control/auth.rs `inspect`:
+   *   rung 1  POST /v1/invoke  and  GET /v1/capabilities  — any other
+   *           (method, path) pair is Forbidden. A GET to /v1/invoke, or a POST
+   *           to /v1/capabilities, is rejected before the token is even read.
+   *   rung 4  Authorization: Bearer <token>. It reads the `authorization`
+   *           header and strips the literal prefix "Bearer "; a request without
+   *           that header presents the empty string and fails the compare.
+   *
+   * This shipped wrong once. The client sent `x-atlas-control-token` on a POST
+   * to both paths, so /v1/capabilities failed at rung 1 and /v1/invoke at rung
+   * 4 — every call 403'd, capabilities() returned [], the orchestrator declared
+   * zero desktop tools, and Claude silently had no desktop at all. Both test
+   * suites were green throughout, because the stub in control.test.ts read the
+   * same wrong header the client wrote: it pinned this side to itself instead
+   * of to Rust. The tests now assert Rust's literals on both sides, and
+   * auth.rs carries the mirror test.
+   */
+  async function request(
+    method: "GET" | "POST",
+    path: string,
+    body: unknown | null,
+    deadline: number,
+  ): Promise<ControlResult> {
     if (!ready) {
       return err("unavailable", "the desktop control port is not available in this process", false);
     }
@@ -105,12 +177,17 @@ export function createControlClient(env: Record<string, string | undefined> = pr
     let res: Response;
     try {
       res = await fetch(`${base}${path}`, {
-        method: "POST",
+        method,
         headers: {
-          "Content-Type": "application/json",
-          "x-atlas-control-token": token as string,
+          // "Bearer " with the trailing space is auth.rs's BEARER_PREFIX
+          // verbatim. Nothing else is sent: a second, unread token header
+          // would be a false clue for the next reader and a second place for
+          // the secret to leak from.
+          Authorization: `Bearer ${token as string}`,
+          ...(body === null ? {} : { "Content-Type": "application/json" }),
         },
-        body: JSON.stringify(body),
+        // A GET carries no body. fetch rejects outright if one is supplied.
+        ...(body === null ? {} : { body: JSON.stringify(body) }),
         signal: AbortSignal.timeout(remaining),
       });
     } catch (e) {
@@ -159,7 +236,10 @@ export function createControlClient(env: Record<string, string | undefined> = pr
       if (capsCache) return capsCache;
       // Its own short budget, independent of any turn: this runs once at
       // startup, and a hung capabilities call must not stall the first chat.
-      const r = await post("/v1/capabilities", {}, Date.now() + 3_000);
+      // GET, and no body. auth.rs matches ("GET", "/v1/capabilities") and
+      // nothing else for this path — a POST here is Forbidden at rung 1,
+      // before the token is read, which is exactly how this went unnoticed.
+      const r = await request("GET", "/v1/capabilities", null, Date.now() + 3_000);
       if (!r.ok) {
         // [] rather than a throw, and NOT cached — a transient failure at boot
         // should not permanently blind the process to its own desktop.
@@ -174,7 +254,26 @@ export function createControlClient(env: Record<string, string | undefined> = pr
     },
 
     call(op, args, opts) {
-      return post("/v1/invoke", { op, args: args ?? {} }, opts.deadline);
+      // IDENTITY GOES IN THE ENVELOPE, NEVER IN `args`. Rust reads `user_id`
+      // off the body and injects it into every query itself; `ops_db.rs`
+      // rejects a caller-supplied `user_id` inside args on purpose. Keeping the
+      // two apart is what makes "the model chose which account to read" an
+      // unreachable state rather than a validation rule.
+      //
+      // This was also a live defect until the write tier landed: the body
+      // carried only {op, args}, so `ctx.user_id` was always "" and every
+      // op that reads the local database — tasks.list, notes.list, events.list,
+      // watchlist.list, both mail reads — failed with "this request carries no
+      // user identity". Only the `data.*` ops, which take no account, worked.
+      //
+      // Fields are omitted rather than sent as null/"" so that Rust's own
+      // "non-Read ops require a non-empty user_id" check is the thing that
+      // refuses, with its message, instead of a blank string sliding through.
+      const envelope: Record<string, unknown> = { op, args: args ?? {} };
+      if (opts.userId) envelope.user_id = opts.userId;
+      if (opts.userToken) envelope.user_token = opts.userToken;
+      if (opts.profile) envelope.profile = opts.profile;
+      return request("POST", "/v1/invoke", envelope, opts.deadline);
     },
   };
 }
