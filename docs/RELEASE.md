@@ -16,7 +16,7 @@ Atlas releases involve **two completely independent** signing mechanisms:
 
 | | What it protects | Key type | Status today |
 |---|---|---|---|
-| **Updater signing** | Every auto-update is verified before install (minisign signature checked against the public key baked into the app) | minisign keypair from `bunx tauri signer generate` | **Works today.** No Apple account needed. This is what enforces "Atlas never installs an unverified update". |
+| **Updater signing** | Every auto-update is verified before install (minisign signature checked against the public key baked into the app) | minisign keypair from `bunx tauri signer generate` | **Works today**, on the key rotated 2026-08-10 (`84E81AF87B3CA4D9`). No Apple account needed. This is what enforces "Atlas never installs an unverified update" — but read the endpoint warning below before trusting that sentence end to end. |
 | **Apple code signing + notarization** | macOS Gatekeeper trust for *fresh installs* (no "unidentified developer" warning) | **Developer ID Application** certificate | **Not possible yet.** Requires the paid Apple Developer Program (~99 USD/yr), which is not purchased. The "Apple Development" certificate already on the Mac **cannot** be used — it is for local dev/device testing only and cannot notarize or distribute. |
 
 The release workflow (`.github/workflows/release.yml`) treats Apple signing as
@@ -42,30 +42,62 @@ Actions**. None of them ever go in the repo.
 
 ### The updater keypair — where it actually is
 
-**The keypair exists and lives at `~/.tauri/atlas-updater.key`** (private,
-`chmod 600`) + `~/.tauri/atlas-updater.key.pub`. Generated 2026-07-25 on this
-Mac with an **empty password**. Its public key ID is `2DBFE39C42EDA4CE`, and
+**The keypair lives at `~/.tauri/atlas-updater.key`** (private, `chmod 600`) +
+`~/.tauri/atlas-updater.key.pub`. Its public key ID is `84E81AF87B3CA4D9`, and
 the `plugins.updater.pubkey` value committed in `src-tauri/tauri.conf.json` is
 the public half of **this exact keypair** — verified by signing a file and
-comparing key IDs.
+comparing the key ID embedded in the signature (bytes 2..10 of the decoded
+signature, reversed) against the key ID in the committed public key.
+
+#### Rotation log
+
+| Date | Key ID | Why it changed |
+|---|---|---|
+| 2026-07-25 | `2DBFE39C42EDA4CE` | First keypair. **BURNED** — the private key appeared in a chat transcript. |
+| 2026-08-10 | `84E81AF87B3CA4D9` | Rotation. In force. |
+
+The burned pair was **not deleted**: it is archived as
+`~/.tauri/BURNED-2026-08-10-atlas-updater.key{,.pub}` (`chmod 600`), renamed so
+it cannot be picked up by the documented path or by habit. It is kept for one
+reason only — it is the sole key that could sign a migration build for a copy of
+Atlas installed *before* the rotation. **It must never sign a new release.**
+
+Rotating was free this time and will not be next time: `gh release list` showed
+**zero releases** on both remotes, so no installed copy had ever accepted an
+update signed by the old key and there was nobody to migrate. Once a signed
+release exists, a rotation costs every user a manual reinstall.
 
 > **Invariant:** `plugins.updater.pubkey` must always be the public half of the
 > key used by `TAURI_SIGNING_PRIVATE_KEY`. Running `tauri signer generate`
 > again creates a *different* keypair — if you do that, you **must** also
 > replace the pubkey in `tauri.conf.json`, and every already-installed copy of
-> Atlas stops accepting updates forever. Only regenerate before the first
-> public release.
+> Atlas stops accepting updates forever.
 
 **Two things you still owe (do them before the first `v*` tag):**
 
 1. Copy the contents of `~/.tauri/atlas-updater.key` into the GitHub secret
-   `TAURI_SIGNING_PRIVATE_KEY`, and set `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` to
-   an **empty string**.
+   `TAURI_SIGNING_PRIVATE_KEY` on **the repo the updater endpoint actually
+   points at** (see the warning below — that is currently unresolved), and set
+   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` to an **empty string**. Use
+   `gh secret set TAURI_SIGNING_PRIVATE_KEY --repo <repo> < ~/.tauri/atlas-updater.key`
+   rather than copy-paste: piping a file never puts the key on a screen, in a
+   clipboard, or in a scrollback buffer, which is how the last one was lost.
 2. Back the private key file up somewhere outside this Mac (password manager /
    encrypted backup). `~/.tauri/` is not backed up by anything. If the key is
    lost, existing installs can never accept another update — their baked-in
    public key won't match any new keypair — and every user must manually
    reinstall.
+
+> ⚠️ **The updater endpoint points at a repo this machine cannot push to.**
+> `plugins.updater.endpoints` is
+> `https://github.com/HelloAtlasAI/helloatlas/releases/latest/download/latest.json`,
+> and `gh api repos/HelloAtlasAI/helloatlas` reports `push: false, admin: false`
+> for the signed-in account (`innovodevelop`) on a **public** repo. Whoever
+> controls that repo controls what every installed Atlas is offered as an
+> update; the signature check is the only thing standing behind it. Either
+> obtain admin on it or repoint the endpoint at a repo we do control, and do it
+> before the first release — not after. Tracked as the "release home repo"
+> decision.
 
 | Secret | What it is | Value |
 |---|---|---|

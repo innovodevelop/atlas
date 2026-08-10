@@ -35,7 +35,7 @@
       }
     },
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJEQkZFMzlDNDJFREE0Q0UKUldUT3BPMUNuT08vTGN2dUtUSGp3N2J4K2wrWTVSL0R3Q2NzYkJCMTFBT1MwUTFyU0E2dG9SbUgK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg0RTgxQUY4N0IzQ0E0RDkKUldUWnBEeDcrQnJvaE9zY3R4RVpJWHAvdDNUc2FiZ3FXeUxlSDl3azFMd1hWY2pzaWZCRFFBUFoK",
       "endpoints": [
         "https://github.com/HelloAtlasAI/helloatlas/releases/latest/download/latest.json"
       ],
