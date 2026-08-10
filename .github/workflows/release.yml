@@ -66,6 +66,34 @@ jobs:
           fi
           echo "Updater signing key is configured."
 
+      # "The key is set" and "the key is the RIGHT key" are different claims,
+      # and only the first one was ever checked. docs/RELEASE.md calls the
+      # correspondence between plugins.updater.pubkey and the signing key an
+      # Invariant; nothing enforced it. Tauri signs with whatever private key it
+      # is handed and never compares it to the pubkey, so a mismatched pair
+      # builds green, produces correct-looking updater artifacts, publishes
+      # without complaint — and is then rejected by every installed copy of
+      # Atlas, which verifies against the pubkey compiled into its own binary.
+      # Nobody finds out until users quietly stop receiving updates, and the
+      # recovery is a manual reinstall for every one of them.
+      #
+      # BEFORE the build on purpose: this needs only a signature, so it fails in
+      # seconds rather than after a 20-minute compile — and on a tag run, before
+      # tauri-action has created a draft release that would then have to be
+      # deleted by hand.
+      - name: Verify the signing key matches the pubkey shipped in the app
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          printf 'keypair correspondence probe\n' > "$RUNNER_TEMP/keyprobe.txt"
+          # The signer takes both values from the env above, so the private key
+          # is never written to the runner's disk and never reaches a log line.
+          bunx tauri signer sign "$RUNNER_TEMP/keyprobe.txt" > /dev/null
+          bun scripts/ci/verify-signing-key.ts "$RUNNER_TEMP/keyprobe.txt.sig"
+          rm -f "$RUNNER_TEMP/keyprobe.txt" "$RUNNER_TEMP/keyprobe.txt.sig"
+
       # The updater endpoint is a hardcoded GitHub URL, but the release is
       # published to whatever repo this workflow runs in. If those disagree,
       # every shipped app polls a repo that has no releases and the update

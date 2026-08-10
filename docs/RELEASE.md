@@ -67,11 +67,26 @@ Rotating was free this time and will not be next time: `gh release list` showed
 update signed by the old key and there was nobody to migrate. Once a signed
 release exists, a rotation costs every user a manual reinstall.
 
-> **Invariant:** `plugins.updater.pubkey` must always be the public half of the
-> key used by `TAURI_SIGNING_PRIVATE_KEY`. Running `tauri signer generate`
-> again creates a *different* keypair — if you do that, you **must** also
-> replace the pubkey in `tauri.conf.json`, and every already-installed copy of
-> Atlas stops accepting updates forever.
+> **Invariant, now enforced:** `plugins.updater.pubkey` must always be the
+> public half of the key used by `TAURI_SIGNING_PRIVATE_KEY`. Running
+> `tauri signer generate` again creates a *different* keypair — if you do that,
+> you **must** also replace the pubkey in `tauri.conf.json`, and every
+> already-installed copy of Atlas stops accepting updates forever.
+>
+> This used to be a sentence in this document and nothing else. `release.yml`'s
+> **Verify the signing key matches the pubkey shipped in the app** step now
+> signs a scratch file with the CI secret and compares the key id in the
+> resulting signature against the committed pubkey
+> (`scripts/ci/verify-signing-key.ts`). It runs *before* the build, so a
+> mismatch costs seconds instead of a 20-minute compile and a stray draft
+> release. Tauri itself never checks this — a mismatched pair builds green and
+> fails only on users' machines.
+
+Run the same check locally against any signature:
+
+```bash
+bun scripts/ci/verify-signing-key.ts path/to/whatever.sig
+```
 
 **CI secrets — DONE 2026-08-10.** Both are set on `innovodevelop/atlas`:
 
