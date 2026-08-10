@@ -14,7 +14,7 @@
 
 import { Database } from "bun:sqlite";
 import { parseVersionPlan, type Version } from "./versionPlan.ts";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { resolve } from "path";
 
 type Json = Record<string, unknown>;
@@ -172,6 +172,7 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
     getTestSuites,
     getTestRuns,
     runTest,
+    discoverTests,
     getDesignSyncs,
   };
 
@@ -311,6 +312,89 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
     })();
 
     return json({ runId, status: "running" });
+  }
+
+  /**
+   * Discover test suites from the filesystem and upsert them into
+   * atlas_test_suites — the row `runTest` later reads `ci_job` from to decide
+   * what `Bun.spawn` runs. That makes this function just as security-relevant
+   * as the CI_JOBS allowlist above, even though it never spawns anything
+   * itself:
+   *
+   *   - `ci_job` is never taken from a file name, a file's contents, or
+   *     anything else this function discovers. It is assigned from a fixed
+   *     path → CI_JOBS-key mapping below, so every row this route can ever
+   *     write already carries a `ci_job` that `runTest`'s own allowlist
+   *     recognises. There is no path from "a file exists in the repo" to "an
+   *     unrecognised or attacker-chosen ci_job lands in the DB" — even a
+   *     malicious path would just fail the `service in CI_JOBS` check below
+   *     and be skipped.
+   *   - Suite ids are a deterministic slug of the discovered path (`discover:
+   *     <path>`), not a random uuid, so re-running discovery upserts the same
+   *     rows instead of accumulating duplicates for the same file forever.
+   *   - Discovery only lists two directory shapes — `tests/*.{test,spec}.ts`
+   *     and `services/<known-job>/src/*.test.ts` — one level deep, no
+   *     recursion and no symlink following, and it never reads file
+   *     contents. It cannot itself execute anything; that stays entirely
+   *     inside `runTest`'s fixed argv arrays.
+   */
+  function discoverTests(req: Request): Response {
+    requireUser(req);
+
+    const discovered: Array<{ id: string; name: string; description: string; ci_job: string }> = [];
+
+    // tests/ — repo-root specs. Everything here runs under the 'frontend' CI
+    // job (bun run ci:quick) today, so that's the only ci_job this branch
+    // can assign; there is no other job in CI_JOBS that covers this directory.
+    const testsDir = resolve(PROJECT_ROOT, "tests");
+    if (existsSync(testsDir)) {
+      for (const entry of readdirSync(testsDir)) {
+        if (!/\.(test|spec)\.tsx?$/.test(entry)) continue;
+        discovered.push({
+          id: `discover:tests/${entry}`,
+          name: entry,
+          description: `tests/${entry}`,
+          ci_job: "frontend",
+        });
+      }
+    }
+
+    // services/*/src/*.test.ts — per-service unit tests. The service
+    // directory name doubles as the ci_job, but only after confirming it's
+    // already a CI_JOBS key: a future services/foo with no matching CI entry
+    // is skipped rather than assigned a guessed-at job.
+    const servicesDir = resolve(PROJECT_ROOT, "services");
+    if (existsSync(servicesDir)) {
+      for (const service of readdirSync(servicesDir)) {
+        if (!(service in CI_JOBS)) continue;
+        const srcDir = resolve(servicesDir, service, "src");
+        if (!existsSync(srcDir)) continue;
+        for (const entry of readdirSync(srcDir)) {
+          if (!/\.test\.tsx?$/.test(entry)) continue;
+          discovered.push({
+            id: `discover:services/${service}/src/${entry}`,
+            name: `${service}/${entry}`,
+            description: `services/${service}/src/${entry}`,
+            ci_job: service,
+          });
+        }
+      }
+    }
+
+    const upsert = db.prepare(`
+      INSERT INTO atlas_test_suites (id, name, description, ci_job)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        name = excluded.name,
+        description = excluded.description,
+        ci_job = excluded.ci_job
+    `);
+    const tx = db.transaction(() => {
+      for (const d of discovered) upsert.run(d.id, d.name, d.description, d.ci_job);
+    });
+    tx();
+
+    return json({ discovered: discovered.length });
   }
 
   function getDesignSyncs(req: Request): Response {

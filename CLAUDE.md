@@ -71,10 +71,25 @@ Supabase is gone. Local-first is the architecture, not a migration in progress.
 
 ## Where the plan lives
 
-**`docs/ROADMAP.md` is the single source of truth** for what is done and what is
-outstanding. Planning state used to be spread across five disagreeing sources,
-so work was recorded as pending long after it shipped. Add phases, stages and
-open items there — not to a new doc.
+Planning state used to be spread across five disagreeing sources, so work was
+recorded as pending long after it shipped. It now has exactly two homes, split
+by what each is for — do not merge them back into one doc or duplicate content
+across both:
+
+- **`docs/VERSION-PLAN.md`** owns versions, features, status and target dates.
+  It is **machine-parsed**: `services/atlas-brain/src/adminRoutes.ts`
+  (`syncVersionPlan` → `versionPlan.ts`) reads it on every `/admin/versions/sync`
+  call and reconciles it straight into SQLite (`atlas_versions`,
+  `atlas_version_features`), which `/versions` renders. Its heading/list format
+  is therefore **load-bearing** — the parser never throws, so a renamed
+  heading or a changed dash character doesn't fail loudly, it silently parses
+  to zero versions (see the empty-guard comment on `applyVersionPlan`). Edit it
+  like a schema, not like prose: keep the existing heading and bullet shape
+  when adding a version or feature.
+- **`docs/ROADMAP.md`** owns architecture decisions, open risks, and the
+  why-history behind them — the reasoning the parser has nowhere to put and
+  must not try to. Add phases, stages and open items there; add versions and
+  per-feature status to VERSION-PLAN.md instead.
 
 ## Commands (native steps are macOS-only)
 

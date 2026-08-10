@@ -4,10 +4,11 @@
  * 5-version pre-plan, feature tracking, progress, changelog.
  * Source of truth: docs/VERSION-PLAN.md (parsed into SQLite by the brain).
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GitBranch, RefreshCw, CheckCircle2, Clock, Circle, AlertTriangle } from 'lucide-react';
 import { Card, Panel, Row, Empty, Button } from '@/components/atlas-ui/primitives';
+import { useAuth } from '@/hooks/useAuth';
 import { useVersions, useVersionDetail, useSyncVersionPlan, type VersionRow, type FeatureRow } from '@/hooks/useVersions';
 import '@/styles/surfaces/versions.css';
 
@@ -17,6 +18,7 @@ export const surface = {
   icon: 'GitBranch',
   entry: 'menu' as const,
   mock: false,
+  edition: 'admin' as const,
 };
 
 const STATUS_ICON: Record<string, typeof Circle> = {
@@ -68,6 +70,15 @@ function VersionCard({ version, selected, onSelect }: { version: VersionRow; sel
 
 export default function AtlasVersions() {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+
+  // Same gate as AtlasDashboard.tsx:107-109 — see the note in AtlasAgentView.tsx.
+  // This was the last of the four admin surfaces reachable while signed out:
+  // /versions rendered the whole version plan, and its Sync button POSTed to
+  // /admin/versions/sync, to anyone who typed the URL.
+  useEffect(() => {
+    if (!authLoading && !user) navigate('/auth');
+  }, [user, authLoading, navigate]);
   const { versions, isLoading, refetch } = useVersions();
   const syncPlan = useSyncVersionPlan();
   const [selectedId, setSelectedId] = useState<string | null>(null);

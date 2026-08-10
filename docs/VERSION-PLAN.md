@@ -7,7 +7,8 @@
 
 ---
 
-## v0.2.0 — Foundation
+## v0.2.0 — Flint
+_Striking the first light with no external fuel: the local-first migration._
 Status: released
 Target: 2026-08-04
 
@@ -23,7 +24,8 @@ Target: 2026-08-04
 
 ---
 
-## v0.3.0 — Admin Suite
+## v0.3.0 — Lens
+_The instrument of seeing: the admin suite and the control port._
 Status: in-progress
 Target: 2026-09-01
 
@@ -39,7 +41,8 @@ Target: 2026-09-01
 
 ---
 
-## v0.4.0 — Mail & Voice
+## v0.4.0 — Waypoint
+_Connectors and plumbing: mail, voice, and the paths between them._
 Status: planned
 Target: 2026-10-01
 
@@ -53,7 +56,8 @@ Target: 2026-10-01
 
 ---
 
-## v0.5.0 — Intelligence
+## v0.5.0 — Bluewater
+_The sailing term for open-ocean capability: autonomous agents and far models._
 Status: planned
 Target: 2026-11-01
 
@@ -67,7 +71,8 @@ Target: 2026-11-01
 
 ---
 
-## v0.6.0 — Platform
+## v0.6.0 — Drydock
+_Where the vessel is serviced and certified: release infrastructure and signing._
 Status: planned
 Target: 2026-12-01
 
@@ -81,7 +86,8 @@ Target: 2026-12-01
 
 ---
 
-## v1.0.0 — Commercial Release
+## v1.0.0 — First Light
+_When a lighthouse first shows its lamp, and a telescope takes its first image._
 Status: planned
 Target: 2027-Q1
 
