@@ -1,15 +1,36 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Volume2, VolumeX } from 'lucide-react';
 import { AuthSphere, type OrbState } from '@/components/atlas-ui/AuthSphere';
 import { useAtlasSpeech } from '@/hooks/useAtlasSpeech';
+import { isVoiceOn, setVoiceOn as persistVoiceOn } from '@/lib/voicePreference';
 import {
   ATLAS_PERMISSIONS,
+  readMicConsent,
   readOnboarding,
   requestPermission,
   writeOnboarding,
   type PermissionId,
 } from '@/lib/atlasPermissions';
+
+/**
+ * Registration data. Mirrored in `src/surfaces.ts`, which is what the router,
+ * the dock and the account menu are built from; `surfaces.test.ts` fails if the
+ * two ever disagree.
+ *
+ * `entry: 'none'` and `eager: true` for the same reason: this is the first
+ * screen a new account sees, reached from the onboarding gate rather than from
+ * a menu, and a lazy chunk that fails to fetch here strands the user before
+ * they have anything.
+ */
+export const surface = {
+  path: '/permissions',
+  label: 'Permissions',
+  icon: 'ShieldCheck',
+  entry: 'none' as const,
+  mock: false,
+  edition: 'consumer' as const,
+};
 
 // First-run consent, in the same scene as the login screen so the two feel like
 // one conversation rather than a login followed by a settings dialog.
@@ -46,15 +67,46 @@ const AtlasPermissions = () => {
   const [record] = useState(() => readOnboarding());
   const revisiting = record !== null;
 
+  /**
+   * The microphone answer given during sign-in, if there was one.
+   *
+   * Consent for the mic moved into the login conversation (Auth.tsx), so on a
+   * first run this screen usually already knows the answer. It has to SHOW that
+   * answer rather than re-derive it from `defaultOn` — a user who declined the
+   * mic thirty seconds ago and finds the switch back on has been told their
+   * "no" did not stick.
+   *
+   * The stored onboarding record still wins where it exists: that is the record
+   * of a decision made on this screen, which is the more deliberate one.
+   */
+  const [micConsent] = useState(() => readMicConsent());
+
   const [choices, setChoices] = useState<Record<PermissionId, boolean>>(() => {
     const stored = record?.choices;
     return Object.fromEntries(
       ATLAS_PERMISSIONS.map((p) => [
         p.id,
-        typeof stored?.[p.id] === 'boolean' ? stored[p.id] : p.defaultOn,
+        typeof stored?.[p.id] === 'boolean'
+          ? stored[p.id]
+          : p.id === 'microphone' && micConsent
+            ? micConsent.granted
+            : p.defaultOn,
       ]),
     ) as Record<PermissionId, boolean>;
   });
+
+  const [voiceOn, setVoiceOn] = useState<boolean>(isVoiceOn);
+  const toggleVoice = useCallback(() => {
+    setVoiceOn((on) => {
+      const next = !on;
+      persistVoiceOn(next);
+      // Silence now, but keep the sentence the user is reading on screen.
+      if (!next) speech.hush();
+      return next;
+    });
+    // `speech` is stable (all-useCallback surface).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Atlas opens the conversation, then hands over to the list.
   useEffect(() => {
@@ -124,6 +176,19 @@ const AtlasPermissions = () => {
       <div className="avig" />
       <div className="ascrim" />
       <span className="alogo">atlas</span>
+      {/* Same control, same place, same stored preference as the sign-in
+          screen — this is the next screen in one conversation, and a mute that
+          silently reset between them would read as the app ignoring you. */}
+      <button
+        type="button"
+        className="avoice"
+        onClick={toggleVoice}
+        aria-pressed={voiceOn}
+        aria-label={voiceOn ? 'Turn Atlas’s voice off' : 'Turn Atlas’s voice on'}
+        title={voiceOn ? 'Atlas is speaking — click to silence' : 'Atlas is silent — click to hear it'}
+      >
+        {voiceOn ? <Volume2 className="i16" /> : <VolumeX className="i16" />}
+      </button>
 
       <div className="agrid">
         <div className="aleft">
@@ -170,6 +235,11 @@ const AtlasPermissions = () => {
                         {busy && <Loader2 className="i16 animate-spin" />}
                         {result === false && (
                           <em className="permdenied">not granted</em>
+                        )}
+                        {/* Only before this screen has asked anything itself:
+                            once `result` exists it is the fresher answer. */}
+                        {result === undefined && p.id === 'microphone' && micConsent?.granted && (
+                          <em className="permnote">already allowed</em>
                         )}
                       </span>
                       <span className="permblurb">{on ? p.blurb : p.withoutIt}</span>

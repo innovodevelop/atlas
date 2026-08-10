@@ -1081,7 +1081,55 @@ body{display:block;overflow-x:hidden;overflow-y:visible;max-width:none;flex:none
    choices / big-text credential inputs right. Low-alpha vignette + scrim
    keep the split depth; the accent gradient background is gone (flat).
    =================================================================== */
-.ascene{position:fixed;inset:0;overflow:hidden;background:#3461f2;color:var(--surface);font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.ascene{position:fixed;inset:0;overflow:hidden;background:#3461f2;color:var(--surface);font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;
+  transition:background-color .8s cubic-bezier(.22,1,.36,1)}
+/* A refused sign-in turns the whole scene amber instead of firing a toast.
+   On a surface that is one full-screen conversation, a notification in the
+   corner is the wrong instrument: it appears away from where the failure
+   happened and it is gone in four seconds, so someone who mistyped and looked
+   away cannot tell a rejected attempt from one still running. Colour is
+   ambient, unmissable, and it PERSISTS until the next keystroke.
+
+   Same hue as --dashboard-warning (38), dropped from 50% to 33% lightness. The
+   token's own lightness is a fill behind dark text; this is a full-bleed
+   background under white type at ~4.3:1, which the scene's type sizes carry.
+   Transitioning background-COLOR (not the shorthand) is what keeps the fade
+   smooth — the vignette, scrim and drifting blobs above are unchanged dark
+   tints and low-alpha light washes, both of which read correctly over either
+   colour, so nothing else has to move. */
+/* WHY THIS IS A DEEP AMBER AND NOT A BRIGHT WARNING-YELLOW.
+   The scene's type is white, and the small copy ("Speak to me, or just type.",
+   the terms line) is normal-size, so it needs 4.5:1. Measured against white:
+     hsl(38 92% 33%)  #a26907  4.61:1  ← chosen
+     hsl(38 90% 36%)  #ae7209  4.03:1
+     hsl(36 94% 38%)  #bc7306  3.75:1
+     hsl(40 95% 42%)  #d18d05  2.79:1
+     hsl(42 96% 45%)  #e19f05  2.29:1  ← an actual warning-yellow
+   For reference the blue this replaces is 5.07:1. A true yellow is simply not
+   reachable under white text — it would need the type to flip to dark ink,
+   which is a different design, not a colour tweak. This is the yellowest value
+   that leaves every line on the screen readable, and it still reads
+   unmistakably as "not blue any more". */
+.ascene.warn{background-color:hsl(38 92% 33%)}
+/* The error line inherits the same treatment: its navy pill is invisible on
+   amber, and a message the user cannot read is the toast problem again. */
+.ascene.warn .aerr{background:rgba(64,30,2,.36)}
+/* The vignette and scrim above are navy (rgba(14,24,78,…)). Over blue they
+   read as depth; over amber they are the complementary hue and grey it into
+   sepia — the scene stopped looking like a warning and started looking like an
+   old photograph. Re-tint them warm so the amber stays amber. */
+.ascene.warn .avig{background:radial-gradient(90% 120% at 6% 50%,rgba(58,26,2,.30),transparent 55%)}
+.ascene.warn .ascrim{background:linear-gradient(90deg,rgba(58,26,2,.14) 0%,transparent 30%,rgba(52,24,2,.20) 66%,rgba(46,20,2,.36) 100%)}
+/* THE FOCUS RING HAS TO CHANGE WITH THE SCENE, and this is where the global
+   token stops working. `--focus` is `rgba(52,97,242,.18)` — the brand blue. On
+   the blue scene it is invisible (arguably its own accessibility bug, but a
+   pre-existing one); the moment the background turns amber it becomes a
+   distinctly BLUE rectangle drawn around the field, which is what the first
+   run of this change actually produced.
+   A translucent white ring is correct on both, so it is scoped to the whole
+   auth scene rather than to the warning state — a focus indicator that only
+   appears when something has gone wrong is not a focus indicator. */
+.ascene{--focus:0 0 0 3px rgba(255,255,255,.34)}
 /* WKWebView (the desktop app engine) draws native button/field chrome unless
    appearance is reset — that's the stray blue box behind the login choices.
    Blink hides it with background:none; WebKit needs this explicitly. */
@@ -1117,6 +1165,38 @@ body{display:block;overflow-x:hidden;overflow-y:visible;max-width:none;flex:none
 .avig{position:absolute;inset:0;z-index:2;pointer-events:none;background:radial-gradient(90% 120% at 6% 50%,rgba(14,24,78,.32),transparent 55%)}
 .ascrim{position:absolute;inset:0;z-index:3;pointer-events:none;background:linear-gradient(90deg,rgba(14,24,78,.16) 0%,transparent 30%,rgba(12,20,70,.22) 66%,rgba(10,18,64,.4) 100%)}
 .alogo{position:absolute;top:5.5%;left:6.5%;z-index:6;font-family:'Hanken Grotesk',sans-serif;font-size:20px;font-weight:600;letter-spacing:-.02em}
+/* The voice toggle, beside the wordmark. Low-contrast until hovered: it is a
+   control you need exactly once, and it should not compete with the sentence
+   Atlas is saying. Inherits the scene's colour, so it stays legible when the
+   background cross-fades to amber on a refused sign-in. */
+.avoice{position:absolute;top:5.5%;left:calc(6.5% + 74px);z-index:6;display:inline-flex;align-items:center;justify-content:center;
+  width:28px;height:28px;border:0;border-radius:50%;background:transparent;color:var(--surface);opacity:.42;cursor:pointer;
+  transition:opacity .2s,background-color .2s}
+.avoice:hover{opacity:.9;background:rgba(255,255,255,.12)}
+.avoice:focus-visible{opacity:.9}
+/* The microphone toggle, next to the speaker. Same quiet chrome — with one
+   state the speaker has no equivalent of: when it is LIVE a real microphone is
+   open, and a control that looks the same whether or not it is recording you is
+   the wrong control. So `.live` leaves the low-contrast resting style entirely:
+   full opacity, a filled ground, and a slow pulse. (The global
+   prefers-reduced-motion block at the end of this file neutralises the pulse;
+   the opacity and fill carry the meaning on their own, which is why the state
+   is not signalled by animation alone.) */
+.amic{position:absolute;top:5.5%;left:calc(6.5% + 74px + 34px);z-index:6;display:inline-flex;align-items:center;justify-content:center;
+  width:28px;height:28px;border:0;border-radius:50%;background:transparent;color:var(--surface);opacity:.42;cursor:pointer;
+  transition:opacity .2s,background-color .2s}
+.amic:hover{opacity:.9;background:rgba(255,255,255,.12)}
+.amic:focus-visible{opacity:.9}
+.amic.live{opacity:1;background:rgba(255,255,255,.18);animation:amicpulse 2.6s ease-in-out infinite}
+.amic:disabled{opacity:.22;cursor:default}
+.amic:disabled:hover{background:transparent}
+@keyframes amicpulse{0%,100%{box-shadow:0 0 0 0 rgba(255,255,255,.28)}50%{box-shadow:0 0 0 7px rgba(255,255,255,0)}}
+/* What Atlas thinks it just heard, while the sentence is still in progress.
+   Italic and dimmed because it is a GUESS — scribe rewrites partials as it
+   goes, and styling it like committed text would make every self-correction
+   look like the field changing under the user. */
+.aheard{margin:0 0 14px;font-family:'Newsreader',Georgia,serif;font-style:italic;font-size:16px;
+  color:rgba(var(--surface-rgb),.66);min-height:22px}
 .agrid{position:absolute;inset:0;z-index:4;display:grid;grid-template-columns:1.02fr .98fr;align-items:stretch}
 .aleft{display:flex;flex-direction:column;justify-content:center;padding:0 4% 0 6.5%}
 .aright{position:relative;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;padding:0 6.5% 0 3%}
@@ -1255,7 +1335,10 @@ body{display:block;overflow-x:hidden;overflow-y:visible;max-width:none;flex:none
 .permtext{display:flex;flex-direction:column;gap:3px;min-width:0}
 .permtitle{display:flex;align-items:center;gap:8px;font-family:'Hanken Grotesk',sans-serif;
   font-size:17px;font-weight:600;letter-spacing:-.02em;color:var(--surface)}
-.permdenied{font-family:'Newsreader',Georgia,serif;font-style:italic;font-size:13px;font-weight:400;
+/* Neutral annotations beside a permission title — "not granted", "already
+   allowed". Deliberately the same quiet voice for both: neither is an alarm,
+   and colouring the refusal red would turn the user's own answer into a fault. */
+.permdenied,.permnote{font-family:'Newsreader',Georgia,serif;font-style:italic;font-size:13px;font-weight:400;
   color:rgba(var(--surface-rgb),.72)}
 /* The blurb swaps to the honest "what you lose" line when switched off, so the
    consequence is visible at the moment of choosing rather than buried in help. */

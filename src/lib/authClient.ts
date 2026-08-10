@@ -7,7 +7,7 @@
 // drive it via useSyncExternalStore without re-render loops.
 
 import { toast } from "sonner";
-import { clearPersistedCache } from "@/App";
+import { clearPersistedCache } from "@/lib/queryClient";
 
 export interface Entitlement {
   plan: string;
@@ -113,6 +113,37 @@ export function signIn(email: string, password: string) {
 
 export function signUp(email: string, password: string) {
   return postAuth("/api/auth/signup", { email, password });
+}
+
+/**
+ * Ask for a password-reset link.
+ *
+ * DELIBERATELY NOT `postAuth`: that helper treats a response without a token as
+ * a failure, which is right for sign-in and wrong here — this endpoint never
+ * returns a session, and its whole design is to answer identically whether or
+ * not the address has an account (see atlas-site functions/api/auth/forgot.ts).
+ * Routing it through postAuth would turn every successful request into
+ * "Authentication failed."
+ *
+ * Resolves `{}` on success. The caller must NOT report whether an account was
+ * found, because this function cannot know and the server will not say.
+ */
+export async function requestPasswordReset(email: string): Promise<{ error?: string }> {
+  let res: Response;
+  try {
+    res = await fetch(`${AUTH_BASE}/api/auth/forgot`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+  } catch {
+    return { error: "Couldn't reach the account server. Check your connection." };
+  }
+  if (res.ok) return {};
+  // The only non-200 that carries meaning is a malformed address — a fact
+  // about the typed string, not about who has an account.
+  const data = (await res.json().catch(() => ({}))) as { error?: string };
+  return { error: data.error ?? "Couldn't send a reset link just now." };
 }
 
 /**

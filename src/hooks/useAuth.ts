@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
-import { clearPersistedCache } from "@/App";
+import { clearPersistedCache } from "@/lib/queryClient";
 import * as auth from "@/lib/authClient";
 
 // Auth is now backed by the Cloudflare account system (atlas-site), not Supabase.
@@ -20,23 +20,30 @@ export const useAuth = () => {
     void auth.refreshEntitlement();
   }, []);
 
+  // NEITHER OF THESE TOASTS ANY MORE, and neither throws.
+  //
+  // They return `{ error }` or `{ data }`, and the CALLER decides what the user
+  // sees. `src/pages/Auth.tsx` is the only caller: it is a full-screen
+  // conversational scene where a toast is the wrong medium — it slides in over
+  // the corner of a page whose whole job is to be talking to you, and it says
+  // the failure somewhere other than where the failure happened.
+  //
+  // The success toasts went for a sharper reason. "Welcome back!" fired from
+  // here on a path that could not tell whether anything had been stored, and
+  // the sign-in screen separately assumed success because these functions do
+  // not throw — so a rejected password produced a cheerful toast AND a
+  // "Good to see you". Two independent claims of success for a login that did
+  // not happen. The screen now renders both outcomes itself, from the returned
+  // value, in the place the user is already looking.
   const signUp = useCallback(async (email: string, password: string, _displayName?: string) => {
     const { error, session } = await auth.signUp(email, password);
-    if (error) {
-      toast.error(error);
-      return { error };
-    }
-    toast.success("Account created successfully!");
+    if (error) return { error };
     return { data: session };
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
     const { error, session } = await auth.signIn(email, password);
-    if (error) {
-      toast.error(error);
-      return { error };
-    }
-    toast.success("Welcome back!");
+    if (error) return { error };
     return { data: session };
   }, []);
 

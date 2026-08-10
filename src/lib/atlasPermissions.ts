@@ -96,6 +96,53 @@ export function writeOnboarding(choices: Record<PermissionId, boolean>) {
 }
 
 /**
+ * The microphone answer, recorded on its own.
+ *
+ * DELIBERATELY NOT part of `OnboardingRecord`. The onboarding gate is a
+ * presence check — `Auth.tsx` sends you to `/permissions` when `readOnboarding()`
+ * returns null — so writing a partial record from the sign-in screen would skip
+ * the consent screen entirely and silently default the other three capabilities
+ * to whatever happened to be in the object. The mic is now asked for earlier
+ * than the rest, so it needs somewhere of its own to be remembered.
+ *
+ * `granted: false` is worth storing too: it means the user was asked and said
+ * no (or macOS did), which is why `/permissions` can show the switch off with
+ * "not granted" instead of cheerfully defaulting it back on.
+ */
+export const MIC_CONSENT_KEY = 'atlas.mic.v1';
+
+export interface MicConsent {
+  askedAt: string;
+  granted: boolean;
+}
+
+export function readMicConsent(): MicConsent | null {
+  try {
+    const raw = localStorage.getItem(MIC_CONSENT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<MicConsent>;
+    // A hand-edited or half-written value must read as "never asked" rather
+    // than as a grant — the safe direction for a microphone.
+    return typeof parsed?.granted === 'boolean'
+      ? { askedAt: String(parsed.askedAt ?? ''), granted: parsed.granted }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeMicConsent(granted: boolean): void {
+  try {
+    localStorage.setItem(
+      MIC_CONSENT_KEY,
+      JSON.stringify({ askedAt: new Date().toISOString(), granted }),
+    );
+  } catch {
+    /* a full/blocked localStorage costs us a second ask, nothing more */
+  }
+}
+
+/**
  * Trigger the REAL OS prompt for a capability. Returns whether it ended up
  * granted. Never reports success it did not observe: an unavailable API returns
  * false rather than pretending, so the UI cannot show a granted state that
@@ -103,13 +150,17 @@ export function writeOnboarding(choices: Record<PermissionId, boolean>) {
  */
 export async function requestPermission(id: PermissionId): Promise<boolean> {
   if (id === 'microphone') {
+    // The ONE place the mic is asked for, so it is also the one place the
+    // answer is recorded — the sign-in screen and this screen can't drift.
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       // We only wanted the grant — release the device immediately so no
       // recording indicator lingers after onboarding.
       stream.getTracks().forEach((t) => t.stop());
+      writeMicConsent(true);
       return true;
     } catch {
+      writeMicConsent(false);
       return false;
     }
   }
