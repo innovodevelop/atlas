@@ -16,7 +16,7 @@ Atlas releases involve **two completely independent** signing mechanisms:
 
 | | What it protects | Key type | Status today |
 |---|---|---|---|
-| **Updater signing** | Every auto-update is verified before install (minisign signature checked against the public key baked into the app) | minisign keypair from `bunx tauri signer generate` | **Works today**, on the key rotated 2026-08-10 (`84E81AF87B3CA4D9`). No Apple account needed. This is what enforces "Atlas never installs an unverified update" — but read the endpoint warning below before trusting that sentence end to end. |
+| **Updater signing** | Every auto-update is verified before install (minisign signature checked against the public key baked into the app) | minisign keypair from `bunx tauri signer generate` | **Works today**, on the key rotated 2026-08-10 (`84E81AF87B3CA4D9`). No Apple account needed. This is what enforces "Atlas never installs an unverified update" — the release home is `innovodevelop/atlas`, which we control. |
 | **Apple code signing + notarization** | macOS Gatekeeper trust for *fresh installs* (no "unidentified developer" warning) | **Developer ID Application** certificate | **Not possible yet.** Requires the paid Apple Developer Program (~99 USD/yr), which is not purchased. The "Apple Development" certificate already on the Mac **cannot** be used — it is for local dev/device testing only and cannot notarize or distribute. |
 
 The release workflow (`.github/workflows/release.yml`) treats Apple signing as
@@ -75,13 +75,18 @@ release exists, a rotation costs every user a manual reinstall.
 
 **Two things you still owe (do them before the first `v*` tag):**
 
-1. Copy the contents of `~/.tauri/atlas-updater.key` into the GitHub secret
-   `TAURI_SIGNING_PRIVATE_KEY` on **the repo the updater endpoint actually
-   points at** (see the warning below — that is currently unresolved), and set
-   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` to an **empty string**. Use
-   `gh secret set TAURI_SIGNING_PRIVATE_KEY --repo <repo> < ~/.tauri/atlas-updater.key`
-   rather than copy-paste: piping a file never puts the key on a screen, in a
-   clipboard, or in a scrollback buffer, which is how the last one was lost.
+1. Put the private key into the GitHub secret `TAURI_SIGNING_PRIVATE_KEY` on
+   the release home (`innovodevelop/atlas`), and set
+   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` to an **empty string**:
+
+   ```bash
+   gh secret set TAURI_SIGNING_PRIVATE_KEY --repo innovodevelop/atlas < ~/.tauri/atlas-updater.key
+   gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD --repo innovodevelop/atlas --body ""
+   ```
+
+   **Pipe the file. Never `cat` it and paste.** Piping never puts the key on a
+   screen, in a clipboard, or in a scrollback buffer — and a screen is exactly
+   where the last one ended up.
 2. Back the private key file up somewhere outside this Mac (password manager /
    encrypted backup). `~/.tauri/` is not backed up by anything. If the key is
    lost, existing installs can never accept another update — their baked-in
@@ -91,12 +96,12 @@ release exists, a rotation costs every user a manual reinstall.
 > **Resolved 2026-08-10.** Both updater endpoints previously named
 > `HelloAtlasAI/helloatlas`, a **public** repo the signed-in account has no push
 > or admin rights on — so the app trusted an update feed we could neither
-> publish to nor control. They now name `innovodevelop/helloatlas-1`. Details
+> publish to nor control. They now name `innovodevelop/atlas`. Details
 > and the guard that keeps them honest are in §5.
 
 | Secret | What it is | Value |
 |---|---|---|
-| `TAURI_SIGNING_PRIVATE_KEY` | minisign private key **content** (the whole file, one base64 line) | `cat ~/.tauri/atlas-updater.key` → paste |
+| `TAURI_SIGNING_PRIVATE_KEY` | minisign private key **content** (the whole file, one base64 line) | Pipe it — see the two `gh secret set` commands above. This row used to read "`cat …` → paste", which is how the first key ended up in a transcript and had to be rotated. |
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | password chosen at generation | empty string |
 
 The matching **public** key is the only piece that goes in the repo. Never
@@ -190,12 +195,19 @@ the pipeline without burning a version number.
 
 ## 5. How the updater feed works
 
-> **Settled 2026-08-10: the release home is `innovodevelop/helloatlas-1`.**
-> Both updater endpoints now name it, and it is the remote the working branch
-> already tracks and the only one the authenticated account can push to
+> **Settled 2026-08-10: the release home is `innovodevelop/atlas`.**
+> Both updater endpoints name it, and it is the remote the working branch tracks
+> and the only one the authenticated account can push to
 > (`gh api repos/HelloAtlasAI/helloatlas` → `push: false, admin: false`).
-> `HelloAtlasAI/helloatlas` remains configured as `origin` but is **not** the
-> release home and nothing ships from it.
+> `HelloAtlasAI/helloatlas` remains configured as the `origin` remote but is
+> **not** the release home and nothing ships from it.
+>
+> It was renamed from the fork-generated `helloatlas-1`. The obvious name,
+> `innovodevelop/helloatlas`, was not available: it is held by a **private,
+> non-fork repo created 2026-02-05 and last pushed the same day** — the
+> abandoned Lovable export this project descends from. That repo was left
+> untouched, deliberately, rather than renamed out of the way or deleted for the
+> sake of a nicer URL.
 >
 > Trusting a repo you cannot push to was the actual risk here, not the
 > inconvenience: whoever controls the endpoint's repo controls what every
@@ -209,17 +221,17 @@ the pipeline without burning a version number.
 > `tauri.lighthouse.conf.json5` has its own endpoint and its own filename
 > (`lighthouse-latest.json`) and is not covered by that guard.
 
-> **The repo name is a fork artifact, and the URL is permanent.**
-> `helloatlas-1` is the name GitHub generated for the fork. That exact string
-> gets compiled into every shipped binary, and while GitHub 301-redirects a
-> renamed repo, the redirect dies the moment anything else claims the old path.
-> Renaming is nearly free until the first release and awkward forever after —
-> so if the release home should be called something else, do it before the
+> **The endpoint URL is permanent — treat a rename as a release-blocking
+> decision.** The repo name compiles into every shipped binary. GitHub
+> 301-redirects a renamed repo, but that redirect dies the moment anything else
+> claims the old path, so a rename is nearly free until the first release and
+> awkward forever after. `helloatlas-1` → `atlas` was done on 2026-08-10 for
+> exactly this reason, before any release existed. Do not rename again after the
 > first `v*` tag.
 
 - The app's updater config (in `src-tauri/tauri.conf.json`, `plugins.updater`)
   points at the static URL
-  `https://github.com/innovodevelop/helloatlas-1/releases/latest/download/latest.json`.
+  `https://github.com/innovodevelop/atlas/releases/latest/download/latest.json`.
   GitHub redirects that to the **latest published, non-prerelease, non-draft**
   release — which is why "publish the draft" is the go-live switch and drafts
   are invisible to users.

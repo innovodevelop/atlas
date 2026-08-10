@@ -126,7 +126,7 @@
       // pointing at a repo we no longer release from; it would just keep
       // 404ing for a second reason and look identical to the intended failure.
       endpoints: [
-        "https://github.com/innovodevelop/helloatlas-1/releases/latest/download/lighthouse-latest.json",
+        "https://github.com/innovodevelop/atlas/releases/latest/download/lighthouse-latest.json",
       ],
     },
   },
