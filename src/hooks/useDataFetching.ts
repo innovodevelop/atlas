@@ -20,7 +20,8 @@ import { isWindowActive } from '@/hooks/useWindowActivity';
  *    `onSuccess` that writes into the caller's own `useState`, which the shared
  *    store deliberately has no equivalent for. Porting them is a separate job
  *    (R2's second half) and is not worth half-doing from another hook's ticket.
- *  - `useEdgeFunction` — the wrapper the three ported hooks used to go through.
+ *  - a per-mount edge-function wrapper the three ported hooks used to go
+ *    through (deleted with them — it had no other caller).
  *    It now has ZERO importers and is a deletion candidate; it was left in place
  *    only because this change owns neither that file nor the dead-code pass.
  *

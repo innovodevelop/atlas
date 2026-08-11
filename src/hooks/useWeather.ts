@@ -62,7 +62,7 @@ const REFRESH_MS = 30 * 60 * 1000;
 /**
  * ONE fetch per city for the whole app.
  *
- * This hook used to be a per-mount `useEdgeFunction`, and the plain dashboard
+ * This hook used to be a per-mount edge-function call, and the plain dashboard
  * mounts it FIVE times (hero card, atmosphere canvas, expanded view, widget
  * catalog, band narration) — ten calls to a rate-limited external API to draw
  * one screen, then five 30-minute timers. It now reads a shared store; see
