@@ -105,6 +105,50 @@ export const PROACTIVE_WALL_CLOCK_MS = 60_000;
 
 const nowIso = () => new Date().toISOString();
 
+// Caps rows touched per sweep call. `session_context` is insert-only (nothing
+// else in the codebase deletes from it) and a stuck/disabled digest lets
+// `atlas_learning_sessions` accumulate 'active' rows that nothing ever closes
+// (see triggerKnowledgeExtraction's removal in orchestrator.ts, audit C13) —
+// either backlog could in principle grow to any size before this file ever
+// looks at it. A plain unbounded DELETE/UPDATE would then turn one digest
+// cycle into a full-table write; the LIMIT below trades a slower drain (a few
+// cycles at most) for a per-call cost this route can always afford.
+const EXPIRY_SWEEP_BATCH = 500;
+
+/**
+ * Bounded janitor for two tables nothing else cleans up: `session_context`
+ * rows past their own `expires_at`, and `atlas_learning_sessions` rows stuck
+ * 'active' more than a day (real sessions close themselves via
+ * completeSessionIfDone/checkSessionBudget in learningGuards.ts; a session
+ * still 'active' after 24h has no path back to either of those and is orphan
+ * by definition, not just old). Runs unconditionally at the top of every
+ * `cycle()` call, before the cooldown/AI-call gates below — the sweep costs no
+ * AI call and does not touch the cooldown stamp, so there is no reason to make
+ * table hygiene wait on a digest that may itself skip.
+ */
+function sweepExpiredState(db: LocalDb, nowDate: Date): void {
+  const nowIsoText = nowDate.toISOString();
+  const dayAgoIsoText = new Date(nowDate.getTime() - 24 * 3_600_000).toISOString();
+
+  db._db
+    .query(
+      `DELETE FROM session_context WHERE id IN (
+         SELECT id FROM session_context WHERE expires_at < ? LIMIT ?
+       )`,
+    )
+    .run(nowIsoText, EXPIRY_SWEEP_BATCH);
+
+  db._db
+    .query(
+      `UPDATE atlas_learning_sessions SET status = 'expired', ended_at = ?
+        WHERE id IN (
+          SELECT id FROM atlas_learning_sessions
+           WHERE status = 'active' AND created_at < ? LIMIT ?
+        )`,
+    )
+    .run(nowIsoText, dayAgoIsoText, EXPIRY_SWEEP_BATCH);
+}
+
 // Runtime-ensured DDL (same pattern as CHAT_TURNS_DDL in localDb.ts): the
 // cooldown stamp must persist even for zero-insight runs, and this module owns
 // its own state table rather than reaching into db_schema.sql.
@@ -443,6 +487,12 @@ export function createProactiveHandlers({
       userId = resolved;
     }
 
+    // Unconditional, before any skip check below: table hygiene is not a
+    // digest feature and must not wait on the digest being enabled, keyed, or
+    // off cooldown.
+    const nowDate = now();
+    sweepExpiredState(db, nowDate);
+
     // Learning master switch (atlas_system_settings is single-row; agent A's
     // seed guarantees it exists on fresh installs). Missing row reads as off.
     const settings = db._db
@@ -452,7 +502,6 @@ export function createProactiveHandlers({
 
     if (!hasKey()) return json({ ok: true, insightsCreated: 0, skipped: "no-key" });
 
-    const nowDate = now();
     const state = db._db
       .query(`SELECT last_run_at FROM proactive_state WHERE user_id = ?`)
       .get(userId) as { last_run_at: string } | null;

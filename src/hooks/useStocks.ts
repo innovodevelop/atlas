@@ -1,5 +1,6 @@
-import { useMemo } from 'react';
-import { useEdgeFunction } from './useEdgeFunction';
+import { useMemo, useSyncExternalStore } from 'react';
+import { localClient as supabase } from '@/integrations/local/localClient';
+import { createSharedPoll, type SharedPollSnapshot } from '@/lib/sharedStore';
 
 export interface StockData {
   symbol: string;
@@ -33,9 +34,32 @@ const MOCK_STOCKS: StockData[] = [
   { symbol: 'NVDA', name: 'NVIDIA', price: 495.22, change: 12.55, changePercent: 2.60, sparkline: [45, 50, 55, 58, 62, 68, 72, 78, 82, 88, 92, 95] },
 ];
 
+const REFRESH_MS = 5 * 60 * 1000;
+
+const EMPTY: StocksResponse = { stocks: [], indices: [] };
+
+// The disabled path (empty watchlist). Both must be frozen module identities:
+// `useSyncExternalStore` compares the subscribe function and the snapshot by
+// identity, so a fresh arrow per render would resubscribe and re-render forever.
+// The snapshot keeps `isLoading` true, which is what the old `enabled: false`
+// path did — it never ran a fetch, so it never left its initial loading state.
+const NEVER_CHANGES = () => () => {};
+const IDLE: SharedPollSnapshot<StocksResponse> = { data: undefined, isLoading: true, error: null };
+const IDLE_SNAPSHOT = () => IDLE;
+
+/**
+ * ONE fetch per watchlist for the whole app — the dashboard card, the expanded
+ * view, the widget catalog and the band narration all mount this. See
+ * `src/lib/sharedStore.ts` for why that used to cost four calls and four timers.
+ *
+ * The key is the symbols IN CALLER ORDER, not sorted. A store's key has to
+ * determine its request: sorting would let two callers with the same set in a
+ * different order share one store, and then the response order matches only one
+ * of them — the other renders its cards in somebody else's order.
+ */
 export const useStocks = (symbols: string[]) => {
   // Stabilize symbols for memoization
-  const symbolsKey = useMemo(() => JSON.stringify(symbols.slice().sort()), [symbols]);
+  const symbolsKey = useMemo(() => JSON.stringify(symbols), [symbols]);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: callers pass fresh array literals every render; keying on the serialized value is the whole point, depending on `symbols` would defeat the stabilization
   const stableSymbols = useMemo(() => symbols, [symbolsKey]);
 
@@ -49,22 +73,44 @@ export const useStocks = (symbols: string[]) => {
     [fallbackData]
   );
 
-  const { data, isLoading, error, refetch } = useEdgeFunction<StocksResponse>(
-    'get-stocks',
-    { symbols: stableSymbols },
-    {
-      fallbackData: fallbackResponse,
-      refreshInterval: 5 * 60 * 1000, // 5 minutes
-      enabled: stableSymbols.length > 0,
-      transform: (response) => (response ?? { stocks: [], indices: [] }) as StocksResponse,
-    }
+  const poll = useMemo(
+    () =>
+      createSharedPoll<StocksResponse>({
+        key: `stocks:${symbolsKey}`,
+        fetch: async () => {
+          const { data, error } = await supabase.functions.invoke('get-stocks', {
+            body: { symbols: stableSymbols },
+          });
+          if (error) throw error;
+          return (data ?? EMPTY) as StocksResponse;
+        },
+        intervalMs: REFRESH_MS,
+      }),
+    [symbolsKey, stableSymbols],
   );
 
+  // An empty watchlist has nothing to ask for. Subscribing anyway would arm a
+  // 5-minute timer around a request for no symbols.
+  const enabled = stableSymbols.length > 0;
+  const snap = useSyncExternalStore(
+    enabled ? poll.subscribe : NEVER_CHANGES,
+    enabled ? poll.getSnapshot : IDLE_SNAPSHOT,
+    enabled ? poll.getSnapshot : IDLE_SNAPSHOT,
+  );
+
+  // Exactly the old three-way behaviour: empty while the first fetch is in
+  // flight (the card must not flash mock prices at every launch), the built-in
+  // sample if that fetch fails, and — new — the real quotes kept rather than
+  // replaced by the sample when a LATER refresh fails.
+  const value = snap.data ?? (snap.error ? fallbackResponse : EMPTY);
+
   return {
-    stocks: data?.stocks ?? [],
-    indices: data?.indices ?? [],
-    isLoading,
-    error,
-    refetch,
+    stocks: value.stocks ?? EMPTY.stocks,
+    indices: value.indices ?? EMPTY.indices,
+    /** The rows above are the built-in sample, not quotes. See useWeather. */
+    isFallback: snap.data == null && !!snap.error,
+    isLoading: snap.isLoading,
+    error: snap.error,
+    refetch: poll.refresh,
   };
 };

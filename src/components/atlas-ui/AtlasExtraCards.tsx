@@ -8,6 +8,8 @@
 import { memo, useEffect, useState } from 'react';
 import { Leaf, Flame, Globe } from 'lucide-react';
 import { useWeather } from '@/hooks/useWeather';
+import { isWindowActive } from '@/hooks/useWindowActivity';
+import { cityTimes } from '@/lib/worldClock';
 import { MusicPlayerCompact } from './music/MusicPlayerCompact';
 import { Card, Row } from './primitives';
 
@@ -112,29 +114,20 @@ export const AtlasActivityCard = memo(() => (
 AtlasActivityCard.displayName = 'AtlasActivityCard';
 
 // ---------------------------------------------------------------------------
-// World clock — real times, minute tick.
-
-const CITIES = [
-  { city: 'San Francisco', tz: 'America/Los_Angeles' },
-  { city: 'London', tz: 'Europe/London' },
-  { city: 'Tokyo', tz: 'Asia/Tokyo' },
-] as const;
-
-function cityTimes() {
-  const now = new Date();
-  const localDay = now.toLocaleDateString('en-CA');
-  return CITIES.map(({ city, tz }) => {
-    const time = now.toLocaleTimeString('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit' });
-    const day = now.toLocaleDateString('en-CA', { timeZone: tz });
-    const rel = day === localDay ? 'Today' : day > localDay ? 'Tomorrow' : 'Yesterday';
-    return { city, time, rel };
-  });
-}
+// World clock — real times, minute tick. CITIES/cityTimes live in
+// src/lib/worldClock.ts, shared with the widget-catalog preview.
 
 export const AtlasWorldClockCard = memo(() => {
   const [rows, setRows] = useState(cityTimes);
   useEffect(() => {
-    const id = window.setInterval(() => setRows(cityTimes()), 30_000);
+    // Gated on isWindowActive() (non-reactive read — the documented pattern
+    // for interval callbacks, see useDataFetching.ts) so a hidden/blurred
+    // window stops ticking instead of recomputing three timezones every 30s
+    // for nobody. 2026-08-11 audit: this interval and the catalog's ran
+    // ungated.
+    const id = window.setInterval(() => {
+      if (isWindowActive()) setRows(cityTimes());
+    }, 30_000);
     return () => window.clearInterval(id);
   }, []);
   return (

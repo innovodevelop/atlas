@@ -1,6 +1,5 @@
 /**
- * The react-query client, its disk persister, and the one teardown that drops
- * both.
+ * The react-query client, and the one teardown that clears it.
  *
  * WHY THIS IS NOT IN App.tsx ANY MORE. `clearPersistedCache` is needed by
  * lib/authClient.ts, hooks/useAuth.ts and the memory/privacy panel, so while it
@@ -18,14 +17,22 @@
  *
  * This module is a leaf — it imports only from @tanstack — so nothing that
  * needs the cache can drag a page module in behind it.
+ *
+ * NO DISK PERSISTENCE (removed 2026-08-11, audit C11). This used to wrap
+ * `queryClient` in `PersistQueryClientProvider` with a `PERSIST_ALLOWLIST` of
+ * ["weather", "profile", "tasks", "notes", "calendar", "user"], on the theory
+ * that those are the "instant startup" queries worth surviving a relaunch. None
+ * of them do: `rg queryKey` across every `useQuery` call site turns up admin/
+ * agent/version/test/learning/provider-status/usage-history keys only — the
+ * screens the allowlist named (weather, tasks, notes, calendar) fetch through
+ * the module-scoped stores in src/hooks, not react-query. So every cold start
+ * paid a synchronous localStorage read, and every admin-surface query event
+ * paid a throttled reserialize, to persist and rehydrate nothing. The
+ * `atlas-query-cache` key is still scrubbed below so an install that has it on
+ * disk from before this change doesn't carry an orphan forever.
  */
 import { QueryClient } from "@tanstack/react-query";
-import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 
-// Instant startup: dashboard data (weather, stocks, news, tasks…) is
-// persisted to disk-backed localStorage, so the app paints with last-known
-// data immediately and refetches in the background. Bump `buster` when the
-// cached shape changes.
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -43,48 +50,20 @@ export const queryClient = new QueryClient({
   },
 });
 
-const persister = createSyncStoragePersister({
-  storage: typeof window !== "undefined" ? window.localStorage : undefined,
-  key: "atlas-query-cache",
-});
-
-// Only persist the small, stable "instant startup" queries. Volatile/large
-// payloads (stock sparklines, news, realtime health) would bloat localStorage
-// and get replayed into memory on every launch.
-const PERSIST_ALLOWLIST = ["weather", "profile", "tasks", "notes", "calendar", "user"];
-
-export const persistOptions = {
-  persister,
-  maxAge: 24 * 60 * 60 * 1000,
-  buster: "v2",
-  dehydrateOptions: {
-    shouldDehydrateQuery: (query: { queryKey: readonly unknown[] }) => {
-      const head = String(query.queryKey?.[0] ?? "").toLowerCase();
-      return PERSIST_ALLOWLIST.some((k) => head.includes(k));
-    },
-  },
-};
-
 // Drops the account-scoped query cache — used by sign-out, a dead session and
-// the "delete all my data" control.
-//
-// Order matters. Removing only the storage key is not a clear: the QueryClient
-// still holds the pre-erase snapshots in memory, and PersistQueryClientProvider
-// re-serialises them into the same key on the very next cache event — so rows
-// erased under a right-to-erasure control would be back on disk seconds later.
-// Dropping the in-memory cache FIRST leaves nothing to re-persist; only then is
-// the key removed.
+// the "delete all my data" control. Three modules depend on this exact name and
+// its privacy contract (authClient, useAuth, MemoryPrivacyPanel): it must
+// leave nothing of the user's data behind, on disk or in memory.
 export const clearPersistedCache = () => {
   queryClient.clear();
   try {
-    // The persister is a no-op when there's no `window` (see above), so this is
-    // safe outside the browser too.
-    persister.removeClient();
+    // Pre-C11 installs may still carry the old persisted cache key on disk —
+    // remove it so it doesn't sit there as a permanent orphan. The
+    // `typeof window` guard (not just optional chaining) matters here: where
+    // there's no `window` at all (SSR/tests), the bare identifier throws a
+    // ReferenceError before `?.` ever gets a chance to short-circuit it.
+    if (typeof window !== "undefined") window.localStorage.removeItem("atlas-query-cache");
   } catch {
     /* storage unavailable */
   }
-  // createSyncStoragePersister throttles writes behind a 1s trailing timer, so a
-  // write scheduled just before this call can still land right after it. By then
-  // the cache is empty, so the worst case is the key reappearing holding an
-  // empty dehydrated state — never user data.
 };

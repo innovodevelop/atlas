@@ -1,11 +1,10 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
-import { queryClient, persistOptions } from "@/lib/queryClient";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { BrowserRouter } from "react-router-dom";
 import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
-import { useRealtimePauseOnInactivity } from "./hooks/useRealtimePauseOnInactivity";
 import { AppRoutes, type RouteOverride } from "./AppRoutes";
 import { OnboardingGate } from "./components/OnboardingGate";
 // The two `eager: true` surfaces in the registry, and the only page modules
@@ -55,12 +54,6 @@ const PageLoader = () => (
   </div>
 );
 
-// App-wide side effects that must run once, inside the providers.
-const GlobalEffects = () => {
-  useRealtimePauseOnInactivity();
-  return null;
-};
-
 // The registry's `eager` surfaces, supplied to the generated table.
 //
 // ADDING A ROUTE IS NOT DONE HERE ANY MORE. A new screen is a new entry in
@@ -84,12 +77,8 @@ const ROUTE_OVERRIDES: Readonly<Record<string, RouteOverride>> = {
 };
 
 const App = () => (
-  <PersistQueryClientProvider
-    client={queryClient}
-    persistOptions={persistOptions}
-  >
+  <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <GlobalEffects />
       <Toaster />
       <Sonner />
       <BrowserRouter>
@@ -98,7 +87,7 @@ const App = () => (
         </RouteErrorBoundary>
       </BrowserRouter>
     </TooltipProvider>
-  </PersistQueryClientProvider>
+  </QueryClientProvider>
 );
 
 export default App;

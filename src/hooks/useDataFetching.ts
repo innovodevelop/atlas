@@ -1,6 +1,35 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { isWindowActive } from '@/hooks/useWindowActivity';
 
+/**
+ * THE OLD PATH. `src/lib/sharedStore.ts` is the canonical one — reach for it
+ * first, and do not add new callers here without a reason you can write down.
+ *
+ * What is wrong with this hook is structural, not a bug in it: state and timer
+ * are per MOUNT, so the cost of a source scales with how many components happen
+ * to draw it. `useWeather` is mounted five times on the plain dashboard and was
+ * therefore making ten calls to a rate-limited external API and running five
+ * 30-minute timers (audit findings C6/C7). `createSharedPoll` replaces that with
+ * one module-scoped store per source, read through `useSyncExternalStore`, and
+ * `useWeather`/`useStocks`/`useNews` are ported onto it.
+ *
+ * What is still here, and why:
+ *  - `useTasks`, `useNotes`, `useCalendarEvents` — these read the LOCAL SQLite
+ *    core, not the network, so the duplicate work is a few in-process calls
+ *    rather than API quota. They also each layer `useCrudOperations` and an
+ *    `onSuccess` that writes into the caller's own `useState`, which the shared
+ *    store deliberately has no equivalent for. Porting them is a separate job
+ *    (R2's second half) and is not worth half-doing from another hook's ticket.
+ *  - `useEdgeFunction` — the wrapper the three ported hooks used to go through.
+ *    It now has ZERO importers and is a deletion candidate; it was left in place
+ *    only because this change owns neither that file nor the dead-code pass.
+ *
+ * The retry/backoff and `isRefetching` machinery below has no equivalent in
+ * `createSharedPoll`: nothing that was ported used `retryCount`, and the shared
+ * store's background refreshes are silent by design. If a future caller needs
+ * retries, add them to the store rather than staying here for them.
+ */
+
 export interface UseDataFetchingOptions<T> {
   fetcher: () => Promise<T>;
   initialData?: T | null;

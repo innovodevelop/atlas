@@ -12,10 +12,20 @@ CI (`.github/workflows/ci.yml`) is mirrored locally so nothing lands red.
 
 Jobs mirrored by `bun run ci`: **frontend** (frozen install, `tsc -b --force`,
 `eslint .`, `bun run build`, `bun test tests/`), **atlas-brain** (install,
-`tsc --noEmit`, `bun test`), **voice-gateway** (install, `fetch-models`,
-`tsc --noEmit`, VAD smoke — energy fallback tolerated), **edge-functions**
-(`deno check --quiet --no-lock` over `supabase/functions/*/index.ts`,
-skipping `_shared`). Requires Bun and Deno on PATH.
+`tsc --noEmit` — now including `supabase/functions/_shared` via a generated
+barrel, see below — plus `bun test`), **voice-gateway** (install,
+`fetch-models`, `tsc --noEmit`, VAD smoke — energy fallback tolerated).
+Requires Bun on PATH; Deno is no longer needed.
+
+The **edge-functions** job is gone (ADR 013). It ran
+`deno check` over `supabase/functions/*/index.ts` while *skipping* `_shared` —
+and `_shared` is the only thing in that directory, so the loop matched nothing
+and the job passed without checking a single file. The shared orchestrator is
+imported by the Bun brain, so it is now typechecked where it actually runs:
+the atlas-brain job generates a barrel importing every `_shared` module and
+feeds it through that sidecar's own tsconfig. Unlike its predecessor, that gate
+was watched failing on a deliberately-injected type error before it was
+trusted.
 
 ## Pre-push hook
 

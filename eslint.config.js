@@ -37,7 +37,6 @@ export default tseslint.config(
     // Supabase client (runtime-neutral module contract).
     files: [
       "src/hooks/useCrudOperations.ts",
-      "src/hooks/useSupabaseQuery.ts",
       "src/hooks/useRealtimeScribeStable.ts",
       "services/voice-gateway/**/*.ts",
     ],

@@ -31,10 +31,15 @@ import '@/styles/surfaces/widgetCatalog.css';
  * the concrete reason it does not exist, and no numbers at all.
  *
  * WHAT IT ADDS over a static spec: `status`. Three of the ten widgets sit on
- * hooks that quietly substitute built-in sample data when the call fails
- * (`useWeather`, `useStocks`, `useNews` all hand `fallbackData` to
- * `useDataFetching`). On the dashboard that is invisible — the card looks
- * populated. Here it reads "Fallback", with the reason.
+ * hooks that quietly substitute built-in sample data when the FIRST call fails
+ * (`useWeather`, `useStocks`, `useNews`). On the dashboard that is invisible —
+ * the card looks populated. Here it reads "Fallback", with the reason.
+ *
+ * Since the shared-store port those hooks keep the last good reading when a
+ * LATER refresh fails, which is a different situation and gets a different
+ * word: "Stale". The two were briefly conflated, and the catalog spent that
+ * time calling real numbers canned — see useCatalogWidgets' header for why the
+ * distinction is now drawn from `isFallback` rather than from `error`.
  *
  * Back-navigation is the headline and Esc, per the surface chrome the app uses;
  * there is no header link and no dock (the wiring pass owns the dock).

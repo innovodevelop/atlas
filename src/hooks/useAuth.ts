@@ -17,6 +17,13 @@ export const useAuth = () => {
     setLoading(false);
     // Re-validate entitlement in the background (offline-safe; clears the
     // session on a 401 so an expired token forces re-login).
+    //
+    // Every mounted consumer runs this, and there are 26 of them — the
+    // dashboard alone used to fire three concurrent `GET /api/me` on load
+    // (audit finding C8). The fix is NOT a guard here, because a guard here
+    // only knows about this component: `refreshEntitlement` itself now shares
+    // one in-flight request per token, so this line costs at most one call no
+    // matter how many surfaces are mounted. Do not add a second guard on top.
     void auth.refreshEntitlement();
   }, []);
 

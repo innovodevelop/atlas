@@ -4,7 +4,6 @@
 // dedup, which SQL can't do).
 
 import { isLearningEnabled } from "./providerStatus.ts";
-import { generateEmbedding } from "./aiGateway.ts";
 
 // Match the codebase convention (providerStatus.ts): loose client type to
 // avoid supabase-js version drift between functions.
@@ -95,42 +94,6 @@ export async function findOrCreateSession(
     return null;
   }
   return created as LearningSession;
-}
-
-/**
- * Semantic dedup: true if an equivalent topic already exists in the knowledge
- * base. Uses real embeddings + match_brain_vectors; falls back to a cheap
- * ilike check when embeddings are unavailable so dedup never blocks research.
- */
-export async function isDuplicateTopic(
-  supabase: SupabaseClient,
-  topic: string,
-  userId?: string | null,
-): Promise<boolean> {
-  try {
-    const embedding = await generateEmbedding(topic);
-    const { data: matches, error } = await supabase.rpc("match_brain_vectors", {
-      query_embedding: `[${embedding.join(",")}]`,
-      match_threshold: 0.85,
-      match_count: 1,
-      p_user_id: userId ?? null,
-    });
-    if (!error && matches && matches.length > 0) {
-      console.log(`[learningGuards] Duplicate topic (similarity ${matches[0].similarity?.toFixed?.(2)}): ${topic}`);
-      return true;
-    }
-    if (error) console.warn("[learningGuards] match_brain_vectors failed:", error.message);
-  } catch (e) {
-    console.warn("[learningGuards] Embedding dedup unavailable:", e instanceof Error ? e.message : e);
-  }
-
-  // Fallback: exact-ish title match against existing research
-  const { data: existing } = await supabase
-    .from("atlas_research_topics")
-    .select("id")
-    .ilike("topic", topic.slice(0, 60))
-    .limit(1);
-  return !!existing && existing.length > 0;
 }
 
 /**

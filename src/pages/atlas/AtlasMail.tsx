@@ -36,6 +36,7 @@ import { MailEmptyState } from '@/components/atlas-ui/mail/MailEmptyState';
 import { MailNotices } from '@/components/atlas-ui/mail/MailNotices';
 import { MailRulesEditor } from '@/components/atlas-ui/mail/MailRulesEditor';
 import { senderDomain } from '@/components/atlas-ui/mail/mailFormat';
+import { isTyping } from './atlasHelpers';
 import '@/styles/mail.css';
 
 /**
@@ -53,13 +54,6 @@ export const surface = {
 };
 
 /** True when a keystroke belongs to whatever the user is typing into. */
-const isTyping = (target: EventTarget | null): boolean => {
-  const el = target as HTMLElement | null;
-  if (!el || !el.tagName) return false;
-  const tag = el.tagName.toLowerCase();
-  return tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable;
-};
-
 const AtlasMail = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();

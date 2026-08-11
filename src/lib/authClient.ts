@@ -197,15 +197,43 @@ const isJsonResponse = (res: Response): boolean =>
   res.headers.get("content-type")?.includes("json") ?? false;
 
 /**
+ * ONE `GET /api/me` at a time, shared by everyone who asks.
+ *
+ * `useAuth` calls this from a mount effect and there are 26 mounted consumers
+ * app-wide — the dashboard alone fired three concurrent requests on every load,
+ * all asking the same question of the same token (audit finding C8). They also
+ * all raced to write the answer back.
+ *
+ * Keyed by token so a sign-out-then-sign-in mid-flight can't be served the
+ * previous account's entitlement out of this cache.
+ */
+let inFlight: { token: string; promise: Promise<Entitlement | null> } | null = null;
+
+/**
  * Refresh entitlement from /api/me. On an invalid/expired token (401) or a
  * deleted account (404), clears the session (forces re-login). On a network
  * error, keeps the cached entitlement (offline grace) so Atlas keeps working
  * without internet; other server errors (5xx) keep it too, so an outage never
  * signs anyone out.
  */
-export async function refreshEntitlement(): Promise<Entitlement | null> {
+export function refreshEntitlement(): Promise<Entitlement | null> {
   const s = getSession();
-  if (!s) return null;
+  if (!s) return Promise.resolve(null);
+  if (inFlight?.token === s.token) return inFlight.promise;
+  const entry: { token: string; promise: Promise<Entitlement | null> } = {
+    token: s.token,
+    // Cleared in `finally` so a failure can't wedge the cache shut: the next
+    // caller must be able to try again, not inherit a dead promise forever.
+    promise: fetchEntitlement(s).finally(() => {
+      if (inFlight === entry) inFlight = null;
+    }),
+  };
+  inFlight = entry;
+  return entry.promise;
+}
+
+/** The request itself. Never call directly — `refreshEntitlement` owns the de-dup. */
+async function fetchEntitlement(s: AtlasSession): Promise<Entitlement | null> {
   let res: Response;
   try {
     res = await fetch(`${AUTH_BASE}/api/me`, { headers: { authorization: `Bearer ${s.token}` } });
@@ -234,6 +262,12 @@ export async function refreshEntitlement(): Promise<Entitlement | null> {
   // The session can have died while this request was in flight (sign-out,
   // account deletion, a 401 from another call). Writing the snapshot we started
   // with would resurrect it, so only store if we're still the current session.
+  //
+  // This compares by OBJECT IDENTITY, which only became a safe test once
+  // `refreshEntitlement` deduped: with N concurrent refreshes racing, the first
+  // one to write changed the session object and every other resolver then
+  // silently dropped its answer here. There is one writer now, so the check
+  // means what it says — "did the session change under me" — and nothing else.
   if (getSession() !== s) return entitlement;
   store({ ...s, entitlement });
   return entitlement;

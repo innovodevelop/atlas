@@ -29,6 +29,10 @@ type Rendered = CatalogStatus | 'immutable';
 const STATUS_LABEL: Record<Rendered, string> = {
   live: 'Live',
   fallback: 'Fallback',
+  // Distinct from Fallback on purpose: these ARE the source's own numbers,
+  // just from an earlier answer. Calling that "Fallback" told the operator the
+  // card was canned when it was real — see useCatalogWidgets' header.
+  stale: 'Stale',
   empty: 'Empty',
   nosource: 'No source',
   unmeasured: 'Not measured',
@@ -39,6 +43,9 @@ const STATUS_LABEL: Record<Rendered, string> = {
 const STATUS_TONE: Record<Rendered, 'ok' | 'warn' | 'idle'> = {
   live: 'ok',
   fallback: 'warn',
+  // Amber, not green: real numbers, but the source is not answering and the
+  // reading will keep ageing until it does.
+  stale: 'warn',
   empty: 'idle',
   nosource: 'warn',
   unmeasured: 'warn',

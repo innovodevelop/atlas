@@ -8,7 +8,9 @@ import { usePortfolio } from '@/hooks/usePortfolio';
 import { useNews } from '@/hooks/useNews';
 import { useMailIntelligence } from '@/hooks/useMailIntelligence';
 import { useMusicPlayer } from '@/hooks/useMusicPlayer';
-import { fmtEventTime, fmtPct } from '@/pages/atlas/atlasHelpers';
+import { isWindowActive } from '@/hooks/useWindowActivity';
+import { cityTimes as worldCityTimes } from '@/lib/worldClock';
+import { fmtEventTime, fmtPct, WATCHLIST } from '@/pages/atlas/atlasHelpers';
 
 /**
  * The catalog's data layer.
@@ -21,19 +23,29 @@ import { fmtEventTime, fmtPct } from '@/pages/atlas/atlasHelpers';
  * uniquely placed to tell you and the dashboard never does:
  *
  *   live        the numbers on screen came from the source
- *   fallback    the source failed and `useDataFetching` swapped in the module's
- *               built-in sample — the card still looks populated and is not
+ *   fallback    the source failed and the card is drawing the module's built-in
+ *               sample — populated, and not real
+ *   stale       the source failed, but an earlier answer is still on screen
  *   empty       the source answered and had nothing
  *   nosource    there is no source connected to answer
  *   unmeasured  nothing measures this at all (Activity)
  *
- * `fallback` is not a hypothetical. `useWeather`, `useStocks` and `useNews` all
- * pass `fallbackData` to `useDataFetching`, which sets it on any error. So a
- * dead network draws "68°, San Francisco" on the dashboard with no indication
- * that it is canned. The catalog reads the same `error` flag and says so.
+ * `fallback` is not a hypothetical: `useWeather` returns `snap.data ??
+ * fallbackData`, so a first fetch that never lands draws "68°, San Francisco"
+ * with nothing on the card admitting it is canned. The catalog says so.
+ *
+ * `stale` EXISTS BECAUSE THIS COMMENT WAS ONCE WRONG. Before the shared-store
+ * port (audit R2), every one of these hooks swapped its built-in sample in on
+ * ANY error, so `error != null` really did mean "you are looking at canned
+ * data" and the catalog said exactly that. The store now keeps the last good
+ * reading across a failed refresh — strictly better behaviour — which silently
+ * turned this file into a liar: it labelled genuine, merely-stale numbers as a
+ * built-in sample. The distinction is therefore drawn from what is ACTUALLY on
+ * screen (did any real data ever arrive?) rather than from the error flag
+ * alone, because the error flag no longer answers that question.
  */
 
-export type CatalogStatus = 'live' | 'fallback' | 'empty' | 'nosource' | 'unmeasured';
+export type CatalogStatus = 'live' | 'fallback' | 'stale' | 'empty' | 'nosource' | 'unmeasured';
 
 export interface WidgetRow { label: string; value: string }
 
@@ -51,22 +63,13 @@ export interface WidgetData {
   note?: string;
 }
 
-/** Mirrors the constant in AtlasCards.tsx, which does not export it. */
-const WATCHLIST = ['AAPL', 'GOOGL', 'MSFT', 'NVDA'];
-
-/** Mirrors the constant in AtlasExtraCards.tsx, which does not export it. */
-const CITIES = [
-  { city: 'San Francisco', tz: 'America/Los_Angeles' },
-  { city: 'London', tz: 'Europe/London' },
-  { city: 'Tokyo', tz: 'Asia/Tokyo' },
-] as const;
-
-function cityTimes(): WidgetRow[] {
-  const now = new Date();
-  return CITIES.map(({ city, tz }) => ({
-    label: city,
-    value: now.toLocaleTimeString('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit' }),
-  }));
+// WATCHLIST and the world-clock cities/times are shared constants now (see
+// atlasHelpers.ts and src/lib/worldClock.ts) — this catalog used to keep its
+// own copies of both, silently drifting from the dashboard cards it exists
+// to preview. `catalogCityTimes` only reshapes worldClock's row shape into
+// this file's generic `{label, value}` WidgetRow.
+function catalogCityTimes(): WidgetRow[] {
+  return worldCityTimes().map(({ city, time }) => ({ label: city, value: time }));
 }
 
 const senderName = (from: string | null) =>
@@ -83,20 +86,23 @@ const mailTime = (iso: string | null) => {
 
 export function useCatalogWidgets(): Record<string, WidgetData> {
   const { user } = useAuth();
-  const { weather, error: weatherError } = useWeather();
+  const { weather, error: weatherError, isFallback: weatherFallback } = useWeather();
   const { events } = useCalendarEvents();
   const { tasks, completedCount, progress } = useTasks();
-  const { stocks, error: stocksError } = useStocks(WATCHLIST);
+  const { stocks, error: stocksError, isFallback: stocksFallback } = useStocks(WATCHLIST);
   const portfolio = usePortfolio();
-  const { news, error: newsError } = useNews();
+  const { news, error: newsError, isFallback: newsFallback } = useNews();
   const mail = useMailIntelligence();
   const music = useMusicPlayer();
 
   // The clock is the one widget whose value changes without a fetch. Same
-  // 30s tick the shipped card uses.
-  const [clock, setClock] = useState<WidgetRow[]>(cityTimes);
+  // 30s tick the shipped card uses, gated the same way (isWindowActive — a
+  // hidden catalog preview shouldn't keep ticking either).
+  const [clock, setClock] = useState<WidgetRow[]>(catalogCityTimes);
   useEffect(() => {
-    const id = window.setInterval(() => setClock(cityTimes()), 30_000);
+    const id = window.setInterval(() => {
+      if (isWindowActive()) setClock(catalogCityTimes());
+    }, 30_000);
     return () => window.clearInterval(id);
   }, []);
 
@@ -105,13 +111,15 @@ export function useCatalogWidgets(): Record<string, WidgetData> {
   return useMemo<Record<string, WidgetData>>(() => {
     // --- Weather -----------------------------------------------------------
     const weatherData: WidgetData = {
-      status: weatherError ? 'fallback' : 'live',
+      status: weatherFallback ? 'fallback' : weatherError ? 'stale' : 'live',
       value: `${Math.round(weather.temp)}°`,
       delta: weather.condition,
       caption: weather.high != null && weather.low != null
         ? `${weather.location} · H ${weather.high}° L ${weather.low}°`
         : weather.location,
-      note: weatherError ? 'Built-in sample — get-weather did not answer.' : undefined,
+      note: weatherFallback ? 'Built-in sample — get-weather did not answer.'
+        : weatherError ? 'Last good reading — get-weather did not answer on the latest refresh.'
+          : undefined,
     };
 
     // --- Air quality -------------------------------------------------------
@@ -129,11 +137,13 @@ export function useCatalogWidgets(): Record<string, WidgetData> {
         note: weatherError ? 'get-weather did not answer.' : undefined,
       }
       : {
-        status: weatherError ? 'fallback' : 'live',
+        status: weatherFallback ? 'fallback' : weatherError ? 'stale' : 'live',
         value: `${Math.round(air.pm25)}`,
         caption: `PM2.5 µg/m³ · band ${air.aqi} of 5`,
         pct: (air.aqi / 5) * 100,
-        note: weatherError ? 'Built-in sample — get-weather did not answer.' : undefined,
+        note: weatherFallback ? 'Built-in sample — get-weather did not answer.'
+        : weatherError ? 'Last good reading — get-weather did not answer on the latest refresh.'
+          : undefined,
       };
 
     // --- Today -------------------------------------------------------------
@@ -175,7 +185,7 @@ export function useCatalogWidgets(): Record<string, WidgetData> {
         note: stocksError ? 'get-stocks did not answer.' : undefined,
       }
       : {
-        status: stocksError ? 'fallback' : 'live',
+        status: stocksFallback ? 'fallback' : stocksError ? 'stale' : 'live',
         value: portfolioLive
           ? `$${Math.round(portfolio.summary?.total_value ?? 0).toLocaleString('en-US')}`
           : fmtPct(heroPct),
@@ -187,7 +197,9 @@ export function useCatalogWidgets(): Record<string, WidgetData> {
           label: s.symbol,
           value: fmtPct(s.changePercent),
         })),
-        note: stocksError ? 'Built-in sample — get-stocks did not answer.' : undefined,
+        note: stocksFallback ? 'Built-in sample — get-stocks did not answer.'
+        : stocksError ? 'Last good reading — get-stocks did not answer on the latest refresh.'
+          : undefined,
       };
 
     // --- Mail --------------------------------------------------------------
@@ -212,11 +224,13 @@ export function useCatalogWidgets(): Record<string, WidgetData> {
         note: newsError ? 'get-news did not answer.' : undefined,
       }
       : {
-        status: newsError ? 'fallback' : 'live',
+        status: newsFallback ? 'fallback' : newsError ? 'stale' : 'live',
         value: `${news.length}`,
         caption: news.length === 1 ? 'story' : 'stories',
         rows: news.slice(0, 3).map((n) => ({ label: n.title, value: n.source })),
-        note: newsError ? 'Built-in sample — get-news did not answer.' : undefined,
+        note: newsFallback ? 'Built-in sample — get-news did not answer.'
+        : newsError ? 'Last good reading — get-news did not answer on the latest refresh.'
+          : undefined,
       };
 
     // --- Now playing -------------------------------------------------------

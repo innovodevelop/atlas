@@ -6,7 +6,7 @@ import { useStocks } from '@/hooks/useStocks';
 import { useMailIntelligence } from '@/hooks/useMailIntelligence';
 import { useNews } from '@/hooks/useNews';
 import { useMusicPlayer } from '@/hooks/useMusicPlayer';
-import { fmtPct, fmtEventTime } from './atlasHelpers';
+import { fmtPct, fmtEventTime, WATCHLIST } from './atlasHelpers';
 import type { AtlasExpandedKey } from './AtlasDashboard';
 
 // The greeting band narrates the focused widget (design Change 2). The title's
@@ -21,7 +21,6 @@ export interface BandContent {
   metaSmall: string;
 }
 
-const WATCH = ['AAPL', 'GOOGL', 'MSFT', 'NVDA', 'AMZN', 'META'];
 const senderName = (from: string | null | undefined) =>
   (from || '').replace(/<.*>/, '').replace(/"/g, '').trim() || 'Someone';
 
@@ -34,12 +33,32 @@ export function useBandNarration(focusedKey: AtlasExpandedKey, home: BandContent
   const { weather } = useWeather();
   const { events } = useCalendarEvents();
   const { tasks, completedCount, progress } = useTasks();
-  const { stocks } = useStocks(WATCH);
+  const { stocks } = useStocks(WATCHLIST);
   const { messages, isConnected: mailConnected } = useMailIntelligence();
   const { news } = useNews();
   const { nowPlaying } = useMusicPlayer();
 
+  // `shownKey` tracks focusedKey with a delay (see the swap effect below) so
+  // the outgoing widget keeps rendering real content while it fades out.
+  // Declared here, ahead of byKey, because byKey's C12 guard needs it.
+  const [shownKey, setShownKey] = useState<AtlasExpandedKey>(focusedKey);
+  const [swapping, setSwapping] = useState(false);
+
+  // C12 (2026-08-11 audit): the plain home view (focusedKey === null) never
+  // reads a key out of byKey — `content` below falls back to `home` — so
+  // building all 7 widgets' formatted strings on every data tick was pure
+  // waste there. The 7 hooks above still mount unconditionally: React's
+  // rules of hooks forbid calling them only when focused, so their
+  // subscriptions/fetches are NOT what this fixes (that's the shared-store
+  // work, R2/R8 in the refactor plan — this only removes the *derived*
+  // work). Checking `shownKey` too (not just focusedKey) matters: mid-swap
+  // back to home, focusedKey goes null before shownKey catches up 210ms
+  // later, and the outgoing widget still needs its real content for that
+  // window or the swap-out animation freezes on stale/missing text.
+  const isHome = focusedKey == null && shownKey == null;
+
   const byKey = useMemo<Record<string, BandContent>>(() => {
+    if (isHome) return {};
     // Weather
     const t = Math.round(weather.temp);
     const hi = weather.high != null ? Math.round(weather.high) : null;
@@ -121,16 +140,13 @@ export function useBandNarration(focusedKey: AtlasExpandedKey, home: BandContent
         metaSmall: nowPlaying?.track ? nowPlaying.track.title : 'paused',
       },
     };
-  }, [weather, events, tasks, completedCount, progress, stocks, messages, mailConnected, news, nowPlaying]);
+  }, [isHome, weather, events, tasks, completedCount, progress, stocks, messages, mailConnected, news, nowPlaying]);
 
   // Directional swap: when the focused widget changes, animate the current text
   // out, switch which widget is shown while hidden, then animate the new text
   // in. We render live content for `shownKey` (so data stays fresh) and only
   // key the swap on `focusedKey` — putting the content object in the deps would
   // let live-data re-renders keep resetting the timer, lagging the swap.
-  const [shownKey, setShownKey] = useState<AtlasExpandedKey>(focusedKey);
-  const [swapping, setSwapping] = useState(false);
-
   useEffect(() => {
     if (focusedKey === shownKey) return;
     // Swap is a self-completing keyframe animation (see workshop.css): switch

@@ -60,6 +60,7 @@ import type { SmartRoom } from '@/lib/mocks/smartHome';
 import { HomeWidgetCard } from '@/components/atlas-ui/smartHome/HomeWidgetCard';
 import { DeviceCard, RecentDeviceStrip } from '@/components/atlas-ui/smartHome/DeviceCard';
 import { Switch } from '@/components/atlas-ui/smartHome/DeviceControls';
+import { isTyping } from './atlasHelpers';
 import '@/styles/surfaces/smartHome.css';
 
 /**
@@ -98,13 +99,6 @@ const TONE_DOT: Record<SmartRoom['tone'], string> = {
 };
 
 /** True when a keystroke belongs to whatever the user is typing into. */
-const isTyping = (target: EventTarget | null): boolean => {
-  const el = target as HTMLElement | null;
-  if (!el || !el.tagName) return false;
-  const tag = el.tagName.toLowerCase();
-  return tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable;
-};
-
 /* ── The honesty treatments ─────────────────────────────────────────────────
    Both of these wrap the shared device components rather than changing them.
    A stale card is dimmed and desaturated and carries the last words the device

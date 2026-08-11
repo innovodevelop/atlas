@@ -46,6 +46,7 @@ import {
 } from '@/lib/mocks/browser';
 import { BrowserTabRail } from '@/components/atlas-ui/browser/BrowserTabRail';
 import { BrowserReader } from '@/components/atlas-ui/browser/BrowserReader';
+import { isTyping } from './atlasHelpers';
 import '@/styles/surfaces/browser.css';
 
 /** The wiring pass reads this; it does not have to read the file. */
@@ -86,13 +87,6 @@ const SUBMIT_ICON: Record<BrowserMode, LucideIcon> = {
 };
 
 /** True when a keystroke belongs to whatever the user is typing into. */
-const isTyping = (target: EventTarget | null): boolean => {
-  const el = target as HTMLElement | null;
-  if (!el || !el.tagName) return false;
-  const tag = el.tagName.toLowerCase();
-  return tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable;
-};
-
 const AtlasBrowser = () => {
   const navigate = useNavigate();
   const live = useBrowser();

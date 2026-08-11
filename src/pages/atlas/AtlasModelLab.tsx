@@ -45,6 +45,7 @@ import { CompareView } from '@/components/atlas-ui/modelLab/CompareView';
 import { ProvidersView } from '@/components/atlas-ui/modelLab/ProvidersView';
 import { activeLane, useModelLabRuntime } from '@/components/atlas-ui/modelLab/useModelLabRuntime';
 import { SOURCES, tierById } from '@/lib/mocks/modelLab';
+import { isTyping } from './atlasHelpers';
 import '@/styles/surfaces/modelLab.css';
 
 /** Registered by the wiring pass; this file does not touch the router. */
@@ -81,13 +82,6 @@ const TABS: { key: Tab; label: string }[] = [
 ];
 
 /** True when a keystroke belongs to whatever the user is typing into. */
-const isTyping = (target: EventTarget | null): boolean => {
-  const el = target as HTMLElement | null;
-  if (!el || !el.tagName) return false;
-  const tag = el.tagName.toLowerCase();
-  return tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable;
-};
-
 const AtlasModelLab = () => {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('routing');

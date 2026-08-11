@@ -128,6 +128,23 @@ pub struct Ctx {
     pub user_id: String,
     pub user_token: Option<String>,
     pub profile: Profile,
+    /// Correlation key for one dispatch, written to the control port's log.
+    ///
+    /// WHAT IT TIES, AND WHAT IT DOES NOT. It reaches the LOG, never a row:
+    /// neither `tool_calls` nor `approvals` has a column for it, and adding one
+    /// is a schema migration that this field is not worth on its own. Inside
+    /// the database the rows of one call already find each other —
+    /// `approvals.tool_call_id` is a foreign key and `approval_resolve` updates
+    /// that same pair — so what the log line buys is the tie ACROSS the process
+    /// boundary: which of the brain's requests produced this desktop row.
+    ///
+    /// That half is latent today, and saying so is the point: the brain's
+    /// client (services/atlas-brain/src/control.ts) does not put `request_id`
+    /// in the envelope, so every id here is currently one Rust generated.
+    ///
+    /// It was dead plumbing before this — parsed, threaded into every op, read
+    /// nowhere. `the_row_writing_paths_log_their_request_id` is what stops it
+    /// quietly becoming that again.
     pub request_id: String,
 }
 
@@ -190,17 +207,32 @@ pub struct Op {
     pub run: fn(&AppHandle, &Value, &Ctx) -> Result<Value, String>,
 }
 
-/// Machine-readable failure classes. The wire form is the snake_case string;
-/// the brain branches on it rather than on message text.
+/// Machine-readable failure classes for everything PAST the auth ladder. The
+/// wire form is the snake_case string; the brain branches on it rather than on
+/// message text.
+///
+/// THERE IS NO `Forbidden` AND NO `TooLarge` ARM, and the absence is the
+/// decision. A 403 or a 413 is answered by `auth::Reject::render()` before the
+/// dispatcher is reached, so a request that gets one never touches this enum.
+/// Both variants existed here anyway, constructed by nothing but tests, which
+/// left the status mapping written down twice — `status()` said 403/413, and
+/// auth.rs's `FORBIDDEN_BODY`/`TOO_LARGE_BODY` said it again in hand-written
+/// JSON — with nothing checking that the two still agreed.
+///
+/// Of the two ways to collapse that, deleting these arms is the one that keeps
+/// the property auth.rs exists to hold. Routing real rejections through
+/// `ControlResult::Err` instead would make "every rejection cause renders an
+/// IDENTICAL 403" depend on every present and future call site passing the same
+/// message string; as one `&'static str` it is identical by construction and
+/// cannot drift. What the split still needs is that auth.rs's hand-written
+/// bodies stay the shape the brain's single parser expects, and that is pinned
+/// by `the_auth_ladders_bodies_are_the_envelope_the_brain_parses`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrCode {
-    /// Auth ladder rejection. Deliberately undifferentiated — see auth.rs.
-    Forbidden,
-    TooLarge,
     BadRequest,
     UnknownOp,
-    /// Per-tier budget spent. Deliberately NOT folded into `Forbidden`: the
-    /// auth ladder's sameness exists so a caller cannot probe the boundary,
+    /// Per-tier budget spent. Deliberately NOT answered with the ladder's 403:
+    /// the auth ladder's sameness exists so a caller cannot probe the boundary,
     /// but a throttle is not a security answer — it is scheduling feedback for
     /// the legitimate caller, who has to know to wait rather than to re-check
     /// its token or give up on the tool. The message carries a machine-readable
@@ -215,8 +247,6 @@ pub enum ErrCode {
 impl ErrCode {
     pub fn as_str(self) -> &'static str {
         match self {
-            ErrCode::Forbidden => "forbidden",
-            ErrCode::TooLarge => "too_large",
             ErrCode::BadRequest => "bad_request",
             ErrCode::UnknownOp => "unknown_op",
             ErrCode::RateLimited => "rate_limited",
@@ -245,14 +275,13 @@ impl ControlResult {
 
     /// Op-level failures are still HTTP 200: the request was well-formed and
     /// authorised, and the brain reads `ok` to decide. Reserving non-2xx for
-    /// transport/auth problems keeps those two classes distinguishable.
+    /// transport problems — and, one layer earlier, for the auth ladder's 403
+    /// and 413 — keeps those classes distinguishable.
     pub fn status(&self) -> u16 {
         match self {
             ControlResult::Ok(_) => 200,
             ControlResult::Err { code, .. } => match code {
                 ErrCode::BadRequest | ErrCode::UnknownOp => 400,
-                ErrCode::TooLarge => 413,
-                ErrCode::Forbidden => 403,
                 // 429, the one status whose defined meaning is exactly "you may
                 // retry this later". 403 would tell the brain to stop trying,
                 // and a 200 with ok:false would put a throttle in the same bin
@@ -551,6 +580,29 @@ fn compose(
     (result.status(), result.to_json().to_string())
 }
 
+/// Ceiling on a caller-supplied `request_id`.
+///
+/// 64 characters: a uuid is 36, and anything longer than that is not an
+/// identifier, it is a payload. The value is an arbitrary string off the wire
+/// that ends up in a log line, which is a single-line frame with the same
+/// weakness the approvals card has — a newline in it forges a second line — so
+/// it is cleaned by the same function the card uses.
+const REQUEST_ID_MAX: usize = 64;
+
+/// A usable correlation key: the caller's, cleaned and bounded, or a fresh uuid
+/// when it sent nothing that survived cleaning. Never empty — an empty key
+/// would group unrelated calls together in whatever reads the log.
+fn request_id(supplied: Option<&str>) -> String {
+    let cleaned = supplied
+        .map(|id| audit::sanitize(id, REQUEST_ID_MAX))
+        .unwrap_or_default();
+    if cleaned.is_empty() {
+        uuid::Uuid::new_v4().to_string()
+    } else {
+        cleaned
+    }
+}
+
 /// Parse the invoke envelope, resolve the op, run it.
 fn invoke(app: &AppHandle, body: &[u8]) -> ControlResult {
     let parsed: InvokeBody = match serde_json::from_slice(body) {
@@ -576,10 +628,7 @@ fn invoke(app: &AppHandle, body: &[u8]) -> ControlResult {
         user_id: parsed.user_id.clone().unwrap_or_default(),
         user_token: parsed.user_token.clone(),
         profile: parsed.profile(),
-        request_id: parsed
-            .request_id
-            .clone()
-            .unwrap_or_else(|| uuid::Uuid::new_v4().to_string()),
+        request_id: request_id(parsed.request_id.as_deref()),
     };
 
     // Rate limit BEFORE the gate, and against the op's DECLARED tier. Queuing
@@ -641,7 +690,17 @@ fn execute(
     // text, so "skip the log this once" must not be a reachable state.
     let tool_call_id = if decision.audited() {
         match audit::record_running(app, ctx, op, redacted) {
-            Ok(id) => Some(id),
+            Ok(id) => {
+                // The ONLY place the request and the row it produced are ever
+                // written down together: `tool_calls` has no column for a
+                // request id (see `Ctx::request_id`).
+                log::info!(
+                    "[control] {} audited as tool_call {id} for request {}",
+                    op.name,
+                    ctx.request_id
+                );
+                Some(id)
+            }
             Err(e) => {
                 return ControlResult::Err {
                     code: ErrCode::Internal,
@@ -810,6 +869,19 @@ fn queue_for_approval(
             message: e,
         };
     }
+
+    // One request, two rows, and a card a human may answer an hour later. This
+    // line is what says which request they all belong to. `approval_resolve`
+    // logs the APPROVAL id as its key (that is what its `ctx.request_id` is),
+    // and the id is in this line too, so one grep on it finds both ends of a
+    // card's life.
+    log::info!(
+        "[control] {} queued as approval {} / tool_call {} for request {}",
+        op.name,
+        queued.approval_id,
+        queued.tool_call_id,
+        ctx.request_id
+    );
 
     ControlResult::Ok(json!({
         "status": "awaiting_approval",
@@ -1079,13 +1151,21 @@ pub fn approval_resolve(
         // is the exact fact `Interactive` asserts — and the fact whose absence
         // sent the call here in the first place.
         profile: Profile::Interactive,
-        // The approval id, so the audit row, the approvals row and any log line
-        // for this execution all carry the same correlation key.
+        // The approval id, so this execution's log line carries the same key
+        // the queue's did — however long the card sat there. It is in neither
+        // row: see `Ctx::request_id` for why the tie is a log line and not a
+        // column.
         request_id: approval_id.clone(),
     };
 
     let outcome = run_op(&app, pending.op, &pending.args, &ctx);
     audit::finish(&app, &pending.tool_call_id, &outcome);
+    log::info!(
+        "[control] {} executed for request {} (tool_call {})",
+        pending.op.name,
+        ctx.request_id,
+        pending.tool_call_id
+    );
 
     Ok(match outcome {
         Ok(data) => json!({
@@ -1317,6 +1397,12 @@ mod tests {
 
     /// A throttle must not be mistakable for an auth rejection or for an op
     /// that ran and failed — the caller's correct response differs in all three.
+    ///
+    /// The rejection side is compared against `auth::Reject::Forbidden`, which
+    /// is what actually goes on the wire. It used to be compared against
+    /// `ErrCode::Forbidden`, a variant nothing outside this test constructed —
+    /// so the test could have passed while the REAL 403 collided with the
+    /// throttle.
     #[test]
     fn rate_limited_is_distinguishable_from_forbidden_and_op_failure() {
         let throttled = ControlResult::Err {
@@ -1326,20 +1412,60 @@ mod tests {
         assert_eq!(throttled.status(), 429);
         assert_eq!(throttled.to_json()["error"]["code"], json!("rate_limited"));
 
-        let forbidden = ControlResult::Err {
-            code: ErrCode::Forbidden,
-            message: "forbidden".into(),
-        };
+        let (forbidden_status, forbidden_body) = auth::Reject::Forbidden.render();
         let failed = ControlResult::Err {
             code: ErrCode::OpFailed,
             message: "spotify said no".into(),
         };
-        assert_ne!(throttled.status(), forbidden.status());
+        assert_ne!(throttled.status(), forbidden_status);
         assert_ne!(throttled.status(), failed.status());
-        assert_ne!(
-            throttled.to_json()["error"]["code"],
-            forbidden.to_json()["error"]["code"]
+        assert!(
+            !forbidden_body.contains("rate_limited"),
+            "the auth ladder's body and the throttle share a code: {forbidden_body}"
         );
+    }
+
+    /// The 403 and 413 bodies are hand-written constants in auth.rs; every
+    /// other error body is generated here. The brain parses both with ONE
+    /// parser (services/atlas-brain/src/control.ts reads `ok`, then
+    /// `error.code`, then maps that code), and since `ErrCode` stopped carrying
+    /// `forbidden`/`too_large` there is no shared Rust type left to make the
+    /// two agree by construction. This is what agrees them instead.
+    ///
+    /// It asserts nothing about WHICH rung produced a 403 — auth.rs owns that
+    /// property and the sameness is deliberate.
+    #[test]
+    fn the_auth_ladders_bodies_are_the_envelope_the_brain_parses() {
+        let generated = ControlResult::Err {
+            code: ErrCode::Internal,
+            message: "x".into(),
+        }
+        .to_json();
+
+        for (reject, expect_status, expect_code) in [
+            (auth::Reject::Forbidden, 403u16, "forbidden"),
+            (auth::Reject::TooLarge, 413, "too_large"),
+        ] {
+            let (status, body) = reject.render();
+            assert_eq!(status, expect_status, "{body}");
+            let parsed: Value =
+                serde_json::from_str(body).unwrap_or_else(|e| panic!("{body} is not JSON: {e}"));
+            assert_eq!(parsed["ok"], json!(false), "{body}");
+            assert_eq!(parsed["error"]["code"], json!(expect_code), "{body}");
+            // An empty message sends the brain to a synthetic one, which is a
+            // worse answer than the honest short string.
+            assert!(
+                parsed["error"]["message"]
+                    .as_str()
+                    .is_some_and(|m| !m.is_empty()),
+                "{body}"
+            );
+            assert_eq!(
+                parsed.as_object().map(|o| o.keys().collect::<Vec<_>>()),
+                generated.as_object().map(|o| o.keys().collect::<Vec<_>>()),
+                "the ladder's body no longer has the shape the dispatcher emits: {body}"
+            );
+        }
     }
 
     /// The backoff has to be machine-readable: the brain retries on it.
@@ -1359,11 +1485,12 @@ mod tests {
         assert_eq!(parsed, 4200);
     }
 
+    /// Every code the DISPATCHER can emit. `forbidden` and `too_large` are not
+    /// in the list because they are not in the enum — they are auth.rs's
+    /// constants, checked against these by the test above.
     #[test]
     fn every_err_code_has_a_distinct_wire_string() {
         let codes = [
-            ErrCode::Forbidden,
-            ErrCode::TooLarge,
             ErrCode::BadRequest,
             ErrCode::UnknownOp,
             ErrCode::RateLimited,
@@ -1784,6 +1911,59 @@ mod tests {
                     op.name
                 );
             }
+        }
+    }
+
+    // --- the correlation key -----------------------------------------------
+
+    /// The caller picks this string and it is written into a log line, so it
+    /// gets the card's treatment: a newline in it would forge a second line in
+    /// the one place a reader reconstructs what the port did.
+    #[test]
+    fn a_caller_supplied_request_id_cannot_forge_a_log_line() {
+        let hostile = "r1\n[control] mail.send executed for request r2";
+        let cleaned = request_id(Some(hostile));
+        assert!(!cleaned.contains('\n'), "{cleaned}");
+        assert!(!cleaned.contains('\u{2028}'), "{cleaned}");
+        assert!(cleaned.chars().count() <= REQUEST_ID_MAX, "{cleaned}");
+
+        assert!(request_id(Some(&"a".repeat(500))).chars().count() <= REQUEST_ID_MAX);
+
+        // An ordinary id passes through untouched — the cleaning must not make
+        // the brain's key and ours differ.
+        assert_eq!(request_id(Some("req-42")), "req-42");
+    }
+
+    /// Never empty, whatever the caller sent. An empty key would file unrelated
+    /// calls under the same non-value in whatever reads the log.
+    #[test]
+    fn an_absent_or_blank_request_id_still_yields_a_usable_key() {
+        assert!(!request_id(None).is_empty());
+        assert!(!request_id(Some("")).is_empty());
+        assert!(!request_id(Some("   ")).is_empty());
+        assert_ne!(
+            request_id(None),
+            request_id(None),
+            "two calls with no id must not be given the same key"
+        );
+    }
+
+    /// FINDING: `request_id` was parsed off every request and threaded into
+    /// every op while being read NOWHERE. Neither audit table has a column for
+    /// it, so the log is the only place it can tie a brain request to the rows
+    /// that request produced.
+    ///
+    /// A source scan, because asserting on log output means installing a logger
+    /// for the whole test binary; what is pinned is that the two paths which
+    /// write rows still name the key, which is the part that regressed.
+    #[test]
+    fn the_row_writing_paths_log_their_request_id() {
+        for f in ["fn execute", "fn queue_for_approval"] {
+            assert!(
+                body_of(include_str!("mod.rs"), f).contains("ctx.request_id"),
+                "{f} writes an audit row without recording which request produced it — \
+                 that is exactly what made request_id dead plumbing the first time"
+            );
         }
     }
 }

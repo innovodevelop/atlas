@@ -302,7 +302,12 @@ fn render(v: Option<&Value>) -> String {
 }
 
 /// Collapse anything that could break the single-line frame, then bound it.
-fn sanitize(s: &str, max: usize) -> String {
+///
+/// Shared with `mod.rs`, which cleans the caller-supplied `request_id` with it
+/// before that reaches a log line. A log line is the same kind of frame as the
+/// card — one line somebody reads — and is forgeable the same way, so both get
+/// the same treatment from one implementation rather than two that drift.
+pub(super) fn sanitize(s: &str, max: usize) -> String {
     let cleaned: String = s
         .chars()
         .map(|c| if frame_safe(c) { c } else { ' ' })

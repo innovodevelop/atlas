@@ -1,5 +1,6 @@
-import { useMemo } from 'react';
-import { useEdgeFunction } from './useEdgeFunction';
+import { useMemo, useSyncExternalStore } from 'react';
+import { localClient as supabase } from '@/integrations/local/localClient';
+import { createSharedPoll } from '@/lib/sharedStore';
 
 export interface WeatherData {
   location: string;
@@ -56,26 +57,63 @@ const FALLBACK_WEATHER: WeatherData = {
   low: 58,
 };
 
+const REFRESH_MS = 30 * 60 * 1000;
+
+/**
+ * ONE fetch per city for the whole app.
+ *
+ * This hook used to be a per-mount `useEdgeFunction`, and the plain dashboard
+ * mounts it FIVE times (hero card, atmosphere canvas, expanded view, widget
+ * catalog, band narration) — ten calls to a rate-limited external API to draw
+ * one screen, then five 30-minute timers. It now reads a shared store; see
+ * `src/lib/sharedStore.ts`.
+ *
+ * The return shape is unchanged on purpose: every caller destructures
+ * `{ weather }` (some also `error`), and the point of this change is that none
+ * of them had to notice it.
+ */
 export const useWeather = (city: string = 'San Francisco') => {
   const fallbackData = useMemo(() => ({
     ...FALLBACK_WEATHER,
     location: city,
   }), [city]);
 
-  const { data, isLoading, error, refetch } = useEdgeFunction<WeatherData>(
-    'get-weather',
-    { city },
-    {
-      fallbackData,
-      refreshInterval: 30 * 60 * 1000, // 30 minutes
-    }
+  const poll = useMemo(
+    () =>
+      createSharedPoll<WeatherData>({
+        key: `weather:${city}`,
+        fetch: async () => {
+          const { data, error } = await supabase.functions.invoke('get-weather', {
+            body: { city },
+          });
+          if (error) throw error;
+          return data as WeatherData;
+        },
+        intervalMs: REFRESH_MS,
+      }),
+    [city],
   );
 
+  const snap = useSyncExternalStore(poll.subscribe, poll.getSnapshot, poll.getSnapshot);
+
   return {
-    // Never null — fall back to representative data until the edge fn resolves
-    weather: data ?? fallbackData,
-    isLoading,
-    error,
-    refetch,
+    // Never null — fall back to representative data until the fetch resolves,
+    // and on a first fetch that never does.
+    weather: snap.data ?? fallbackData,
+    /**
+     * True when `weather` above is the built-in sample rather than a reading.
+     *
+     * Additive, and it exists because `error` STOPPED ANSWERING THIS QUESTION.
+     * Before the shared-store port, any error swapped the sample in, so
+     * `error != null` meant "you are looking at canned data" and the widget
+     * catalog said so on that basis. The store now keeps the last good reading
+     * across a failed refresh — better behaviour — which made that inference
+     * false and turned the catalog into a liar about real numbers. Callers that
+     * need to distinguish "canned" from "stale" must read this, not `error`.
+     */
+    isFallback: snap.data == null,
+    isLoading: snap.isLoading,
+    error: snap.error,
+    refetch: poll.refresh,
   };
 };

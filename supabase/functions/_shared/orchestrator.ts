@@ -965,76 +965,15 @@ export async function executeTool(
 // ---------------------------------------------------------------------------
 // Fire-and-forget side channels (learning, session context, summaries)
 
-async function triggerKnowledgeExtraction(
-  supabaseUrl: string,
-  conversation: ChatMessage[],
-  userId: string | null,
-  source: string,
-  systemDb: any,
-  learningIntent: ReturnType<typeof detectLearningIntent>,
-  conversationId: string | null,
-  userToken: string,
-) {
-  try {
-    const learningSettings = await isLearningEnabled(systemDb);
-
-    if (!learningSettings.enabled) {
-      console.log("[orchestrator] Learning is disabled, skipping knowledge extraction");
-      return;
-    }
-
-    if (!learningIntent.hasIntent) {
-      console.log("[orchestrator] No learning intent detected, skipping knowledge extraction");
-      return;
-    }
-
-    const isHealthy = await isProviderHealthy(systemDb, "lovable_ai");
-    if (!isHealthy) {
-      console.log("[orchestrator] Primary AI provider unhealthy, skipping knowledge extraction");
-      return;
-    }
-
-    // Containment: everything learned from this chat belongs to one session,
-    // scoped to the conversation and its topic budget.
-    const session = await findOrCreateSession(systemDb, {
-      userId,
-      conversationId,
-      rootTopic: learningIntent.topic || "general",
-      triggerType: source === "voice" ? "voice" : "text",
-    });
-
-    await logLearningSession(systemDb, {
-      userId: userId || undefined,
-      sessionId: session?.id,
-      triggerType: source === "voice" ? "voice" : "text",
-      intentDetected: learningIntent.intentType,
-      topicRequested: learningIntent.topic,
-      status: "started",
-      maxTopicsAllowed: learningSettings.maxTopics,
-    });
-
-    console.log(`[orchestrator] Triggering knowledge extraction for topic: ${learningIntent.topic || "general"} (session: ${session?.id})`);
-
-    fetch(`${supabaseUrl}/functions/v1/atlas-knowledge`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        // Forward the caller's JWT — atlas-knowledge derives identity from it.
-        Authorization: `Bearer ${userToken}`,
-      },
-      body: JSON.stringify({
-        conversation,
-        source,
-        learningTopic: learningIntent.topic,
-        maxTopics: learningSettings.maxTopics,
-        learningSessionId: session?.id ?? null,
-        conversationId,
-      }),
-    }).catch(e => console.log("[orchestrator] Knowledge extraction trigger failed:", e));
-  } catch (e) {
-    console.log("[orchestrator] Could not trigger knowledge extraction:", e);
-  }
-}
+// `triggerKnowledgeExtraction` used to live here: a fire-and-forget fetch to
+// Supabase edge function `atlas-knowledge`, which was deleted along with the
+// rest of Supabase. Every call therefore hit a URL that doesn't parse
+// (`new URL("local/functions/v1/atlas-knowledge")`), and the failure landed on
+// a bare `.catch()` — so it was a silent no-op that still ran
+// findOrCreateSession + logLearningSession first, leaving a permanently
+// orphaned `active` atlas_learning_sessions/atlas_learning_logs row pair
+// behind on every "remember X" phrase. Deleted 2026-08-11 (audit C13). The
+// real local research path is learningRoutes.ts's `POST /research`.
 
 // Summarize longer conversations into ai_memory (category conversation_summary)
 // so the next chat can pick up where this one left off. Cheap model, one call,
@@ -1619,12 +1558,9 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
 
   console.log("[orchestrator] Learning intent:", learningIntent.hasIntent ? learningIntent.intentType : "none");
 
-  // Fire-and-forget: knowledge extraction, session context, summaries
-  if (messages.length >= 2 && supabaseUrl && learningIntent.hasIntent) {
-    // systemDb: learning settings/session tables are system-level (no user RLS).
-    triggerKnowledgeExtraction(supabaseUrl, messages, userId, source, systemDb, learningIntent, conversationId, userToken);
-  }
-
+  // Fire-and-forget: session context, summaries. (Knowledge extraction used to
+  // fire here too — see the comment above triggerKnowledgeExtraction's old
+  // spot, near the top of this "side channels" section, for why it's gone.)
   trackSessionContext(supabase, userId, sessionId, messages).catch(e =>
     console.log("[orchestrator] Session tracking error:", e)
   );

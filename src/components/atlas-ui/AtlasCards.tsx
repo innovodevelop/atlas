@@ -4,7 +4,7 @@ import {
   Droplets, Wind, Sun, Sunrise, Sunset,
 } from 'lucide-react';
 import { WeatherIcon } from './atlasIcons';
-import { sparklinePoints, fmtPct, fmtEventTime } from '@/pages/atlas/atlasHelpers';
+import { sparklinePoints, fmtPct, fmtEventTime, WATCHLIST } from '@/pages/atlas/atlasHelpers';
 import { startWxCanvas, presetFor } from '@/lib/wxAtmosphere';
 import { Card, Row, Empty } from './primitives';
 import { useWindowActivity } from '@/hooks/useWindowActivity';
@@ -154,8 +154,6 @@ export const AtlasTasksCard = memo(({ onOpen }: { onOpen: () => void }) => {
   );
 });
 AtlasTasksCard.displayName = 'AtlasTasksCard';
-
-const WATCHLIST = ['AAPL', 'GOOGL', 'MSFT', 'NVDA'];
 
 /** Area chart for the watchlist hero (design .stkchart geometry). */
 const areaPath = (series: number[]) => {
