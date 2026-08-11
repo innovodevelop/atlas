@@ -1,8 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Merged into the bundle's Info.plist by the Tauri bundler on macOS. Every key
+  here is a TCC usage string: the sentence macOS puts in front of the user when
+  it asks. They are read by someone deciding whether to say yes, so each one
+  says what the capability UNLOCKS and, where it matters, what Atlas will not do
+  with it. Keep them true — a usage string that overstates is the first lie the
+  product tells, and it is told at the least forgivable moment.
+
+  A missing key is NOT a soft failure. For Bluetooth in particular, the first
+  framework call without NSBluetoothAlwaysUsageDescription raises SIGABRT — the
+  app dies on launch rather than returning nil (verified on macOS 26.3; see
+  docs/decisions/010-objc2-wifi-bluetooth-resolution.md). So the key has to land
+  in the same change as the code that touches the framework, never after it.
+-->
 <plist version="1.0">
 <dict>
   <key>NSMicrophoneUsageDescription</key>
   <string>Atlas uses your microphone for voice conversations and wake-word detection.</string>
+
+  <!--
+    Read-only, and the string says so because it is the whole truth: macOS
+    exposes Bluetooth power as a getter with no setter anywhere in any public
+    framework, so Atlas cannot turn it on or off, pair, or control a device even
+    if it wanted to. The status bar shows state and connected devices, and hands
+    the on/off switch to System Settings.
+  -->
+  <key>NSBluetoothAlwaysUsageDescription</key>
+  <string>Atlas shows your Bluetooth status and which devices are connected. It never pairs with, connects to, or controls them.</string>
 </dict>
 </plist>
