@@ -40,9 +40,14 @@ named speaker in the user's home (Atlas already talks to Home Assistant and
 HomeKit accessories, so "wake me through the kitchen speaker" is real). Design
 the ringing state and snooze.
 
-  A decision that shapes this: **alarms fire even when Atlas is quit.** That
-  needs the user's permission once, so design the consent moment — it should
-  feel like the existing `/permissions` screen, not like a system dialog.
+  **An alarm only sounds while Atlas is running, and the screen has to say so
+  without being sheepish about it.** This was tested rather than assumed: macOS
+  will not let an unprivileged app wake a sleeping Mac, and the scheduled-launch
+  mechanism that would have covered a quit app is not dependable. So design the
+  honest line — where it sits, how it reads, and what it looks like the moment
+  someone sets a 7am alarm and needs to understand that the lid must stay open.
+  This is the one place on the screen where a design that over-promises would
+  cost somebody a missed morning.
 
 **4. Clocks** — the city overview that replaces today's three-city card. Add,
 reorder, remove. Day-offset badges (Today / Tomorrow / Yesterday) already exist
@@ -85,5 +90,14 @@ So the design does not promise anything hollow:
 - System clock, any timezone: **yes**, already working.
 - Ringing through home speakers: **yes** — the home bridge is live, though it
   currently only sets volume, so playback is being added for this.
-- Firing when Atlas is quit: **being built**, with the user's consent.
-- Waking the Mac from sleep to ring: **being built**.
+- Ringing while Atlas is open but the window is hidden or behind other apps:
+  **yes**, being built in the native layer so it survives the webview being
+  throttled.
+- Firing when Atlas has been quit: **no.** Tested on real hardware and ruled
+  out — see `docs/decisions/012-launchd-alarm-agent.md`.
+- Waking the Mac from sleep to ring: **no.** macOS refuses the wake-scheduling
+  call to an unprivileged app.
+
+Those last two are the constraint to design around, not to hide. A user who
+understands the limit sets a second alarm on their phone; a user who discovers
+it at 7am does not come back.

@@ -7,7 +7,15 @@ everything below the line.
 ---
 
 **Design a floating system status bar — the strip that tells you the state of
-the Mac Atlas is running on, and lets you change it.**
+the Mac Atlas is running on, and lets you change what can be changed.**
+
+One thing settled by testing before you start: **Wi-Fi can be switched from
+inside Atlas; Bluetooth cannot be toggled at all.** Every public macOS framework
+exposes Bluetooth power as a read-only property — there is no setter anywhere.
+So Bluetooth is a readout plus a route into System Settings, and that asymmetry
+is a design problem you have to solve rather than a detail to note: two
+neighbouring controls in one strip, one of which acts and one of which hands
+off.
 
 Atlas today knows nothing about its own machine. No battery, no Wi-Fi, no
 Bluetooth, no idea what is connected. This adds all of it.
@@ -38,7 +46,12 @@ Match that family rather than inventing a new blur.
 **4. The expanded states — this is where the design earns its keep.**
 - **Wi-Fi:** the network list, signal strengths, the one you are on, joining a
   new one, and the password prompt for a network Atlas has not seen before.
-- **Bluetooth:** toggling it on and off, and the device list.
+  This is the one genuine control on the bar.
+- **Bluetooth:** the device list, and the hand-off to System Settings for the
+  on/off switch. **Do not draw a toggle** — it cannot be built, and a switch
+  that opens another app instead of switching is worse than an honest link.
+  Design what a "this happens elsewhere" affordance looks like in this system;
+  Atlas does not have one yet, and it will be needed again.
 - **Battery:** whatever detail is worth a second glance — time remaining, what
   is draining it.
 
@@ -76,11 +89,19 @@ placeholder value.**
 Two honest limits worth designing around:
 
 - **Connected-device names come from a system query**, not from a live
-  connection. Expect a device list that refreshes on an interval rather than
-  instantly — so a device appearing or disappearing may lag by a second or two.
-  Design a transition that survives that, rather than one that implies realtime.
-- **Wi-Fi and Bluetooth both need a one-time macOS permission**, and Wi-Fi
-  network names additionally require *location* permission on modern macOS —
-  which surprises people. Design that consent moment; it should feel like
-  Atlas's existing `/permissions` screen, which explains before it asks, rather
-  than like a bare system dialog.
+  connection. Measured at 60–110 ms, so the list refreshes on an interval rather
+  than instantly — a device appearing or disappearing may lag a second or two.
+  Design a transition that survives that, rather than one implying realtime.
+- **The device list may be partial.** The system query distinguishes connected
+  from merely paired, but it was never observed with something actually
+  connected during testing. Design for the case where Atlas knows a device is
+  paired but is not certain it is in use.
+- **Wi-Fi network names require *location* permission** on modern macOS, which
+  surprises people — Atlas can see the signal strength and the security type
+  without it, but not the name. Design both that consent moment (it should feel
+  like Atlas's existing `/permissions` screen, which explains before it asks)
+  **and the degraded state where the user declines**: a connected network with
+  no name is a real thing this bar will show.
+- **Bluetooth needs its own one-time permission**, and the first framework call
+  without it crashes the app rather than returning nothing — so that prompt is
+  not optional and cannot be deferred.
