@@ -24,6 +24,15 @@ export interface VadEngine {
   process(frame: Int16Array): Promise<void>;
   /** Reset internal state (start of a new turn). */
   reset(): void;
+  /**
+   * Free whatever the engine allocated. Sessions are created per WebSocket
+   * connection and each carries its own VAD (session.ts:82); without a
+   * release, every disconnect leaked a live ONNX inference session — and the
+   * webview's reconnect bug (audit C1) manufactured disconnects by the dozen,
+   * so the two leaks compounded (audit finding C4). Must be safe to call on a
+   * half-initialized or already-released engine.
+   */
+  release(): void;
 }
 
 const SILERO_FRAME = 512; // samples @16k
@@ -83,6 +92,9 @@ abstract class BaseVad implements VadEngine {
     this.silenceMs = 0;
     this.pending = [];
   }
+
+  /** Engines that allocate nothing (energy) inherit this no-op. */
+  release(): void {}
 }
 
 /**
@@ -137,6 +149,10 @@ class SileroVad extends BaseVad {
   }
 
   async scoreFrame(frame: Float32Array): Promise<number> {
+    // A frame already in flight when release() ran lands here with no
+    // session. Silence (score 0) is the right answer for a dying connection —
+    // throwing would surface as an unhandled rejection in the WS handler.
+    if (!this.session) return 0;
     const input = new this.ort.Tensor("float32", frame, [1, frame.length]);
     const out = await this.session.run({ input, state: this.state, sr: this.sr });
     this.state = out.stateN ?? out.state ?? this.state;
@@ -147,6 +163,19 @@ class SileroVad extends BaseVad {
   reset(): void {
     super.reset();
     this.state = new this.ort.Tensor("float32", new Float32Array(2 * 1 * 128), [2, 1, 128]);
+  }
+
+  release(): void {
+    // Both ORT backends (node and web) expose release() on the session; both
+    // return a promise. Fire-and-forget with a catch: release runs from
+    // synchronous teardown, and a failed release means the session is dead
+    // anyway. Null the reference so a late scoreFrame from an in-flight
+    // process() rejects loudly instead of running on a freed session.
+    const s = this.session;
+    this.session = null;
+    void s?.release?.().catch?.(() => {
+      /* already dead */
+    });
   }
 }
 

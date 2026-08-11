@@ -20,11 +20,54 @@ import type { ClientMsg } from "./protocol.ts";
 import type { VoiceSettings } from "./voiceSettings.ts";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { timingSafeEqual } from "node:crypto";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 const PORT = Number(process.env.VOICE_GATEWAY_PORT ?? 4820);
 const SIDECAR_TOKEN = process.env.SIDECAR_TOKEN;
+
+/**
+ * Timing-safe token check. The control port documents why its bearer compare
+ * is constant-time (a loopback attacker CAN take timings — any local process
+ * can); this gateway guarded the same class of token with a plain `!==`,
+ * which was the weaker standard for no reason (audit, gateway hardening).
+ * Length mismatch returns false without throwing — timingSafeEqual throws on
+ * unequal lengths, and an error here would turn a bad token into a 500.
+ */
+function tokenMatches(presented: string | null | undefined): boolean {
+  if (!SIDECAR_TOKEN) return true; // token auth disabled (dev)
+  if (typeof presented !== "string") return false;
+  const a = Buffer.from(presented);
+  const b = Buffer.from(SIDECAR_TOKEN);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
+/**
+ * Origin gate for the HTTP routes. The control port rejects ANY Origin —
+ * nothing legitimate calls it from a page. This gateway is different: the
+ * webview itself calls /tts and /scribe-token from tauri://localhost (packaged)
+ * or http://localhost:* (dev), so those Origins must pass. What must NOT pass
+ * is a browser tab on some website scripting fetch() at 127.0.0.1:4820 — its
+ * Origin is https://<site>, and with `Access-Control-Allow-Origin: *` in our
+ * responses the browser would happily complete the call. Requests with no
+ * Origin header (curl, native code) pass: the token is the auth for those;
+ * this gate only closes the browser hole.
+ */
+function originAllowed(origin: string | null): boolean {
+  if (origin === null) return true;
+  if (origin === "tauri://localhost" || origin === "null") return true;
+  try {
+    const u = new URL(origin);
+    return (
+      (u.protocol === "http:" || u.protocol === "https:") &&
+      (u.hostname === "localhost" || u.hostname === "127.0.0.1")
+    );
+  } catch {
+    return false;
+  }
+}
 const VAD_MODEL_PATH = process.env.VAD_MODEL_PATH ?? join(HERE, "../models/silero_vad.onnx");
 
 /**
@@ -162,7 +205,10 @@ const server = Bun.serve<SocketData>({
     if (url.pathname === "/tts" || url.pathname === "/scribe-token") {
       if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
       if (req.method !== "POST") return jsonRes({ error: "method not allowed" }, 405);
-      if (SIDECAR_TOKEN && req.headers.get("x-sidecar-token") !== SIDECAR_TOKEN) {
+      if (!originAllowed(req.headers.get("origin"))) {
+        return jsonRes({ error: "unauthorized" }, 401);
+      }
+      if (!tokenMatches(req.headers.get("x-sidecar-token"))) {
         return jsonRes({ error: "unauthorized" }, 401);
       }
       // Bun.serve's default 500 carries no CORS headers, so an uncaught
@@ -198,7 +244,7 @@ const server = Bun.serve<SocketData>({
       }
 
       if (msg.type === "hello") {
-        if (SIDECAR_TOKEN && msg.sessionToken !== SIDECAR_TOKEN) {
+        if (!tokenMatches(msg.sessionToken)) {
           ws.send(JSON.stringify({ type: "error", message: "bad session token" }));
           ws.close(4001);
           return;

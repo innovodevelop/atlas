@@ -271,6 +271,17 @@ export const useRealtimeScribeStable = (options: UseRealtimeScribeOptions = {}) 
       if (retryTimeoutRef.current) {
         clearTimeout(retryTimeoutRef.current);
       }
+      // Never leave a microphone open behind a navigation. useScribe does NOT
+      // auto-disconnect on unmount — useLoginVoice already learned this and
+      // fixed it for the same library — and until this line existed, leaving
+      // /atlas-teach with voice connected kept the ElevenLabs realtime socket
+      // AND live mic capture streaming to a third party indefinitely (audit
+      // finding C2).
+      try {
+        scribeRef.current.disconnect();
+      } catch {
+        /* not connected */
+      }
     };
   }, []);
   /* eslint-enable react-hooks/exhaustive-deps */

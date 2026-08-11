@@ -401,5 +401,14 @@ export class VoiceSession {
 
   destroy(): void {
     this.cancelTurn("disconnect");
+    // Sessions are per-WebSocket and each owns a VAD engine; without this
+    // release, every disconnect leaked a live ONNX inference session — and the
+    // webview's reconnect bug (audit C1) manufactured disconnects, so the
+    // leaks compounded server-side (audit finding C4).
+    try {
+      this.vad?.release();
+    } catch {
+      /* teardown must not throw over a dead engine */
+    }
   }
 }

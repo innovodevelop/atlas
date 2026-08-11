@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getToken } from "@/lib/authClient";
 import { WakeWordDetector } from "@/lib/wakeWord";
+import { createReconnectGovernor, type ReconnectGovernor } from "@/lib/reconnectGovernor";
 import type { VoiceSettings } from "@/lib/voiceTuning";
 import type { AIState } from "@/types";
 
@@ -82,6 +83,15 @@ export function useVoiceSession(options?: {
   const [partialTranscript, setPartialTranscript] = useState("");
 
   const wsRef = useRef<WebSocket | null>(null);
+  // Owns the onclose→reconnect timer. Created in the mount effect (NOT
+  // lazily on the ref: cancel is permanent, and an effect re-run on the same
+  // component instance — StrictMode's dev double-mount — must get a fresh
+  // governor or reconnects would be refused forever). Cancelled in the
+  // unmount cleanup BEFORE the socket is closed — closing fires onclose, and
+  // an unguarded onclose used to arm a reconnect during teardown, spawning a
+  // hello-authenticated zombie session 3s after every navigation away (audit
+  // finding C1). See reconnectGovernor.ts for the full incident.
+  const reconnectRef = useRef<ReconnectGovernor | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
@@ -277,8 +287,10 @@ export function useVoiceSession(options?: {
       setConnected(false);
       setState("idle");
       wsRef.current = null;
-      // Gateway restarting (sidecar respawn) — retry quietly.
-      setTimeout(() => void connect(), 3000);
+      // Gateway restarting (sidecar respawn) — retry quietly. Through the
+      // governor, never a bare setTimeout: this handler also fires when the
+      // UNMOUNT cleanup closes the socket, and that path must not schedule.
+      reconnectRef.current?.arm(() => void connect(), 3000);
     };
     ws.onerror = () => { /* onclose handles retry */ };
   }, [playNextChunk, stopPlayback]);
@@ -401,8 +413,13 @@ export function useVoiceSession(options?: {
 
   // Connect lazily on mount (no mic permission until first activation).
   useEffect(() => {
+    reconnectRef.current = createReconnectGovernor();
     void connect();
     return () => {
+      // Cancel BEFORE closing: close() fires onclose, and onclose arms the
+      // reconnect. Cancelled-first means that arm is a refused no-op instead
+      // of a zombie session with nobody left to close it.
+      reconnectRef.current?.cancel();
       stopCapture();
       stopPlayback();
       wsRef.current?.close();
