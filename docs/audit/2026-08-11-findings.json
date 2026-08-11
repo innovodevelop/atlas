@@ -1,0 +1,505 @@
+{
+ "stats": {
+  "total": 37,
+  "verified": 14,
+  "confirmed": 14,
+  "refuted": 0,
+  "uncertain": 0,
+  "plausible": 23
+ },
+ "confirmed": [
+  {
+   "kind": "error",
+   "severity": "high",
+   "file": "src/hooks/useVoiceSession.ts",
+   "line": 276,
+   "claim": "Unmount doesn't cancel the WS reconnect timer, so every navigation away spawns a zombie voice session 3s later",
+   "evidence": "ws.onclose (line 276-283) unconditionally does setTimeout(() => void connect(), 3000). The unmount cleanup (403-415) calls wsRef.current?.close(), which fires onclose and arms that same timer, but the timeout id is never stored or cleared \u2014 connect() runs 3s after every unmount, opening a fresh WS+hello with the live JWT.",
+   "fix": "Store the setTimeout id in a ref, clearTimeout it in the effect cleanup, and/or guard connect() with an isUnmounted flag set in that same cleanup.",
+   "effort": "M",
+   "area": "voice",
+   "verdict": "CONFIRMED",
+   "vnote": "Verified against src/hooks/useVoiceSession.ts. ws.onclose (line 276-282) unconditionally schedules `setTimeout(() => void connect(), 3000)` with no stored timer id. The unmount cleanup (403-415) calls `wsRef.current?.close()` (which fires onclose) then sets `wsRef.current = null`, but never clears that timeout and sets no unmounted/cancelled flag. 3s later the orphaned closure runs `connect()`; its only guard (`wsRef.current && wsRef.current.readyState <= WebSocket.OPEN`) is false because wsRef.current is now null, so it proceeds: fetches a fresh gateway target, opens a new WebSocket, and on open sends a `hello` with the live JWT from getToken() \u2014 a genuine new gateway session with nobody left to close it. Confirmed this is reachable in practice, not just theoretical: useVoiceSession is invoked at the top of both src/pages/atlas/AtlasHome.tsx and src/pages/atlas/AtlasDashboard.tsx, which are sibling routes \u2014 navigating between Home and Dashboard unmounts one instance while mounting the other, so every such navigation leaves a stray reconnect timer that fires a zombie session 3s later on top of the new page's own live connection. No isUnmounted guard, no timeout ref, and no comment anywhere in the file documenting this as deliberate (unlike the wake-word rejection-handling code nearby which does have such a comment) \u2014 this looks like an oversight, not an intentional tradeoff. Downgrading from critical to high: it's a real, easily-reproduced resource leak (dangling WS + duplicate gateway session per navigation, accumulating over a session) and correctly flagged, but the zombie connection stays idle post-`hello` (no capture/activation is ever sent on it) so it doesn't cause data loss, security exposure, or immediate user-visible breakage \u2014 it's a leak/cost issue, which fits \"high\" better than \"critical\" under typical severity rubrics.</note>\n</invoke>\n"
+  },
+  {
+   "kind": "security",
+   "severity": "high",
+   "file": "src/hooks/useRealtimeScribeStable.ts",
+   "line": 266,
+   "claim": "Unmount never disconnects the ElevenLabs scribe socket, so the mic can keep streaming audio to a third party after the user leaves /atlas-teach",
+   "evidence": "The only unmount effect (266-275) clears speechTimeoutRef/retryTimeoutRef but never calls scribeRef.current.disconnect(). AtlasTeach.tsx's autoConnect effect (340-360), which auto-opens the mic 500ms after mount, also has no disconnect in its own cleanup \u2014 only `mounted=false`.",
+   "fix": "Add scribeRef.current.disconnect() to the unmount cleanup, matching useLoginVoice.ts:189-195 which does this correctly for the same @elevenlabs/react hook.",
+   "effort": "S",
+   "area": "voice",
+   "verdict": "CONFIRMED",
+   "vnote": "Verified directly against source. useRealtimeScribeStable.ts's only unmount effect (lines 266-275) clears speechTimeoutRef and retryTimeoutRef only \u2014 it never calls scribeRef.current.disconnect(). AtlasTeach.tsx (the consumer) auto-connects the mic 500ms after mount (lines 340-360) and only ever calls disconnect() from the manual mic-toggle handler (line 448) \u2014 no unmount cleanup calls it. Sibling hook useLoginVoice.ts contains the counter-evidence that refutes the \"already mitigated\" possibility: it has an explicit unmount effect (lines 187-192) with the comment \"Never leave a microphone open behind a navigation\" that calls scribeRef.current.disconnect() \u2014 proving the @elevenlabs/react useScribe hook does NOT auto-disconnect on unmount, and that this project already recognizes the leak pattern as one requiring an explicit fix. So the finding is real: navigating away from /atlas-teach while voice is connected leaves the ElevenLabs realtime STT WebSocket (and live mic capture) open indefinitely, since nothing else in the app calls disconnect for this hook's instance.\n\nSeverity: I downgrade from critical to high. It's a real resource/privacy leak with a trivial one-line fix (add scribeRef.current.disconnect() to the unmount cleanup, mirroring useLoginVoice.ts), but it is scoped to a single page (/atlas-teach, presumably a dev/onboarding surface, not a universally-loaded flow) and requires the user to have actively connected voice and then navigate away without clicking the mic-off button first \u2014 not the default/every-session path. It's a genuine bug worth fixing quickly, but \"critical\" overstates blast radius relative to e.g. an auth bypass or data-loss bug."
+  },
+  {
+   "kind": "perf",
+   "severity": "medium",
+   "file": "src/hooks/useAuth.ts",
+   "line": 16,
+   "claim": "26 useAuth() consumers each independently fire refreshEntitlement() on mount, no de-dup",
+   "evidence": "useAuth.ts:16-21 `useEffect(() => { setLoading(false); void auth.refreshEntitlement(); }, [])` has no in-flight/debounce guard. AtlasDashboard alone mounts 4 separate useAuth() instances: AtlasDashboard.tsx:66 (direct), useCalendarEvents.ts:31 (mounted at AtlasDashboard.tsx:69), useAgentRuns.ts:37 (mounted at AtlasDashboard.tsx:326), useAccountDockItem.tsx:44 (mounted at AtlasDashboard.tsx:354) \u2014 4 concurrent GET /api/me on one dashboard load.",
+   "fix": "Add a module-level in-flight promise in authClient.refreshEntitlement() so concurrent callers share one fetch, or move the refresh to a single App.tsx-level effect instead of per-hook.",
+   "effort": "S",
+   "area": "shell",
+   "verdict": "CONFIRMED",
+   "vnote": "Core mechanism is real: useAuth.ts:16-21 fires `void auth.refreshEntitlement()` unconditionally on every mount with no in-flight guard, and authClient.ts's refreshEntitlement() (line 206) does a bare fetch every call \u2014 no module-level dedup/memoization exists anywhere in authClient.ts. Verified 26 total useAuth() call sites across src.\n\nHowever the evidence is overstated: useAccountDockItem.tsx does NOT call useAuth() (it calls useUserProfile() only; the file is 42 lines, so \"useAccountDockItem.tsx:44\" doesn't even exist). So AtlasDashboard's actual concurrent useAuth mounts are 3, not 4: AtlasDashboard.tsx:66 (direct), useCalendarEvents.ts:31, useAgentRuns.ts:37 \u2014 I checked every other hook AtlasDashboard imports (useWeather, useUnifiedChat, useVoiceSession, useAtlasSettings, useAtlasPresence, useStreamingTTS, useUserProfile) and none call useAuth. Also checked comments in useAuth.ts and authClient.ts for any documented rationale for skipping dedup (\"offline-safe... clears session on 401\" comment addresses correctness, not the duplicate-fetch cost) \u2014 nothing suggests this was a deliberate tradeoff.\n\nNet: 3 redundant GET /api/me calls per dashboard mount is real and easy to fix (the suggested in-flight-promise fix is sound and low-effort), but it's a handful of small idempotent GETs on initial mount, not a runaway/repeating cost or correctness bug \u2014 downgrading from high to medium and flagging the fabricated 4th citation."
+  },
+  {
+   "kind": "arch",
+   "severity": "medium",
+   "file": "src/lib/queryClient.ts",
+   "line": 25,
+   "claim": "PersistQueryClientProvider + PERSIST_ALLOWLIST is dead code relative to its own documented purpose",
+   "evidence": "Comment claims 'dashboard data (weather, stocks, news, tasks\u2026) is persisted to disk-backed localStorage, so the app paints with last-known data immediately' (queryClient.ts:25-27) and PERSIST_ALLOWLIST (line 54) lists weather/profile/tasks/notes/calendar/user \u2014 but `grep -rn \"queryKey:\" src` shows zero matches for any of those substrings. Every consumer data hook (useWeather, useStocks, useNews, useTasks, useNotes, useCalendarEvents, useUserProfile) routes through useDataFetching/useEdgeFunction, a hand-rolled useState/useEffect stack that never touches QueryClient (useTasks.ts:34, useCalendarEvents.ts:48, useWeather.ts:65 all call useDataFetching/useEdgeFunction, not useQuery). Only 6 admin-only hooks (useVersions, useTests, useDesignSync, useAgentView, useAtlasProviderStatus, useAtlasLearning) call react-query's useQuery, with keys like ['admin', \u2026] / ['atlas-brain-runs'] that don't match the allowlist either \u2014 so shouldDehydrateQuery is never true for anything, ever.",
+   "fix": "Either wire the dashboard hooks onto react-query so the documented 'instant startup from cache' claim becomes true, or delete PersistQueryClientProvider/persister/PERSIST_ALLOWLIST since it currently persists nothing and still pays a localStorage read on every cold start plus a throttled serialize-and-write on every admin-surface query event.",
+   "effort": "M",
+   "area": "shell",
+   "verdict": "CONFIRMED",
+   "vnote": "Verified directly: grep -rn \"queryKey\" src shows only admin/telemetry hooks (useVersions, useTests, useAgentView, useAtlasProviderStatus, useAtlasLearning, useDesignSync, useUsageHistory, useSpendingAlerts) call useQuery, with keys like ['admin', ...], 'atlas-provider-status', 'atlas-usage-history' etc. Dashboard hooks (useTasks.ts:34, useCalendarEvents.ts:48, useNotes.ts:33, useWeather.ts:65) all use useDataFetching/useEdgeFunction, never useQuery. None of the live queryKeys contain 'weather'/'profile'/'tasks'/'notes'/'calendar'/'user' substrings from PERSIST_ALLOWLIST (src/lib/queryClient.ts:54), so shouldDehydrateQuery (line 61-64) never returns true \u2014 confirmed dead relative to its documented purpose. No nearby incident comment documents this gap as deliberate; the header comment (lines 25-27) describes it as live behavior. However this is a doc/dead-code mismatch with a minor, bounded cost (one localStorage read on cold start, throttled writes gated by admin-surface query activity) \u2014 not a functional bug, data-loss, or crash risk, so 'high' overweights it. Downgraded to medium.</note>\n</invoke>\n"
+  },
+  {
+   "kind": "perf",
+   "severity": "high",
+   "file": "src/hooks/useDataFetching.ts",
+   "line": 100,
+   "claim": "No cross-instance cache: every mount of a data hook fires its own uncached fetch + own interval",
+   "evidence": "useDataFetching holds fetchData/useState/useEffect per hook call with no module-level store or in-flight dedup; useEffect(()=>{if(enabled) fetchData(false)}, [enabled, fetchData]) fires independently for every mounted instance.",
+   "fix": "Port the useSyncExternalStore module-scoped pattern already used by useMusicPlayer.ts to useWeather/useStocks/useNews/useTasks/useCalendarEvents/useMailIntelligence so N mounted consumers share one fetch + one poll.",
+   "effort": "M",
+   "area": "dashboard",
+   "verdict": "CONFIRMED",
+   "vnote": "Verified against actual usage, not just the hook's shape. `useDataFetching` (src/hooks/useDataFetching.ts:100-116) is genuinely per-instance state (useState/useEffect/useRef, no module-level store, no in-flight dedup) \u2014 confirmed by reading the full file. And it isn't hypothetical: AtlasDashboard.tsx mounts AtlasWeatherCard (AtlasCards.tsx:54 useWeather()), AtmosphereCanvas.tsx:15 useWeather(), and useBandNarration.ts:34 useWeather() simultaneously on the single always-rendered home screen \u2014 three independent fetches + three independent 30-min setIntervals hitting the OpenWeather edge function concurrently. Same pattern for useStocks (AtlasCards.tsx:173 + useBandNarration.ts:37, 5-min interval, live against Finnhub) and useNews (AtlasCards.tsx:316 + useBandNarration.ts:39, 15-min interval, live against a News API) \u2014 both routed through useEdgeFunction \u2192 useDataFetching. useTasks/useCalendarEvents (via localClient/SQLite, no refreshInterval) get duplicate one-shot fetches from the same multi-mount pattern, cheaper but still redundant DB round-trips. The isWindowActive() guard on line 112 only skips polls while the window is inactive; it does nothing to prevent the multi-instance duplication. No React Query/SWR-style cache sits in front of any of this. The one inaccuracy in the finding: useMailIntelligence.ts does not go through useDataFetching at all (it's a separate hand-rolled implementation with Supabase-realtime), so that item in the proposed fix list is wrong \u2014 but it doesn't undermine the core claim, which is fully reproducible for weather/stocks/news via the code paths above. useMusicPlayer.ts:698-699 does confirm a working useSyncExternalStore module-scoped alternative already exists in this codebase, supporting the proposed fix direction. Severity high is appropriate: this is a real, always-triggered (not edge-case) 2-3x multiplier on paid third-party API calls (OpenWeather/Finnhub/News) from the main screen every load, not a cosmetic inefficiency."
+  },
+  {
+   "kind": "perf",
+   "severity": "high",
+   "file": "src/pages/atlas/AtlasDashboard.tsx",
+   "line": 68,
+   "claim": "useWeather() alone mounts 5 independent instances on the plain dashboard, each issuing 2 real HTTP calls",
+   "evidence": "Independent useWeather() call sites: AtlasDashboard.tsx:68, AtmosphereCanvas.tsx:15, AtlasCards.tsx:54 (AtlasWeatherCard), AtlasExtraCards.tsx:39 (AirQuality), useBandNarration.ts:34 (always mounted). fetch_weather (src-tauri/src/datafetch.rs:91-124) does two ureq HTTP calls (current + 5-day forecast) per invocation with no cache, so a single dashboard load fires up to 10 concurrent OpenWeatherMap requests, repeating every 30 min per instance.",
+   "fix": "Same as above \u2014 one shared weather store; this is the highest-cost instance of the pattern since it hits a rate-limited external API rather than local SQLite.",
+   "effort": "M",
+   "area": "dashboard",
+   "verdict": "CONFIRMED",
+   "vnote": "Verified against actual code, not just the cited line. AtlasDashboard.tsx does mount 5 independent useWeather() call sites simultaneously on the plain dashboard: line 68 (AtlasDashboard itself), AtmosphereCanvas (rendered line 382), AtlasWeatherCard (line 441), AtlasAirQualityCard (line 447), and useBandNarration (called line 321, unconditionally mounted). Traced the full chain: useWeather -> useEdgeFunction -> useDataFetching, none of which have any request coalescing, caching, or shared state across hook instances (src/hooks/useDataFetching.ts confirmed \u2014 plain useState/useEffect per instance, no module-level cache, no SWR-style dedup key). useEdgeFunction -> localClient.functions.invoke -> Tauri invoke('fetch_weather', ...) (src/integrations/local/localClient.ts:454,472) with no caching layer in between. The Rust side (src-tauri/src/datafetch.rs fetch_weather, lines 90-184) has no cache/static/OnceCell either \u2014 confirmed via grep, none found. Each call does real network I/O when an OpenWeather key is present (mock_weather fallback only fires if no key configured).\n\nOne correction to the evidence: fetch_weather actually issues THREE real HTTP calls per invocation, not two as stated \u2014 current weather (line ~98-109), 5-day forecast (line 124-125), and air_pollution (line 166-167) are all separate ureq requests. This makes the finding's worst case understated, not overstated: 5 instances x 3 calls = up to 15 concurrent OpenWeatherMap requests on a fresh dashboard load, not 10. The refreshInterval (30 min) is identical across all 5 hook instances and independently timed per-mount (separate setInterval in each), so they don't even stay synchronized \u2014 they can drift and each independently re-fire every 30 min, multiplying sustained request volume against a rate-limited external API. isWindowActive() gating on the interval refetch is the only mitigation present, and it does nothing about the initial mount burst or the 5x duplication itself. Severity high is appropriate given this hits a rate-limited paid-tier-adjacent external API (OpenWeatherMap) with no backoff/circuit-breaker visible in this file, not an internal resource."
+  },
+  {
+   "kind": "perf",
+   "severity": "medium",
+   "file": "src/pages/atlas/useBandNarration.ts",
+   "line": 34,
+   "claim": "Band narration unconditionally mounts 7 live hooks even when the computed byKey map is thrown away (home view)",
+   "evidence": "useBandNarration(focusedKey, home) is called unconditionally at AtlasDashboard.tsx:321; internally it calls useWeather/useCalendarEvents/useTasks/useStocks/useMailIntelligence/useNews/useMusicPlayer (lines 34-40) to build `byKey`, but `content = shownKey ? byKey[shownKey] ?? home : home` (line 146) discards byKey entirely whenever no widget is focused, which is the common case.",
+   "fix": "Only build/read byKey when focusedKey is non-null (e.g. lazy useMemo gated on focusedKey, or don't call the hooks at all until a widget opens), or fold this into the shared-store fix above so the extra mounts are free.",
+   "effort": "M",
+   "area": "dashboard",
+   "verdict": "CONFIRMED",
+   "vnote": "Verified against src/pages/atlas/useBandNarration.ts and its call site (AtlasDashboard.tsx:321, unconditional). The hook does mount useWeather/useCalendarEvents/useTasks/useStocks/useMailIntelligence/useNews/useMusicPlayer regardless of focusedKey, and byKey (line 146, `shownKey ? byKey[shownKey] ?? home : home`) is discarded whenever no widget is focused (the home view). Checked useDataFetching.ts (the shared base for useWeather/useStocks/useNews/useCalendarEvents/useTasks): each mount runs its own initial fetch effect plus its own `setInterval` (30 min for weather, 5 min for stocks, 15 min for news) \u2014 there is no cross-mount cache/dedup, unlike useMusicPlayer, which the file's own comments say was deliberately rewritten into a module-scoped singleton store specifically because 'band narration (mounted for the life of the dashboard)' plus four other call sites were quintupling `music_status`/`music:level` traffic. That singleton fix does not extend to the other six hooks, so the claim is real: useBandNarration adds one more standing set of fetch+interval mounts for weather/calendar/tasks/stocks/mail/news that's thrown away on the (common) home view.\n\nHowever, severity should be corrected down from high to medium. Grepping the codebase shows this per-mount duplication is already systemic, not unique to useBandNarration: AtlasCards.tsx, AtlasExpanded.tsx, useCatalogWidgets.ts, AtmosphereCanvas.tsx, and AtlasSettings.tsx all independently call the same hooks with the same no-dedup pattern, so the dashboard already carries 3-5x duplication of these fetches before useBandNarration's mount is even counted. useBandNarration's marginal contribution is one more redundant mount on top of an existing pile, bounded by long refresh intervals (5-30 min) rather than a tight loop or per-render cost \u2014 real waste, but not disproportionate to the rest of the page, and not a runaway/high-frequency cost like the music case that got the singleton-store treatment."
+  },
+  {
+   "kind": "arch",
+   "severity": "medium",
+   "file": "src/hooks/useVoiceSession.ts",
+   "line": 11,
+   "claim": "Header claims useVoiceSession replaces useStreamingTTS/useRealtimeScribeStable, but both remain live on reachable routes",
+   "evidence": "useStreamingTTS is imported by src/pages/Auth.tsx:8, src/pages/AtlasTeach.tsx:6, src/hooks/useAtlasSpeech.ts:2; useRealtimeScribeStable by src/pages/AtlasTeach.tsx:5. Both /auth and /atlas-teach are registered, non-dead menu surfaces in src/surfaces.ts, not the dead code the comment implies.",
+   "fix": "Either migrate Auth.tsx/AtlasTeach.tsx onto useVoiceSession or correct the header comment to describe two intentionally-separate stacks, so a future barge-in/VAD change isn't made in only one of them.",
+   "effort": "L",
+   "area": "voice",
+   "verdict": "CONFIRMED",
+   "vnote": "Verified directly. useVoiceSession.ts line 11-12 states it \"Replaces useVoice, useWakeWord(Core), useStreamingTTS, useDashboardVoice, useRealtimeScribeStable.\" Grep confirms useStreamingTTS is still imported/used in src/pages/Auth.tsx:8/118, src/pages/AtlasTeach.tsx:6/115, and src/hooks/useAtlasSpeech.ts:2/68; useRealtimeScribeStable is still imported/used in src/pages/AtlasTeach.tsx:5. src/surfaces.ts confirms /auth (line 207) and /atlas-teach (line 168) are registered, non-mock, lazy-loaded routes (lines 311, 316) \u2014 not dead code. Additionally, useVoiceSession itself has zero callers anywhere in src/ outside its own definition file, meaning it is not yet wired into the app at all \u2014 the header's \"replaces\" claim is aspirational, not descriptive of current reality. This is a real doc/architecture accuracy issue (misleading comment that could cause a future barge-in/VAD fix to be applied to only the unused new hook while the two live legacy hooks silently diverge), but it's not a runtime failure or cost \u2014 downgrading from high to medium since the fix is a comment correction / migration TODO, not an active bug affecting users today."
+  },
+  {
+   "kind": "perf",
+   "severity": "high",
+   "file": "src/lib/wakeWord.ts",
+   "line": 224,
+   "claim": "WakeWordDetector.destroy() never releases the ONNX InferenceSession WASM memory it allocated",
+   "evidence": "destroy() (224-227) only sets running=false and clears JS arrays; ort.InferenceSession exposes release(), which is called nowhere for d.mel, d.emb, or any per-phrase model session. Both useVoiceSession-mounting routes ('/' and '/home', per grep) start/stop capture independently, re-running WakeWordDetector.create() from scratch each time.",
+   "fix": "Call session.release() for mel, emb, and every models[].session inside destroy().",
+   "effort": "S",
+   "area": "voice",
+   "verdict": "CONFIRMED",
+   "vnote": "Verified directly in src/lib/wakeWord.ts: destroy() (lines 224-227) only sets running=false and calls reset() (clears JS arrays raw/melFrames/embeddings/score) \u2014 it never calls .release() on this.mel, this.emb, or any this.models[].session, all of which are onnxruntime-web ort.InferenceSession instances backed by WASM heap memory (real API: InferenceSession.prototype.release exists). There is no module-level session cache/singleton \u2014 WakeWordDetector.create() (line 99) always does a fresh fetch + ort.InferenceSession.create() for mel, emb, and every matched phrase model, so each create() call allocates new WASM sessions independent of any prior instance. The caller (src/hooks/useVoiceSession.ts) confirms the leak is reachable repeatedly at runtime, not just theoretically: stopCapture() (line 359-366) calls wakeRef.current?.destroy() and nulls the ref, and startCapture() (~line 345-356) re-arms with a brand-new WakeWordDetector.create() whenever wakeRef.current is falsy \u2014 this is on the mic mute/unmute and voice-session start/stop path, so each cycle in a long-running Tauri desktop app leaks 3 WASM inference sessions with no upper bound. There's also a second, more insidious leak path at line 328-333: on wake-inference failure the detector is retired (destroy() + null) and never recreated, again without releasing sessions. No comment in the file documents this as a deliberate/known tradeoff (the file's comments cover other incidents \u2014 the unhandled-rejection fix at 320-327 \u2014 but say nothing about session lifecycle). The fix (call .release() on mel, emb, and each models[].session inside destroy()) is exactly as described and is a small, safe, self-contained change. I corroborate high severity: this is a real unbounded-growth WASM memory leak in a persistent desktop app on a path (mic toggle) a user can trigger many times per session, and the fix is trivial (effort S) \u2014 nothing here suggests it should be downgraded.</note>\n"
+  },
+  {
+   "kind": "error",
+   "severity": "medium",
+   "file": "services/voice-gateway/src/session.ts",
+   "line": 402,
+   "claim": "VoiceSession.destroy() never releases the Silero ONNX VAD engine, so each zombie reconnect leaks a server-side inference session too",
+   "evidence": "destroy() (402-404) calls cancelTurn(), which aborts tts and closes stt, but this.vad (the ONNX-backed engine created in create(), see vad.ts) has no matching release/dispose call anywhere in the class \u2014 compounding the client-side reconnect leak (see useVoiceSession.ts finding) on the gateway process itself.",
+   "fix": "Add a vad.release()/dispose() method to VadEngine and call it from destroy().",
+   "effort": "S",
+   "area": "voice",
+   "verdict": "CONFIRMED",
+   "vnote": "Verified: VadEngine interface (vad.ts) exposes no release/dispose method, SileroVad never calls session.release() on the onnxruntime-node/onnxruntime-web InferenceSession, and VoiceSession.destroy()/cancelTurn() (session.ts:392-402) only touches llmAbort/tts/stt \u2014 this.vad is never referenced. index.ts confirms a fresh VoiceSession (and thus a fresh ONNX session) is created per WS connection and destroy() is the only cleanup path on disconnect (index.ts:241). onnxruntime-node's InferenceSession holds native (non-GC-tracked) memory and ships a .release() API specifically because JS GC doesn't reliably reclaim it, so this is a genuine per-reconnect native memory leak, not a mitigated/deliberate pattern \u2014 no comment or ADR anywhere in vad.ts or session.ts acknowledges it. I downgrade from high to medium: each session's ONNX resources (small Silero model, interOp/intraOp threads=1, minimal state tensors) are lightweight compared to a typical STT/TTS session, and the WASM/energy fallback tiers (also leak-free of native memory) are common in practice per vad.ts's own fallback comments \u2014 so this needs sustained reconnect churn before it becomes operationally serious, rather than being an immediate high-severity risk on its own. The fix (add release()/dispose() to VadEngine, call from destroy()) is correct and cheap (effort S) as stated."
+  },
+  {
+   "kind": "error",
+   "severity": "medium",
+   "file": "supabase/functions/_shared/orchestrator.ts",
+   "line": 1018,
+   "claim": "Fire-and-forget knowledge-extraction fetches a Supabase edge function that no longer exists, leaving orphaned local DB rows",
+   "evidence": "triggerKnowledgeExtraction() (968-1037) does fetch(`${supabaseUrl}/functions/v1/atlas-knowledge`, ...) after already writing atlas_learning_sessions (status:'active') and atlas_learning_logs (status:'started') via findOrCreateSession/logLearningSession. index.ts passes supabaseUrl:'local', so `new URL('local/functions/v1/atlas-knowledge')` throws 'cannot be parsed as a URL' (verified with `bun -e`). Triggered by ordinary phrases via detectLearningIntent's regex, e.g. providerStatus.ts:244 `remember (?:that\\s+)?(.+)`.",
+   "fix": "Either delete this dead trigger (the real local research path is learningRoutes.ts's /research, invoked separately) or point it at that local route; also add a completion/expiry path so orphaned 'active' sessions don't accumulate.",
+   "effort": "M",
+   "area": "brain",
+   "verdict": "CONFIRMED",
+   "vnote": "Verified end-to-end. services/atlas-brain/src/index.ts:165 hardcodes supabaseUrl:\"local\" into orchestrator.ts's runChat. triggerKnowledgeExtraction (orchestrator.ts:968-1037) is reached in ordinary use: isLearningEnabled defaults to enabled=true (localDb.ts:339-344 seeds atlas_system_settings.learning_enabled=1 on first run), isProviderHealthy defaults true when no atlas_provider_status row exists, and detectLearningIntent's `remember (?:that\\s+)?(.+)` regex (providerStatus.ts:244) fires on ordinary phrases like \"remember that I like hiking\". Confirmed with `bun -e`: `new URL(\"local/functions/v1/atlas-knowledge\")` throws \"cannot be parsed as a URL\"; fetch() surfaces this as an async rejection caught only by the trailing `.catch()` at line 1033 (verified with a live bun repro), so nothing crashes \u2014 it's a silent no-op. Crucially, findOrCreateSession (learningGuards.ts:79-97, status:'active') and logLearningSession (status:'started') both write and commit *before* the failing fetch at line 1018, so every matching \"remember X\" phrase leaves a permanently orphaned atlas_learning_sessions/atlas_learning_logs row pair \u2014 there is no cleanup path for them (learningGuards.ts:153-158 only lazily marks a session 'expired' when something later re-checks its budget, which never happens here since atlas-knowledge is never called). This is dead Supabase-era code left in the shared orchestrator that the local brain never wired to a working endpoint; the real local path is learningRoutes.ts's /research, exactly as the finding's fix suggests. I downgrade to medium rather than high: this is a fire-and-forget call that is never awaited by the response path, so it never blocks or breaks a user-visible chat turn; there's no crash, no security exposure, and the orphaned rows are small, per-trigger, and only affect a secondary personal-assistant feature (a countActiveSessions() cap in learningRoutes.ts:89-94 is display-only, not gating), not core chat/data integrity. The underlying claim (dead endpoint, orphaned rows, easy trigger) is fully accurate though, so the fix is worth doing as described.\""
+  },
+  {
+   "kind": "arch",
+   "severity": "medium",
+   "file": "supabase/functions/_shared/orchestrator.ts",
+   "line": 1213,
+   "claim": "runChat() is a ~460-line monolith mixing DB fan-out, prompt assembly, a tool loop, SSE streaming and turn-capture packaging with no internal seams",
+   "evidence": "Single function spans lines 1213-1673: 9-way Promise.all DB load, humour-gate math (1316-1338), buildPersonalizedPrompt call, a 6-iteration tool-execution loop (1492-1594), citation-prefixing TransformStream setup (1636-1657), and TurnCapture packaging (1663-1671) all inline.",
+   "fix": "Split into prompt-build, tool-loop, and stream/capture-assembly units so a change to one (e.g. prompt-cache byte-stability) doesn't require reading the others.",
+   "effort": "L",
+   "area": "brain",
+   "verdict": "CONFIRMED",
+   "vnote": "Verified directly: runChat() spans exactly lines 1213-1673 (461 lines) in supabase/functions/_shared/orchestrator.ts. Confirmed all cited elements: a 9-arm Promise.all DB/recall fan-out (1248-1286), humour-gate math for personality (1316-1338), the buildPersonalizedPrompt call (1340), a teaching-mode fast path (1421-1489), a 6-iteration tool-execution loop (maxToolIterations = 6, loop at 1492-1594), citation-prefixing TransformStream setup (1636-1657), and TurnCapture packaging in the final return (1659-1672) \u2014 all inline in one function with no extracted helpers for these phases. This is real: no test file, caller, or comment shows these concerns already factored out elsewhere: it's one continuous async function mixing DB access, prompt construction, model-call orchestration, and stream plumbing. However, this is a well-earned monolith, not neglect \u2014 the function is unusually heavily commented, and several comments explicitly explain non-obvious cross-cutting invariants that span the phases the finding wants split apart (e.g. the systemPrompt/volatileContext split for prompt-cache byte-stability spans prompt-build and turn-capture; the terse-gate hysteresis logic exists precisely because gate flips propagate into the cached prefix used later in the streaming call). This raises real risk that a mechanical extraction into separate prompt-build/tool-loop/stream-capture units done carelessly could sever those documented invariants \u2014 but that's a caution about how to refactor, not a refutation that the monolith exists or that seam-based extraction is impossible; done deliberately (e.g. threading a small shared context object) it's a legitimate readability improvement. Since there's no claimed correctness bug, security issue, or measured cost/incident tied to the size \u2014 only future-maintenance friction \u2014 'high' overstates it for a pure structural/refactor concern; 'medium' better reflects a real but non-urgent maintainability debt."
+  },
+  {
+   "kind": "perf",
+   "severity": "medium",
+   "file": "src/lib/wakeWord.ts",
+   "line": 27,
+   "claim": "Full onnxruntime-web (InferenceSession/OrtInit) is bundled into the eager main chunk, not lazy",
+   "evidence": "wakeWord.ts:27 `import * as ort from \"onnxruntime-web\"` at module scope; imported by src/pages/atlas/AtlasDashboard.tsx (one of only 2 static/eager routes per App.tsx's own comment) via atlasHelpers.ts. Confirmed present in the shipped bundle: `grep -o InferenceSession dist/assets/index-Df3X5YcZ.js` and OrtInit both match inside the 1,113,215-byte main chunk.",
+   "fix": "Split the WakeWordDetector class (and its ort import) into a separate module that's dynamically imported only when voice/wake features actually initialize; keep getActiveWakePhrases() (a pure string list) as the only synchronously-imported export from the eager path.",
+   "effort": "M",
+   "area": "build",
+   "verdict": "CONFIRMED",
+   "vnote": "Verified end-to-end: AtlasDashboard.tsx is one of only two eager (`eager: true`) route modules statically named in App.tsx (per the file's own comment about code-splitting). AtlasDashboard.tsx statically imports useVoiceSession (src/hooks/useVoiceSession.ts:17), which statically imports WakeWordDetector from src/lib/wakeWord.ts (not just the pure getActiveWakePhrases() \u2014 that's a separate, tree-shakeable import path via atlasHelpers.ts). wakeWord.ts:27 does `import * as ort from \"onnxruntime-web\"` at module scope, and WakeWordDetector.create() genuinely calls into ort (instantiated at useVoiceSession.ts:347), so it is NOT dead code eligible for tree-shaking despite the module-header comment claiming \"no side effects at import time\" (that comment is about ORT env config being deferred to create(), not about the import being elidable). Confirmed in the shipped bundle: dist/assets/index-Df3X5YcZ.js (1,113,215 bytes) \u2014 one of the app's small number of non-hashed-lazy chunks \u2014 contains 2 matches each for InferenceSession and OrtInit. This is a real, reproducible eager-bundling issue, not a documented/deliberate tradeoff (no ADR or comment defends bundling ORT eagerly; the surrounding comments in fact describe an active effort to keep the eager chunk minimal).\n\nSeverity correction to medium: this is real perf/bundle-size waste but it's a single WASM-backed library pulled into an already-large eager chunk of a local desktop Tauri app (not a web app where cold-load/TTI on a cellular connection is paying the cost) \u2014 the assets ship on disk with the installer, so the primary cost is parse/eval time and installer size, not network latency. That's a genuine but bounded regression, not a high-severity user-facing failure, so \"high\" overweights it relative to the app's own eager-chunk minimization efforts elsewhere (e.g., the deliberate admin/consumer edition split documented in the same file)."
+  },
+  {
+   "kind": "perf",
+   "severity": "medium",
+   "file": "public/ort/ort-wasm-simd-threaded.jsep.wasm",
+   "line": 1,
+   "claim": "Shipped ONNX wasm is the 25.6MB threaded+JSEP build while the code forces single-threaded execution",
+   "evidence": "dist/assets/ort-wasm-simd-threaded.jsep-DC5y_g6C.wasm is 26,827,543 bytes \u2014 44% of the entire 59MB dist/ output and larger than every other asset combined. src/lib/wakeWord.ts:75 sets `ort.env.wasm.numThreads = 1`, yet the only wasm variant present is the 'threaded' one.",
+   "fix": "Ship the non-threaded, non-JSEP ort-wasm-simd.wasm build instead (typically a fraction of the size) unless WebGPU/multi-thread inference is actually exercised; verify with numThreads=1 whether the smaller variant loads correctly.",
+   "effort": "S",
+   "area": "build",
+   "verdict": "CONFIRMED",
+   "vnote": "Verified directly: public/ort/ort-wasm-simd-threaded.jsep.wasm is 26,827,543 bytes and dist/assets/ort-wasm-simd-threaded.jsep-DC5y_g6C.wasm matches (same size, same file, hashed by Vite). It's the only .wasm variant anywhere in public/ort or dist/ort \u2014 no non-threaded, non-JSEP fallback is shipped. src/lib/wakeWord.ts:75 does set `ort.env.wasm.numThreads = 1` in configureOrt(), and the code only requests the \"wasm\" execution provider (not \"webgpu\"), so JSEP (which exists mainly to support the WebGPU EP) buys nothing here either. Searched docs/atlas-audit-2026-07-24.md and architecture docs for any rationale/incident note about this specific wasm variant choice \u2014 found none; the only relevant doc note is that onnxruntime-web serves wake-word/VAD only, no mention of the threaded/JSEP build being deliberate. No build script selects/copies a smaller variant (checked vite.config.ts, package.json, src/) \u2014 the file appears to have been manually dropped into public/ort/ as the default onnxruntime-web asset without trimming to the actually-used variant. So the core technical claim holds up.\n\nSeverity correction: this is real waste but it's build/bundle bloat, not a functional break \u2014 the app still works correctly (numThreads=1 avoids the cross-origin-isolation requirement the threaded build would otherwise need, so nothing is broken, just oversized). It's shipped inside a Tauri desktop bundle (not a web page users download repeatedly over the wire on every visit), and wasm is loaded lazily from WakeWordDetector.create(), not blocking initial app boot. That tempers \"high\" (which implies a functional or major cost failure) down to \"medium\" \u2014 real, worth an S-effort fix, but not urgent/breaking."
+  }
+ ],
+ "uncertain": [],
+ "refuted": [],
+ "plausible": [
+  {
+   "kind": "perf",
+   "severity": "medium",
+   "file": "src/lib/authClient.ts",
+   "line": 237,
+   "claim": "Concurrent refreshEntitlement() calls silently discard all but the first resolver's write",
+   "evidence": "`if (getSession() !== s) return entitlement; store({ ...s, entitlement });` compares against the session object captured at call start; when call A's fetch resolves first it advances the stored session, so call B (which read the same `s` before A wrote) fails the identity check and drops its own response even though the session is still alive \u2014 not just on sign-out/expiry as the comment implies.",
+   "fix": "Compare session identity by a monotonic request/version counter rather than object reference, or fold concurrent calls into one shared promise (see the useAuth finding) so this path isn't exercised on every dashboard mount.",
+   "effort": "S",
+   "area": "shell"
+  },
+  {
+   "kind": "arch",
+   "severity": "medium",
+   "file": "src/hooks/useDataFetching.ts",
+   "line": 25,
+   "claim": "Two parallel, non-interoperating data-fetching stacks with no shared retry/cache/persist semantics",
+   "evidence": "useDataFetching.ts implements its own loading/retry/refreshInterval state machine, used transitively by useEdgeFunction.ts and 15+ consumer hooks (useTasks, useNotes, useCalendarEvents, useWeather, useStocks, useNews, \u2026), while a separate, unrelated set of admin hooks uses @tanstack/react-query's useQuery directly. queryClient.ts's defaultOptions (retry:2, staleTime, gcTime) and the persister only govern the second stack, which nothing consumer-facing uses.",
+   "fix": "Document (or better, collapse to) one canonical fetching convention so a new feature doesn't have to guess which stack gets caching/persistence and which doesn't.",
+   "effort": "L",
+   "area": "shell"
+  },
+  {
+   "kind": "arch",
+   "severity": "medium",
+   "file": "src/components/atlas-ui/AtlasExtraCards.tsx",
+   "line": 117,
+   "claim": "World-clock CITIES array + cityTimes() + 30s interval duplicated verbatim in two files, neither activity-gated",
+   "evidence": "AtlasExtraCards.tsx:117-139 and widgetCatalog/useCatalogWidgets.ts:58-70,97-101 both define the identical CITIES const and cityTimes() shape and each runs its own window.setInterval(..., 30_000) with no isWindowActive() check, unlike every canvas in the same area which uses the shared useWindowActivity gate.",
+   "fix": "Move CITIES + cityTimes into one shared module; gate the interval on isWindowActive() like useDataFetching's refresh interval does.",
+   "effort": "S",
+   "area": "dashboard"
+  },
+  {
+   "kind": "arch",
+   "severity": "medium",
+   "file": "src/components/atlas-ui/AtlasCards.tsx",
+   "line": 158,
+   "claim": "Two silently-diverging stock watchlists for the same concept across the app",
+   "evidence": "WATCHLIST=['AAPL','GOOGL','MSFT','NVDA'] in AtlasCards.tsx:158 (also useCatalogWidgets.ts:55) vs a different 6-ticker WATCH=['AAPL','GOOGL','MSFT','NVDA','AMZN','META'] in useBandNarration.ts:22 and AtlasExpanded.tsx:360 \u2014 neither is exported/shared.",
+   "fix": "Extract one exported WATCHLIST constant and import it everywhere; the band's 'top mover' narration can currently name AMZN/META, a stock never shown on the dashboard's own Watchlist card.",
+   "effort": "S",
+   "area": "dashboard"
+  },
+  {
+   "kind": "arch",
+   "severity": "medium",
+   "file": "src/pages/atlas/AtlasDashboard.tsx",
+   "line": 441,
+   "claim": "Dashboard card grid is a hardcoded JSX list that duplicates metadata already captured in widgetCatalog/registry.ts",
+   "evidence": "AtlasDashboard.tsx:441-450 hand-lists all 10 cards; widgetCatalog/registry.ts:33-35 itself documents 'the dashboard renders its own hardcoded list and nothing reads this module except the catalog' \u2014 unlike surfaces.ts, which surfaces.test.ts enforces stays in sync with the router/dock, nothing ties the two card lists together.",
+   "fix": "Already tracked (task #52, 'Make the dashboard render from the widget registry'); flagging because it's the concrete file:line the change needs to touch.",
+   "effort": "L",
+   "area": "dashboard"
+  },
+  {
+   "kind": "arch",
+   "severity": "medium",
+   "file": "src/pages/atlas/AtlasMail.tsx",
+   "line": 56,
+   "claim": "isTyping() keyboard-focus guard duplicated verbatim in 4 route files, not in shared atlasHelpers.ts",
+   "evidence": "Identical 5-line function body in AtlasMail.tsx:56-61, AtlasBrowser.tsx:89-94, AtlasModelLab.tsx:84-89, AtlasSmartHome.tsx:101-106 (confirmed byte-identical via diff). atlasHelpers.ts exists specifically for shared screen helpers but does not contain it. AtlasBanking.tsx:88-92 also reimplements the same check inline with a slightly different shape (tag check duplicated in a 4th form), showing the pattern is already drifting.",
+   "fix": "Move isTyping() into src/pages/atlas/atlasHelpers.ts and import it from all 5 call sites; one place to add a new focusable element type (e.g. a future combobox) instead of 4-5 places that can silently disagree.",
+   "effort": "S",
+   "area": "surfaces"
+  },
+  {
+   "kind": "security",
+   "severity": "medium",
+   "file": "services/voice-gateway/src/index.ts",
+   "line": 76,
+   "claim": "Voice gateway HTTP routes allow CORS from any origin with no Origin/Host check, unlike the control port's ladder in the same repo",
+   "evidence": "CORS = {'Access-Control-Allow-Origin': '*'} (76-80); /tts and /scribe-token check only method and the (optional-in-dev) x-sidecar-token (165), no Origin/Host validation. src-tauri/src/control/auth.rs rungs 2-3 explicitly reject ANY Origin header and pin Host specifically to close this exact loopback/DNS-rebinding class of attack.",
+   "fix": "Add an Origin/Host check on the gateway's HTTP routes (or reject any Origin, as the control port does), especially since SIDECAR_TOKEN is unset in dev per the comment in useVoiceSession.ts:27.",
+   "effort": "M",
+   "area": "voice"
+  },
+  {
+   "kind": "arch",
+   "severity": "medium",
+   "file": "src-tauri/src/control/mod.rs",
+   "line": 196,
+   "claim": "ErrCode::Forbidden/TooLarge are dead in production; real 403/413 use a separate auth::Reject enum",
+   "evidence": "rustc: 'variants Forbidden and TooLarge are never constructed' (control/mod.rs:198). grep shows ErrCode::Forbidden/TooLarge only appear in #[test] blocks (mod.rs:1329-1330). Real rejections render via auth::Reject::{Forbidden,TooLarge} with hardcoded FORBIDDEN_BODY/TOO_LARGE_BODY constants (auth.rs:20,26,50-51) that must be kept in sync with ErrCode::status()'s 403/413 mapping (mod.rs:254-255) by hand, with no test exercising that link.",
+   "fix": "Either construct ControlResult::Err{code: ErrCode::Forbidden/TooLarge,...} from auth::Reject at the actual rejection site so status()/as_str() are load-bearing, or delete the unreachable variants and assert auth::Reject's rendered bodies directly.",
+   "effort": "S",
+   "area": "rust-domains"
+  },
+  {
+   "kind": "dead-code",
+   "severity": "medium",
+   "file": "src-tauri/src/control/mod.rs",
+   "line": 131,
+   "claim": "Ctx.request_id is parsed from every request and passed to every op, but never read anywhere",
+   "evidence": "rustc: 'field request_id is never read' (mod.rs:131). It's populated at mod.rs:579-580 (parsed from body) and mod.rs:1084 (approval_id.clone()) and threaded into every ops_*::run(app, args, ctx) call, but grep across control/ops_*.rs and audit.rs finds zero reads outside test literals (\"test\"/\"t\").into()). Audit correlation uses tool_call_id instead (audit.rs record_running/finish).",
+   "fix": "Either log/attach request_id in audit rows for cross-request tracing (its apparent purpose) or remove the field and its parsing/threading to stop carrying dead plumbing through every op signature.",
+   "effort": "S",
+   "area": "rust-domains"
+  },
+  {
+   "kind": "error",
+   "severity": "medium",
+   "file": "src-tauri/src/control/mod.rs",
+   "line": 484,
+   "claim": "The 560-test suite cannot reach handle()/header()/respond() \u2014 the real HTTP wire glue that runs against tiny_http is untested",
+   "evidence": "handle(app, request: tiny_http::Request, ...) is called only from the live server.recv() loop (mod.rs:361); tiny_http::Request has no public test constructor, and grep confirms no #[test] in mod.rs calls handle(. auth::inspect() (auth.rs:82) is tested instead via a synthetic RequestHead struct (auth.rs:57), which duplicates the Host/token checks but never runs through tiny_http's actual header parsing.",
+   "fix": "Add an integration test that binds a real tiny_http/OS port (as #38 already tracks) and drives at least one request through handle() end-to-end, rather than only through the synthetic RequestHead shim.",
+   "effort": "M",
+   "area": "rust-domains"
+  },
+  {
+   "kind": "error",
+   "severity": "medium",
+   "file": "supabase/functions/_shared/orchestrator.ts",
+   "line": 1509,
+   "claim": "Provider-health bookkeeping is hardcoded to the literal name \"lovable_ai\" even though the app now runs on Anthropic Claude or Bedrock",
+   "evidence": "recordError/recordSuccess(systemDb, \"lovable_ai\", ...) at 1509/1516/1614/1618, isProviderHealthy(systemDb, \"lovable_ai\") at 991, isLovableAIEnabled(systemDb) master kill-switch at 1229 \u2014 all predate the Claude/Bedrock migration (aiGateway.ts config.provider is 'anthropic'|'bedrock'|'gemini') and were never renamed.",
+   "fix": "Key health tracking off the real config.provider from aiGateway.ts, or rename the settings/columns to a provider-neutral name, so admin health views reflect the actual model provider.",
+   "effort": "S",
+   "area": "brain"
+  },
+  {
+   "kind": "dead-code",
+   "severity": "medium",
+   "file": "supabase/functions/_shared/learningGuards.ts",
+   "line": 131,
+   "claim": "isDuplicateTopic() is unreferenced anywhere in the codebase and its fallback path calls a QueryBuilder method the local DB shim never implements",
+   "evidence": "`grep -rn isDuplicateTopic` finds only the definition (learningGuards.ts:105-134); its fallback `.from(\"atlas_research_topics\").select(\"id\").ilike(...)` (line 131) sits outside the function's own try/catch, and services/atlas-brain/src/localDb.ts's QueryBuilder defines eq/neq/in/gt/gte/lt/lte but no `ilike`.",
+   "fix": "Either delete the dead function, or implement `.ilike()` on the local QueryBuilder before wiring it in \u2014 as written it would throw an uncaught TypeError the moment a caller adopts it.",
+   "effort": "S",
+   "area": "brain"
+  },
+  {
+   "kind": "dead-code",
+   "severity": "medium",
+   "file": "src/components/ui",
+   "line": 1,
+   "claim": "12 shadcn-ui wrapper components (and their 12 backing npm packages) have zero importers anywhere in src/",
+   "evidence": "input-otp, carousel, calendar, drawer, resizable, command, menubar, navigation-menu, context-menu, hover-card, aspect-ratio, toggle-group all return 0 matches for `rg -l \"from '@/components/ui/<name>'\" src/` outside their own definition file \u2014 backed by input-otp, embla-carousel-react, react-day-picker, vaul, react-resizable-panels, cmdk, @radix-ui/react-menubar, -navigation-menu, -context-menu, -hover-card, -aspect-ratio, -toggle-group (12 of the 60 runtime deps).",
+   "fix": "Delete the unused wrapper files and their npm dependencies from package.json, or confirm a near-term feature needs them before keeping.",
+   "effort": "M",
+   "area": "build"
+  },
+  {
+   "kind": "arch",
+   "severity": "medium",
+   "file": "tsconfig.app.json",
+   "line": 18,
+   "claim": "strict:false + noImplicitAny/noUnusedLocals/noUnusedParameters:false plus eslint's no-unused-vars:off jointly neuter the 'typecheck'/'lint' CI gates",
+   "evidence": "tsconfig.app.json:18-22 sets `\"strict\": false, \"noUnusedLocals\": false, \"noUnusedParameters\": false, \"noImplicitAny\": false`; eslint.config.js sets `\"@typescript-eslint/no-unused-vars\": \"off\"`. No ADR/comment in either file justifies this; ci.yml's 'Typecheck'/'Lint' steps run these exact configs so null-safety bugs and dead code are structurally invisible to CI.",
+   "fix": "Incrementally re-enable strictNullChecks and no-unused-vars (start with new/high-risk files via eslint overrides) rather than leaving the whole 296-file tree unchecked.",
+   "effort": "L",
+   "area": "build"
+  },
+  {
+   "kind": "dead-code",
+   "severity": "low",
+   "file": "src/hooks/useRealtimePauseOnInactivity.ts",
+   "line": 1,
+   "claim": "Comment and mechanism describe pausing a Supabase realtime WebSocket that no longer exists",
+   "evidence": "Comment says the hook disconnects/reconnects 'the Supabase realtime WebSocket' to stop it buffering in WKWebView, but localClient.ts:441-445 defines `realtime` as a stub (`isConnected: () => true, connect: () => {}, disconnect: () => {}`) \u2014 there is no socket, so every effect run in this hook is a no-op against a stub.",
+   "fix": "Delete the hook and its GlobalEffects wiring in App.tsx:59-62, or update the comment to say it's currently inert pending a real local realtime transport.",
+   "effort": "S",
+   "area": "shell"
+  },
+  {
+   "kind": "arch",
+   "severity": "low",
+   "file": "src/hooks/useMailIntelligence.ts",
+   "line": 138,
+   "claim": "The exact multi-instance dedup problem is fixed for the alert channel but not for the plain data refresh 20 lines below it",
+   "evidence": "Lines 58-113 build a module-level refcounted `alertChannel` specifically because 'the hook is mounted by BOTH the Inbox card (always) and the expanded Mail view' (comment at line 59); but `refresh()` at 138-158 (3-query Promise.all) has no equivalent dedup, so AtlasInboxCard and useBandNarration each independently run the same 3 SQLite queries on every dashboard mount.",
+   "fix": "Extend the same module-level pattern already written for alerts to cover the accounts/messages/alerts refresh.",
+   "effort": "S",
+   "area": "dashboard"
+  },
+  {
+   "kind": "arch",
+   "severity": "low",
+   "file": "src/pages/atlas/AtlasDashboard.tsx",
+   "line": 64,
+   "claim": "AtlasDashboard mixes 6+ distinct concerns (auth gate, two-stage greeting/TTS, presence computation, widget-expand animation timing, dock config, drawer/settings overlay) in one 488-line component",
+   "evidence": "Single component owns: auth redirect (106-108), salience DB fetch (170-200), greeting gate + TTS network call (223-297), agent-run presence derivation (326-341), dock item list (358-377), and widget open/close animation state (117-130) \u2014 no sub-hook or child component isolates any one of these.",
+   "fix": "Extract the greeting-gate + speakGreeting logic and the salience fetch into a dedicated useDashboardGreeting() hook; leave AtlasDashboard as layout + wiring only. Low priority since every branch already carries an incident-comment justifying its placement here.",
+   "effort": "M",
+   "area": "surfaces"
+  },
+  {
+   "kind": "security",
+   "severity": "low",
+   "file": "services/voice-gateway/src/index.ts",
+   "line": 165,
+   "claim": "Sidecar token comparisons use plain !== instead of the constant-time compare used by the control port",
+   "evidence": "`req.headers.get(\"x-sidecar-token\") !== SIDECAR_TOKEN` (165) and `msg.sessionToken !== SIDECAR_TOKEN` (201), vs src-tauri/src/control/auth.rs's dedicated ct_eq() built explicitly to avoid this kind of comparison for its bearer token.",
+   "fix": "Reuse a constant-time string compare for both token checks in the gateway, for consistency with the control port's documented threat model.",
+   "effort": "S",
+   "area": "voice"
+  },
+  {
+   "kind": "perf",
+   "severity": "low",
+   "file": "a.rs",
+   "claim": "x",
+   "evidence": "y",
+   "fix": "z",
+   "effort": "S",
+   "area": "rust-platform"
+  },
+  {
+   "kind": "arch",
+   "severity": "low",
+   "file": "src-tauri/src/home/hap/mod.rs",
+   "line": 55,
+   "claim": "Module-wide #![allow(dead_code)] hides genuinely-dead code within hap/*, not just the documented 'no consumer yet' case",
+   "evidence": "mod.rs:53-55 comment promises the allow 'must never grow to cover code that has a consumer and is genuinely dead,' but that promise is prose only \u2014 no lint/CI check enforces it, so any function added and later abandoned inside discovery.rs/http.rs/pairing.rs/session.rs/srp.rs/tlv.rs/verify.rs (8,441 combined lines) would also be silently hidden until the whole allow is deleted.",
+   "fix": "When the HomeAdapter consumer lands and the blanket allow is removed (as the comment says to do), scope any residual allow to specific still-unconsumed items with #[allow(dead_code)] rather than re-blanketing the module, so future abandonment is caught by rustc again.",
+   "effort": "S",
+   "area": "rust-domains"
+  },
+  {
+   "kind": "arch",
+   "severity": "low",
+   "file": "supabase/functions/_shared/orchestrator.ts",
+   "line": 1163,
+   "claim": "session_context rows are insert-only with no local cleanup path despite the schema providing an expiry index for exactly that purpose",
+   "evidence": "trackSessionContext (1089-1172) inserts 1-3 rows/turn with `expires_at: now + 30min`; db_schema.sql defines idx_session_context_expires, but grepping src-tauri/src, services/atlas-brain/src and supabase/functions/_shared finds no DELETE against session_context anywhere \u2014 expired rows are filtered out of reads (line 1189) but never purged.",
+   "fix": "Add a periodic DELETE FROM session_context WHERE expires_at < now() to the local scheduler/proactive cycle, mirroring the index that already anticipates it.",
+   "effort": "S",
+   "area": "brain"
+  },
+  {
+   "kind": "arch",
+   "severity": "low",
+   "file": "eslint.config.js",
+   "line": 41,
+   "claim": "eslint's any-allowlist override references a file that no longer exists in the tree",
+   "evidence": "eslint.config.js:41 lists `\"src/hooks/useSupabaseQuery.ts\"` in the `files` array for the no-explicit-any exemption, but `find`/`ls` confirm no such file exists under src/hooks (only useCrudOperations.ts and useRealtimeScribeStable.ts remain).",
+   "fix": "Remove the stale path from the override list, or update it to whatever file replaced it, so the config stops silently matching nothing.",
+   "effort": "S",
+   "area": "build"
+  },
+  {
+   "kind": "arch",
+   "severity": "low",
+   "file": "src",
+   "line": 1,
+   "claim": "Only 16 of 296 src/*.ts(x) files (5.4%) have any co-located test",
+   "evidence": "`find src -name '*.test.ts*' | wc -l` = 16 vs `find src -name '*.ts' -o -name '*.tsx' | wc -l` = 296. ci.yml's own comment notes the test filter itself silently ran only 1 of 7 test files until 2026-08-04, suggesting coverage has historically been unmonitored, not just thin.",
+   "fix": "Prioritize tests for the highest-risk untested surfaces (control port command handlers, approval queue transitions) rather than treating the whole tree as equally covered.",
+   "effort": "L",
+   "area": "build"
+  }
+ ],
+ "critic": {
+  "gaps": [
+   {
+    "area": "Runtime behaviour \u2014 nothing was executed; all 14 findings are static reads",
+    "why_missed": "All 8 areas read source. No agent launched the app, so nothing observed WKWebView throttling, idle suspension, multi-hour sessions or memory growth. The repo's own tracker still carries #48 'Atlas window goes blank after idle and Cmd+R does not recover it' and #38 'Runtime-verify the control port end to end' \u2014 both unreproducible by reading.",
+    "check": "Run `bun run dev` + the installed .app: (1) leave the window idle 30-60 min, then Cmd+R, and capture whether the WKWebView content process was jetsam'd (Console.app, 'Atlas' + 'WebContent'); (2) sample RSS of Atlas, atlas-brain and atlas-voice-gateway every 60s for an hour on the dashboard and on /atlas-teach to see whether the confirmed socket/ONNX leaks compound; (3) background the window and confirm which intervals keep firing under throttling (add a counter or watch atlas-brain access logs)."
+   },
+   {
+    "area": "The webview\u2192Rust IPC boundary as a security surface (26 commands) vs the control port's tiered model",
+    "why_missed": "rust-platform and rust-domains read modules one at a time; the asymmetry only appears when you diff two op tables that live in different places. src-tauri/src/lib.rs:491-576 registers 26 commands \u2014 db_delete, mail_send_reply, home_lock_set, home_device_set, health_forget \u2014 with no tier, no approval and no audit row, while the same capabilities via control/ (registry allowlist + approval + audit.rs) are gated. The webview is trusted implicitly; nobody wrote down what that trust is worth if one string reaches the DOM.",
+    "check": "Diff `tauri::generate_handler![...]` (lib.rs:491-576) against the control registry allowlist and mark every op reachable by IPC but tier-gated on the control port. Then, for each IPC command, verify argument validation in Rust rather than in TS: start with db.rs's generic CRUD (db_select/db_insert/db_update/db_delete take `table: String` \u2014 confirm table_columns() at db.rs:279-293 is the ONLY gate and that filter keys/operators cannot smuggle SQL), and check that no command trusts a caller-supplied user_id."
+   },
+   {
+    "area": "Ship path end-to-end: hardened runtime + unsigned sidecars + notarization + updater install",
+    "why_missed": "The build area measured bundle size (wasm, main chunk). Nobody exercised the artifact. tauri.conf.json sets \"hardenedRuntime\": true with \"signingIdentity\": null and externalBin of two Bun-compiled sidecars; release.yml:129-158 makes Apple signing/notarization strictly optional and prints a ::notice:: when absent. A hardened-runtime parent whose child binaries are unsigned or differently-signed is killed by macOS at exec, and the failure mode is 'chat and voice never come up' \u2014 invisible in CI.",
+    "check": "On a release artifact: `codesign -dvvv --entitlements :- Atlas.app` and `codesign -dvvv Atlas.app/Contents/MacOS/atlas-voice-gateway` (and atlas-brain); `spctl -a -vvv -t install Atlas.app`. Then install v(N-1), publish a v(N) latest.json against https://github.com/innovodevelop/atlas/releases/latest/download/latest.json and confirm useAppUpdater.ts check()+downloadAndInstall() actually relaunches \u2014 the minisign pubkey is baked in, so a key/artifact mismatch silently leaves every install stranded forever."
+   },
+   {
+    "area": "CI gate integrity \u2014 a gate that reports green while checking nothing",
+    "why_missed": "Each area trusted 'build is green'. But `ls supabase/functions` returns ONLY `_shared`, and ci.yml's edge-functions job loops `for d in */` with `[ \"$d\" = \"_shared\" ] && continue` \u2014 zero directories checked, exit 0, PASS. So the 4457 lines under _shared are covered only where the brain transitively imports them; auth.ts (84), cors.ts (36), mailShared.ts (61) are imported by nothing and type-checked by nothing. tsconfig.app.json:18-21 also runs the 296-file webview at \"strict\": false / \"noImplicitAny\": false and excludes all *.test.ts. This repo was already burned once \u2014 task #15, 'Fix the 59 type errors hidden by the no-op typecheck gate'.",
+    "check": "Run `deno check --no-lock supabase/functions/_shared/*.ts` directly and count errors; confirm the CI job is vacuous by adding a deliberate type error to _shared/auth.ts and observing the job still passes. Then run `bunx tsc -b --force` with strict:true in a scratch tsconfig over src/ and count what appears."
+   },
+   {
+    "area": "The CSS cascade and eager style cost \u2014 no area owned styling",
+    "why_missed": "shell/dashboard/surfaces read TSX and hooks. Nobody measured CSS. main.tsx:3,6 statically imports index.css + workshop.css (120,848 bytes source), producing dist/assets/index-DM8psh92.css at 169,704 bytes parsed on every cold start before first paint, while the per-surface sheets ARE correctly route-split (AtlasSmartHome-*.css 16,885 B, AtlasMail-*.css 13,248 B). Cascade risk is invisible too: workshop.css is a verbatim design drop per CLAUDE.md, layered against index.css's @layer base/components/utilities (index.css:52,204,218,276) and Tailwind.",
+    "check": "Load the dashboard with Chrome DevTools Coverage and record the unused fraction of index-*.css; if workshop.css is largely surface-specific, split it the way the surfaces sheets already are. Separately, grep workshop.css for selectors that outrank the @layer blocks in index.css (id selectors, !important, deep descendant chains) and check whether any component relies on import order rather than specificity."
+   },
+   {
+    "area": "The test suites' own quality \u2014 nothing tests the class of bug the sweep actually found",
+    "why_missed": "Areas graded product code, not the safety net. 16 test files cover 296 TS files in src/, and none of them mount-and-unmount a hook: every confirmed finding (WS reconnect timer, scribe socket, ONNX session, VAD engine) is a cleanup bug that no existing test could ever catch, so the fixes will regress silently. tests/auth.spec.ts is a live-network suite whose real assertions are opt-in (RUN_LIVE_AUTH_TESTS=1) \u2014 it is green in CI while testing almost nothing.",
+    "check": "Add (or at least scope) a render/unmount harness and assert post-unmount that no timer is pending and no socket is OPEN \u2014 jsdom + fake timers, or a stub WebSocket recording close(). Also count how many of the 119 frontend tests assert behaviour vs. re-state constants, and check whether the brain's 16 suites cover runChat()'s tool loop against real SQLite or only against mocks."
+   },
+   {
+    "area": "Data-layer drift: 68-table DDL owned by Rust, queried by a second process, with no schema version",
+    "why_missed": "rust-domains read db.rs, brain read localDb.ts \u2014 neither is the boundary. src-tauri/src/db_schema.sql declares 68 CREATE TABLEs; the brain opens the SAME atlas.db through bun:sqlite with its own hand-written SQL. Rust runs migrate_ai_memory()/migrate_mail() on every open (db.rs:212-213, 225-226) with no PRAGMA user_version stamp anywhere, so 'has this DB been migrated' is inferred from column presence \u2014 and db.rs:179 swallows a failed ALTER with eprintln!. Meanwhile supabase/migrations/ still holds 20 dead .sql files, and CLAUDE.md claims @supabase/supabase-js and postgres are still in package.json when neither is.",
+    "check": "Extract every table/column the brain and localClient.ts touch and diff against db_schema.sql \u2014 any name present in one and not the other is a runtime-only failure. Add a user_version stamp check. Count how many of the 68 tables are never read or written by any of the three processes (dead schema), and reconcile CLAUDE.md's 'inert leftovers' paragraph with the actual dependency list."
+   },
+   {
+    "area": "Attacker-authorable URLs reaching the OS opener with no scheme allowlist",
+    "why_missed": "The injection lens was applied to text reaching the model and text reaching the DOM (mail HTML is correctly refused \u2014 MailReadingPane.tsx:94 'body_html is deliberately not rendered'), but not to URLs reaching the OS. src/components/atlas-ui/answerViews/openExternal.ts:9-15 does `openUrl(url)` on whatever string arrives, and its callers render model-, news- and mail-derived citations; capabilities/default.json grants \"opener:default\" to the main window with no scope narrowing. On macOS this hands arbitrary schemes (file:, atlas:, third-party app schemes) to LaunchServices.",
+    "check": "Trace every caller of openExternal/openUrl (Auth.tsx:56, useMusicPlayer.ts:455, useMailIntelligence.ts:187, usePortfolio.ts:94, openExternal.ts:11) and classify each URL's origin as first-party-constructed vs remote-derived. For the remote ones, assert an https-only allowlist before the call, and narrow the opener capability scope in capabilities/default.json rather than relying on the caller."
+   },
+   {
+    "area": "Localization and formatting consistency \u2014 no area owned copy or number/date rendering",
+    "why_missed": "There is no i18n layer to audit, so nobody looked. Formatting is ad hoc and inconsistent on a single screen: 35 toLocale* call sites in src/, of which 18 pass no locale (follow the OS, i.e. da-DK here) while others hardcode a foreign one \u2014 AtlasExtraCards.tsx:127 toLocaleTimeString('en-US') sits beside AtlasExtraCards.tsx:125 toLocaleDateString('en-CA'), and useCatalogWidgets.ts:68,180 and AtlasCards.tsx:202 hardcode 'en-US'. The user-facing result is 12-hour and 24-hour clocks, and comma vs period decimals, in adjacent cards.",
+    "check": "Boot the dashboard with the Mac set to Danish and screenshot the widget grid: list every card whose date, time, currency or number formatting disagrees with its neighbour. Decide one policy (OS locale everywhere, or one pinned locale) and grep the 35 call sites against it. Also grep UI strings for Danish leftovers \u2014 CLAUDE.md still mandates English UI copy while the language memory says the Danish instruction is stale."
+   },
+   {
+    "area": "Concurrency and multi-instance semantics: Atlas + Lighthouse, two writers, one credential",
+    "why_missed": "lib.rs's owner-election block is heavily commented and each area read it as documented-and-therefore-fine, but it is the only place where a documented, deliberately-unfixed security consequence lives: lib.rs:653-666 states that whichever bundle owns the sidecars lends its control credential to both, so 'chat in Atlas.app can reach home.discover, which Atlas.app's own binary does not contain'. No area owns 'two apps at once', and no Rust test covers claim_sidecars/adoption because it needs two live processes.",
+    "check": "Launch Atlas.app and the Lighthouse build simultaneously and verify: (1) exactly one atlas-brain and one atlas-voice-gateway process exist (`ps ax | grep atlas-`); (2) the adopter recovers chat within seconds when the owner quits (instance::claim_sidecars re-ask loop); (3) the op table exposed in the consumer window when Lighthouse owns the sidecars \u2014 confirm the documented crossover empirically and decide whether it is still acceptable now that home_lock_set is actuating; (4) both processes writing atlas.db concurrently under WAL with busy_timeout=5000 (db.rs:207-209) do not surface SQLITE_BUSY to the user."
+   }
+  ],
+  "overall": "The sweep is a strong static read of hot paths \u2014 the 14 confirmed findings cluster tightly around React lifecycle, hook fan-out and bundle weight \u2014 but it is structurally one-modality: every finding came from reading TypeScript and Rust, and nothing was executed, measured at runtime, or exercised as a shipped artifact. The three largest holes follow from that. (1) No runtime lens at all: the repo's own tracker still carries an unreproduced blank-window-after-idle bug (#48) and an unverified control port (#38), and the confirmed leaks were found by reading cleanup functions rather than by watching memory, so nobody knows their actual cost. (2) The boundaries between the four processes went unexamined even though each side was read: the 26-command Tauri IPC surface has no tier/approval/audit while the control port that reaches the same capabilities does; the Rust-owned 68-table DDL is queried by a second process with no schema version; and the Atlas/Lighthouse owner election contains a written-down, deliberately-unfixed credential crossover that no test can reach. (3) The gates themselves were trusted rather than audited \u2014 the edge-functions CI job iterates over zero directories and reports PASS, the webview typechecks at strict:false, and 16 test files for 296 source files include not one mount/unmount assertion, which is precisely the class of bug the sweep just found by hand and will therefore find again. Two smaller but genuine silences: nobody owned CSS (169KB parsed before first paint, entirely unmeasured for coverage or cascade conflicts) and nobody owned the ship path (hardened runtime over unsigned sidecars, an updater feed never exercised end to end). One narrow security gap slipped between lenses \u2014 openExternal.ts hands any string, including model- and mail-derived URLs, to the OS opener with no scheme allowlist, in a codebase that otherwise refuses to render remote HTML precisely because it understands the threat."
+ }
+}
