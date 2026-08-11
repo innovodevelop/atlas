@@ -84,20 +84,33 @@ precedent for "flat loop, hard containment"):
 
 ### 4. Capture and recording (the one genuinely new native capability)
 
-- **SPIKE (gates this component):** `objc2-screen-capture-kit` — same lockfile
-  discipline as ADR 010: prove `cargo add --dry-run` + lock diff is a pure
-  append before committing to it. ScreenCaptureKit can capture a single window
-  (`SCContentFilter` on the sandbox window) at native resolution.
-- **Live stream:** SCK frames at ~10–15 fps, JPEG-encoded, pushed to the
-  Lighthouse webview over the existing Tauri event channel (`lab:frame` with a
-  shared-buffer path if event payloads prove too slow — measure first).
+- **SPIKE — DONE, GO.** [ADR 014](../decisions/014-screencapturekit-frame-capture.md):
+  `objc2-screen-capture-kit` takes the lock 784 → 792 as a **pure append** (zero
+  version changes, zero removals, vergen and objc2 untouched), and binds the
+  whole single-window path including `initWithDesktopIndependentWindow:`,
+  `setMinimumFrameInterval` and `CMSampleBuffer` delivery. No shim needed. Add
+  SCK alone for L1–L4; `objc2-av-foundation` is 4 more packages and is only
+  needed for L8's mp4 muxing, so it waits.
+- **Live stream — the spike CORRECTED this plan.** Frames must NOT go over the
+  Tauri event channel. Measured on a real capture: a 2560px q75 JPEG is 475 KB,
+  ~5.4 MB/s at 12 fps, and base64 through the IPC bridge inflates that by ~33%
+  onto the main thread — the thread with its own blocking incident already on
+  record. Serve frames from Rust over **loopback HTTP**, modelled on the control
+  port's auth ladder (`tiny_http` is already a dependency), and let the webview
+  decode off-thread. **Live preview at 1280px q75 (164 KB, 1.8 MB/s)**;
+  the saved recording at full 2560px, written by Rust and never streamed. Show
+  both numbers in the UI so the preview is never mistaken for the artefact.
 - **Recording:** full-rate frames to disk per run; v1 stores a frame sequence +
   manifest (seekable by the timeline's sequence numbers), v1.5 muxes to `.mp4`
-  via AVAssetWriter (`objc2-av-foundation` — same spike). The recording lives
-  under the run's dir, referenced from `lab_runs`.
-- **Permission:** Screen Recording TCC — one-time, granted in System Settings.
-  The not-granted state is first-class in the design; the plist string lands
-  with the code (the ADR 010 lesson: the key ships in the same change).
+  via AVAssetWriter. The recording lives under the run's dir, referenced from
+  `lab_runs`.
+- **Permission:** Screen Recording is **TCC-only — no Info.plist key exists**
+  (unlike Bluetooth in ADR 010, and unlike what this plan previously assumed).
+  `CGPreflightScreenCaptureAccess` answers granted/not-granted **without
+  prompting and without crashing**, so "not granted" is a queryable first-class
+  state; `CGRequestScreenCaptureAccess` raises the prompt deliberately. The user
+  grants it in System Settings and **must then relaunch Atlas** — that relaunch
+  is part of the flow and has to be designed, not discovered.
 
 ### 5. The fix-agent handoff
 
