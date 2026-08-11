@@ -37,7 +37,7 @@ import { describe, expect, test } from 'bun:test';
 import { readFileSync, readdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { SURFACES, EDITION, surfaceByPath } from '@/surfaces';
+import { SURFACES, EDITION, surfaceByPath, entitledSurfaces, routableSurfaces } from '@/surfaces';
 import { visibleTabs } from '@/pages/atlas/AtlasCoreScreen';
 import { visibleSettingsTabs } from '@/pages/atlas/AtlasSettings';
 import { SURFACE_ICONS } from '@/components/atlas-ui/surfaceIcons';
@@ -157,6 +157,50 @@ describe('an admin path in a consumer build is unknown, not hidden', () => {
     // typo still 404s loudly instead of silently deleting a button.
     expect(probe('consumer', '/').dockKept).toEqual(['/mail', '/not-a-surface']);
     expect(probe('admin', '/').dockKept).toEqual(['/mail', '/model-lab', '/not-a-surface']);
+  });
+});
+
+/**
+ * The OTHER gate, and it is not the edition one.
+ *
+ * `edition` is decided by the build: the admin screens are absent from a
+ * consumer bundle, which is what every test above measures. `feature` is
+ * decided by the account in front of us — the page ships, and the entitlement
+ * says whether it has a route. That check cannot be observed in the bundle at
+ * all, so it is observed here, on the pure derivation the router calls.
+ *
+ * No surface sets `feature` yet, so the gated case is constructed. That is
+ * deliberate: adding a real surface to prove the mechanism would change the
+ * hardcoded counts in surfaces.test.ts and ship a screen nobody asked for.
+ */
+describe('a surface may also be gated on an entitlement', () => {
+  test('a surface carrying `feature` does not route when the entitlement is absent', () => {
+    const base = routableSurfaces[0];
+    const gated = { ...base, meta: { ...base.meta, feature: 'clock-pro' } };
+
+    expect(entitledSurfaces(() => false, [gated])).toEqual([]);
+    // …and it comes back the moment the account has it, so this is a gate and
+    // not a deletion — the same distinction the tab-strip tests draw.
+    expect(entitledSurfaces((f) => f === 'clock-pro', [gated])).toEqual([gated]);
+    // A different feature is not a near miss.
+    expect(entitledSurfaces((f) => f === 'clock-basic', [gated])).toEqual([]);
+  });
+
+  test('an ungated surface is untouched by the gate', () => {
+    // The check is asked about nothing, so a signed-out account still gets the
+    // whole table. A gate that fired on every surface would be catastrophic and
+    // otherwise silent.
+    expect(entitledSurfaces(() => false).length).toBe(routableSurfaces.length);
+    expect(SURFACES.filter((s) => s.feature).map((s) => s.path)).toEqual([]);
+  });
+
+  test('the router routes the gated table, not the raw one', () => {
+    // Without this, `feature` could be declared, tested in isolation and never
+    // applied — which is precisely how `consumerTabs` sat inert for weeks.
+    const src = readFileSync(join(SRC, 'AppRoutes.tsx'), 'utf8');
+    const code = src.slice(src.indexOf('*/') + 2);
+    expect(code.includes('entitledSurfaces(')).toBe(true);
+    expect(code.includes('routableSurfaces'), 'AppRoutes still maps the ungated table').toBe(false);
   });
 });
 

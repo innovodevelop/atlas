@@ -34,11 +34,21 @@
  * here, so this module stays cheap enough to render in a test. App.tsx is the
  * only caller and it passes both; a DEV assertion below catches the day someone
  * marks a third surface eager and forgets.
+ *
+ * ── THE ENTITLEMENT GATE ────────────────────────────────────────────────────
+ *
+ * A surface may also declare `feature` (see SurfaceMeta), and that is a runtime
+ * fact rather than a build one, so this is where it is applied: the table is
+ * re-derived per render from the live entitlement. `useAuth` is the one
+ * non-trivial import that buys — the auth client and its dependencies — and it
+ * is the price of the gate being in the real route table instead of in App.tsx,
+ * where nothing could render it to check.
  */
 import { Suspense, type ComponentType, type ReactElement, type ReactNode } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import NotFound from './pages/NotFound';
-import { routableSurfaces } from './surfaces';
+import { entitledSurfaces } from './surfaces';
+import { useAuth } from './hooks/useAuth';
 
 export interface RouteOverride {
   /** Renders instead of the registry's `lazy()` component (for `eager` surfaces). */
@@ -54,8 +64,19 @@ interface Props {
 }
 
 export const AppRoutes = ({ overrides = {}, fallback = null }: Props) => {
+  // `useAuth` and not a bare `hasFeature()` import: the entitlement is not known
+  // at first paint (it lands with the session, and again after every /api/me
+  // refresh), so the gate has to be re-read on the render that follows. The
+  // subscription is what causes that render — reading the check directly would
+  // leave a just-purchased surface 404ing until the app was restarted.
+  const { hasFeature } = useAuth();
+  // A surface whose entitlement is missing drops out of the table entirely and
+  // therefore lands on the same 404 as an admin path in a consumer build. It is
+  // not routed-then-hidden: there is no route.
+  const surfaces = entitledSurfaces(hasFeature);
+
   if (import.meta.env.DEV) {
-    const unhonoured = routableSurfaces
+    const unhonoured = surfaces
       .filter((s) => s.meta.eager && !overrides[s.meta.path]?.Component)
       .map((s) => s.meta.path);
     if (unhonoured.length) {
@@ -70,7 +91,7 @@ export const AppRoutes = ({ overrides = {}, fallback = null }: Props) => {
     /* One suspense boundary for every lazy route. */
     <Suspense fallback={fallback}>
       <Routes>
-        {routableSurfaces.flatMap(({ meta, paths, Component }) => {
+        {surfaces.flatMap(({ meta, paths, Component }) => {
           const override = overrides[meta.path];
           const Page = override?.Component ?? Component;
           const element = override?.wrap ? override.wrap(<Page />) : <Page />;

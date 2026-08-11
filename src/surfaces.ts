@@ -83,6 +83,27 @@ export interface SurfaceMeta {
   /** Linked only in DEV builds (an internal tool that stays URL-only when shipped). */
   readonly devOnly?: boolean;
   /**
+   * Entitlement this surface needs before it routes: set it and the surface is
+   * dropped from the route table unless `hasFeature(name)` says the signed-in
+   * account has it (lib/authClient.ts, from the Cloudflare entitlement).
+   *
+   * Distinct from `edition`, which is a BUILD fact folded in by Rollup — the
+   * admin screens are not in a consumer bundle at all. This one is a RUNTIME
+   * fact about the account in front of us, so the page still ships and the
+   * check has to be re-read whenever the entitlement changes (it arrives after
+   * sign-in, and again after every /api/me refresh). Nothing gated this way is
+   * secure; like the rest of this file it decides what is offered, not what is
+   * permitted. Anything that must be denied belongs in the Rust control
+   * registry.
+   *
+   * Nothing sets it yet. The dock and account menu are NOT gated on it — they
+   * are module-scope consts derived once at import, which is the same staleness
+   * the routing gate avoids by asking per render. The first surface to set
+   * `feature` and appear in the dock has to fix that; a `feature` surface with
+   * `entry: 'none'` needs nothing further.
+   */
+  readonly feature?: string;
+  /**
    * Tab keys a consumer build may show, for surfaces whose tab strip is mixed.
    * Only `/atlas-core` has one. APPLYING it needs an edit inside
    * AtlasCoreScreen.tsx, which this registry does not own — see the entry.
@@ -351,6 +372,40 @@ export const routableSurfaces: readonly RoutableSurface[] = SURFACES
     };
   })
   .filter((s): s is RoutableSurface => s !== null);
+
+/**
+ * `hasFeature`, passed in rather than imported.
+ *
+ * This module is imported by the router, the dock, the account menu and the
+ * edition probe, and it deliberately has no dependencies beyond React's
+ * `lazy`. Reaching into lib/authClient.ts for the real check would drag the
+ * auth client, the query client and the toaster behind every one of them —
+ * and, worse, would invite the check at module scope, which is where a
+ * runtime entitlement goes stale (see `feature` on SurfaceMeta).
+ */
+export type FeatureCheck = (feature: string) => boolean;
+
+/** True when `has` permits this surface. An ungated surface is always allowed. */
+export const surfaceEntitled = (meta: SurfaceMeta, has: FeatureCheck): boolean =>
+  meta.feature === undefined || has(meta.feature);
+
+/**
+ * The route table this ACCOUNT may render — `routableSurfaces` minus anything
+ * whose entitlement is missing.
+ *
+ * Kept as a function of the check instead of another module-scope const, so
+ * `AppRoutes` can re-derive it on the render that follows the entitlement
+ * arriving. A snapshot taken at import would need an app restart before a
+ * newly-bought feature had a route, and would silently 404 it until then.
+ *
+ * `from` defaults to the registry's own routable list; it is a parameter so the
+ * gate can be exercised against a surface that carries `feature` while the
+ * registry itself still has none.
+ */
+export const entitledSurfaces = (
+  has: FeatureCheck,
+  from: readonly RoutableSurface[] = routableSurfaces,
+): readonly RoutableSurface[] => from.filter((s) => surfaceEntitled(s.meta, has));
 
 /** Dock items for this edition, in registry order. */
 export const dockSurfaces: readonly SurfaceMeta[] =
