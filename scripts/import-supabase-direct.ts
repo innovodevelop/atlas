@@ -82,7 +82,7 @@ try {
 
 // Prefer the separately-supplied password; else the one embedded in the URL.
 // Reject the literal placeholder.
-let password = DB_PASSWORD_ENV || (urlPassword && urlPassword !== "[YOUR-PASSWORD]" ? decodeURIComponent(urlPassword) : "");
+const password = DB_PASSWORD_ENV || (urlPassword && urlPassword !== "[YOUR-PASSWORD]" ? decodeURIComponent(urlPassword) : "");
 if (!password || password === "[YOUR-PASSWORD]") {
   die("No DB password. Set SUPABASE_DB_PASSWORD='your-db-password' (or put it into the URL).");
 }

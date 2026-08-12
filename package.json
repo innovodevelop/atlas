@@ -20,7 +20,9 @@
     "gen:sidecar-manifest": "bun scripts/gen-sidecar-manifest.ts",
     "tauri": "tauri",
     "tauri:lighthouse": "tauri build --config src-tauri/tauri.lighthouse.conf.json5",
-    "icons:lighthouse": "tauri icon design/brand-icons/lighthouse-appicon-C-blend-padded.svg -o src-tauri/icons-lighthouse"
+    "icons:lighthouse": "tauri icon design/brand-icons/lighthouse-appicon-C-blend-padded.svg -o src-tauri/icons-lighthouse",
+    "typecheck:strict": "tsc -p tsconfig.strict.json --noEmit",
+    "new:surface": "bun scripts/new-surface.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

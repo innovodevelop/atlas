@@ -11,7 +11,10 @@ export default tseslint.config(
   // `dist-admin` is the Lighthouse (admin edition) frontend build — the same
   // kind of output as `dist`, produced by `bun run build:admin`. Linting a
   // minified bundle reports rules that are not configured and fails the gate.
-  { ignores: ["dist", "dist-admin", "supabase/functions", "src-tauri", "scripts"] },
+  // `scripts` is NOT ignored any more: it now holds shipped tooling with its
+// own test suite (scripts/new-surface.ts + newSurface.test.ts), and an
+// ignored directory is a directory the lint gate lies about.
+{ ignores: ["dist", "dist-admin", "supabase/functions", "src-tauri"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
@@ -41,5 +44,21 @@ export default tseslint.config(
       "services/voice-gateway/**/*.ts",
     ],
     rules: { "@typescript-eslint/no-explicit-any": "off" },
+  },
+  {
+    // R11 type-safety ratchet (ADR 015): re-enable the rule the top-level
+    // config turns off, scoped to the same src/lib/ boundary tsconfig.strict.json
+    // enforces. Every future wave widens this `files` glob outward alongside
+    // the tsconfig boundary; neither one narrows back.
+    //
+    // argsIgnorePattern respects this file's existing `_x`/`_ms`-style
+    // convention for params a fake/mock must accept to match an interface
+    // (FakePath2D.moveTo, fakeClock's scheduler) but never reads — an
+    // explicit "deliberately unused" marker, not a rule weakening; a
+    // non-underscored unused arg or var still fails.
+    files: ["src/lib/**/*.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+    },
   },
 );

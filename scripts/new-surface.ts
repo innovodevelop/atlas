@@ -1,0 +1,605 @@
+#!/usr/bin/env bun
+/**
+ * The feature scaffolder — R9 of the 2026-08-11 refactor plan.
+ *
+ * Adding one surface to Atlas means coordinated edits in four places, and the
+ * pinned tests (`src/surfaces.test.ts`, `src/editionSplit.test.ts`) correctly
+ * fail if any is missed:
+ *
+ *   1. a `surface` export literal on the page module (`src/surfaces.test.ts`
+ *      regex-parses it — see `parseSurface`),
+ *   2. an entry in `SURFACES` in `src/surfaces.ts`,
+ *   3. a loader line in `CONSUMER_LOADERS`/`ADMIN_LOADERS` — regex-parsed too,
+ *      exact single-line shape required,
+ *   4. an icon entry in `src/components/atlas-ui/surfaceIcons.ts`
+ *      (`editionSplit.test.ts` fails on a missing OR a spare one),
+ *   plus two hardcoded surface counts in `surfaces.test.ts`.
+ *
+ * THIS SCRIPT DOES NOT WEAKEN OR REPLACE THOSE TESTS. It does the mechanical
+ * four-file dance so a human doesn't have to hand-edit four files in lockstep
+ * — the tests are still what makes drift impossible; this is what makes
+ * satisfying them free. Nothing here relaxes a check, skips a file, or writes
+ * around the regexes those tests depend on.
+ *
+ * ROUTING, THE DOCK AND THE ACCOUNT MENU NEED NO FURTHER EDIT. Per
+ * `src/App.tsx`'s own comment ("ADDING A ROUTE IS NOT DONE HERE ANY MORE"),
+ * all three are generated from `src/surfaces.ts` — a registry entry with
+ * `entry: 'dock' | 'menu'` is enough to appear in both without touching
+ * `App.tsx` or `AccountMenu.tsx`.
+ *
+ * WHAT THIS SCRIPT DELIBERATELY DOES NOT TOUCH — see docs/adding-a-surface.md
+ * for the full list, most notably `src/surfaces.test.ts`'s "the classification
+ * is the agreed one" test, which pins the exact consumer/admin path sets by
+ * hand on purpose (an editorial call, not a mechanical one) and must be
+ * updated by a human after a real surface lands.
+ *
+ * Usage:
+ *   bun scripts/new-surface.ts <Name> --label "..." --icon <LucideName> \
+ *     [--entry dock|menu|none] [--edition consumer|admin] [--feature <name>]
+ *
+ * Example:
+ *   bun scripts/new-surface.ts Journal --label "Journal" --icon BookOpen
+ *
+ * Writes `src/pages/atlas/Atlas<Name>.tsx` and
+ * `src/styles/surfaces/<name>.css`, then edits `src/surfaces.ts`,
+ * `src/components/atlas-ui/surfaceIcons.ts` and `src/surfaces.test.ts` in
+ * place. Refuses (before writing anything) if the page file already exists,
+ * or if `--icon` does not name a real `lucide-react` export.
+ */
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+
+// ── naming ────────────────────────────────────────────────────────────────
+
+/** `SmartHome` → `smart-home`. Handles runs of caps (`HTTPServer` → `http-server`). */
+export function kebabCase(name: string): string {
+  return name
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1-$2')
+    .toLowerCase();
+}
+
+/** `smart-home` → `smartHome` — the CSS-filename convention every existing surface uses. */
+export function camelFromKebab(kebab: string): string {
+  return kebab.replace(/-([a-z0-9])/g, (_m, c: string) => c.toUpperCase());
+}
+
+/** `smart-home` → `Smart home` — first word capitalised, the rest sentence-case, matching
+ * the registry's existing labels ("Smart home", "Widget catalog", "Model lab", …). Only a
+ * default: `--label` overrides it, and should for anything with a proper noun in it. */
+export function defaultLabel(kebab: string): string {
+  const words = kebab.split('-').filter(Boolean);
+  return words.map((w, i) => (i === 0 ? w[0]!.toUpperCase() + w.slice(1) : w)).join(' ');
+}
+
+// ── spec ──────────────────────────────────────────────────────────────────
+
+export type Edition = 'consumer' | 'admin';
+export type Entry = 'dock' | 'menu' | 'none';
+
+export interface SurfaceSpec {
+  name: string; // PascalCase, e.g. "Journal"
+  componentName: string; // `Atlas${name}`
+  path: string; // `/journal`
+  label: string;
+  icon: string;
+  entry: Entry;
+  edition: Edition;
+  feature?: string;
+  cssName: string; // `journal` — the file's basename under src/styles/surfaces/
+  moduleSpec: string; // `./pages/atlas/AtlasJournal`
+}
+
+export function buildSpec(opts: {
+  name: string;
+  label?: string;
+  icon: string;
+  entry?: Entry;
+  edition?: Edition;
+  feature?: string;
+}): SurfaceSpec {
+  const kebab = kebabCase(opts.name);
+  return {
+    name: opts.name,
+    componentName: `Atlas${opts.name}`,
+    path: `/${kebab}`,
+    label: opts.label ?? defaultLabel(kebab),
+    icon: opts.icon,
+    entry: opts.entry ?? 'menu',
+    edition: opts.edition ?? 'consumer',
+    feature: opts.feature,
+    cssName: camelFromKebab(kebab),
+    moduleSpec: `./pages/atlas/Atlas${opts.name}`,
+  };
+}
+
+// ── templates (pure string builders — no disk access) ───────────────────────
+
+export function buildPageTemplate(spec: SurfaceSpec): string {
+  const featureLine = spec.feature ? `\n  feature: '${spec.feature}',` : '';
+  return `/**
+ * Atlas ${spec.label} — the \`${spec.path}\` route.
+ *
+ * Generated by \`bun scripts/new-surface.ts\` (see docs/adding-a-surface.md).
+ * This file wires the house chrome — band header, Esc-to-return, an <Empty>
+ * state — and nothing else. The design and the real data hook are still
+ * yours: replace the placeholder body below with the actual screen before
+ * this ships. Nothing here invents data; the empty state says so honestly
+ * until a real hook is wired in.
+ *
+ * ── CHROME ──────────────────────────────────────────────────────────────
+ * \`.page\` root, band header, back-navigation through the headline plus Esc
+ * — never a header link (the dashboard's \`.greetB.returnable\` pattern).
+ */
+import { useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ${spec.icon} } from 'lucide-react';
+import { Empty } from '@/components/atlas-ui/primitives';
+import { isTyping } from './atlasHelpers';
+import '@/styles/surfaces/${spec.cssName}.css';
+
+/**
+ * Registration data. Mirrored in \`src/surfaces.ts\`, which is what the router,
+ * the dock and the account menu are built from; \`surfaces.test.ts\` fails if the
+ * two ever disagree.
+ */
+export const surface = {
+  path: '${spec.path}',
+  label: '${spec.label}',
+  icon: '${spec.icon}',
+  entry: '${spec.entry}',
+  mock: false,
+  edition: '${spec.edition}',${featureLine}
+} as const;
+
+const ${spec.componentName} = () => {
+  const navigate = useNavigate();
+
+  const goUp = useCallback(() => navigate('/'), [navigate]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (isTyping(e.target)) { (e.target as HTMLElement).blur(); return; }
+      goUp();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [goUp]);
+
+  return (
+    <div className="page ${spec.cssName}-page" data-screen-label="Atlas — ${spec.label}">
+      <div className="grain" aria-hidden />
+
+      {/* Band header. The headline is the back control — there is no header
+          link, by the same rule the dashboard follows. */}
+      <section className="bandB">
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h2 className="greetB returnable" onClick={goUp} title="Return to the dashboard">
+            <span className="accw">${spec.label}.</span>
+          </h2>
+          <p className="gsubB">TODO: describe what this surface shows.</p>
+        </div>
+        <div className="bandmetaB">
+          <p className="bmvB tnum">—</p>
+          <p className="bmlB">TODO</p>
+        </div>
+      </section>
+
+      <main className="${spec.cssName}-body">
+        {/* TODO: replace with the real data hook and layout. Never a dead
+            end — this Empty state is the honest placeholder until then. */}
+        <Empty
+          size="section"
+          icon={<${spec.icon} className="i20" />}
+          title="Nothing here yet"
+          body="This surface was scaffolded by new-surface.ts and has no data hook wired in yet."
+        />
+      </main>
+    </div>
+  );
+};
+
+export default ${spec.componentName};
+`;
+}
+
+export function buildCssTemplate(spec: SurfaceSpec): string {
+  return `/* ==========================================================================
+   Atlas ${spec.label} — the \`${spec.path}\` route's stylesheet.
+   Scaffolded by scripts/new-surface.ts — see docs/adding-a-surface.md.
+
+   Everything here should reference workshop.css tokens, never a raw hex —
+   replace this placeholder with the real design's CSS (with attribution to
+   its \`.dc.html\` source) when the design lands.
+   ========================================================================== */
+
+.${spec.cssName}-page { position: relative; overflow-x: hidden; }
+
+.${spec.cssName}-body {
+  position: relative;
+  z-index: 10;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 56px 80px;
+}
+`;
+}
+
+// ── pure insertion functions (string → string; unit-tested in newSurface.test.ts) ──
+
+function extractField(block: string, key: string): string {
+  const m = block.match(new RegExp(`${key}:\\s*'([^']*)'`));
+  if (!m) throw new Error(`entry block has no '${key}' field`);
+  return m[1]!;
+}
+
+/** The exact object-literal text inserted into `SURFACES` in src/surfaces.ts. */
+export function buildSurfaceEntryBlock(spec: SurfaceSpec): string {
+  const lines = [
+    '  {',
+    `    path: '${spec.path}',`,
+    `    label: '${spec.label}',`,
+    `    icon: '${spec.icon}',`,
+    `    entry: '${spec.entry}',`,
+    `    mock: false,`,
+    `    edition: '${spec.edition}',`,
+  ];
+  if (spec.feature) lines.push(`    feature: '${spec.feature}',`);
+  lines.push('  },');
+  return lines.join('\n');
+}
+
+export function hasSurfaceEntry(source: string, path: string): boolean {
+  return source.includes(`path: '${path}',`);
+}
+
+const ADMIN_SECTION_MARKER = '// ── ADMIN ──';
+const SURFACES_DECL = 'export const SURFACES';
+const ARRAY_CLOSE = '] as const;';
+
+/**
+ * Inserts a new SURFACES entry at the end of its edition's section, right
+ * after the last existing entry there — never between two entries, and never
+ * disturbing the blank line that separates the CONSUMER and ADMIN groups.
+ * A no-op (idempotent) if an entry for this path already exists.
+ */
+export function insertSurfaceEntry(source: string, edition: Edition, entryBlock: string): string {
+  const path = extractField(entryBlock, 'path');
+  if (hasSurfaceEntry(source, path)) return source;
+
+  if (edition === 'consumer') {
+    // Land it right before the blank line + admin-section comment, i.e.
+    // directly after the last consumer entry — `\n\n(marker)` becomes
+    // `\n(new entry)\n\n(marker)`.
+    const markerIdx = source.indexOf(ADMIN_SECTION_MARKER);
+    if (markerIdx < 0) throw new Error('surfaces.ts: could not find the ADMIN section marker');
+    const re = /\n\n(\s*\/\/ ── ADMIN)/;
+    if (!re.test(source)) throw new Error('surfaces.ts: admin marker is not preceded by a blank line as expected');
+    return source.replace(re, `\n${entryBlock}\n\n$1`);
+  }
+
+  // admin: last section — insert right before the array's closing `] as const;`.
+  const surfacesStart = source.indexOf(SURFACES_DECL);
+  if (surfacesStart < 0) throw new Error('surfaces.ts: could not find the SURFACES declaration');
+  const closeIdx = source.indexOf(ARRAY_CLOSE, surfacesStart);
+  if (closeIdx < 0) throw new Error('surfaces.ts: could not find the SURFACES array close');
+  return source.slice(0, closeIdx) + entryBlock + '\n' + source.slice(closeIdx);
+}
+
+/**
+ * The loader-line shape `surfaces.test.ts` regex-parses to learn path→module.
+ * Copied here with attribution rather than imported, because the test's regex
+ * is a *test* asset (bun:test isn't a runtime dependency of this script):
+ *
+ *   src/surfaces.test.ts, `LOADERS` — `/^ {2}'([^']+)':\s*\(\)\s*=>\s*import\('([^']+)'\),$/gm`
+ */
+export const SURFACES_TEST_LOADER_REGEX = /^ {2}'([^']+)':\s*\(\)\s*=>\s*import\('([^']+)'\),$/gm;
+
+export function buildLoaderLine(path: string, moduleSpec: string): string {
+  return `  '${path}': () => import('${moduleSpec}'),`;
+}
+
+export function hasLoaderLine(source: string, path: string): boolean {
+  return source.includes(`  '${path}': () =>`);
+}
+
+const CONSUMER_LOADERS_START = 'const CONSUMER_LOADERS: Record<string, Loader> = {';
+const CONSUMER_LOADERS_END = '\n};';
+const ADMIN_LOADERS_START = "const ADMIN_LOADERS: Record<string, Loader> = EDITION === 'admin' ? {";
+const ADMIN_LOADERS_END = '\n} : {};';
+
+/** Appends `line` as the last entry of `CONSUMER_LOADERS`/`ADMIN_LOADERS`. Idempotent. */
+export function insertLoaderLine(source: string, edition: Edition, line: string): string {
+  const m = line.match(/^ {2}'([^']+)':/);
+  if (!m) throw new Error(`loader line is malformed: ${line}`);
+  if (hasLoaderLine(source, m[1]!)) return source;
+
+  const startMarker = edition === 'consumer' ? CONSUMER_LOADERS_START : ADMIN_LOADERS_START;
+  const endMarker = edition === 'consumer' ? CONSUMER_LOADERS_END : ADMIN_LOADERS_END;
+  const start = source.indexOf(startMarker);
+  if (start < 0) throw new Error(`surfaces.ts: could not find the ${edition} loader table start`);
+  const end = source.indexOf(endMarker, start);
+  if (end < 0) throw new Error(`surfaces.ts: could not find the ${edition} loader table end`);
+  return source.slice(0, end) + '\n' + line + source.slice(end);
+}
+
+// ── surfaceIcons.ts ─────────────────────────────────────────────────────────
+
+function parseIdentList(block: string): string[] {
+  return block.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+}
+
+/** Re-wraps a sorted, comma-separated identifier list at ~78 columns, 2-space indent —
+ * matching the existing hand-wrapped style in surfaceIcons.ts closely enough to lint clean. */
+function formatIdentList(names: string[], indent = '  ', width = 78): string {
+  const sorted = [...new Set(names)].sort((a, b) => a.localeCompare(b));
+  const lines: string[] = [];
+  let current = indent;
+  for (const name of sorted) {
+    const piece = `${name}, `;
+    if (current.length + piece.length > width && current.trim().length > 0) {
+      lines.push(current.replace(/ +$/, ''));
+      current = indent;
+    }
+    current += piece;
+  }
+  if (current.trim().length > 0) lines.push(current.replace(/ +$/, ''));
+  return lines.join('\n');
+}
+
+const LUCIDE_IMPORT_START = 'import {';
+const LUCIDE_IMPORT_END = "} from 'lucide-react';";
+const ICON_MAP_START = 'export const SURFACE_ICONS: Readonly<Record<string, IconComponent>> = {';
+const ICON_MAP_END = '};';
+
+export function hasIconEntry(source: string, iconName: string): boolean {
+  const mapStart = source.indexOf(ICON_MAP_START);
+  if (mapStart < 0) return false;
+  const bodyStart = mapStart + ICON_MAP_START.length;
+  const mapEnd = source.indexOf(ICON_MAP_END, bodyStart);
+  if (mapEnd < 0) return false;
+  return parseIdentList(source.slice(bodyStart, mapEnd)).includes(iconName);
+}
+
+/**
+ * Adds `iconName` to both the `lucide-react` import list and the
+ * `SURFACE_ICONS` map, alphabetised, matching what
+ * `src/editionSplit.test.ts`'s "every icon the registry names resolves, and
+ * none is spare" test checks in both directions. Idempotent per block.
+ */
+export function insertIconEntry(source: string, iconName: string): string {
+  let out = source;
+
+  const importStart = out.indexOf(LUCIDE_IMPORT_START);
+  if (importStart < 0) throw new Error("surfaceIcons.ts: could not find the lucide-react import block");
+  const importEnd = out.indexOf(LUCIDE_IMPORT_END, importStart);
+  if (importEnd < 0) throw new Error("surfaceIcons.ts: could not find the end of the lucide-react import block");
+  const importBody = out.slice(importStart + LUCIDE_IMPORT_START.length, importEnd);
+  const importNames = parseIdentList(importBody);
+  if (!importNames.includes(iconName)) {
+    const rebuilt = `${LUCIDE_IMPORT_START}\n${formatIdentList([...importNames, iconName])}\n${LUCIDE_IMPORT_END}`;
+    out = out.slice(0, importStart) + rebuilt + out.slice(importEnd + LUCIDE_IMPORT_END.length);
+  }
+
+  const mapStart = out.indexOf(ICON_MAP_START);
+  if (mapStart < 0) throw new Error('surfaceIcons.ts: could not find SURFACE_ICONS');
+  const bodyStart = mapStart + ICON_MAP_START.length;
+  const mapEnd = out.indexOf(ICON_MAP_END, bodyStart);
+  if (mapEnd < 0) throw new Error('surfaceIcons.ts: could not find the end of SURFACE_ICONS');
+  const mapNames = parseIdentList(out.slice(bodyStart, mapEnd));
+  if (!mapNames.includes(iconName)) {
+    out = out.slice(0, bodyStart) + '\n' + formatIdentList([...mapNames, iconName]) + '\n' + out.slice(mapEnd);
+  }
+
+  return out;
+}
+
+// ── surfaces.test.ts — the two hardcoded counts ──────────────────────────────
+
+const COUNT_RE = /expect\((PARSED|SURFACES)\.length\)\.toBe\((\d+)\);/g;
+
+/**
+ * Bumps both hardcoded counts in "the count is the count" (surfaces.test.ts)
+ * by 1. Fails loudly rather than guessing if the file doesn't currently carry
+ * exactly two agreeing counts — that shape is load-bearing for this function,
+ * per the test's own comment ("bump it deliberately when a real surface is
+ * added").
+ *
+ * This is a delta, not idempotent by itself — running it twice on the same
+ * source bumps twice. That is fine here: `main()` only calls it once, guarded
+ * by the page-already-exists refusal below.
+ */
+export function bumpSurfaceCounts(source: string): string {
+  const matches = [...source.matchAll(COUNT_RE)];
+  if (matches.length !== 2) {
+    throw new Error(
+      `surfaces.test.ts: expected exactly 2 hardcoded surface counts, found ${matches.length} — ` +
+      `the "count is the count" test has changed shape; bump it by hand.`,
+    );
+  }
+  const n = Number(matches[0]![2]);
+  if (Number(matches[1]![2]) !== n) {
+    throw new Error(
+      `surfaces.test.ts: the two hardcoded counts disagree (${matches[0]![2]} vs ${matches[1]![2]}) — ` +
+      `fix that by hand before running the scaffolder.`,
+    );
+  }
+  return source.replace(COUNT_RE, (_full, which: string) => `expect(${which}.length).toBe(${n + 1});`);
+}
+
+// ── CLI ───────────────────────────────────────────────────────────────────
+
+const ROOT = join(import.meta.dir, '..');
+
+function usage(): string {
+  return `Usage: bun scripts/new-surface.ts <Name> --label "..." --icon <LucideName> \\
+  [--entry dock|menu|none] [--edition consumer|admin] [--feature <entitlement>]
+
+Example:
+  bun scripts/new-surface.ts Journal --label "Journal" --icon BookOpen
+
+Creates src/pages/atlas/Atlas<Name>.tsx and src/styles/surfaces/<name>.css,
+then wires the registry entry, loader line, icon entry and the two pinned
+surface counts in place. Refuses if the page already exists, and validates
+--icon against lucide-react's real exports before writing anything.
+
+See docs/adding-a-surface.md for what this does NOT do for you.`;
+}
+
+interface CliArgs {
+  name: string;
+  label?: string;
+  icon: string;
+  entry?: Entry;
+  edition?: Edition;
+  feature?: string;
+}
+
+export function parseArgs(argv: string[]): CliArgs {
+  const positional: string[] = [];
+  const flags: Record<string, string> = {};
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg.startsWith('--')) {
+      const key = arg.slice(2);
+      const value = argv[i + 1];
+      if (value === undefined || value.startsWith('--')) {
+        throw new Error(`--${key} needs a value`);
+      }
+      flags[key] = value;
+      i++;
+    } else {
+      positional.push(arg);
+    }
+  }
+  const name = positional[0];
+  if (!name) throw new Error('missing <Name>');
+  if (!/^[A-Z][A-Za-z0-9]*$/.test(name)) {
+    throw new Error(`<Name> must be PascalCase (e.g. "Journal", "SmartHome"), got "${name}"`);
+  }
+  const icon = flags.icon;
+  if (!icon) throw new Error('--icon is required');
+  if (flags.entry && !['dock', 'menu', 'none'].includes(flags.entry)) {
+    throw new Error(`--entry must be dock|menu|none, got "${flags.entry}"`);
+  }
+  if (flags.edition && !['consumer', 'admin'].includes(flags.edition)) {
+    throw new Error(`--edition must be consumer|admin, got "${flags.edition}"`);
+  }
+  return {
+    name,
+    label: flags.label,
+    icon,
+    entry: flags.entry as Entry | undefined,
+    edition: flags.edition as Edition | undefined,
+    feature: flags.feature,
+  };
+}
+
+/** Thrown by `ensureNewSurface` — a distinct type so callers can tell "the
+ * surface already exists" apart from any other failure. */
+export class SurfaceExistsError extends Error {}
+
+/**
+ * The refuses-when-exists check, as a pure predicate: `pageExists` is
+ * whatever the caller's `existsSync` said, so this function itself never
+ * touches disk and is testable in isolation. Throws before ANYTHING is
+ * written — the caller must check this before any of the write* calls below.
+ */
+export function ensureNewSurface(pageExists: boolean, pageRelPath: string): void {
+  if (pageExists) {
+    throw new SurfaceExistsError(
+      `${pageRelPath} already exists — new-surface.ts refuses to overwrite a surface. ` +
+      `If you meant to change it, edit it directly; this script only creates NEW surfaces.`,
+    );
+  }
+}
+
+async function validateIconExists(iconName: string): Promise<void> {
+  const mod: Record<string, unknown> = await import('lucide-react');
+  if (!(iconName in mod) || typeof mod[iconName] !== 'object') {
+    throw new Error(
+      `"${iconName}" is not a lucide-react icon export. Check the exact PascalCase name ` +
+      `(e.g. "BookOpen", not "book-open") at https://lucide.dev/icons.`,
+    );
+  }
+}
+
+function readOwn(relPath: string): string {
+  return readFileSync(join(ROOT, relPath), 'utf8');
+}
+
+function writeOwn(relPath: string, content: string): void {
+  const full = join(ROOT, relPath);
+  mkdirSync(dirname(full), { recursive: true });
+  writeFileSync(full, content, 'utf8');
+}
+
+async function main(): Promise<void> {
+  const argv = process.argv.slice(2);
+  if (argv.length === 0 || argv[0] === '--help' || argv[0] === '-h') {
+    console.log(usage());
+    process.exit(argv.length === 0 ? 1 : 0);
+  }
+
+  let args: CliArgs;
+  try {
+    args = parseArgs(argv);
+  } catch (e) {
+    console.error(`error: ${e instanceof Error ? e.message : String(e)}\n`);
+    console.error(usage());
+    process.exit(1);
+  }
+
+  const spec = buildSpec(args);
+  const pageRelPath = `src/pages/atlas/${spec.componentName}.tsx`;
+  const cssRelPath = `src/styles/surfaces/${spec.cssName}.css`;
+
+  // Refuse cleanly, before writing anything or touching the registry files.
+  try {
+    ensureNewSurface(existsSync(join(ROOT, pageRelPath)), pageRelPath);
+  } catch (e) {
+    console.error(`error: ${e instanceof Error ? e.message : String(e)}`);
+    process.exit(1);
+  }
+
+  // Validate --icon before any write, per the spec.
+  await validateIconExists(spec.icon);
+
+  // Everything below only runs once validation and the exists-check pass.
+  writeOwn(pageRelPath, buildPageTemplate(spec));
+  writeOwn(cssRelPath, buildCssTemplate(spec));
+
+  const surfacesSrc = readOwn('src/surfaces.ts');
+  const withEntry = insertSurfaceEntry(surfacesSrc, spec.edition, buildSurfaceEntryBlock(spec));
+  const withLoader = insertLoaderLine(withEntry, spec.edition, buildLoaderLine(spec.path, spec.moduleSpec));
+  writeOwn('src/surfaces.ts', withLoader);
+
+  const iconsSrc = readOwn('src/components/atlas-ui/surfaceIcons.ts');
+  writeOwn('src/components/atlas-ui/surfaceIcons.ts', insertIconEntry(iconsSrc, spec.icon));
+
+  const testSrc = readOwn('src/surfaces.test.ts');
+  writeOwn('src/surfaces.test.ts', bumpSurfaceCounts(testSrc));
+
+  console.log(`Created ${spec.componentName} at ${spec.path} (${spec.edition}, entry: ${spec.entry}).`);
+  console.log(`  ${pageRelPath}`);
+  console.log(`  ${cssRelPath}`);
+  console.log(`  src/surfaces.ts (registry entry + loader line)`);
+  console.log(`  src/components/atlas-ui/surfaceIcons.ts (icon entry)`);
+  console.log(`  src/surfaces.test.ts (bumped the two hardcoded counts)`);
+  console.log('');
+  console.log('Still by hand — see docs/adding-a-surface.md:');
+  console.log(`  - the real design and data hook (this page is a placeholder)`);
+  console.log(`  - if this is a REAL surface (not scratch), add '${spec.path}' to the`);
+  console.log(`    hardcoded ${spec.edition} list in surfaces.test.ts's`);
+  console.log(`    "the classification is the agreed one" test`);
+  console.log('');
+  console.log('Run: bun test src/surfaces.test.ts src/editionSplit.test.ts');
+}
+
+if (import.meta.main) {
+  main().catch((e) => {
+    console.error(`error: ${e instanceof Error ? e.message : String(e)}`);
+    process.exit(1);
+  });
+}

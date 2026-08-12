@@ -1,0 +1,30 @@
+{
+  // R11 type-safety ratchet (ADR 015). This is a SEPARATE, narrower gate on
+  // top of tsconfig.app.json, not a replacement for it — tsconfig.app.json
+  // stays strict:false because 296 files won't convert in one wave (see the
+  // ADR for the measured counts that led to this boundary). Every future
+  // wave widens `include` here; nothing ever narrows it back.
+  //
+  // Boundary = src/lib/, minus two files excluded for one documented reason:
+  // brainClient.ts and voiceClient.ts each import `isTauri` from
+  // src/integrations/local/localClient.ts, which is off-limits to edit
+  // (CLAUDE.md / task rules) and fails strictNullChecks on its own two
+  // `as null` casts (TS2352, lines 33 and 42). TypeScript checks a file's
+  // full transitive import closure regardless of `exclude`, so leaving
+  // either client in would fail this gate on code we're not allowed to
+  // touch. Excluding the two importers — not widening a type, not adding an
+  // assertion — is the documented trade the task's rules call for: a smaller
+  // enforced boundary over one bought with a silencing hack. Drop this
+  // exclusion the moment localClient.ts is back in scope for an edit.
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "strictNullChecks": true,
+    "noUnusedLocals": true
+  },
+  "include": ["src/lib/**/*.ts", "src/vite-env.d.ts"],
+  "exclude": [
+    "src/lib/**/*.test.ts",
+    "src/lib/brainClient.ts",
+    "src/lib/voiceClient.ts"
+  ]
+}

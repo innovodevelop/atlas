@@ -1148,33 +1148,61 @@ async function getSessionContext(
 
 // ---------------------------------------------------------------------------
 // Main orchestration
+//
+// `runChat` is the composition of three units. It used to be one ~460-line
+// function that mixed a nine-way DB fan-out, prompt assembly, a bounded tool
+// loop, an SSE pass and turn-capture packaging with no seam anywhere, so
+// nothing inside it could be exercised without a live model and a live DB
+// (audit C14, Wave 2 R10):
+//
+//   buildTurnContext  — the parallel fan-out and the prompt that goes on the wire
+//   runToolLoop       — the bounded iteration and executeTool dispatch
+//   streamAndCapture  — the final streaming call and TurnCapture packaging
+//
+// SEAM-ONLY CHANGE: not one byte of the assembled prompt moved.
+// orchestrator.test.ts pins the WHOLE system prompt against a snapshot taken
+// from the pre-split code, and that test is the entire safety net for this
+// refactor. It has to be the whole prompt, not a fragment: the adapter puts
+// Claude's cache breakpoint on system[0] (see toAnthropicRequest), so one
+// changed space anywhere in it is a cache miss on every turn for every user,
+// forever — a recurring bill that no other test in this repo would notice.
+//
+// Three things deliberately did NOT become units of their own — see the
+// comment at each: the two entry guards, the model/tool selection, and the
+// teaching-mode fast path.
 
-export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatResult> {
-  const { supabase, systemDb, userId, userToken, supabaseUrl, control, controlCaps } = deps;
+/** What `buildTurnContext` resolved for this turn. */
+export interface TurnContext {
+  /** Working-memory session id — caller-supplied, or minted here. */
+  sessionId: string;
+  /** enableTools && !teachingMode. Decides tool declarations AND prompt text. */
+  hasTools: boolean;
+  /** system[0]: the cache-stable prefix. Byte-identical turn to turn. */
+  systemPrompt: string;
+  /** system[1] when non-empty: recall + working memory. Changes every turn. */
+  volatileContext: string;
+  /** system[0], the volatile system message if any, then the caller's history. */
+  conversationMessages: Array<{ role: string; content: string }>;
+  /** stable + volatile joined — what TurnCapture records. See below. */
+  capturedSystemPrompt: string;
+}
+
+/**
+ * The nine-way DB fan-out and everything derived from it.
+ *
+ * Exported for orchestrator.test.ts, which stubs `deps.supabase` and asserts
+ * the assembled prompt byte for byte. That is the only reason this is a
+ * separate function: the prompt is the most expensive thing in the file to get
+ * wrong and it was previously unreachable without a live model call.
+ */
+export async function buildTurnContext(deps: ChatDeps, opts: ChatOptions): Promise<TurnContext> {
+  const { supabase, userId } = deps;
   const {
     messages,
-    source = "text_chat",
     enableTools = true,
     teachingMode = false,
     systemPromptOverride = null,
-    conversationId = null,
   } = opts;
-
-  if (!hasAIKey()) {
-    return { kind: "error", status: 500, message: "No AI key configured (ANTHROPIC_API_KEY)" };
-  }
-
-  // Check if Lovable AI is enabled (master kill switch)
-  const lovableAIStatus = await isLovableAIEnabled(systemDb);
-  if (!lovableAIStatus.enabled) {
-    console.log("[orchestrator] Lovable AI is disabled");
-    return {
-      kind: "error",
-      status: 503,
-      message: lovableAIStatus.reason || "AI features have been disabled to conserve credits",
-      reason: "lovable_ai_disabled",
-    };
-  }
 
   const sessionId = deps.sessionId || `session_${Date.now()}`;
 
@@ -1320,119 +1348,75 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
     ? `${systemPrompt}\n\n${volatileContext}`
     : systemPrompt;
 
+  return { sessionId, hasTools, systemPrompt, volatileContext, conversationMessages, capturedSystemPrompt };
+}
+
+/**
+ * What the tool loop produced, or the error that ended the turn.
+ *
+ * The loop's failures are transport failures with a status the caller must
+ * return verbatim (429 and 402 are user-visible and mean different things), so
+ * they travel as a value rather than an exception — an exception here would
+ * have to be re-typed at the boundary to say the same thing.
+ */
+export type ToolLoopOutcome =
+  | {
+      ok: true;
+      /** conversationMessages plus everything the loop appended. */
+      messages: Array<{ role: string; content: string }>;
+      /** Just the appended part: assistant tool_calls + tool results, in order. */
+      toolMessages: Array<{ role: string; content: string; tool_calls?: unknown }>;
+      /** Citations harvested from bridged web_search and from tool results. */
+      citations: string[];
+    }
+  | { ok: false; error: Extract<ChatResult, { kind: "error" }> };
+
+/**
+ * The bounded tool loop: non-streaming passes that exist only to harvest and
+ * execute client tool calls.
+ *
+ * BOTH BOUNDS ARE PASSED IN, not derived here, and that is deliberate:
+ *  - `deadline` is an absolute epoch-ms ceiling because the clock has to start
+ *    where runChat starts it (after the fan-out, before the first model call).
+ *    Deriving it from `source` in here would silently hand every turn a fresh
+ *    budget and make the short-circuit untestable without real slow tools.
+ *  - `maxIterations` is the caller's, so the teaching-mode 0 stays visible at
+ *    the call site rather than hiding behind a flag in here.
+ * `toolTimeBudgetMs` remains the single source of the 20s/8s numbers.
+ *
+ * `chat` is injected with a default so a test can drive the loop's bounds
+ * without a live gateway. Every production call site takes the default.
+ */
+export async function runToolLoop(args: {
+  supabase: any;
+  systemDb: any;
+  userId: string;
+  userToken?: string;
+  control?: ToolContext["control"];
+  model: string;
+  tools: ToolDecl[] | undefined;
+  conversationMessages: Array<{ role: string; content: string }>;
+  maxIterations: number;
+  /** Absolute epoch-ms ceiling for ALL tool work in this turn. */
+  deadline: number;
+  chat?: typeof aiChatCompletion;
+}): Promise<ToolLoopOutcome> {
+  const {
+    supabase, systemDb, userId, userToken, control,
+    model, tools: chatTools, conversationMessages, deadline: turnDeadline,
+    chat = aiChatCompletion,
+  } = args;
+
   const allToolResults: Array<{ name: string; result: unknown; citations?: string[] }> = [];
-  // 3 -> 6 now that desktop tools exist. A realistic sequence needs three by
-  // itself (search -> read the result -> answer), and one malformed-args
-  // correction eats another; three left no room to recover from a single
-  // mistake. The real safety bound is the wall clock below, not this count.
-  let maxToolIterations = teachingMode ? 0 : 6;
-  const turnDeadline = Date.now() + toolTimeBudgetMs(source);
   const currentMessages = [...conversationMessages];
-
-  // Detect learning intent once — it drives both the model tier below and the
-  // fire-and-forget knowledge extraction after the stream starts.
-  const latestUserMessage = messages.filter((m) => m.role === "user").pop();
-  const learningIntent = latestUserMessage
-    ? detectLearningIntent(latestUserMessage.content)
-    : { hasIntent: false } as ReturnType<typeof detectLearningIntent>;
-
-  // Difficulty tiering: only an explicit research ask pays for the hard tier.
-  const chatModel = selectModel(
-    learningIntent.hasIntent && learningIntent.intentType === "research" ? "deep_research" : "chat",
-  );
-
-  // Search runs inside Claude (web_search_20260209). Declare it through the
-  // adapter passthrough and drop the client-side twins from the function list —
-  // a duplicate "web_search" name would be rejected by the Messages API. Without
-  // an Anthropic key the function tools stay, and executeTool degrades.
-  const nativeSearch = hasNativeWebSearch();
-  // buildAtlasTools, not ATLAS_TOOLS: desktop tools are added only for ops the
-  // control port actually advertised. No port -> identical to before.
-  const declaredTools = buildAtlasTools(controlCaps ?? null);
-  const chatTools = hasTools
-    ? nativeSearch
-      ? declaredTools.filter((t) => !NATIVE_SEARCH_TOOLS.has(t.function.name))
-      : declaredTools
-    : undefined;
-  const anthropicTools = hasTools && nativeSearch ? [ANTHROPIC_WEB_SEARCH_TOOL] : undefined;
-  console.log("[orchestrator] Model:", chatModel, "native web_search:", nativeSearch);
-
-  // TEACHING MODE: Fast path - skip tool checking, single non-streaming call
-  if (teachingMode) {
-    console.log("[orchestrator] Teaching mode: fast path (no tool loop)");
-
-    // Teaching mode only captures memories and acknowledges — cheap tier.
-    const teachModel = selectModel("memory");
-    const teachResponse = await aiChatCompletion({
-      model: teachModel,
-      messages: currentMessages,
-      tools: [{
-        type: "function",
-        function: {
-          name: "memory_store",
-          description: "Store an important fact about the user",
-          parameters: {
-            type: "object",
-            properties: {
-              key: { type: "string" },
-              value: { type: "string" },
-              category: { type: "string", enum: ["preference", "fact", "relationship", "event", "work", "health", "personal", "values"] },
-            },
-            required: ["key", "value", "category"],
-          },
-        },
-      }],
-      tool_choice: "auto",
-      stream: false,
-    });
-
-    if (!teachResponse.ok) {
-      const status = teachResponse.status;
-      if (status === 429) return { kind: "error", status: 429, message: "Rate limits exceeded" };
-      if (status === 402) return { kind: "error", status: 402, message: "Payment required" };
-      return { kind: "error", status: 500, message: `AI gateway error: ${status}` };
-    }
-
-    const teachData = await teachResponse.json();
-    const choice = teachData.choices?.[0];
-    const responseText = choice?.message?.content || "I understand. Tell me more.";
-
-    const toolCalls = choice?.message?.tool_calls;
-    if (toolCalls && toolCalls.length > 0) {
-      for (const tc of toolCalls) {
-        if (tc.function?.name === "memory_store") {
-          try {
-            const args = JSON.parse(tc.function.arguments);
-            console.log("[orchestrator] Teaching mode: storing memory", args);
-            await supabase.from("ai_memory").upsert({
-              user_id: userId,
-              key: args.key,
-              value: args.value,
-              category: args.category,
-              memory_type: "fact",
-              importance: 7,
-              updated_at: new Date().toISOString(),
-            }, { onConflict: "user_id,key" });
-          } catch (e) {
-            console.error("[orchestrator] Memory store error:", e);
-          }
-        }
-      }
-    }
-
-    return {
-      kind: "json",
-      body: { response: responseText, message: responseText },
-      capture: { systemPrompt: capturedSystemPrompt, model: teachModel, toolMessages: [] },
-    };
-  }
+  let maxToolIterations = args.maxIterations;
 
   // Tool execution loop - non-streaming request first to check for tool calls
   while (maxToolIterations > 0) {
     console.log("[orchestrator] Making AI request, iteration:", 4 - maxToolIterations);
 
-    const checkResponse = await aiChatCompletion({
-      model: chatModel,
+    const checkResponse = await chat({
+      model,
       messages: currentMessages,
       tools: chatTools,
       tool_choice: chatTools ? "auto" : undefined,
@@ -1447,9 +1431,9 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
       const errorText = await checkResponse.text();
       await recordError(systemDb, "lovable_ai", checkResponse.status, errorText);
 
-      if (checkResponse.status === 429) return { kind: "error", status: 429, message: "Rate limits exceeded, please try again later." };
-      if (checkResponse.status === 402) return { kind: "error", status: 402, message: "Payment required, please add funds to your workspace." };
-      return { kind: "error", status: 500, message: `AI gateway error: ${checkResponse.status}` };
+      if (checkResponse.status === 429) return { ok: false, error: { kind: "error", status: 429, message: "Rate limits exceeded, please try again later." } };
+      if (checkResponse.status === 402) return { ok: false, error: { kind: "error", status: 402, message: "Payment required, please add funds to your workspace." } };
+      return { ok: false, error: { kind: "error", status: 500, message: `AI gateway error: ${checkResponse.status}` } };
     }
 
     await recordSuccess(systemDb, "lovable_ai");
@@ -1458,7 +1442,7 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
     const choice = checkData.choices?.[0];
 
     if (!choice) {
-      return { kind: "error", status: 500, message: "No response from AI" };
+      return { ok: false, error: { kind: "error", status: 500, message: "No response from AI" } };
     }
 
     // Native web_search citations live in Claude's web_search_tool_result blocks.
@@ -1532,12 +1516,57 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
     maxToolIterations--;
   }
 
-  // Citations emitted up-front as an SSE event. Claude's own web_search
-  // citations arrive inside the streamed content blocks, which this function
-  // passes through untouched — so with native search this list is normally
-  // empty and the UI relies on the inline links Claude writes.
-  const allCitations = allToolResults.flatMap(r => r.citations || []);
-  console.log("[orchestrator] Total citations collected:", allCitations.length);
+  return {
+    ok: true,
+    messages: currentMessages,
+    // Everything appended past the initial prompt+history is this turn's
+    // tool loop (assistant tool_calls + tool results).
+    toolMessages: currentMessages.slice(conversationMessages.length) as Array<{
+      role: string; content: string; tool_calls?: unknown;
+    }>,
+    citations: allToolResults.flatMap(r => r.citations || []),
+  };
+}
+
+/**
+ * The final streaming pass, the tee, and the TurnCapture packaging.
+ *
+ * WHAT REACHES THE WEBVIEW AND WHAT DOES NOT is the load-bearing part of this
+ * function. The returned `stream` is the only thing the caller forwards: an
+ * optional citations SSE event, then Claude's own bytes, untouched. `capture`
+ * travels beside it in the return value for the brain sidecar to write to
+ * chat_turns — it carries the full system prompt, which is training data about
+ * the user, and it is deliberately never written into the stream.
+ *
+ * The two fire-and-forget side channels stay here, after the stream response
+ * has come back: they must never delay the first token, and they must not run
+ * at all on a turn that failed before the model answered.
+ *
+ * Not exported: it cannot be exercised without a live streaming response, so
+ * an export would be surface with no caller and no test behind it.
+ */
+async function streamAndCapture(args: {
+  supabase: any;
+  systemDb: any;
+  userId: string;
+  sessionId: string;
+  conversationId: string | null;
+  /** The caller's own history — what the side channels summarize. */
+  messages: ChatMessage[];
+  model: string;
+  /** conversationMessages plus whatever the tool loop appended. */
+  currentMessages: Array<{ role: string; content: string }>;
+  anthropicTools: unknown[] | undefined;
+  citations: string[];
+  capturedSystemPrompt: string;
+  toolMessages: Array<{ role: string; content: string; tool_calls?: unknown }>;
+  learningIntent: ReturnType<typeof detectLearningIntent>;
+}): Promise<ChatResult> {
+  const {
+    supabase, systemDb, userId, sessionId, conversationId, messages,
+    model: chatModel, currentMessages, anthropicTools,
+    citations: allCitations, capturedSystemPrompt, toolMessages, learningIntent,
+  } = args;
 
   // Now stream the final response — the pass that may run native web search.
   const streamResponse = await aiChatCompletion({
@@ -1599,11 +1628,197 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
     capture: {
       systemPrompt: capturedSystemPrompt,
       model: chatModel,
-      // Everything appended past the initial prompt+history is this turn's
-      // tool loop (assistant tool_calls + tool results).
-      toolMessages: currentMessages.slice(conversationMessages.length) as Array<{
-        role: string; content: string; tool_calls?: unknown;
-      }>,
+      toolMessages,
     },
   };
+}
+
+export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatResult> {
+  const { supabase, systemDb, userId, userToken, control, controlCaps } = deps;
+  const {
+    messages,
+    source = "text_chat",
+    teachingMode = false,
+    conversationId = null,
+  } = opts;
+
+  // The two entry guards stay inline. They are not "context building" — they
+  // decide whether a turn happens at all, and both return a ChatResult error
+  // that the caller maps straight to an HTTP status. Folding them into
+  // buildTurnContext would make that function's return type a union and force
+  // every test of the prompt to first satisfy a kill switch.
+  if (!hasAIKey()) {
+    return { kind: "error", status: 500, message: "No AI key configured (ANTHROPIC_API_KEY)" };
+  }
+
+  // Check if Lovable AI is enabled (master kill switch)
+  const lovableAIStatus = await isLovableAIEnabled(systemDb);
+  if (!lovableAIStatus.enabled) {
+    console.log("[orchestrator] Lovable AI is disabled");
+    return {
+      kind: "error",
+      status: 503,
+      message: lovableAIStatus.reason || "AI features have been disabled to conserve credits",
+      reason: "lovable_ai_disabled",
+    };
+  }
+
+  const { sessionId, hasTools, conversationMessages, capturedSystemPrompt } =
+    await buildTurnContext(deps, opts);
+
+  // 3 -> 6 now that desktop tools exist. A realistic sequence needs three by
+  // itself (search -> read the result -> answer), and one malformed-args
+  // correction eats another; three left no room to recover from a single
+  // mistake. The real safety bound is the wall clock below, not this count.
+  const maxToolIterations = teachingMode ? 0 : 6;
+  // Started HERE, after the fan-out and before the first model call, so the
+  // budget covers tool work and nothing else. See runToolLoop.
+  const turnDeadline = Date.now() + toolTimeBudgetMs(source);
+
+  // Detect learning intent once — it drives both the model tier below and the
+  // fire-and-forget knowledge extraction after the stream starts.
+  const latestUserMessage = messages.filter((m) => m.role === "user").pop();
+  const learningIntent = latestUserMessage
+    ? detectLearningIntent(latestUserMessage.content)
+    : { hasIntent: false } as ReturnType<typeof detectLearningIntent>;
+
+  // Difficulty tiering: only an explicit research ask pays for the hard tier.
+  const chatModel = selectModel(
+    learningIntent.hasIntent && learningIntent.intentType === "research" ? "deep_research" : "chat",
+  );
+
+  // Model and tool selection stays in the composition, not in either unit
+  // below: the loop and the stream need DIFFERENT halves of it (the loop gets
+  // the client function tools, the stream gets the anthropic passthrough), so
+  // pushing it into one of them would make the other reach across.
+  //
+  // Search runs inside Claude (web_search_20260209). Declare it through the
+  // adapter passthrough and drop the client-side twins from the function list —
+  // a duplicate "web_search" name would be rejected by the Messages API. Without
+  // an Anthropic key the function tools stay, and executeTool degrades.
+  const nativeSearch = hasNativeWebSearch();
+  // buildAtlasTools, not ATLAS_TOOLS: desktop tools are added only for ops the
+  // control port actually advertised. No port -> identical to before.
+  const declaredTools = buildAtlasTools(controlCaps ?? null);
+  const chatTools = hasTools
+    ? nativeSearch
+      ? declaredTools.filter((t) => !NATIVE_SEARCH_TOOLS.has(t.function.name))
+      : declaredTools
+    : undefined;
+  const anthropicTools = hasTools && nativeSearch ? [ANTHROPIC_WEB_SEARCH_TOOL] : undefined;
+  console.log("[orchestrator] Model:", chatModel, "native web_search:", nativeSearch);
+
+  // TEACHING MODE: Fast path - single non-streaming call, no tool loop, no
+  // stream. It stays inline rather than becoming a fourth unit because it is
+  // not a variant of either unit below: it declares its own one-tool schema,
+  // runs on the cheap `memory` tier, executes memory_store itself instead of
+  // going through executeTool, and returns {kind:"json"}. Wrapping it in
+  // runToolLoop (which is what maxToolIterations = 0 looks like it invites)
+  // would mean a loop that never loops, a tool list that is never the declared
+  // one, and a return type that is never a stream.
+  if (teachingMode) {
+    console.log("[orchestrator] Teaching mode: fast path (no tool loop)");
+
+    // Teaching mode only captures memories and acknowledges — cheap tier.
+    const teachModel = selectModel("memory");
+    const teachResponse = await aiChatCompletion({
+      model: teachModel,
+      messages: conversationMessages,
+      tools: [{
+        type: "function",
+        function: {
+          name: "memory_store",
+          description: "Store an important fact about the user",
+          parameters: {
+            type: "object",
+            properties: {
+              key: { type: "string" },
+              value: { type: "string" },
+              category: { type: "string", enum: ["preference", "fact", "relationship", "event", "work", "health", "personal", "values"] },
+            },
+            required: ["key", "value", "category"],
+          },
+        },
+      }],
+      tool_choice: "auto",
+      stream: false,
+    });
+
+    if (!teachResponse.ok) {
+      const status = teachResponse.status;
+      if (status === 429) return { kind: "error", status: 429, message: "Rate limits exceeded" };
+      if (status === 402) return { kind: "error", status: 402, message: "Payment required" };
+      return { kind: "error", status: 500, message: `AI gateway error: ${status}` };
+    }
+
+    const teachData = await teachResponse.json();
+    const choice = teachData.choices?.[0];
+    const responseText = choice?.message?.content || "I understand. Tell me more.";
+
+    const toolCalls = choice?.message?.tool_calls;
+    if (toolCalls && toolCalls.length > 0) {
+      for (const tc of toolCalls) {
+        if (tc.function?.name === "memory_store") {
+          try {
+            const args = JSON.parse(tc.function.arguments);
+            console.log("[orchestrator] Teaching mode: storing memory", args);
+            await supabase.from("ai_memory").upsert({
+              user_id: userId,
+              key: args.key,
+              value: args.value,
+              category: args.category,
+              memory_type: "fact",
+              importance: 7,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: "user_id,key" });
+          } catch (e) {
+            console.error("[orchestrator] Memory store error:", e);
+          }
+        }
+      }
+    }
+
+    return {
+      kind: "json",
+      body: { response: responseText, message: responseText },
+      capture: { systemPrompt: capturedSystemPrompt, model: teachModel, toolMessages: [] },
+    };
+  }
+
+  const loop = await runToolLoop({
+    supabase,
+    systemDb,
+    userId,
+    userToken,
+    control,
+    model: chatModel,
+    tools: chatTools,
+    conversationMessages,
+    maxIterations: maxToolIterations,
+    deadline: turnDeadline,
+  });
+  if (!loop.ok) return loop.error;
+
+  // Citations emitted up-front as an SSE event. Claude's own web_search
+  // citations arrive inside the streamed content blocks, which this function
+  // passes through untouched — so with native search this list is normally
+  // empty and the UI relies on the inline links Claude writes.
+  const allCitations = loop.citations;
+  console.log("[orchestrator] Total citations collected:", allCitations.length);
+
+  return await streamAndCapture({
+    supabase,
+    systemDb,
+    userId,
+    sessionId,
+    conversationId,
+    messages,
+    model: chatModel,
+    currentMessages: loop.messages,
+    anthropicTools,
+    citations: allCitations,
+    capturedSystemPrompt,
+    toolMessages: loop.toolMessages,
+    learningIntent,
+  });
 }
