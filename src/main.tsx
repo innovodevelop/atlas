@@ -4,8 +4,10 @@ import "./index.css";
 // Single consolidated stylesheet (base layer + Workshop design, cascade order
 // preserved from the former atlas.css + workshop.css).
 import "./styles/workshop.css";
+import { startWebviewWatchdog } from "./lib/webviewWatchdog";
 
 createRoot(document.getElementById("root")!).render(<App />);
+startWebviewWatchdog();
 
 // Dev-only click-blocker watchdog.
 //

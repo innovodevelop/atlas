@@ -52,6 +52,7 @@ const JSON_COLUMNS = new Set([
   "people_involved", "metadata", "extracted", "payload", "context", "details",
   "metrics", "provider_errors", "sources_checked", "validation_consensus",
   "root_topic_context", "source_ref_json", "raw_json", "settings_json",
+  "autonomy_condition", "participants", "predicate", "action_config", "surfaces",
 ]);
 const BOOL_COLUMNS = new Set([
   "completed", "resolved", "acknowledged", "enabled", "sandboxed", "requires_approval",
