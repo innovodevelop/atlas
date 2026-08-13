@@ -27,6 +27,175 @@ import {
   mapModelToBedrock,
 } from "./bedrockAdapter.ts";
 
+// ---------------------------------------------------------------------------
+// Rate-limit resilience: exponential backoff + jitter + sliding-window TPM
+//
+// Bedrock quotas refresh on 60-second windows (RPM and TPM). A 429 means the
+// current window is exhausted — retrying within the SAME window is futile, so
+// the backoff delays are designed to span into the next window boundary.
+//
+// The sliding-window limiter is a PROACTIVE measure: it estimates token usage
+// per request and delays the caller BEFORE the quota is hit, avoiding the 429
+// entirely for sustained workloads. It cannot be perfect (it does not know the
+// server's true remaining budget), so the retry layer is always the backstop.
+// ---------------------------------------------------------------------------
+
+const MAX_RETRIES = 4;
+const BASE_DELAY_MS = 1_500;
+const MAX_DELAY_MS = 45_000;
+
+/** Retryable status codes: 429 (rate limit), 529 (overloaded), 5xx (transient). */
+function isRetryable(status: number): boolean {
+  return status === 429 || status === 529 || (status >= 500 && status < 600);
+}
+
+/**
+ * Parse `retry-after` header (seconds or HTTP-date) into milliseconds to wait.
+ * Returns undefined if the header is absent or unparseable — the exponential
+ * formula takes over in that case.
+ */
+function parseRetryAfter(response: Response): number | undefined {
+  const header = response.headers.get("retry-after");
+  if (!header) return undefined;
+  const secs = Number(header);
+  if (Number.isFinite(secs) && secs > 0) return secs * 1000;
+  const date = Date.parse(header);
+  if (Number.isFinite(date)) {
+    const delta = date - Date.now();
+    return delta > 0 ? delta : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Exponential backoff with full jitter, capped at MAX_DELAY_MS.
+ * Jitter range is [0, delay) — "full jitter" per AWS architecture blog.
+ */
+function backoffDelay(attempt: number, retryAfterMs?: number): number {
+  if (retryAfterMs !== undefined) {
+    return Math.min(retryAfterMs + Math.random() * 1000, MAX_DELAY_MS);
+  }
+  const exponential = BASE_DELAY_MS * Math.pow(2, attempt);
+  const capped = Math.min(exponential, MAX_DELAY_MS);
+  return Math.random() * capped;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Wrap a provider call with retry-on-429/5xx. Streaming responses that already
+ * returned 200 are NOT retried (the failure is inside the stream and is surfaced
+ * to the user inline — retrying would lose partial output).
+ */
+async function withRetry(
+  fn: () => Promise<Response>,
+  label: string,
+): Promise<Response> {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const response = await fn();
+    if (response.ok || !isRetryable(response.status)) return response;
+    if (attempt === MAX_RETRIES) {
+      console.warn(`[aiGateway] ${label}: giving up after ${MAX_RETRIES + 1} attempts (last status=${response.status})`);
+      return response;
+    }
+    const retryAfterMs = parseRetryAfter(response);
+    const delay = backoffDelay(attempt, retryAfterMs);
+    console.log(
+      `[aiGateway] ${label}: ${response.status}, retry ${attempt + 1}/${MAX_RETRIES} in ${Math.round(delay)}ms` +
+        (retryAfterMs ? ` (retry-after: ${Math.round(retryAfterMs)}ms)` : ""),
+    );
+    // Consume the body so the connection is freed for the retry.
+    await response.text().catch(() => {});
+    await sleep(delay);
+  }
+  // Unreachable, but TypeScript needs it.
+  return new Response(null, { status: 500 });
+}
+
+// ---------------------------------------------------------------------------
+// Sliding-window token budget (proactive 429 avoidance)
+//
+// Bedrock's per-minute TPM quota counts `input_tokens + max_tokens` at
+// reservation time (the initial reservation — see the AWS blog post). By
+// tracking our own rolling usage we can delay a request that would push us over
+// the limit, converting a server-side 429 into a client-side wait.
+//
+// This is BEST-EFFORT: the server's budget may differ (other consumers on the
+// same account, cache settlements, burndown), so it errs on the side of letting
+// through and relying on the retry layer as backstop.
+// ---------------------------------------------------------------------------
+
+interface TokenRecord {
+  ts: number;
+  tokens: number;
+}
+
+const TOKEN_WINDOW_MS = 60_000;
+const tokenLog: TokenRecord[] = [];
+
+/** TPM budget — env-configurable, defaults to a conservative estimate. */
+function tpmBudget(): number {
+  const env = Deno.env.get("ATLAS_TPM_BUDGET");
+  return env ? Number(env) : 200_000;
+}
+
+function pruneBefore(cutoff: number) {
+  while (tokenLog.length > 0 && tokenLog[0].ts < cutoff) tokenLog.shift();
+}
+
+function currentWindowUsage(): number {
+  pruneBefore(Date.now() - TOKEN_WINDOW_MS);
+  let sum = 0;
+  for (const r of tokenLog) sum += r.tokens;
+  return sum;
+}
+
+/**
+ * Estimate the token reservation for a request. Bedrock reserves
+ * `input_tokens + max_tokens` initially; we approximate input_tokens from the
+ * JSON byte length (÷4 is the standard heuristic for English text).
+ */
+function estimateReservation(body: Record<string, unknown>): number {
+  const maxTokens = Number(body.max_tokens ?? 4096);
+  const messagesStr = JSON.stringify(body.messages ?? []);
+  const estimatedInput = Math.ceil(messagesStr.length / 4);
+  return estimatedInput + maxTokens;
+}
+
+/**
+ * If the estimated reservation would exceed the TPM budget, sleep until enough
+ * of the window has rolled off. Returns immediately if there's headroom.
+ */
+async function throttleIfNeeded(body: Record<string, unknown>, label: string): Promise<void> {
+  const budget = tpmBudget();
+  if (budget <= 0) return; // disabled
+  const reservation = estimateReservation(body);
+  const used = currentWindowUsage();
+  const headroom = budget - used;
+  if (reservation <= headroom) {
+    tokenLog.push({ ts: Date.now(), tokens: reservation });
+    return;
+  }
+  // How long until enough rolls off? Find the oldest record whose removal
+  // would free enough space, then sleep until its window expires.
+  pruneBefore(Date.now() - TOKEN_WINDOW_MS);
+  let freed = 0;
+  let waitUntil = Date.now();
+  for (const r of tokenLog) {
+    freed += r.tokens;
+    waitUntil = r.ts + TOKEN_WINDOW_MS;
+    if (used - freed + reservation <= budget) break;
+  }
+  const waitMs = Math.max(0, waitUntil - Date.now());
+  if (waitMs > 0 && waitMs < MAX_DELAY_MS) {
+    console.log(`[aiGateway] ${label}: proactive throttle ${Math.round(waitMs)}ms (used=${used}, reservation=${reservation}, budget=${budget})`);
+    await sleep(waitMs);
+  }
+  tokenLog.push({ ts: Date.now(), tokens: reservation });
+}
+
 const LOVABLE_CHAT_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const GEMINI_CHAT_URL =
   "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
@@ -133,14 +302,23 @@ function requestNeedsNativeServerTool(body: Record<string, unknown>): boolean {
  * Drop-in replacement for `fetch(LOVABLE_URL, { body: JSON.stringify(body) })`.
  * Accepts an OpenAI-format chat.completions body (streaming supported) and
  * returns the raw Response. The model id is translated for the active provider.
+ *
+ * Rate-limit resilience (added per AWS Bedrock best-practices blog):
+ *  - Proactive sliding-window throttle delays requests that would exceed TPM.
+ *  - Exponential backoff with jitter retries 429 / 5xx up to MAX_RETRIES times.
+ *  - Streaming requests (body.stream=true) are retried on the initial fetch only
+ *    (a 200 that later errors mid-stream is surfaced inline, not retried).
  */
-export function aiChatCompletion(body: Record<string, unknown>): Promise<Response> {
+export async function aiChatCompletion(body: Record<string, unknown>): Promise<Response> {
   const config = getAIConfig();
   if (!config) {
     return Promise.reject(
       new Error("No AI key configured: set ATLAS_AI_PROVIDER=bedrock with AWS credentials, or ANTHROPIC_API_KEY"),
     );
   }
+
+  const label = `${config.provider}/${String(body.model ?? "default")}`;
+  await throttleIfNeeded(body, label);
 
   // Bedrock is the credit-funded background tier. The ONE thing it cannot serve
   // is native web search, so web-search-dependent turns bridge to first-party
@@ -150,32 +328,34 @@ export function aiChatCompletion(body: Record<string, unknown>): Promise<Respons
   if (config.provider === "bedrock") {
     if (requestNeedsNativeServerTool(body)) {
       const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
-      if (anthropicKey) return claudeChatCompletion(body, anthropicKey);
-      // No first-party bridge key: serve on Bedrock WITHOUT the server tools
-      // (degraded — no live search) rather than 400 the whole request.
+      if (anthropicKey) {
+        return withRetry(() => claudeChatCompletion(body, anthropicKey), `${label}/bridge`);
+      }
       const { anthropicTools: _drop, ...rest } = body;
-      return bedrockChatCompletion(rest);
+      return withRetry(() => bedrockChatCompletion(rest), `${label}/degraded`);
     }
-    return bedrockChatCompletion(body);
+    return withRetry(() => bedrockChatCompletion(body), label);
   }
 
-  // Claude is not OpenAI-compatible; the adapter translates both directions and
-  // still hands back a raw Response, so no call site changes.
   if (config.provider === "anthropic") {
-    return claudeChatCompletion(body, config.apiKey);
+    return withRetry(() => claudeChatCompletion(body, config.apiKey), label);
   }
+
   const payload = {
     ...body,
     model: mapModel(String(body.model ?? "google/gemini-2.5-flash")),
   };
-  return fetch(config.chatUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${config.apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
+  return withRetry(
+    () => fetch(config.chatUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${config.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    }),
+    label,
+  );
 }
 
 /**
