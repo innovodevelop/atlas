@@ -451,6 +451,8 @@ const server = Bun.serve({
       if (url.pathname === "/admin/tests/discover" && req.method === "POST") return admin.discoverTests(req);
       if (url.pathname.startsWith("/admin/tests/run/") && req.method === "POST") return admin.runTest(req, url.pathname.split("/")[4]);
       if (url.pathname === "/admin/design-syncs" && req.method === "GET") return admin.getDesignSyncs(req);
+      if (url.pathname === "/admin/ingest-sessions" && req.method === "POST") return admin.ingestSessions(req);
+      if (url.pathname === "/admin/ci-runs" && req.method === "POST") return admin.getCiRuns(req);
     } catch (e) {
       if (e instanceof AuthError) return json({ error: e.message }, e.status);
       console.error("[brain] error:", e);

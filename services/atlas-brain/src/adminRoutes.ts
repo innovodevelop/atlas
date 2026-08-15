@@ -14,6 +14,7 @@
 
 import { Database } from "bun:sqlite";
 import { parseVersionPlan, type Version } from "./versionPlan.ts";
+import { ingestJsonlSessions } from "./jsonlIngest.ts";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { resolve } from "path";
 
@@ -174,6 +175,8 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
     runTest,
     discoverTests,
     getDesignSyncs,
+    ingestSessions,
+    getCiRuns,
   };
 
   function syncVersionPlan(req: Request): Response {
@@ -401,5 +404,80 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
     requireUser(req);
     const rows = db.query(`SELECT * FROM atlas_design_syncs ORDER BY synced_at DESC LIMIT 20`).all();
     return json(rows);
+  }
+
+  function ingestSessions(req: Request): Response {
+    requireUser(req);
+    const result = ingestJsonlSessions(db);
+    return json(result);
+  }
+
+  /**
+   * CI pipeline monitoring — runs `gh run list` for the repo and upserts
+   * results as ci-pipeline agent sessions. Uses the gh CLI (already
+   * authenticated on this machine) rather than a raw API call, matching
+   * the shell-out precedent in health/zip.rs.
+   */
+  function getCiRuns(req: Request): Response {
+    requireUser(req);
+
+    try {
+      const proc = Bun.spawnSync(
+        ["gh", "run", "list", "--repo", "innovodevelop/atlas", "--limit", "20", "--json", "databaseId,name,status,conclusion,headBranch,createdAt,updatedAt,url"],
+        { stdout: "pipe", stderr: "pipe" },
+      );
+
+      if (proc.exitCode !== 0) {
+        const stderr = new TextDecoder().decode(proc.stderr);
+        return json({ error: `gh failed: ${stderr.slice(0, 300)}` }, 502);
+      }
+
+      const runs = JSON.parse(new TextDecoder().decode(proc.stdout)) as Array<{
+        databaseId: number;
+        name: string;
+        status: string;
+        conclusion: string | null;
+        headBranch: string;
+        createdAt: string;
+        updatedAt: string;
+        url: string;
+      }>;
+
+      // Upsert each run as a ci-pipeline session
+      const upsert = db.prepare(`
+        INSERT INTO atlas_agent_sessions (id, session_type, source_id, status, task_summary, started_at, ended_at, metadata)
+        VALUES (?, 'ci-pipeline', ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          status = excluded.status,
+          task_summary = excluded.task_summary,
+          ended_at = excluded.ended_at,
+          metadata = excluded.metadata
+      `);
+
+      const tx = db.transaction(() => {
+        for (const run of runs) {
+          const status = run.status === "in_progress" ? "active"
+            : run.conclusion === "success" ? "completed"
+            : run.conclusion === "failure" ? "failed"
+            : run.conclusion === "cancelled" ? "cancelled"
+            : "completed";
+          const ended = run.status === "completed" ? run.updatedAt : null;
+          upsert.run(
+            `ci-${run.databaseId}`,
+            run.url,
+            status,
+            `${run.name} (${run.headBranch})`,
+            run.createdAt,
+            ended,
+            JSON.stringify({ branch: run.headBranch, conclusion: run.conclusion }),
+          );
+        }
+      });
+      tx();
+
+      return json({ synced: runs.length });
+    } catch (err) {
+      return json({ error: `CI fetch failed: ${String(err).slice(0, 300)}` }, 500);
+    }
   }
 }

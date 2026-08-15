@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
-import { adminGet, ADMIN_REFETCH_INTERVAL_MS } from './useAdminApi';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { adminGet, adminPost, ADMIN_REFETCH_INTERVAL_MS } from './useAdminApi';
 
 export interface AgentSessionRow {
   id: string;
@@ -43,4 +43,22 @@ export function useAgentEvents(sessionId: string | null) {
     refetchInterval: ADMIN_REFETCH_INTERVAL_MS,
   });
   return { events: data ?? [], isLoading, error: error as Error | null };
+}
+
+/** POST /admin/ingest-sessions — scan ~/.claude/projects/ and upsert sessions. */
+export function useIngestSessions() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => adminPost<{ sessions_upserted: number; events_inserted: number }>('/admin/ingest-sessions'),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin', 'agent-sessions'] }); },
+  });
+}
+
+/** POST /admin/ci-runs — fetch GitHub Actions runs and upsert as ci-pipeline sessions. */
+export function useSyncCiRuns() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => adminPost<{ synced: number }>('/admin/ci-runs'),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin', 'agent-sessions'] }); },
+  });
 }

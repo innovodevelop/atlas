@@ -30,14 +30,14 @@ Status: in-progress
 Target: 2026-09-01
 
 ### Features
-- [ ] Version tracking surface (/versions) {id: feat-010, agent: claude-code}
-- [ ] Live agent view (/agent-view) {id: feat-011, agent: claude-code}
-- [ ] Design sync surface (/design-sync) {id: feat-012, agent: claude-code}
-- [ ] Test management surface (/tests) {id: feat-013, agent: claude-code}
-- [ ] Internal changelog {id: feat-014, agent: claude-code}
-- [ ] Claude Code JSONL ingestion (file watcher) {id: feat-015, agent: claude-code}
-- [ ] CI pipeline monitoring {id: feat-016, agent: claude-code}
-- [ ] VERSION-PLAN.md parser + DB sync {id: feat-017, agent: claude-code}
+- [x] Version tracking surface (/versions) {id: feat-010, agent: claude-code}
+- [x] Live agent view (/agent-view) {id: feat-011, agent: claude-code}
+- [x] Design sync surface (/design-sync) {id: feat-012, agent: claude-code}
+- [x] Test management surface (/tests) {id: feat-013, agent: claude-code}
+- [x] Internal changelog {id: feat-014, agent: claude-code}
+- [x] Claude Code JSONL ingestion (file watcher) {id: feat-015, agent: claude-code}
+- [x] CI pipeline monitoring {id: feat-016, agent: claude-code}
+- [x] VERSION-PLAN.md parser + DB sync {id: feat-017, agent: claude-code}
 
 ---
 

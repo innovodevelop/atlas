@@ -5,10 +5,10 @@
  */
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Monitor, Radio } from 'lucide-react';
-import { Panel, Empty, Row } from '@/components/atlas-ui/primitives';
+import { Monitor, Radio, RefreshCw, Download } from 'lucide-react';
+import { Panel, Empty, Row, Button } from '@/components/atlas-ui/primitives';
 import { useAuth } from '@/hooks/useAuth';
-import { useAgentSessions, useAgentEvents, type AgentSessionRow } from '@/hooks/useAgentView';
+import { useAgentSessions, useAgentEvents, useIngestSessions, useSyncCiRuns, type AgentSessionRow } from '@/hooks/useAgentView';
 import '@/styles/surfaces/agentView.css';
 
 export const surface = {
@@ -33,15 +33,14 @@ export default function AtlasAgentView() {
   const { user, loading: authLoading } = useAuth();
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Same gate as AtlasDashboard.tsx:107-109. This page had none — every
-  // /agent-view, /design-sync and /tests component skipped it, so all three
-  // (plus AtlasHome) were reachable signed out.
   useEffect(() => {
     if (!authLoading && !user) navigate('/auth');
   }, [user, authLoading, navigate]);
 
   const { sessions, isLoading: sessionsLoading, error: sessionsError } = useAgentSessions();
   const { events, isLoading: eventsLoading, error: eventsError } = useAgentEvents(selectedId);
+  const ingest = useIngestSessions();
+  const syncCi = useSyncCiRuns();
 
   return (
     <div className="av-surface">
@@ -51,6 +50,14 @@ export default function AtlasAgentView() {
           <h1 className="av-title">Agent View</h1>
         </button>
         <p className="av-eyebrow">admin</p>
+        <Button variant="ghost" size="sm" onClick={() => ingest.mutate()} loading={ingest.isPending}>
+          <Download className="i14" />
+          Ingest JSONL
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => syncCi.mutate()} loading={syncCi.isPending}>
+          <RefreshCw className="i14" />
+          Sync CI
+        </Button>
         <span className="av-live"><Radio className="i12" /> Live</span>
       </header>
 
