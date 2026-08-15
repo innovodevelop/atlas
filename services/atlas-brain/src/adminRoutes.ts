@@ -15,6 +15,7 @@
 import { Database } from "bun:sqlite";
 import { parseVersionPlan, type Version } from "./versionPlan.ts";
 import { ingestJsonlSessions } from "./jsonlIngest.ts";
+import { executeRepair, type RepairContext } from "./selfRepair.ts";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { resolve } from "path";
 
@@ -599,8 +600,6 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
 
   function getRepairs(req: Request): Response {
     requireUser(req);
-    // Repairs are stored in atlas_agent_sessions with session_type 'autonomous' and
-    // metadata containing repair_target_error_id
     const rows = db.prepare(`
       SELECT id, metadata, status, task_summary as diagnosis, started_at as created_at, ended_at as completed_at
       FROM atlas_agent_sessions
@@ -610,13 +609,25 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
 
     const repairs = (rows as Array<{ id: string; metadata: string; status: string; diagnosis: string | null; created_at: string; completed_at: string | null }>).map(r => {
       const meta = JSON.parse(r.metadata || "{}");
+      const pipelineStage = meta.pipeline_stage ?? "auditing";
+      const pipelineStatus = meta.pipeline_status ?? (r.status === "completed" ? "completed" : r.status === "failed" ? "failed" : "active");
+
+      let status: string;
+      if (pipelineStatus === "completed") status = "verified";
+      else if (pipelineStatus === "failed") status = "failed";
+      else if (pipelineStage === "testing") status = "testing";
+      else if (pipelineStage === "proposing") status = "proposing";
+      else status = "auditing";
+
       return {
         id: r.id,
         error_id: meta.repair_target_error_id ?? "",
-        status: r.status === "completed" ? "verified" : r.status === "failed" ? "failed" : "auditing",
-        diagnosis: r.diagnosis,
+        status,
+        diagnosis: meta.diagnosis ?? r.diagnosis,
         proposed_fix: meta.proposed_fix ?? null,
         test_result: meta.test_result ?? null,
+        test_passed: meta.test_passed ?? null,
+        affected_files: meta.affected_files ?? [],
         created_at: r.created_at,
         completed_at: r.completed_at,
       };
@@ -629,8 +640,10 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
     requireUser(req);
 
     // Fetch the error
-    const error = db.prepare(`SELECT * FROM atlas_error_logs WHERE id = ?`).get(errorId) as { id: string; error_type: string; error_message: string; stack_trace: string | null } | null;
-    if (!error) return json({ error: "Error not found" }, 404);
+    const errorRow = db.prepare(`SELECT * FROM atlas_error_logs WHERE id = ?`).get(errorId) as {
+      id: string; error_type: string; error_message: string; stack_trace: string | null; context: string | null; severity: string;
+    } | null;
+    if (!errorRow) return json({ error: "Error not found" }, 404);
 
     // Create an autonomous repair session
     const sessionId = `repair-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -639,15 +652,36 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
       VALUES (?, 'autonomous', 'active', ?, ?, ?)
     `).run(
       sessionId,
-      `Self-repair: ${error.error_message.slice(0, 100)}`,
+      `Self-repair: ${errorRow.error_message.slice(0, 100)}`,
       new Date().toISOString(),
       JSON.stringify({
         repair_target_error_id: errorId,
-        error_type: error.error_type,
-        error_message: error.error_message,
-        stack_trace: error.stack_trace,
+        error_type: errorRow.error_type,
+        error_message: errorRow.error_message,
+        stack_trace: errorRow.stack_trace,
+        pipeline_status: "active",
+        pipeline_stage: "auditing",
       }),
     );
+
+    // Fire the repair pipeline in the background — don't block the response
+    const repairCtx: RepairContext = {
+      errorId: errorRow.id,
+      errorType: errorRow.error_type,
+      errorMessage: errorRow.error_message,
+      stackTrace: errorRow.stack_trace,
+      context: errorRow.context,
+      severity: errorRow.severity,
+    };
+
+    executeRepair(repairCtx, { db, sessionId }).catch((e) => {
+      // Pipeline crashed — mark session as failed
+      db.prepare(`UPDATE atlas_agent_sessions SET status = 'failed', ended_at = ? WHERE id = ?`)
+        .run(new Date().toISOString(), sessionId);
+      db.prepare(`UPDATE atlas_agent_sessions SET metadata = json_set(metadata, '$.pipeline_status', 'failed', '$.pipeline_error', ?) WHERE id = ?`)
+        .run(String(e).slice(0, 500), sessionId);
+      console.error(`[self-repair] pipeline failed for ${sessionId}:`, e);
+    });
 
     return json({
       id: sessionId,

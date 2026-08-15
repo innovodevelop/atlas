@@ -170,10 +170,31 @@ export default function AtlasSystemStatus() {
             <div className="ss-repairs">
               {repairs.map(r => (
                 <div key={r.id} className="ss-repair-card">
-                  <span className="ss-repair-status" data-status={r.status}>{r.status}</span>
-                  {r.diagnosis && <div className="ss-repair-diag">{r.diagnosis}</div>}
-                  {r.proposed_fix && <div className="ss-repair-diag"><strong>Fix:</strong> {r.proposed_fix}</div>}
-                  {r.test_result && <div className="ss-repair-diag"><strong>Test:</strong> {r.test_result}</div>}
+                  <div className="ss-repair-header">
+                    <span className="ss-repair-status" data-status={r.status}>{r.status}</span>
+                    {r.test_passed !== null && (
+                      <span className={`ss-repair-badge ${r.test_passed ? 'ss-badge-pass' : 'ss-badge-fail'}`}>
+                        {r.test_passed ? 'tests pass' : 'tests fail'}
+                      </span>
+                    )}
+                  </div>
+                  {r.diagnosis && (
+                    <div className="ss-repair-diag">{r.diagnosis.slice(0, 300)}{r.diagnosis.length > 300 ? '…' : ''}</div>
+                  )}
+                  {r.affected_files.length > 0 && (
+                    <div className="ss-repair-files">
+                      {r.affected_files.map(f => <code key={f} className="ss-repair-file">{f}</code>)}
+                    </div>
+                  )}
+                  {r.proposed_fix && (
+                    <details className="ss-repair-diff">
+                      <summary>Proposed fix (diff)</summary>
+                      <pre>{r.proposed_fix}</pre>
+                    </details>
+                  )}
+                  {r.test_result && (
+                    <div className="ss-repair-diag ss-repair-test">{r.test_result.slice(0, 200)}</div>
+                  )}
                   <div className="ss-repair-time">{relativeTime(r.created_at)}</div>
                 </div>
               ))}

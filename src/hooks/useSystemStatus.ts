@@ -36,6 +36,8 @@ export interface RepairAttempt {
   diagnosis: string | null;
   proposed_fix: string | null;
   test_result: string | null;
+  test_passed: boolean | null;
+  affected_files: string[];
   created_at: string;
   completed_at: string | null;
 }

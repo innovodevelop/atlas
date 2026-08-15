@@ -214,6 +214,12 @@
   background: var(--card);
   border-radius: var(--r-sm);
 }
+.ss-repair-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
 .ss-repair-status {
   display: inline-block;
   font-size: 11px;
@@ -222,19 +228,67 @@
   letter-spacing: 0.04em;
   padding: 2px 8px;
   border-radius: var(--r-pill);
-  margin-bottom: 8px;
 }
 .ss-repair-status[data-status="auditing"] { background: var(--acc-wash); color: var(--acc); }
 .ss-repair-status[data-status="proposing"] { background: var(--acc-wash); color: var(--acc); }
 .ss-repair-status[data-status="testing"] { background: color-mix(in srgb, var(--ylw) 15%, transparent); color: var(--ylw); }
+.ss-repair-status[data-status="applying"] { background: color-mix(in srgb, var(--ylw) 15%, transparent); color: var(--ylw); }
 .ss-repair-status[data-status="verified"] { background: color-mix(in srgb, var(--grn) 15%, transparent); color: var(--grn); }
 .ss-repair-status[data-status="failed"] { background: color-mix(in srgb, var(--red) 15%, transparent); color: var(--red); }
 .ss-repair-status[data-status="rejected"] { background: var(--wash); color: var(--ink3); }
+.ss-repair-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: var(--r-pill);
+}
+.ss-badge-pass { background: color-mix(in srgb, var(--grn) 15%, transparent); color: var(--grn); }
+.ss-badge-fail { background: color-mix(in srgb, var(--red) 15%, transparent); color: var(--red); }
 .ss-repair-diag {
   font-size: 12px;
   color: var(--ink2);
   margin-top: 6px;
   line-height: 1.4;
+}
+.ss-repair-test {
+  font-style: italic;
+  opacity: 0.8;
+}
+.ss-repair-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.ss-repair-file {
+  font-size: 11px;
+  background: var(--wash);
+  padding: 2px 6px;
+  border-radius: var(--r-pill);
+  color: var(--ink2);
+}
+.ss-repair-diff {
+  margin-top: 8px;
+}
+.ss-repair-diff summary {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--acc);
+  cursor: pointer;
+}
+.ss-repair-diff pre {
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.5;
+  background: var(--wash);
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 300px;
+  overflow-y: auto;
+  color: var(--ink2);
 }
 .ss-repair-time {
   font-size: 11px;
