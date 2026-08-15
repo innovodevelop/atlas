@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { adminGet, adminPost, ADMIN_REFETCH_INTERVAL_MS } from './useAdminApi';
+import { adminGet, adminPost, ADMIN_REFETCH_INTERVAL_MS, ADMIN_QUERY_OPTIONS } from './useAdminApi';
 
 export interface AgentSessionRow {
   id: string;
@@ -29,6 +29,7 @@ export function useAgentSessions(status?: string) {
     queryFn: () => adminGet<AgentSessionRow[]>(`/admin/agent-sessions${status ? `?status=${encodeURIComponent(status)}` : ''}`),
     staleTime: 10_000,
     refetchInterval: ADMIN_REFETCH_INTERVAL_MS,
+    ...ADMIN_QUERY_OPTIONS,
   });
   return { sessions: data ?? [], isLoading, error: error as Error | null, refetch };
 }
@@ -41,6 +42,7 @@ export function useAgentEvents(sessionId: string | null) {
     enabled: !!sessionId,
     staleTime: 5_000,
     refetchInterval: ADMIN_REFETCH_INTERVAL_MS,
+    ...ADMIN_QUERY_OPTIONS,
   });
   return { events: data ?? [], isLoading, error: error as Error | null };
 }

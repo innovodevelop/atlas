@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { adminGet, ADMIN_REFETCH_INTERVAL_MS } from './useAdminApi';
+import { adminGet, ADMIN_REFETCH_INTERVAL_MS, ADMIN_QUERY_OPTIONS } from './useAdminApi';
 
 export interface DesignSyncRow {
   id: string;
@@ -20,6 +20,7 @@ export function useDesignSyncs() {
     queryFn: () => adminGet<DesignSyncRow[]>('/admin/design-syncs'),
     staleTime: 10_000,
     refetchInterval: ADMIN_REFETCH_INTERVAL_MS,
+    ...ADMIN_QUERY_OPTIONS,
   });
   return { syncs: data ?? [], isLoading, error: error as Error | null, refetch };
 }

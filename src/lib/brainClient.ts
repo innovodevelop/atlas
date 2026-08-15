@@ -15,9 +15,14 @@ export async function getBrainEndpoint(): Promise<{ baseUrl: string; token: stri
   try {
     const { invoke } = await import("@tauri-apps/api/core");
     const info = (await invoke("atlas_brain_info")) as { port: number; token: string; running: boolean };
+    if (!info.running) return null;
     cached = { baseUrl: `http://127.0.0.1:${info.port}`, token: info.token };
     return cached;
   } catch {
     return null;
   }
+}
+
+export function clearBrainCache(): void {
+  cached = null;
 }

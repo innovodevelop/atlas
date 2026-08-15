@@ -10,6 +10,7 @@ import { getBrainEndpoint } from '@/lib/brainClient';
 // out from under it. Keep the interval modest — these are admin surfaces,
 // not something a user stares at waiting for updates.
 const ADMIN_REFETCH_INTERVAL_MS = 30_000;
+const ADMIN_QUERY_OPTIONS = { retry: 1, retryDelay: 2_000 } as const;
 
 export interface VersionRow {
   id: string;
@@ -58,6 +59,7 @@ export function useVersions() {
     },
     staleTime: 30_000,
     refetchInterval: ADMIN_REFETCH_INTERVAL_MS,
+    ...ADMIN_QUERY_OPTIONS,
   });
   return { versions: data ?? [], isLoading, error, refetch };
 }
@@ -85,6 +87,7 @@ export function useVersionDetail(versionId: string | null) {
     enabled: !!versionId,
     staleTime: 10_000,
     refetchInterval: ADMIN_REFETCH_INTERVAL_MS,
+    ...ADMIN_QUERY_OPTIONS,
   });
   return { features: data?.features ?? [], changelog: data?.changelog ?? [], isLoading };
 }

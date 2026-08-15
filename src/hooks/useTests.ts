@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { adminGet, adminPost, ADMIN_REFETCH_INTERVAL_MS } from './useAdminApi';
+import { adminGet, adminPost, ADMIN_REFETCH_INTERVAL_MS, ADMIN_QUERY_OPTIONS } from './useAdminApi';
 
 export interface TestSuiteRow {
   id: string;
@@ -31,6 +31,7 @@ export function useTestSuites() {
     queryFn: () => adminGet<TestSuiteRow[]>('/admin/tests/suites'),
     staleTime: 10_000,
     refetchInterval: ADMIN_REFETCH_INTERVAL_MS,
+    ...ADMIN_QUERY_OPTIONS,
   });
   return { suites: data ?? [], isLoading, error: error as Error | null, refetch };
 }
@@ -43,6 +44,7 @@ export function useTestRuns(suiteId: string | null) {
     enabled: !!suiteId,
     staleTime: 5_000,
     refetchInterval: ADMIN_REFETCH_INTERVAL_MS,
+    ...ADMIN_QUERY_OPTIONS,
   });
   return { runs: data ?? [], isLoading, error: error as Error | null };
 }
