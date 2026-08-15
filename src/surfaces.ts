@@ -251,6 +251,7 @@ export const SURFACES: readonly SurfaceMeta[] = [
   { path: '/agent-view', label: 'Agent view', icon: 'Monitor', entry: 'menu', mock: false, edition: 'admin' },
   { path: '/design-sync', label: 'Design sync', icon: 'Palette', entry: 'menu', mock: false, edition: 'admin' },
   { path: '/tests', label: 'Tests', icon: 'TestTube2', entry: 'menu', mock: false, edition: 'admin' },
+  { path: '/system-status', label: 'System status', icon: 'Activity', entry: 'menu', mock: false, edition: 'admin' },
   {
     path: '/atlas-architecture',
     label: 'How Atlas works',
@@ -335,6 +336,7 @@ const ADMIN_LOADERS: Record<string, Loader> = EDITION === 'admin' ? {
   '/agent-view': () => import('./pages/atlas/AtlasAgentView'),
   '/design-sync': () => import('./pages/atlas/AtlasDesignSync'),
   '/tests': () => import('./pages/atlas/AtlasTests'),
+  '/system-status': () => import('./pages/atlas/AtlasSystemStatus'),
   '/atlas-architecture': () => import('./pages/AtlasArchitecture'),
   '/homekit-lab': () => import('./pages/atlas/AtlasHomeKitLab'),
   '/atlas-sphere': () => import('./pages/AtlasSphereGallery'),

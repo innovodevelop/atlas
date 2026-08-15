@@ -16,7 +16,7 @@
  */
 import type { ComponentType } from 'react';
 import {
-  CircleDot, Compass, Cpu, FlaskConical, GitBranch, GraduationCap, HeartPulse,
+  Activity, CircleDot, Compass, Cpu, FlaskConical, GitBranch, GraduationCap, HeartPulse,
   Home, Landmark, Layers, LayoutGrid, LogIn, Mail, Mic, Monitor, Network, Orbit,
   Palette, Settings, ShieldCheck, Sparkles, TestTube2,
 } from 'lucide-react';
@@ -24,7 +24,7 @@ import {
 export type IconComponent = ComponentType<{ className?: string }>;
 
 export const SURFACE_ICONS: Readonly<Record<string, IconComponent>> = {
-  Compass, Cpu, FlaskConical, GitBranch, GraduationCap, HeartPulse,
+  Activity, Compass, Cpu, FlaskConical, GitBranch, GraduationCap, HeartPulse,
   Home, Landmark, Layers, LayoutGrid, LogIn, Mail, Mic, Monitor, Network, Orbit,
   Palette, Settings, ShieldCheck, Sparkles, TestTube2,
 };

@@ -150,8 +150,8 @@ describe('the surface registry covers every page, exactly once', () => {
     // A bare number so that ADDING a page without registering it, or removing
     // one without unregistering it, fails here even if some other assertion is
     // relaxed later. Bump it deliberately when a real surface is added.
-    expect(PARSED.length).toBe(24);
-    expect(SURFACES.length).toBe(24);
+    expect(PARSED.length).toBe(25);
+    expect(SURFACES.length).toBe(25);
   });
 });
 
@@ -216,8 +216,8 @@ describe('the consumer/admin split', () => {
     ].sort());
     expect(of('admin')).toEqual([
       '/agent-view', '/answer-views', '/atlas-architecture', '/atlas-sphere',
-      '/browser', '/design-sync', '/homekit-lab', '/model-lab', '/money', '/tests',
-      '/versions', '/widget-sheet', '/widgets',
+      '/browser', '/design-sync', '/homekit-lab', '/model-lab', '/money',
+      '/system-status', '/tests', '/versions', '/widget-sheet', '/widgets',
     ].sort());
   });
 

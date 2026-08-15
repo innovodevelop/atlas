@@ -177,6 +177,12 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
     getDesignSyncs,
     ingestSessions,
     getCiRuns,
+    getSystemHealth,
+    getErrorLogs,
+    resolveError,
+    scanErrors,
+    getRepairs,
+    initiateRepair,
   };
 
   function syncVersionPlan(req: Request): Response {
@@ -479,5 +485,179 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
     } catch (err) {
       return json({ error: `CI fetch failed: ${String(err).slice(0, 300)}` }, 500);
     }
+  }
+
+  function getSystemHealth(req: Request): Response {
+    requireUser(req);
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    const errorCount = (db.prepare(
+      `SELECT COUNT(*) as c FROM atlas_error_logs WHERE created_at >= ? AND severity IN ('error','critical') AND resolved = 0`
+    ).get(oneDayAgo) as { c: number }).c;
+
+    const warningCount = (db.prepare(
+      `SELECT COUNT(*) as c FROM atlas_error_logs WHERE created_at >= ? AND severity = 'warning' AND resolved = 0`
+    ).get(oneDayAgo) as { c: number }).c;
+
+    const healthScore = Math.max(0, 100 - errorCount * 10 - warningCount * 2);
+    const brainStatus = errorCount > 5 ? "down" as const : errorCount > 0 ? "degraded" as const : "healthy" as const;
+
+    const services: Array<{ name: string; status: string; latency_ms: number | null; last_check: string; error?: string }> = [];
+
+    // Check brain self
+    services.push({ name: "atlas-brain", status: "healthy", latency_ms: 0, last_check: new Date().toISOString() });
+
+    // Check voice gateway
+    try {
+      const start = performance.now();
+      const vgPort = process.env.VOICE_GATEWAY_PORT || "4820";
+      const res = Bun.spawnSync(["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", `http://127.0.0.1:${vgPort}/health`]);
+      const code = new TextDecoder().decode(res.stdout).trim();
+      const elapsed = Math.round(performance.now() - start);
+      services.push({
+        name: "voice-gateway",
+        status: code === "200" ? "healthy" : "down",
+        latency_ms: elapsed,
+        last_check: new Date().toISOString(),
+        ...(code !== "200" ? { error: `HTTP ${code}` } : {}),
+      });
+    } catch {
+      services.push({ name: "voice-gateway", status: "down", latency_ms: null, last_check: new Date().toISOString(), error: "unreachable" });
+    }
+
+    return json({
+      health_score: healthScore,
+      uptime_seconds: Math.round(process.uptime()),
+      error_count_24h: errorCount,
+      warning_count_24h: warningCount,
+      brain_status: brainStatus,
+      services,
+    });
+  }
+
+  function getErrorLogs(req: Request, limit = 50): Response {
+    requireUser(req);
+    const rows = db.prepare(
+      `SELECT id, error_type, error_message, stack_trace, context, severity, resolved, created_at
+       FROM atlas_error_logs ORDER BY created_at DESC LIMIT ?`
+    ).all(limit);
+    return json(rows);
+  }
+
+  function resolveError(req: Request, errorId: string): Response {
+    requireUser(req);
+    db.prepare(`UPDATE atlas_error_logs SET resolved = 1 WHERE id = ?`).run(errorId);
+    return json({ ok: true });
+  }
+
+  function scanErrors(req: Request): Response {
+    requireUser(req);
+    let newErrors = 0;
+
+    // Scan brain logs for recent errors
+    const logPath = resolve(PROJECT_ROOT, "services/atlas-brain/brain.log");
+    if (existsSync(logPath)) {
+      try {
+        const logContent = readFileSync(logPath, "utf8");
+        const lines = logContent.split("\n").slice(-200);
+        const errorLines = lines.filter(l => /\b(error|ERR|FATAL|panic|uncaught)/i.test(l));
+
+        const insert = db.prepare(`
+          INSERT OR IGNORE INTO atlas_error_logs (id, error_type, error_message, severity, resolved, created_at)
+          VALUES (?, ?, ?, ?, 0, ?)
+        `);
+
+        for (const line of errorLines.slice(-20)) {
+          const id = `scan-${Bun.hash(line).toString(36)}`;
+          const severity = /\b(FATAL|panic|uncaught)/i.test(line) ? "critical" : "error";
+          insert.run(id, "runtime", line.slice(0, 500), severity, new Date().toISOString());
+          newErrors++;
+        }
+      } catch { /* log file unreadable — not an error in itself */ }
+    }
+
+    // Scan Rust panic logs
+    const rustLogPath = resolve(PROJECT_ROOT, "src-tauri/target/release/atlas.log");
+    if (existsSync(rustLogPath)) {
+      try {
+        const content = readFileSync(rustLogPath, "utf8");
+        const panicLines = content.split("\n").filter(l => /panic|thread.*panicked/i.test(l)).slice(-10);
+        const insert = db.prepare(`
+          INSERT OR IGNORE INTO atlas_error_logs (id, error_type, error_message, severity, resolved, created_at)
+          VALUES (?, ?, ?, ?, 0, ?)
+        `);
+        for (const line of panicLines) {
+          const id = `rust-${Bun.hash(line).toString(36)}`;
+          insert.run(id, "rust-panic", line.slice(0, 500), "critical", new Date().toISOString());
+          newErrors++;
+        }
+      } catch { /* log file unreadable */ }
+    }
+
+    return json({ scanned: 2, new_errors: newErrors });
+  }
+
+  function getRepairs(req: Request): Response {
+    requireUser(req);
+    // Repairs are stored in atlas_agent_sessions with session_type 'autonomous' and
+    // metadata containing repair_target_error_id
+    const rows = db.prepare(`
+      SELECT id, metadata, status, task_summary as diagnosis, started_at as created_at, ended_at as completed_at
+      FROM atlas_agent_sessions
+      WHERE session_type = 'autonomous' AND metadata LIKE '%repair_target%'
+      ORDER BY started_at DESC LIMIT 50
+    `).all();
+
+    const repairs = (rows as Array<{ id: string; metadata: string; status: string; diagnosis: string | null; created_at: string; completed_at: string | null }>).map(r => {
+      const meta = JSON.parse(r.metadata || "{}");
+      return {
+        id: r.id,
+        error_id: meta.repair_target_error_id ?? "",
+        status: r.status === "completed" ? "verified" : r.status === "failed" ? "failed" : "auditing",
+        diagnosis: r.diagnosis,
+        proposed_fix: meta.proposed_fix ?? null,
+        test_result: meta.test_result ?? null,
+        created_at: r.created_at,
+        completed_at: r.completed_at,
+      };
+    });
+
+    return json(repairs);
+  }
+
+  function initiateRepair(req: Request, errorId: string): Response {
+    requireUser(req);
+
+    // Fetch the error
+    const error = db.prepare(`SELECT * FROM atlas_error_logs WHERE id = ?`).get(errorId) as { id: string; error_type: string; error_message: string; stack_trace: string | null } | null;
+    if (!error) return json({ error: "Error not found" }, 404);
+
+    // Create an autonomous repair session
+    const sessionId = `repair-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    db.prepare(`
+      INSERT INTO atlas_agent_sessions (id, session_type, status, task_summary, started_at, metadata)
+      VALUES (?, 'autonomous', 'active', ?, ?, ?)
+    `).run(
+      sessionId,
+      `Self-repair: ${error.error_message.slice(0, 100)}`,
+      new Date().toISOString(),
+      JSON.stringify({
+        repair_target_error_id: errorId,
+        error_type: error.error_type,
+        error_message: error.error_message,
+        stack_trace: error.stack_trace,
+      }),
+    );
+
+    return json({
+      id: sessionId,
+      error_id: errorId,
+      status: "auditing",
+      diagnosis: null,
+      proposed_fix: null,
+      test_result: null,
+      created_at: new Date().toISOString(),
+      completed_at: null,
+    });
   }
 }

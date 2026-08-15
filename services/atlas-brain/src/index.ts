@@ -453,6 +453,12 @@ const server = Bun.serve({
       if (url.pathname === "/admin/design-syncs" && req.method === "GET") return admin.getDesignSyncs(req);
       if (url.pathname === "/admin/ingest-sessions" && req.method === "POST") return admin.ingestSessions(req);
       if (url.pathname === "/admin/ci-runs" && req.method === "POST") return admin.getCiRuns(req);
+      if (url.pathname === "/admin/system/health" && req.method === "GET") return admin.getSystemHealth(req);
+      if (url.pathname === "/admin/system/errors" && req.method === "GET") return admin.getErrorLogs(req, Number(url.searchParams.get("limit")) || 50);
+      if (url.pathname === "/admin/system/scan" && req.method === "POST") return admin.scanErrors(req);
+      if (url.pathname === "/admin/system/repairs" && req.method === "GET") return admin.getRepairs(req);
+      if (url.pathname.startsWith("/admin/system/errors/") && url.pathname.endsWith("/resolve") && req.method === "POST") return admin.resolveError(req, url.pathname.split("/")[4]);
+      if (url.pathname.startsWith("/admin/system/errors/") && url.pathname.endsWith("/repair") && req.method === "POST") return admin.initiateRepair(req, url.pathname.split("/")[4]);
     } catch (e) {
       if (e instanceof AuthError) return json({ error: e.message }, e.status);
       console.error("[brain] error:", e);
