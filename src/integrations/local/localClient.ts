@@ -59,7 +59,7 @@ const BOOL_COLUMNS = new Set([
   "auto_generated", "auto_validation", "auto_knowledge_extraction", "auto_switch_enabled",
   "auto_disable_on_limit", "auto_prune", "lovable_ai_enabled", "global_discovery_enabled",
   "should_follow_up", "should_remember", "learning_enabled", "require_approval_for_risky",
-  "auto_approve_low_risk", "alerts_enabled",
+  "auto_approve_low_risk", "alerts_enabled", "visible",
 ]);
 const isJsonCol = (k: string) => k.endsWith("_json") || JSON_COLUMNS.has(k);
 const isBoolCol = (k: string) => BOOL_COLUMNS.has(k) || k.startsWith("is_") || k.startsWith("has_");

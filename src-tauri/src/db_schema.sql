@@ -1376,3 +1376,23 @@ CREATE TRIGGER IF NOT EXISTS trg_health_sync_state_updated AFTER UPDATE ON healt
 -- ###########################################################################
 -- # HEALTH — end. Append new, unrelated tables BELOW this line.              #
 -- ###########################################################################
+
+-- ###########################################################################
+-- # DASHBOARD LAYOUT                                                          #
+-- ###########################################################################
+
+CREATE TABLE IF NOT EXISTS dashboard_layout (
+  id         TEXT PRIMARY KEY NOT NULL,
+  user_id    TEXT NOT NULL,
+  widget_id  TEXT NOT NULL,
+  position   INTEGER NOT NULL DEFAULT 0,
+  size       TEXT NOT NULL DEFAULT 'l',
+  visible    INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE(user_id, widget_id)
+);
+
+CREATE TRIGGER IF NOT EXISTS trg_dashboard_layout_updated AFTER UPDATE ON dashboard_layout
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE dashboard_layout SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;

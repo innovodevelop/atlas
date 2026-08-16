@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Cpu, Mail, Mic, MicOff, Sparkles, Settings, Home, CornerUpLeft } from 'lucide-react';
 import { Dock, type DockItem } from '@/components/atlas-ui/primitives';
@@ -32,6 +32,7 @@ import { ProactiveInsight } from '@/components/atlas-ui/ProactiveInsight';
 import {
   AtlasAirQualityCard, AtlasNowPlayingCard, AtlasActivityCard, AtlasWorldClockCard,
 } from '@/components/atlas-ui/AtlasExtraCards';
+import { useDashboardLayout } from '@/hooks/useDashboardLayout';
 import { AtmosphereCanvas } from '@/components/atlas-ui/AtmosphereCanvas';
 import { AtlasDrawer } from '@/components/atlas-ui/AtlasDrawer';
 import { AtlasExpanded } from '@/components/atlas-ui/AtlasExpanded';
@@ -57,6 +58,21 @@ export const surface = {
 };
 
 export type AtlasExpandedKey = 'weather' | 'calendar' | 'tasks' | 'stocks' | 'email' | 'news' | 'music' | null;
+
+type WidgetRenderer = (props: { onOpen?: () => void }) => React.ReactNode;
+
+const WIDGET_RENDERERS: Record<string, { component: WidgetRenderer; expandKey?: Exclude<AtlasExpandedKey, null> }> = {
+  weather: { component: ({ onOpen }) => <AtlasWeatherCard onOpen={onOpen} />, expandKey: 'weather' },
+  calendar: { component: ({ onOpen }) => <AtlasCalendarCard onOpen={onOpen} />, expandKey: 'calendar' },
+  tasks: { component: ({ onOpen }) => <AtlasTasksCard onOpen={onOpen} />, expandKey: 'tasks' },
+  stocks: { component: ({ onOpen }) => <AtlasStocksCard onOpen={onOpen} />, expandKey: 'stocks' },
+  mail: { component: ({ onOpen }) => <AtlasInboxCard onOpen={onOpen} />, expandKey: 'email' },
+  briefing: { component: ({ onOpen }) => <AtlasBriefingCard onOpen={onOpen} />, expandKey: 'news' },
+  air: { component: () => <AtlasAirQualityCard /> },
+  music: { component: ({ onOpen }) => <AtlasNowPlayingCard onOpen={onOpen} />, expandKey: 'music' },
+  activity: { component: () => <AtlasActivityCard /> },
+  worldclock: { component: () => <AtlasWorldClockCard /> },
+};
 
 // `commitAfter` moved to @/lib/commitAfter when the Clock surface needed the
 // same guarantee — see that file for why a plain setTimeout is unsafe here.
@@ -142,6 +158,8 @@ const AtlasDashboard = () => {
     setInput('');
     void sendMessage(v);
   }, [input, sendMessage]);
+
+  const { visibleSlots } = useDashboardLayout();
 
   const name = profile?.nickname || profile?.first_name || profile?.display_name || 'there';
   // The user's zone, not the machine's. greetingPhrase implements the brain's
@@ -438,16 +456,12 @@ const AtlasDashboard = () => {
           and band above stay mounted either way (design Change 1). */}
       {!expanded ? (
         <main className={`gridB${gridFolding ? ' folding' : ''}`}>
-          <AtlasWeatherCard onOpen={() => openWidget('weather')} />
-          <AtlasCalendarCard onOpen={() => openWidget('calendar')} />
-          <AtlasTasksCard onOpen={() => openWidget('tasks')} />
-          <AtlasStocksCard onOpen={() => openWidget('stocks')} />
-          <AtlasInboxCard onOpen={() => openWidget('email')} />
-          <AtlasBriefingCard onOpen={() => openWidget('news')} />
-          <AtlasAirQualityCard />
-          <AtlasNowPlayingCard onOpen={() => openWidget('music')} />
-          <AtlasActivityCard />
-          <AtlasWorldClockCard />
+          {visibleSlots.map((slot) => {
+            const entry = WIDGET_RENDERERS[slot.widget_id];
+            if (!entry) return null;
+            const onOpen = entry.expandKey ? () => openWidget(entry.expandKey!) : undefined;
+            return <React.Fragment key={slot.widget_id}>{entry.component({ onOpen })}</React.Fragment>;
+          })}
         </main>
       ) : (
         <div className={`focusview${viewExiting ? ' exiting' : ''}`}>

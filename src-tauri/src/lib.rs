@@ -31,6 +31,7 @@ mod home;
 // Health. macOS serves no HealthKit data at all (ADR 008), so the only path
 // that works today is the Apple Health export importer. See src/health/mod.rs.
 mod health;
+mod watchdog;
 
 /// Outcome of a sidecar spawn attempt. `integrity_error` is set when the
 /// binary failed integrity verification (and was therefore NOT spawned) — it
@@ -754,6 +755,8 @@ pub fn run() {
             .build(),
         )?;
       }
+
+      watchdog::start(app.handle());
 
       // Deep-link OAuth capture. In dev the scheme isn't in the app bundle's
       // Info.plist, so register it at runtime; packaged macOS builds get it
