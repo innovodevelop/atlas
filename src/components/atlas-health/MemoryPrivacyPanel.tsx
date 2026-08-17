@@ -6,7 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { deleteAccount, getToken, LOCAL_DATA_DIR } from '@/lib/authClient';
 import { getBrainEndpoint } from '@/lib/brainClient';
+import { isTauri } from '@/integrations/local/localClient';
 import { clearPersistedCache } from '@/lib/queryClient';
+import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 
 // Memory management & erasure ("the right to be forgotten", Phase 3). Lists the
@@ -96,10 +98,24 @@ export function MemoryPrivacyPanel() {
   const [isClosingAccount, setIsClosingAccount] = useState(false);
   const [isTidying, setIsTidying] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const load = useCallback(async () => {
     setIsLoading(true);
-    const { data, error } = await brainPost('/memory/list', {});
+    let result: { data: unknown; error: Error | null };
+    if (isTauri()) {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const data = await invoke('brain_memory_list', { userId: user?.id ?? '' });
+        result = { data, error: null };
+      } catch (e) {
+        result = { data: null, error: e instanceof Error ? e : new Error(String(e)) };
+      }
+    } else {
+      result = await brainPost('/memory/list', {});
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = result as { data: any; error: Error | null };
     if (error) {
       setLoadError(error.message);
       setMemories([]);
@@ -108,13 +124,26 @@ export function MemoryPrivacyPanel() {
       setMemories((data?.memories ?? []) as StoredMemory[]);
     }
     setIsLoading(false);
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => { load(); }, [load]);
 
   const forget = async (m: StoredMemory) => {
     setForgettingId(m.id);
-    const { data, error } = await brainPost('/memory/forget', { id: m.id });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let result: { data: any; error: Error | null };
+    if (isTauri()) {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const data = await invoke('brain_memory_forget', { userId: user?.id ?? '', id: m.id });
+        result = { data, error: null };
+      } catch (e) {
+        result = { data: null, error: e instanceof Error ? e : new Error(String(e)) };
+      }
+    } else {
+      result = await brainPost('/memory/forget', { id: m.id });
+    }
+    const { data, error } = result;
     setForgettingId(null);
     if (error) {
       toast({ title: 'Forget failed', description: error.message, variant: 'destructive' });
@@ -168,7 +197,20 @@ export function MemoryPrivacyPanel() {
   const eraseAll = async () => {
     if (confirmText !== ERASE_PHRASE) return;
     setIsErasing(true);
-    const { data, error } = await brainPost('/memory/erase-all', { confirm: true }, { timeoutMs: ERASE_TIMEOUT_MS });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let result: { data: any; error: Error | null };
+    if (isTauri()) {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const data = await invoke('brain_memory_erase_all', { userId: user?.id ?? '', confirm: true });
+        result = { data, error: null };
+      } catch (e) {
+        result = { data: null, error: e instanceof Error ? e : new Error(String(e)) };
+      }
+    } else {
+      result = await brainPost('/memory/erase-all', { confirm: true }, { timeoutMs: ERASE_TIMEOUT_MS });
+    }
+    const { data, error } = result;
     setIsErasing(false);
     setConfirmText('');
     if (error) {

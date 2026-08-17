@@ -32,6 +32,7 @@ mod home;
 // that works today is the Apple Health export importer. See src/health/mod.rs.
 mod health;
 mod watchdog;
+mod brain;
 
 /// Outcome of a sidecar spawn attempt. `integrity_error` is set when the
 /// binary failed integrity verification (and was therefore NOT spawned) — it
@@ -494,6 +495,13 @@ pub fn run() {
       atlas_brain_info,
       brain_set_ai_key,
       brain_ai_status,
+      brain::brain_memory_list,
+      brain::brain_memory_forget,
+      brain::brain_memory_erase_all,
+      brain::brain_personality_get,
+      brain::brain_personality_update,
+      brain::brain_personality_reset,
+      brain::brain_chat_stream,
       portfolio::portfolio_status,
       portfolio::portfolio_connect_url,
       portfolio::portfolio_sync,

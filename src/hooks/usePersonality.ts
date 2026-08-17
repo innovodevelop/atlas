@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getToken } from '@/lib/authClient';
 import { getBrainEndpoint } from '@/lib/brainClient';
+import { isTauri } from '@/integrations/local/localClient';
+import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 
 // Personality trait vector (Phase 4). Frontend mirror of the canonical shape in
@@ -39,7 +41,55 @@ function normalizeTraits(raw: unknown): Traits {
   return out;
 }
 
-// Same local-sidecar fetch pattern as useBrainSearch.
+// Personality I/O — Rust Tauri commands when running in the desktop app;
+// falls back to the Bun sidecar HTTP path when the native commands are absent
+// (e.g. web preview, older build). The Rust path is preferred: no 355MB sidecar
+// process, no stdio IPC, no HTTP round-trip.
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- free-form JSON from Rust/brain
+async function personalityGet(userId: string): Promise<{ data: any; error: Error | null }> {
+  if (isTauri()) {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const data = await invoke('brain_personality_get', { userId });
+      return { data, error: null };
+    } catch (e) {
+      return { data: null, error: e instanceof Error ? e : new Error(String(e)) };
+    }
+  }
+  // Bun sidecar fallback (dev / web preview)
+  return brainPost('/personality', { action: 'get' });
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- free-form JSON from Rust/brain
+async function personalityUpdate(userId: string, traits: unknown): Promise<{ data: any; error: Error | null }> {
+  if (isTauri()) {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const data = await invoke('brain_personality_update', { userId, traits });
+      return { data, error: null };
+    } catch (e) {
+      return { data: null, error: e instanceof Error ? e : new Error(String(e)) };
+    }
+  }
+  return brainPost('/personality', { action: 'update', traits });
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- free-form JSON from Rust/brain
+async function personalityReset(userId: string): Promise<{ data: any; error: Error | null }> {
+  if (isTauri()) {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const data = await invoke('brain_personality_reset', { userId });
+      return { data, error: null };
+    } catch (e) {
+      return { data: null, error: e instanceof Error ? e : new Error(String(e)) };
+    }
+  }
+  return brainPost('/personality', { action: 'reset' });
+}
+
+// Bun sidecar fallback — only used when not running in Tauri (web preview, CI).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- brain sidecar returns free-form JSON; `unknown` here would force a cast at every call site without adding safety
 async function brainPost(path: string, body: unknown): Promise<{ data: any; error: Error | null }> {
   const brain = await getBrainEndpoint();
@@ -65,6 +115,7 @@ export const usePersonality = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const { user } = useAuth();
   const { toast } = useToast();
 
   // Debounced persist: sliders fire continuously while dragging, so the local
@@ -75,18 +126,18 @@ export const usePersonality = () => {
 
   const persist = useCallback(async (next: Traits) => {
     if (mounted.current) setIsSaving(true);
-    const { error } = await brainPost('/personality', { action: 'update', traits: next });
+    const { error } = await personalityUpdate(user?.id ?? '', next);
     if (!mounted.current) return;
     setIsSaving(false);
     if (error) {
       toast({ title: 'Could not save personality', description: error.message, variant: 'destructive' });
     }
-  }, [toast]);
+  }, [user?.id, toast]);
 
   useEffect(() => {
     mounted.current = true;
     (async () => {
-      const { data, error } = await brainPost('/personality', { action: 'get' });
+      const { data, error } = await personalityGet(user?.id ?? '');
       if (!mounted.current) return;
       if (error) {
         setLoadError(error.message);
@@ -126,7 +177,7 @@ export const usePersonality = () => {
     if (saveTimer.current != null) window.clearTimeout(saveTimer.current);
     pendingTraits.current = null;
     setIsSaving(true);
-    const { data, error } = await brainPost('/personality', { action: 'reset' });
+    const { data, error } = await personalityReset(user?.id ?? '');
     if (!mounted.current) return;
     setIsSaving(false);
     if (error) {
