@@ -156,7 +156,7 @@ export const usePersonality = () => {
       if (pendingTraits.current) void persist(pendingTraits.current);
       pendingTraits.current = null;
     };
-  }, [persist]);
+  }, [persist, user?.id]);
 
   const setTrait = useCallback((key: keyof Traits, value: number) => {
     setTraits((prev) => {
@@ -187,7 +187,7 @@ export const usePersonality = () => {
     setTraits(normalizeTraits(data?.traits ?? DEFAULT_TRAITS));
     if (data?.lexicon) setLexicon(data.lexicon as Record<string, string>);
     toast({ title: 'Personality reset', description: 'All traits are back to their defaults.' });
-  }, [toast]);
+  }, [toast, user?.id]);
 
   return { traits, lexicon, isLoading, loadError, isSaving, setTrait, reset };
 };
