@@ -16,6 +16,7 @@ mod music_engine;
 mod db;
 mod datafetch;
 mod mail;
+mod gmail;
 mod scheduler;
 mod integrity;
 mod control;
@@ -489,6 +490,7 @@ pub fn run() {
     .manage(gateway)
     .manage(brain)
     .manage(music::MusicState::new())
+    .manage(gmail::GmailState::new())
     .manage(home::HomeState::new())
     .invoke_handler(tauri::generate_handler![
       voice_gateway_info,
@@ -541,6 +543,9 @@ pub fn run() {
       mail::mail_set_status,
       mail::mail_send_reply,
       mail::mail_ingest_errors,
+      gmail::gmail_connect,
+      gmail::gmail_disconnect,
+      gmail::gmail_sync,
       // The webview's yes/no on a queued control-port action. Execution stays
       // in Rust: this command takes an approval id and a boolean, and the
       // arguments it would run with never leave the Rust process — the webview
@@ -786,6 +791,11 @@ pub fn run() {
               // status event. Dispatch to each provider that could be in flight.
               if let Some(state) = handle.try_state::<music::MusicState>() {
                 music::complete_oauth(&handle, state.inner(), &cb);
+              }
+              if let Some(gmail_state) = handle.try_state::<gmail::GmailState>() {
+                if let Some(db_state) = handle.try_state::<db::DbState>() {
+                  gmail::complete_oauth(&handle, gmail_state.inner(), db_state.inner(), &cb);
+                }
               }
               // Sanitized signal for the generic seam (src/lib/deepLinkOauth.ts):
               // no auth code crosses the boundary.

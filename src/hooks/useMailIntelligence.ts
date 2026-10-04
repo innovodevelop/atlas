@@ -179,7 +179,7 @@ export function useMailIntelligence() {
     setIsConnecting(true);
     try {
       const { data, error } = await supabase.functions.invoke('mail-oauth-start', {
-        body: { provider: 'gmail' },
+        body: { provider: 'gmail', userId: user.id },
       });
       if (error || !data?.authUrl) throw error ?? new Error('No auth URL returned');
 
@@ -226,9 +226,13 @@ export function useMailIntelligence() {
 
   const syncNow = useCallback(async () => {
     if (!user) return;
-    await supabase.functions.invoke('mail-sync', { body: {} });
+    const active = accounts.find((a) => a.status === 'active');
+    if (!active) return;
+    await supabase.functions.invoke('mail-sync', {
+      body: { accountId: active.id, userId: user.id },
+    });
     refresh();
-  }, [user, refresh]);
+  }, [user, accounts, refresh]);
 
   return {
     accounts,

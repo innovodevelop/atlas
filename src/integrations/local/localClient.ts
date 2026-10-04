@@ -457,13 +457,13 @@ const LOCAL_FN: Record<string, string> = {
   "get-news": "fetch_news",
 };
 
-// The two consumer-mailbox edge functions that still have no local replacement —
-// connecting and disconnecting a personal Gmail/IMAP account is Stage 6e. They
-// keep a stub so the legacy useMailIntelligence call sites fail legibly instead
-// of pretending. `mail-sync` is gone from this set on purpose: the admin mailbox
-// syncs through the `mail_sync` Tauri command now, so the old edge-function name
-// is a dead route rather than an unavailable one.
-const UNBUILT_MAIL_FNS = new Set(["mail-oauth-start", "mail-disconnect"]);
+// Consumer-mailbox Tauri commands. These were previously stubbed as
+// "unavailable" — now they route to the local gmail_* Rust commands.
+const GMAIL_FNS: Record<string, string> = {
+  "mail-oauth-start": "gmail_connect",
+  "mail-disconnect": "gmail_disconnect",
+  "mail-sync": "gmail_sync",
+};
 
 const functions = {
   async invoke(name: string, opts?: { body?: unknown; headers?: Record<string, string> }): Promise<Result<any>> {
@@ -476,8 +476,17 @@ const functions = {
         return { data: null, error: { message: e instanceof Error ? e.message : String(e) } };
       }
     }
-    if (UNBUILT_MAIL_FNS.has(name)) {
-      return { data: null, error: new Error("Connecting a personal mailbox isn't available in Atlas yet.") };
+    const gmailCmd = GMAIL_FNS[name];
+    if (gmailCmd && isTauri()) {
+      try {
+        const data = await invoke(gmailCmd, (opts?.body ?? {}) as Record<string, unknown>);
+        return { data, error: null };
+      } catch (e) {
+        return { data: null, error: { message: e instanceof Error ? e.message : String(e) } };
+      }
+    }
+    if (gmailCmd && !isTauri()) {
+      return { data: null, error: { message: "Gmail sync is only available in the desktop app." } };
     }
     return { data: null, error: new Error(`${name} is not available locally`) };
   },

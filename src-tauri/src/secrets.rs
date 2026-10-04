@@ -92,6 +92,30 @@ pub fn clear_music_refresh_token() -> Result<(), String> {
     Ok(())
 }
 
+// --- Gmail (consumer mail sync) --------------------------------------------
+// Each connected Gmail account stores its refresh token under its own Keychain
+// item, keyed by account_id (e.g. "gmail:user@gmail.com"). Same permissive-ACL
+// approach as Spotify — the token never touches the DB or the JS layer.
+
+const GMAIL_SERVICE: &str = "atlas-gmail";
+
+fn gmail_entry(account: &str) -> keyring::Result<keyring::Entry> {
+    keyring::Entry::new(GMAIL_SERVICE, account)
+}
+
+pub fn gmail_refresh_token(account_id: &str) -> Option<String> {
+    gmail_entry(account_id).ok()?.get_password().ok()
+}
+
+pub fn set_gmail_refresh_token(account_id: &str, token: &str) -> Result<(), String> {
+    set_permissive(GMAIL_SERVICE, account_id, token)
+}
+
+pub fn clear_gmail_refresh_token(account_id: &str) -> Result<(), String> {
+    if let Ok(e) = gmail_entry(account_id) { let _ = e.delete_password(); }
+    Ok(())
+}
+
 // --- Brain sidecar / AI provider keys -----------------------------------
 // All atlas-core secrets live in ONE Keychain item ("atlas-core" / "secrets")
 // holding a JSON object, instead of one item per key.
