@@ -3,8 +3,9 @@ name: Rust core
 # Added 2026-08-04. Until then there was NO Rust job anywhere, so the
 # #[cfg(test)] modules in db.rs, music.rs and integrity.rs — 20 tests covering
 # the SQLite CRUD identifier guards, the ai_memory migration, hybrid recall and
-# the sidecar integrity gate — had never run in CI. Verified green locally
-# before this workflow was added.
+# the sidecar integrity gate — had never run in CI. "Verified green locally"
+# when it was added, but it then failed on every CI run for the reason
+# explained at the stub step below. Fixed 2026-10-04.
 #
 # WHY ITS OWN FILE, not a job in ci.yml: `paths` is only available on the
 # workflow trigger, never per job. Running a macOS runner on every
@@ -47,5 +48,24 @@ jobs:
       #
       # --lib skips the binary target and doc-tests (both empty here), keeping
       # the job to unit tests without linking the full app bundle.
+      # Every run from 2026-08-07 to 2026-08-17 failed HERE, before compiling a
+      # single test: tauri-build refuses to build unless each externalBin
+      # sidecar exists at binaries/<name>-<host triple>, and
+      # generate_context!() needs frontendDist (../dist) to exist. Both are
+      # gitignored build outputs, and "worked locally" only because a dev
+      # checkout has them lying around. Building the real ones takes Bun plus
+      # the e5 model download, which unit tests don't need. --lib never spawns
+      # a sidecar or serves the frontend, so empty stand-ins are enough. No
+      # manifest.json is written, so build.rs embeds "{}" exactly as it does
+      # on a fresh dev checkout.
+      - name: Stub gitignored build outputs (sidecars + frontendDist)
+        run: |
+          triple="$(rustc -vV | sed -n 's/^host: //p')"
+          mkdir -p src-tauri/binaries dist
+          for bin in atlas-voice-gateway atlas-brain; do
+            printf '#!/bin/sh\nexit 1\n' > "src-tauri/binaries/$bin-$triple"
+            chmod +x "src-tauri/binaries/$bin-$triple"
+          done
+          printf '<!doctype html><title>ci</title>\n' > dist/index.html
       - name: Test
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib --locked
