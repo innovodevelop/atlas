@@ -53,7 +53,7 @@ Target: 2026-11-29
 ### Features
 - [ ] Mail Stage 6e: Gmail/Outlook/IMAP connectors {id: feat-020, status: in-progress}
 
-_Gmail connector built and merged 2026-10-23 (loopback OAuth, history-API inbox sync, metadata only); not yet run against a real Google account. Outlook and IMAP not started._
+_Gmail connector built and merged 2026-10-23 (loopback OAuth, history-API inbox sync, metadata only); not yet run against a real Google account. Background sync every 15 minutes added 2026-10-23, tested in `cargo test` only. Outlook and IMAP not started._
 
 - [ ] Mail sending (SES production access) {id: feat-021}
 - [ ] Mail 6b-6d runtime verification {id: feat-022}

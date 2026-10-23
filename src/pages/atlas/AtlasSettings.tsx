@@ -251,15 +251,15 @@ function MailSettings() {
       <div>
         <h3 className="t14 fw6" style={{ color: 'var(--ink)', marginBottom: 6 }}>Connected mailboxes</h3>
         <p className="fs12" style={{ color: 'var(--ink2)', lineHeight: 1.5 }}>
-          Atlas scans connected mailboxes read-only and alerts you to bills, deadlines and documents. Your mailbox is never modified.
+          Atlas scans connected mailboxes read-only, every 15 minutes while it is open, and alerts you to bills, deadlines and documents. Your mailbox is never modified.
         </p>
       </div>
       {accounts.map((a) => (
         <Panel pad="sm" className="fx ac jb" key={a.id}>
           <div style={{ minWidth: 0 }}>
             <p className="t14 fw6 trunc m0" style={{ color: 'var(--ink)' }}>{a.email_address}</p>
-            <p className="fs12 m0 fx ac gap6" style={{ color: a.status === 'active' ? 'var(--positive)' : 'var(--negative)' }}>
-              <Check className="i12" />{a.status === 'active' ? 'Active · read-only' : a.status}
+            <p className="fs12 m0 fx ac gap6" title={a.last_error ?? undefined} style={{ color: a.status === 'active' ? 'var(--positive)' : 'var(--negative)' }}>
+              <Check className="i12" />{a.status === 'active' ? 'Active · read-only' : a.last_error ?? a.status}
             </p>
           </div>
           {/* Scan and disconnect exist for Gmail only. The admin IMAP mailbox

@@ -760,6 +760,9 @@ pub fn run() {
           // /proactive/cycle. All judgement lives brain-side; this only ticks —
           // but it ticks a shared brain, so only the owner may run one.
           handle.manage(scheduler::ProactiveScheduler::spawn(token, ATLAS_BRAIN_PORT));
+          // Background Gmail sync writes the shared atlas.db too, so it runs
+          // in the owner only, for the same reason.
+          handle.manage(gmail::GmailAutoSync::spawn(handle.clone()));
         });
       }
 
@@ -832,6 +835,9 @@ pub fn run() {
       if let tauri::RunEvent::Exit = event {
         if let Some(sched) = app_handle.try_state::<scheduler::ProactiveScheduler>() {
           sched.stop();
+        }
+        if let Some(mail) = app_handle.try_state::<gmail::GmailAutoSync>() {
+          mail.stop();
         }
         // The home push socket owns a thread of its own; close it before the
         // process goes so an open WebSocket is not left to the OS.
