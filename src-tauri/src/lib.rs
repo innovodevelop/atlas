@@ -244,6 +244,20 @@ fn spawn_atlas_brain(token: &str, control: Option<(u16, &str)>) -> SidecarSpawn 
             .env("ATLAS_CONTROL_TOKEN", control_token)
             .env("ATLAS_CONTROL_PROFILE", "interactive");
     }
+    // Where the git checkout is, for /versions' "Local checkout" check
+    // (services/atlas-brain/src/planSync.ts). A Finder launch gets launchd's
+    // environment and the compiled brain's own project root is "/", so a
+    // checkout outside planSync's fixed list (~/atlas, ~/Developer/atlas, ...)
+    // was never found. A build made on this Mac knows its checkout at compile
+    // time; a CI-built release embeds a runner path that doesn't exist here
+    // and is skipped. An ATLAS_REPO_DIR the user set is inherited and wins.
+    if std::env::var_os("ATLAS_REPO_DIR").is_none() {
+        if let Some(repo) = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).parent() {
+            if repo.join(".git").exists() {
+                cmd.env("ATLAS_REPO_DIR", repo);
+            }
+        }
+    }
     // AI key from the Keychain (never in env files / git). Anthropic is the
     // only chat provider on the app path — the Gemini key is deliberately NOT
     // injected: a silent fallback would send prompts (which embed the user's
