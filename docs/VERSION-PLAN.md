@@ -59,7 +59,9 @@ _Gmail connector built and merged 2026-10-23 (loopback OAuth, history-API inbox 
 
 - [ ] Mail sending (SES production access) {id: feat-021}
 - [ ] Mail 6b-6d runtime verification {id: feat-022}
-- [ ] Wake-word model licensing resolution (Google speech_embedding) {id: feat-023, design: linked}
+- [ ] Wake-word model licensing resolution (Google speech_embedding) {id: feat-023, status: in-progress, design: linked}
+
+_2026-10-23: backbone done — Google speech_embedding (Apache-2.0) converted to ONNX in CI and shipping in place of openWakeWord's NC mel + embedding models; verified equivalent in CI (hey_jarvis 0.999 vs 0.997 on a TTS clip), not yet on a real microphone. Remaining: train the Hey Atlas phrase model on CC0 negatives (feat-024)._
 - [ ] Hey Atlas custom wake phrase {id: feat-024}
 - [ ] Voice latency optimization {id: feat-025, status: in-progress}
 

@@ -17,10 +17,8 @@
  */
 import * as ort from "onnxruntime-web";
 import { DEFAULT_THRESHOLD, WAKE_MODELS, _setActivePhrases, type WakeModelSpec } from "./wakeWord";
+import { EmbeddingFramer, WINDOW } from "./wakeWordFraming";
 
-const CHUNK = 1280;          // 80 ms @ 16 kHz — openWakeWord's native hop
-const MEL_WINDOW = 76;       // mel frames per embedding
-const MEL_HOP = 8;           // mel frames advanced per embedding
 const EMB_WINDOW = 16;       // embeddings per wake-model inference
 const REFRACTORY_MS = 1500;  // ignore re-triggers right after a detection
 
@@ -40,12 +38,11 @@ interface LoadedWakeModel {
 }
 
 export class WakeWordDetectorImpl {
-  private mel!: ort.InferenceSession;
-  private emb!: ort.InferenceSession;
+  /** Google speech_embedding: 12400-sample window → one 96-dim embedding. */
+  private backbone!: ort.InferenceSession;
   private models: LoadedWakeModel[] = [];
 
-  private raw: number[] = [];
-  private melFrames: number[][] = [];   // each [32]
+  private framer = new EmbeddingFramer();
   private embeddings: number[][] = [];  // each [96]
   private lastFire = 0;
   private running = false;
@@ -69,11 +66,8 @@ export class WakeWordDetectorImpl {
     };
 
     const d = new WakeWordDetectorImpl(onWake);
-    // Feature models are mandatory — without them nothing can run.
-    [d.mel, d.emb] = await Promise.all([
-      load("/models/melspectrogram.onnx"),
-      load("/models/embedding_model.onnx"),
-    ]);
+    // The backbone is mandatory — without it nothing can run.
+    d.backbone = await load("/models/speech_embedding.onnx");
 
     // Phrase models are best-effort: try every candidate, skip the missing.
     const specs: WakeModelSpec[] = opts?.modelUrl
@@ -111,67 +105,42 @@ export class WakeWordDetectorImpl {
   /** Feed a capture frame (Int16, 16 kHz mono). */
   async push(frame: Int16Array): Promise<void> {
     if (!this.running) return;
-    for (let i = 0; i < frame.length; i++) this.raw.push(frame[i]);
-    while (this.raw.length >= CHUNK) {
-      const chunk = new Float32Array(this.raw.splice(0, CHUNK));
-      await this.processChunk(chunk);
-    }
+    for (const window of this.framer.push(frame)) await this.processWindow(window);
   }
 
-  private async processChunk(chunk: Float32Array): Promise<void> {
-    // 1) mel spectrogram. openWakeWord's model expects raw int16-range floats.
-    const melOut = await this.mel.run({
-      [this.mel.inputNames[0]]: new ort.Tensor("float32", chunk, [1, CHUNK]),
+  private async processWindow(window: Float32Array): Promise<void> {
+    // 1) one embedding for the latest 775 ms (the model computes its own
+    //    log-mel features internally).
+    const out = await this.backbone.run({
+      [this.backbone.inputNames[0]]: new ort.Tensor("float32", window, [1, WINDOW]),
     });
-    const melTensor = melOut[this.mel.outputNames[0]];
-    const md = melTensor.data as Float32Array;
-    const frames = melTensor.dims[2] as number; // [1,1,T,32]
-    for (let f = 0; f < frames; f++) {
-      const row = new Array<number>(32);
-      for (let m = 0; m < 32; m++) row[m] = md[f * 32 + m] / 10 + 2; // oww scaling
-      this.melFrames.push(row);
-    }
+    this.embeddings.push(Array.from(out[this.backbone.outputNames[0]].data as Float32Array)); // [96]
+    if (this.embeddings.length < EMB_WINDOW) return;
 
-    // 2) embeddings over a sliding 76-frame window, hop 8.
-    while (this.melFrames.length >= MEL_WINDOW) {
-      const windowFrames = this.melFrames.slice(0, MEL_WINDOW);
-      const flat = new Float32Array(MEL_WINDOW * 32);
-      for (let f = 0; f < MEL_WINDOW; f++) flat.set(windowFrames[f], f * 32);
-      const embOut = await this.emb.run({
-        [this.emb.inputNames[0]]: new ort.Tensor("float32", flat, [1, MEL_WINDOW, 32, 1]),
-      });
-      const e = embOut[this.emb.outputNames[0]].data as Float32Array;
-      this.embeddings.push(Array.from(e)); // [96]
-      this.melFrames.splice(0, MEL_HOP);
+    // 2) wake scores over the last 16 embeddings — all models in parallel.
+    const win = this.embeddings.slice(-EMB_WINDOW);
+    const flatE = new Float32Array(EMB_WINDOW * 96);
+    for (let i = 0; i < EMB_WINDOW; i++) flatE.set(win[i], i * 96);
+    const input = new ort.Tensor("float32", flatE, [1, EMB_WINDOW, 96]);
+    await Promise.all(
+      this.models.map(async (m) => {
+        const res = await m.session.run({ [m.session.inputNames[0]]: input });
+        m.score = (res[m.session.outputNames[0]].data as Float32Array)[0];
+      }),
+    );
+    this.score = Math.max(...this.models.map((m) => m.score));
+    if (this.embeddings.length > EMB_WINDOW * 4) this.embeddings.splice(0, EMB_WINDOW);
 
-      // 3) wake scores over the last 16 embeddings — all models in parallel.
-      if (this.embeddings.length >= EMB_WINDOW) {
-        const win = this.embeddings.slice(-EMB_WINDOW);
-        const flatE = new Float32Array(EMB_WINDOW * 96);
-        for (let i = 0; i < EMB_WINDOW; i++) flatE.set(win[i], i * 96);
-        const input = new ort.Tensor("float32", flatE, [1, EMB_WINDOW, 96]);
-        await Promise.all(
-          this.models.map(async (m) => {
-            const out = await m.session.run({ [m.session.inputNames[0]]: input });
-            m.score = (out[m.session.outputNames[0]].data as Float32Array)[0];
-          }),
-        );
-        this.score = Math.max(...this.models.map((m) => m.score));
-        if (this.embeddings.length > EMB_WINDOW * 4) this.embeddings.splice(0, EMB_WINDOW);
-
-        const now = performance.now();
-        const hit = this.models.find((m) => m.score >= m.threshold);
-        if (hit && now - this.lastFire > REFRACTORY_MS) {
-          this.lastFire = now;
-          this.onWake(hit.phrase);
-        }
-      }
+    const now = performance.now();
+    const hit = this.models.find((m) => m.score >= m.threshold);
+    if (hit && now - this.lastFire > REFRACTORY_MS) {
+      this.lastFire = now;
+      this.onWake(hit.phrase);
     }
   }
 
   reset(): void {
-    this.raw = [];
-    this.melFrames = [];
+    this.framer.reset();
     this.embeddings = [];
     this.score = 0;
     for (const m of this.models) m.score = 0;
@@ -192,8 +161,7 @@ export class WakeWordDetectorImpl {
         /* session already dead — the memory is gone either way */
       });
     };
-    release(this.mel);
-    release(this.emb);
+    release(this.backbone);
     for (const m of this.models) release(m.session);
     this.models = [];
   }

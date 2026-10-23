@@ -1,10 +1,15 @@
 /**
- * On-device wake word (WS-B B2) — openWakeWord pipeline over onnxruntime-web.
+ * On-device wake word (WS-B B2) — openWakeWord-style pipeline over
+ * onnxruntime-web.
  *
- * Chained ONNX stages (served from /models, MIT/Apache):
- *   melspectrogram.onnx  raw 16 kHz PCM chunk → mel frames [1,1,T,32]
- *   embedding_model.onnx sliding window of 76 mel frames → 96-dim embedding
- *   <phrase>.onnx        last 16 embeddings → wake probability
+ * Chained ONNX stages (served from /models):
+ *   speech_embedding.onnx  latest 12400 samples (775 ms), every 1280 (80 ms)
+ *                          → 96-dim embedding. Google's speech_embedding,
+ *                          Apache-2.0, converted by scripts/wakeword-backbone/.
+ *                          It replaced openWakeWord's melspectrogram +
+ *                          embedding_model pair (CC BY-NC-SA) with no
+ *                          retraining: same features, same phrase models.
+ *   <phrase>.onnx          last 16 embeddings → wake probability
  *
  * The phrase stage scores every loaded model in parallel per frame and wakes
  * when ANY crosses its threshold. All WAKE_MODELS candidates are attempted at

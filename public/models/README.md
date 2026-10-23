@@ -1,53 +1,48 @@
 # /models — on-device wake-word ONNX models
 
-Consumed by `src/lib/wakeWord.ts` (openWakeWord pipeline over
+Consumed by `src/lib/wakeWordRuntime.ts` (openWakeWord-style pipeline over
 onnxruntime-web). Everything runs client-side; audio never leaves the app.
 
-## ⚠️ LICENCE — none of the models here may ship commercially
+## What ships, and under which licence
 
-The three files below are stock openWakeWord **pre-trained models**, and they
-are **CC BY-NC-SA 4.0 (NonCommercial + ShareAlike)** — not Apache-2.0. This
-file previously claimed Apache-2.0; that was wrong and it mattered.
+| File | Role | Licence |
+|---|---|---|
+| `speech_embedding.onnx` | 775 ms of 16 kHz audio → 96-dim embedding, every 80 ms | **Apache-2.0** (Google) — see `LICENSE-speech_embedding.txt` |
+| `hey_jarvis_v0.1.onnx` | last 16 embeddings → "Hey Jarvis" probability (fallback phrase) | **CC BY-NC-SA 4.0** — must not ship commercially |
 
-openWakeWord's own README is explicit about the split:
+### The backbone: resolved (2026-10-23)
 
-> All of the code in this repository is licensed under the **Apache 2.0**
-> license. All of the included **pre-trained models** are licensed under the
-> Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
-> license due to the inclusion of datasets with unknown or restrictive
-> licensing as part of the training data.
+`speech_embedding.onnx` is Google's `speech_embedding` module (TF Hub /
+Kaggle Models, **Apache 2.0** per its model card), converted to ONNX by
+`scripts/wakeword-backbone/convert.py` in CI
+(`.github/workflows/wakeword-backbone.yml`). It replaced openWakeWord's
+`melspectrogram.onnx` + `embedding_model.onnx`, which are **CC BY-NC-SA 4.0**
+and have been removed.
 
-The **code** is Apache-2.0. The **weights** are not. Atlas is a commercial
-product, so all three must be replaced before any public release. ShareAlike
-alone would be disqualifying even without the NonCommercial clause.
+openWakeWord's backbone is a re-implementation of this module, so phrase models
+trained for openWakeWord run on it unchanged. The CI comparison measured that,
+rather than assuming it:
 
-Shipped today — all **CC BY-NC-SA 4.0**, from
-[dscripka/openWakeWord](https://github.com/dscripka/openWakeWord):
+- ONNX vs TensorFlow: max difference 4.4e-5; sliding 12400-sample windows by
+  1280 reproduces the module's full-length output.
+- Embeddings vs openWakeWord's pair on the same audio: median cosine 0.95–0.97.
+- `hey_jarvis_v0.1.onnx` on a Piper TTS "hey jarvis" clip: **0.999** on this
+  backbone vs 0.997 on openWakeWord's; ≈0 on noise and on other speech.
 
-- `melspectrogram.onnx` — 16 kHz PCM → mel frames (feature stage 1)
-- `embedding_model.onnx` — mel frames → 96-dim speech embeddings (stage 2)
-- `hey_jarvis_v0.1.onnx` — stock "Hey Jarvis" phrase model, the current
-  **fallback** wake phrase
+It also fixed a framing bug: the app ran openWakeWord's mel model on each
+1280-sample chunk alone, which yields 5 mel frames per chunk instead of 8, so
+every embedding covered ~1.2 s of audio instead of 775 ms. The new backbone
+frames audio itself (`src/lib/wakeWordFraming.ts`).
 
-### The replacement path (verified 2026-08-02)
+### What still blocks a commercial release
 
-Google's **`speech_embedding`** module on Kaggle Models is **Apache 2.0** —
-stated on the model card (google/speech-embedding, TensorFlow1, v1). It is the
-model openWakeWord re-implemented, and it **computes its own log-mel features
-internally**, so one Apache-2.0 module replaces *both* `melspectrogram.onnx`
-and `embedding_model.onnx`.
+Only the **phrase model**. `hey_jarvis_v0.1.onnx` is CC BY-NC-SA 4.0, and the
+UI says "Hey Atlas". Train `hey_atlas.onnx` / `atlas.onnx` on
+permissively-licensed negatives (prefer **CC0**, Mozilla Common Voice) with
+embeddings computed by `speech_embedding.onnx`; see
+`scripts/train-wakeword/README.md`.
 
-Its published spec matches this pipeline exactly (see the constants in
-`src/lib/wakeWord.ts`): 32 mel bins, 25 ms window / 10 ms step, first embedding
-at 12400 samples (775 ms = 76 feature vectors), each subsequent embedding every
-1280 samples (80 ms = 8 feature vectors), 96-dim output. A drop-in conversion,
-no retraining.
-
-That leaves only the phrase model to train on permissively-licensed negatives
-(prefer **CC0** — Mozilla Common Voice — so no attribution or derivative
-question arises at all). See `scripts/train-wakeword/README.md`.
-
-Lands here after training (see `scripts/train-wakeword/README.md`):
+Lands here after training:
 
 - `hey_atlas.onnx` — custom "Hey Atlas" phrase model
 - `atlas.onnx` — custom "Atlas" phrase model
