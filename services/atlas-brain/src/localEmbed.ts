@@ -11,8 +11,9 @@
  * Runtime: onnxruntime-**web** (WASM) + @huggingface/tokenizers. Not
  * onnxruntime-node: its .dylib does not survive `bun build --compile`, and the
  * whole point is a sidecar binary that works with no network and no
- * node_modules. Weights, tokenizer and the ORT wasm all ship inside the binary
- * (see embeddedAssets.ts).
+ * node_modules. The ORT wasm ships inside the binary (embeddedAssets.ts); the
+ * weights and tokenizer are downloaded once, verified, into Application Support
+ * (modelStore.ts) rather than inflating every download of the app.
  *
  * Cost of that choice: the WASM session dequantizes the weights on load, so the
  * process sits at ~1.4 GiB RSS once loaded and takes ~1.5 s to warm. Both are
@@ -27,12 +28,8 @@
 
 import { Tokenizer } from "@huggingface/tokenizers";
 import * as ort from "onnxruntime-web";
-import {
-  EMBED_ONNX,
-  EMBED_TOKENIZER,
-  EMBED_TOKENIZER_CONFIG,
-  prepareOrtWasmDir,
-} from "./embeddedAssets.ts";
+import { prepareOrtWasmDir } from "./embeddedAssets.ts";
+import { ensureModel } from "./modelStore.ts";
 
 /** Must match aiGateway.EMBEDDING_DIMENSIONS and db_schema's vector(768). */
 export const EMBEDDING_DIMENSIONS = 768;
@@ -57,9 +54,14 @@ interface Loaded {
 
 let loading: Promise<Loaded> | null = null;
 
-/** Load tokenizer + ONNX session once per process. */
+/**
+ * Load tokenizer + ONNX session once per process. A failed load (the model
+ * still downloading, or offline on first launch) is not cached, so the next
+ * embed tries again.
+ */
 function load(): Promise<Loaded> {
   loading ??= (async () => {
+    const model = await ensureModel();
     const started = performance.now();
     // wasmPaths must be set before the first session is created — ORT resolves
     // its loader/wasm pair by canonical filename out of this directory.
@@ -69,15 +71,18 @@ function load(): Promise<Loaded> {
     ort.env.wasm.proxy = false;
 
     const tokenizer = new Tokenizer(
-      await Bun.file(EMBED_TOKENIZER).json(),
-      await Bun.file(EMBED_TOKENIZER_CONFIG).json(),
+      await Bun.file(model["tokenizer.json"]).json(),
+      await Bun.file(model["tokenizer_config.json"]).json(),
     );
     const session = await ort.InferenceSession.create(
-      new Uint8Array(await Bun.file(EMBED_ONNX).arrayBuffer()),
+      new Uint8Array(await Bun.file(model["model_quantized.onnx"]).arrayBuffer()),
     );
     console.log(`[brain] embedding model ready in ${(performance.now() - started).toFixed(0)} ms (${EMBEDDING_MODEL_ID})`);
     return { tokenizer, session };
-  })();
+  })().catch((e) => {
+    loading = null;
+    throw e;
+  });
   return loading;
 }
 

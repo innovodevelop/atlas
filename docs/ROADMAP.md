@@ -109,7 +109,7 @@ Exposed in a transcript. Still valid. Security item, user-only.
 - ~~Decide the release-home repo and align the updater endpoint~~ Done 2026-08-10: innovodevelop/atlas (RELEASE.md)
 - Back up the updater private key off this Mac (the CI signing secrets were set 2026-08-10)
 - Cut the first release: no tag, GitHub release or updater feed has ever existed
-- Shrink the download (e5 model out of the sidecar binary)
+- ~~Shrink the download (e5 model out of the sidecar binary)~~ Built 2026-10-23: downloaded on first use, pinned + SHA-256-verified (`modelStore.ts`). Tradeoff: the first launch needs network for semantic recall (keyword recall and chat work without it); the download is a plain GET of a public model with no user data
 - Enable Fable 5 / Opus 5 / Sonnet 5 / Opus 4.8 on Bedrock. **IAM is done** (v4,
   applied and functionally verified 2026-08-02). What remains is entitlement, and
   **there is no longer an access-request form** — the Bedrock "Model access" page

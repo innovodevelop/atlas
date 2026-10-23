@@ -2,6 +2,10 @@
 # files the brain downloads on first launch (services/atlas-brain/src/modelStore.ts),
 # so the pins can be (re)derived from a machine that can reach Hugging Face.
 # Results are raised as a notice annotation; nothing is committed.
+#
+# The second job runs the brain's real first-launch path end to end: download
+# through modelStore.ts (verifying the committed pins), load, embed, and check
+# the vectors make sense.
 name: E5 model pin
 
 on:
@@ -10,6 +14,8 @@ on:
     branches: ["ws-*"]
     paths:
       - ".github/workflows/e5-model-pin.yml"
+      - "services/atlas-brain/src/modelStore.ts"
+      - "services/atlas-brain/src/localEmbed.ts"
 
 permissions:
   contents: read
@@ -29,3 +35,31 @@ jobs:
             out="$out%0A$f $(stat -c %s file) $(sha256sum file | cut -d' ' -f1)"
           done
           echo "::notice title=e5 pins::$out"
+
+  first-launch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: services/atlas-brain
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - name: Download, verify, load and embed
+        env:
+          ATLAS_MODELS_DIR: ${{ runner.temp }}/models
+        run: |
+          cat > /tmp/e5-check.ts <<'TS'
+          import { embedText } from "${{ github.workspace }}/services/atlas-brain/src/localEmbed.ts";
+          const cos = (a: number[], b: number[]) => a.reduce((s, x, i) => s + x * b[i], 0);
+          const q = await embedText("Hvornår skal jeg betale elregningen?", "query");
+          const hit = await embedText("Elregningen fra Ørsted forfalder den 1. november.");
+          const miss = await embedText("My favourite football team is FC Barcelona.");
+          const out = `dims ${q.length}, hit ${cos(q, hit).toFixed(3)}, miss ${cos(q, miss).toFixed(3)}`;
+          console.log(`::notice title=e5 first launch::${out}`);
+          if (q.length !== 768 || !(cos(q, hit) > cos(q, miss))) { console.error(out); process.exit(1); }
+          TS
+          bun run /tmp/e5-check.ts

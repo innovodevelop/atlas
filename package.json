@@ -16,7 +16,7 @@
     "hooks:install": "git config core.hooksPath scripts/hooks",
     "preview": "vite preview",
     "build:sidecar": "cd services/voice-gateway && bun install --frozen-lockfile && bun run fetch-models && bun build --compile --minify src/index.ts --outfile ../../src-tauri/binaries/atlas-voice-gateway-aarch64-apple-darwin && cd ../.. && bun run gen:sidecar-manifest",
-    "build:brain": "cd services/atlas-brain && bun install --frozen-lockfile && bun run fetch-models && bun build --compile --minify src/index.ts --outfile ../../src-tauri/binaries/atlas-brain-aarch64-apple-darwin && cd ../.. && bun run gen:sidecar-manifest",
+    "build:brain": "cd services/atlas-brain && bun install --frozen-lockfile && bun build --compile --minify src/index.ts --outfile ../../src-tauri/binaries/atlas-brain-aarch64-apple-darwin && cd ../.. && bun run gen:sidecar-manifest",
     "gen:sidecar-manifest": "bun scripts/gen-sidecar-manifest.ts",
     "tauri": "tauri",
     "tauri:lighthouse": "tauri build --config src-tauri/tauri.lighthouse.conf.json5",

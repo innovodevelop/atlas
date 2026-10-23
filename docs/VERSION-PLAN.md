@@ -95,7 +95,9 @@ Target: 2026-12-20
 - [ ] Privacy policy deploy automation {id: feat-042}
 - [ ] Atlas Teach redesign (design system compliance) {id: feat-043, design: linked}
 - [ ] Home floating memory cards {id: feat-044, design: linked}
-- [ ] E5 model extraction from sidecar binary {id: feat-045}
+- [ ] E5 model extraction from sidecar binary {id: feat-045, status: in-progress}
+
+_2026-10-23: the e5 weights + tokenizer (~280 MB) are out of the brain binary; the brain downloads them once on first use into Application Support beside atlas.db, pinned to one Hugging Face revision and SHA-256-verified (`services/atlas-brain/src/modelStore.ts`). Chat works while it downloads (recall falls back). Verified end to end in CI (`.github/workflows/e5-model-pin.yml`); not yet on the Mac._
 
 ---
 
