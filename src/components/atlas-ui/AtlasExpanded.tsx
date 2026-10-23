@@ -12,7 +12,7 @@ import { useStocks } from '@/hooks/useStocks';
 import { useNews } from '@/hooks/useNews';
 import { useTasks } from '@/hooks/useTasks';
 import { useCalendarEvents } from '@/hooks/useCalendarEvents';
-import { useMailIntelligence, isUserMailbox } from '@/hooks/useMailIntelligence';
+import { useMailIntelligence, isUserMailbox, type OAuthMailProvider } from '@/hooks/useMailIntelligence';
 import { usePortfolio, type HistoryPoint } from '@/hooks/usePortfolio';
 import type { WakeWordState, AIState } from '@/types';
 import type { AtlasExpandedKey } from '@/pages/atlas/AtlasDashboard';
@@ -433,9 +433,27 @@ const MAIL_CATEGORIES = [
   { key: 'other', label: 'Other' },
 ] as const;
 
+/** Gmail and Outlook sign-in buttons; each says when it's the one waiting. */
+function ConnectMailButtons({ isConnecting, provider, connect }: {
+  isConnecting: boolean;
+  provider: OAuthMailProvider | null;
+  connect: (p: OAuthMailProvider) => Promise<void>;
+}) {
+  return (
+    <div className="col gap8" style={{ marginTop: 6 }}>
+      <Button variant="primary" icon={<Mail className="i16" />} loading={isConnecting && provider === 'gmail'} disabled={isConnecting} onClick={() => void connect('gmail')} style={{ width: '100%' }}>
+        {isConnecting && provider === 'gmail' ? 'Waiting for Google…' : 'Connect Gmail'}
+      </Button>
+      <Button variant="primary" icon={<Mail className="i16" />} loading={isConnecting && provider === 'outlook'} disabled={isConnecting} onClick={() => void connect('outlook')} style={{ width: '100%' }}>
+        {isConnecting && provider === 'outlook' ? 'Waiting for Microsoft…' : 'Connect Outlook'}
+      </Button>
+    </div>
+  );
+}
+
 function EmailView({ onClose }: { onClose: () => void }) {
   const {
-    messages, alerts, accounts, isConnected, isConnecting, error,
+    messages, alerts, accounts, isConnected, isConnecting, connectingProvider, error,
     connect, cancelConnect, disconnect, acknowledge, syncNow,
   } = useMailIntelligence();
   const [filter, setFilter] = useState<string>('all');
@@ -464,17 +482,9 @@ function EmailView({ onClose }: { onClose: () => void }) {
               <>
                 <p className="t14 fw6 mb8" style={{ color: 'hsl(240 30% 88%)' }}>Connect your mailbox</p>
                 <p className="fs12 mb12" style={{ color: 'hsl(240 20% 62%)', lineHeight: 1.5 }}>
-                  One-time, read-only connection. Your browser's existing Google session means it's usually a single "Allow" click — Atlas then scans automatically, sorts everything here, and alerts you to bills, deadlines and documents. Your mailbox is never modified.
+                  One-time, read-only connection. Your browser's existing Google or Microsoft session means it's usually a single "Allow" click — Atlas then scans automatically, sorts everything here, and alerts you to bills, deadlines and documents. Your mailbox is never modified. Other providers connect over IMAP in Settings.
                 </p>
-                <Button
-                  variant="primary"
-                  icon={<Mail className="i16" />}
-                  loading={isConnecting}
-                  onClick={() => void connect()}
-                  style={{ width: '100%' }}
-                >
-                  {isConnecting ? 'Waiting for Google…' : 'Connect Gmail'}
-                </Button>
+                <ConnectMailButtons isConnecting={isConnecting} provider={connectingProvider} connect={connect} />
               </>
             ) : (
               <>
@@ -497,16 +507,9 @@ function EmailView({ onClose }: { onClose: () => void }) {
                     Scan now
                   </Button>
                 ) : (
-                  // Only the admin IMAP mailbox is connected: still offer Gmail
-                  // (IMAP mailboxes connect from Settings).
-                  <Button
-                    icon={<Mail className="i14" />}
-                    loading={isConnecting}
-                    style={{ width: '100%', marginTop: 6 }}
-                    onClick={() => void connect()}
-                  >
-                    {isConnecting ? 'Waiting for Google…' : 'Connect Gmail'}
-                  </Button>
+                  // Only the admin IMAP mailbox is connected: still offer the
+                  // OAuth providers (IMAP mailboxes connect from Settings).
+                  <ConnectMailButtons isConnecting={isConnecting} provider={connectingProvider} connect={connect} />
                 )}
               </>
             )}
