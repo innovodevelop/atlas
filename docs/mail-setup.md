@@ -101,8 +101,35 @@ tab shows whether the mailbox connected. Back in Atlas, use **Scan now** to sync
 - Gmail sign-in has not yet been run end to end against a real Google
   account; the first real connect is the verification step.
 
+## Custom IMAP mailboxes
+
+Settings → Mail → **Connect another mailbox (IMAP)** connects any mailbox
+that speaks IMAP (iCloud, Fastmail, Yahoo, a hosting provider's server).
+
+- **Server settings:** the email address, the IMAP server and port (993),
+  an optional username (defaults to the address) and the password. Most
+  providers with two-factor sign-in need an **app-specific password**:
+  iCloud (appleid.apple.com), Yahoo and Fastmail all issue them.
+- **TLS only.** Atlas connects with implicit TLS and refuses STARTTLS and
+  plaintext, so the password never crosses the network unencrypted.
+- **Read-only.** The inbox is opened with `EXAMINE`, so the server cannot
+  even mark a message as read, and only the envelope (sender, subject, date,
+  Message-ID) is fetched.
+- **Where it lives:** server settings and password are one Keychain item
+  per mailbox (service `atlas-imap`); messages are in `atlas.db`.
+- **Sync:** Atlas logs in once before saving anything, scans straight away,
+  then joins Gmail's 15-minute background sync. A first scan takes the
+  newest 50 messages and doesn't backfill. A rejected password or a TLS
+  certificate that doesn't verify marks the mailbox **error** until you
+  reconnect it; a network failure is retried on the next round.
+- **Disconnect** deletes the mailbox, its scanned mail and the Keychain item.
+  There is no grant to revoke; change the password at your provider if you
+  want to cut access off there too.
+- **Not yet:** run against a real server (the first connect on the Mac is
+  the verification step).
+
 ## Later phases
 
 - **Outlook** (Microsoft Graph `Mail.Read`) — same local pipeline, needs an
-  Azure app registration.
-- **Custom IMAP** — syncs locally inside the Mac app.
+  Azure app registration. Outlook.com mailboxes no longer accept IMAP
+  password logins, so the IMAP connector doesn't cover them.

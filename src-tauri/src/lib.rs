@@ -17,6 +17,7 @@ mod db;
 mod datafetch;
 mod mail;
 mod gmail;
+mod mail_imap;
 mod scheduler;
 mod integrity;
 mod control;
@@ -492,6 +493,7 @@ pub fn run() {
     .manage(oauth::FlowRegistry::default())
     .manage(music::MusicState::new())
     .manage(gmail::GmailState::new())
+    .manage(mail_imap::ImapState::new())
     .manage(home::HomeState::new())
     .invoke_handler(tauri::generate_handler![
       voice_gateway_info,
@@ -548,6 +550,9 @@ pub fn run() {
       gmail::gmail_disconnect,
       gmail::gmail_sync,
       gmail::gmail_cancel_connect,
+      mail_imap::imap_connect,
+      mail_imap::imap_disconnect,
+      mail_imap::imap_sync,
       // The webview's yes/no on a queued control-port action. Execution stays
       // in Rust: this command takes an approval id and a boolean, and the
       // arguments it would run with never leave the Rust process — the webview

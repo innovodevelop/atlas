@@ -54,6 +54,8 @@ ureq = { version = "2.10", features = ["json"] }        # lean blocking HTTP (no
 hmac = "0.12"                                           # SnapTrade request signing
 sha2 = "0.10"
 base64 = "0.22"
+imap = "2.4"                                            # read-only IMAP sync for custom mailboxes (mail_imap.rs)
+native-tls = "0.2"                                      # TLS for imap; already in the tree via other deps
 keyring = "2"                                           # macOS Keychain for app creds + user secret
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }

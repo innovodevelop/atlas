@@ -6,9 +6,10 @@ import { useAuth } from '@/hooks/useAuth';
 // Gmail connects, syncs and disconnects through the local gmail_* Rust
 // commands (localClient routes the old edge-function names to them); this hook
 // reads mail_accounts / mail_messages / mail_alerts, streams new alerts, and
-// exposes those actions. Only provider 'gmail' rows are syncable or
-// disconnectable here: the admin IMAP mailbox (mail.rs) is listed too, and
-// gmail_disconnect refuses it.
+// exposes those actions. IMAP mailboxes the user connected go through the
+// imap_* commands (mail_imap.rs) the same way. Only those two kinds are
+// syncable or disconnectable here (isUserMailbox): the admin IMAP mailbox
+// (mail.rs) is listed too, and both Rust modules refuse it.
 // NOTE: mail_accounts.encrypted_refresh_token must never reach React state.
 // The local shim ignores select() column lists and returns full rows, so the
 // projection is enforced in JS here (pickAccount) — every mail_accounts result
@@ -52,6 +53,23 @@ const ACCOUNT_COLUMNS = 'id, provider, email_address, status, last_synced_at, la
 // project mail_accounts rows down in JS — this is the only thing standing
 // between encrypted_refresh_token and React state. Exported for the shim's
 // projection test (localClient.test.ts).
+/** A mailbox the user connected themselves (Gmail, or IMAP through
+ *  mail_imap.rs, whose ids start "imap:"), as opposed to the admin mailbox
+ *  that is also provider 'imap'. Only these get Scan and Disconnect. */
+export function isUserMailbox(a: Pick<MailAccount, 'id' | 'provider'>): boolean {
+  return a.provider === 'gmail' || (a.provider === 'imap' && a.id.startsWith('imap:'));
+}
+
+const isImap = (accountId: string) => accountId.startsWith('imap:');
+
+export interface ImapSettings {
+  email: string;
+  host: string;
+  port?: number;
+  username?: string;
+  password: string;
+}
+
 export function pickAccount(r: Record<string, unknown>): MailAccount {
   return {
     id: r.id as string,
@@ -323,7 +341,7 @@ export function useMailIntelligence() {
   const disconnect = useCallback(async (accountId: string) => {
     if (!user) return;
     setError(null);
-    const { error } = await supabase.functions.invoke('mail-disconnect', {
+    const { error } = await supabase.functions.invoke(isImap(accountId) ? 'imap-disconnect' : 'mail-disconnect', {
       body: { accountId, userId: user.id },
     });
     if (error) setError(error.message);
@@ -335,25 +353,49 @@ export function useMailIntelligence() {
     await supabase.from('mail_alerts').update({ acknowledged: true }).eq('id', alertId);
   }, []);
 
-  // Sync one Gmail mailbox: the given one, else the first active Gmail
-  // account, else any Gmail account (a sync is how an 'error' mailbox
-  // recovers, and gmail_sync reports why if it can't). Never another
-  // provider's row: gmail_sync would refuse it, and the admin IMAP mailbox
-  // syncs through mail.rs.
+  // Sync one user mailbox: the given one, else the first active one, else
+  // any (a sync is how an 'error' mailbox recovers, and the Rust command
+  // reports why if it can't). Never the admin IMAP mailbox: it syncs through
+  // mail.rs, and gmail_sync / imap_sync both refuse it.
   const syncNow = useCallback(async (accountId?: string) => {
     if (!user) return;
-    const gmail = accounts.filter((a) => a.provider === 'gmail');
+    const own = accounts.filter(isUserMailbox);
     const target = accountId
-      ? gmail.find((a) => a.id === accountId)
-      : gmail.find((a) => a.status === 'active') ?? gmail[0];
+      ? own.find((a) => a.id === accountId)
+      : own.find((a) => a.status === 'active') ?? own[0];
     if (!target) return;
     setError(null);
-    const { error } = await supabase.functions.invoke('mail-sync', {
+    const { error } = await supabase.functions.invoke(isImap(target.id) ? 'imap-sync' : 'mail-sync', {
       body: { accountId: target.id, userId: user.id },
     });
     if (error) setError(error.message);
     refresh();
   }, [user, accounts, refresh]);
+
+  // Connect an IMAP mailbox. Rust logs in once before saving anything, so a
+  // wrong password fails here with the server's verdict, then the first scan
+  // runs straight away rather than at the next 15-minute tick.
+  const connectImap = useCallback(async (settings: ImapSettings): Promise<boolean> => {
+    if (!user) return false;
+    setError(null);
+    if (!('__TAURI_INTERNALS__' in window)) {
+      setError('IMAP mailboxes can only be connected in the desktop app.');
+      return false;
+    }
+    const { data, error } = await supabase.functions.invoke('imap-connect', {
+      body: { ...settings, userId: user.id },
+    });
+    if (error || !data?.accountId) {
+      setError(error?.message ?? 'Connecting the mailbox failed.');
+      return false;
+    }
+    const synced = await supabase.functions.invoke('imap-sync', {
+      body: { accountId: data.accountId, userId: user.id },
+    });
+    if (synced.error) setError(synced.error.message);
+    refresh();
+    return true;
+  }, [user, refresh]);
 
   return {
     accounts,
@@ -369,6 +411,7 @@ export function useMailIntelligence() {
     // Scan / Disconnect actions to recover.
     hasGmail: accounts.some((a) => a.provider === 'gmail'),
     connect,
+    connectImap,
     cancelConnect,
     disconnect,
     acknowledge,

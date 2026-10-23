@@ -125,14 +125,15 @@ impl GmailState {
     }
 }
 
-/// Marks an account as syncing for as long as it lives.
-struct SyncGuard<'a> {
+/// Marks an account as syncing for as long as it lives. Shared with
+/// mail_imap.rs.
+pub(crate) struct SyncGuard<'a> {
     set: &'a Mutex<HashSet<String>>,
     account_id: String,
 }
 
 impl<'a> SyncGuard<'a> {
-    fn acquire(set: &'a Mutex<HashSet<String>>, account_id: &str) -> Option<Self> {
+    pub(crate) fn acquire(set: &'a Mutex<HashSet<String>>, account_id: &str) -> Option<Self> {
         set.lock()
             .unwrap()
             .insert(account_id.to_string())
@@ -814,7 +815,7 @@ const AUTO_SYNC_INTERVAL: Duration = Duration::from_secs(15 * 60);
 /// MAX_FETCH_PER_SYNC slice per interval.
 const AUTO_SYNC_CATCH_UP_ROUNDS: usize = 5;
 
-/// Scans every active Gmail mailbox on a timer while Atlas runs, the same
+/// Scans every active Gmail and IMAP mailbox on a timer while Atlas runs, the same
 /// sync as Scan now. Mail is local-only, so there is no sync while the app is
 /// closed (docs/mail-setup.md).
 ///
@@ -858,6 +859,8 @@ impl GmailAutoSync {
 }
 
 fn auto_sync_once(app: &AppHandle) {
+    // IMAP mailboxes ride the same timer and owner-instance check.
+    crate::mail_imap::auto_sync_once(app, AUTO_SYNC_CATCH_UP_ROUNDS);
     let (Some(db), Some(gmail)) = (app.try_state::<DbState>(), app.try_state::<GmailState>()) else {
         return;
     };
