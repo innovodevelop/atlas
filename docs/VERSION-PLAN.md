@@ -61,7 +61,9 @@ _Gmail connector built and merged 2026-10-23 (loopback OAuth, history-API inbox 
 - [ ] Mail 6b-6d runtime verification {id: feat-022}
 - [ ] Wake-word model licensing resolution (Google speech_embedding) {id: feat-023, design: linked}
 - [ ] Hey Atlas custom wake phrase {id: feat-024}
-- [ ] Voice latency optimization {id: feat-025}
+- [ ] Voice latency optimization {id: feat-025, status: in-progress}
+
+_2026-10-23: each turn now logs where its time went (`[latency]` lines from the voice gateway: STT final, brain response, first token, first sentence, first audio) and sends it to the client as a `latency` message. Scribe tokens are prefetched instead of minted on wake, and the final transcript is awaited on its event rather than polled. Next: read real breakdowns on the Mac and cut the largest stage._
 
 ---
 
