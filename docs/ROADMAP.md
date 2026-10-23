@@ -14,29 +14,29 @@ work was recorded nowhere. If you add a phase, a stage or a TODO, it goes here.
 
 ## Blocking commercial release
 
-### 1. Wake-word model licensing — **hard blocker**
+### 1. Wake-word model licensing — **backbone resolved; phrase model still blocks**
 
-All three ONNX models in `public/models/` (`melspectrogram.onnx`,
-`embedding_model.onnx`, `hey_jarvis_v0.1.onnx`) are openWakeWord **pre-trained
-models**, licensed **CC BY-NC-SA 4.0** — NonCommercial *and* ShareAlike. Only
-openWakeWord's *code* is Apache-2.0. Atlas cannot ship any of them.
+openWakeWord's pre-trained models are **CC BY-NC-SA 4.0** (only its *code*
+is Apache-2.0), so none of them can ship.
 
-Training a custom model with `scripts/train-wakeword/` as written does not
-escape this: the negative feature set (`davidscripka/openwakeword_features`)
-carries the same licence, and a custom phrase model still runs on top of the two
-NC-SA backbone files.
+**Backbone — resolved 2026-10-23.** Google's `speech_embedding` module
+(Apache 2.0 per its model card) is converted to ONNX in CI
+(`scripts/wakeword-backbone/`) and ships as `public/models/speech_embedding.onnx`;
+openWakeWord's `melspectrogram.onnx` + `embedding_model.onnx` are gone. The
+CI comparison showed it is the drop-in the 2026-08-02 analysis predicted:
+embeddings at median cosine 0.95–0.97 to openWakeWord's, and the stock
+hey_jarvis model scoring 0.999 vs 0.997 on a TTS "hey jarvis" clip, ≈0 on
+noise and other speech. It also fixed a framing bug (the app fed the mel
+model 1280-sample chunks without context: 5 frames per chunk instead of 8).
+Not yet heard through a real microphone on the Mac.
 
-**Resolution path (verified 2026-08-02):** Google's `speech_embedding` module on
-Kaggle Models is **Apache 2.0** per its model card (`google/speech-embedding`,
-TensorFlow1, v1). openWakeWord's backbone is a re-implementation of it, and the
-Google module computes its own log-mel internally, so **one Apache-2.0 module
-replaces both backbone files with no retraining**. Its published spec matches
-`src/lib/wakeWord.ts` exactly (32 mel bins, 25 ms/10 ms STFT, first embedding at
-12400 samples = 76 frames, then every 1280 samples = 8 frames, 96-dim output).
-The phrase model is then trained on CC0 negatives (Mozilla Common Voice).
+**Still blocking: the phrase model.** `hey_jarvis_v0.1.onnx` is CC BY-NC-SA.
+Train `hey_atlas.onnx` on CC0 negatives (Mozilla Common Voice) with embeddings
+from `speech_embedding.onnx`; `scripts/train-wakeword/` as written still uses
+openWakeWord's NC negative feature set and needs that swap first.
 
-Full detail: `docs/decisions/002-wake-word-openwakeword.md` (licence correction
-section) and `scripts/train-wakeword/README.md`.
+Full detail: `public/models/README.md`, `docs/decisions/002-wake-word-openwakeword.md`
+(licence correction section) and `scripts/train-wakeword/README.md`.
 
 ### 2. The wake phrase is a lie in the UI
 
