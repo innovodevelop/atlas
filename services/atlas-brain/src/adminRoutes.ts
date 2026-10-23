@@ -28,6 +28,33 @@ const json = (data: unknown, status = 200) =>
 
 const PROJECT_ROOT = resolve(import.meta.dir, "../../..");
 
+// Where /admin/versions/sync reads the plan from. Overridable so a feature
+// branch can preview its own plan without a merge.
+const PLAN_REPO = process.env.ATLAS_PLAN_REPO ?? "innovodevelop/atlas";
+const PLAN_REF = process.env.ATLAS_PLAN_REF ?? "atlas-redesign";
+
+/**
+ * Reads docs/VERSION-PLAN.md from GitHub through the `gh` CLI, the same way
+ * getCiRuns does. Reusing the developer's existing `gh` login means no token
+ * is stored or handled by Atlas, and private repos work unchanged. Returns
+ * null on any failure (gh missing, signed out, offline, timeout) so the caller
+ * can fall back to the local file.
+ */
+function fetchPlanFromGitHub(): string | null {
+  try {
+    const proc = Bun.spawnSync(
+      ["gh", "api", "-H", "Accept: application/vnd.github.raw",
+        `repos/${PLAN_REPO}/contents/docs/VERSION-PLAN.md?ref=${encodeURIComponent(PLAN_REF)}`],
+      { stdout: "pipe", stderr: "pipe", timeout: 15_000 },
+    );
+    if (proc.exitCode !== 0) return null;
+    const md = new TextDecoder().decode(proc.stdout);
+    return md.trim() ? md : null;
+  } catch {
+    return null;
+  }
+}
+
 export type ApplyResult =
   | { ok: true; synced: number; features: number }
   | { ok: false; error: string };
@@ -188,17 +215,22 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
 
   function syncVersionPlan(req: Request): Response {
     requireUser(req);
-    const planPath = resolve(PROJECT_ROOT, "docs/VERSION-PLAN.md");
-    let md: string;
-    try {
-      md = readFileSync(planPath, "utf8");
-    } catch {
-      return json({ error: "VERSION-PLAN.md not found" }, 404);
+    // GitHub is the source of truth: the plan on disk is only as fresh as the
+    // last `git pull`, and an installed .app has no checkout at all. The local
+    // file stays as the fallback for offline use or a signed-out `gh`.
+    let md = fetchPlanFromGitHub();
+    const source = md === null ? "local" : `github:${PLAN_REPO}@${PLAN_REF}`;
+    if (md === null) {
+      try {
+        md = readFileSync(resolve(PROJECT_ROOT, "docs/VERSION-PLAN.md"), "utf8");
+      } catch {
+        return json({ error: "VERSION-PLAN.md not reachable on GitHub or on disk" }, 404);
+      }
     }
 
     const result = applyVersionPlan(db, parseVersionPlan(md));
     if (!result.ok) return json({ error: result.error }, 422);
-    return json({ synced: result.synced, features: result.features });
+    return json({ synced: result.synced, features: result.features, source });
   }
 
   function getVersions(req: Request): Response {

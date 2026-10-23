@@ -4,7 +4,7 @@
  * 5-version pre-plan, feature tracking, progress, changelog.
  * Source of truth: docs/VERSION-PLAN.md (parsed into SQLite by the brain).
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GitBranch, RefreshCw, CheckCircle2, Clock, Circle, AlertTriangle } from 'lucide-react';
 import { Card, Panel, Row, Empty, Button } from '@/components/atlas-ui/primitives';
@@ -87,6 +87,15 @@ export default function AtlasVersions() {
   const handleSync = useCallback(() => {
     syncPlan.mutate(undefined, { onSuccess: () => refetch() });
   }, [syncPlan, refetch]);
+
+  // Pull the plan from GitHub once per visit, so the page reflects what is
+  // merged without anyone pressing Sync. The button stays for a manual refresh.
+  const autoSynced = useRef(false);
+  useEffect(() => {
+    if (!user || autoSynced.current) return;
+    autoSynced.current = true;
+    handleSync();
+  }, [user, handleSync]);
 
   const selected = versions.find(v => v.id === selectedId);
 
