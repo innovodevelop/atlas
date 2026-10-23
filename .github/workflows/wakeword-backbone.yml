@@ -1,0 +1,54 @@
+# Converts Google's Apache-2.0 speech_embedding module to ONNX and compares it
+# with the openWakeWord backbone it would replace (ROADMAP.md blocker 1,
+# feat-023). See scripts/wakeword-backbone/convert.py.
+#
+# Not part of the normal build: it runs only when its own files change on a
+# ws-* branch, or by hand. The ONNX file and the report are uploaded as an
+# artifact; nothing is committed by the workflow.
+name: Wake-word backbone
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["ws-*"]
+    paths:
+      - "scripts/wakeword-backbone/**"
+      - ".github/workflows/wakeword-backbone.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install converter
+        run: pip install -r scripts/wakeword-backbone/requirements.txt
+      - name: Fetch a Piper voice for the test clips (MIT tool, CC BY 4.0 voice)
+        # Only for the comparison clips; nothing from Piper ends up in the model.
+        continue-on-error: true
+        run: |
+          pip install piper-tts==1.2.0
+          mkdir -p voices
+          base=https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/lessac/medium
+          curl -sSfL -o voices/en_US-lessac-medium.onnx "$base/en_US-lessac-medium.onnx"
+          curl -sSfL -o voices/en_US-lessac-medium.onnx.json "$base/en_US-lessac-medium.onnx.json"
+      - name: Convert and compare
+        env:
+          OUT_DIR: out
+          MODELS_DIR: public/models
+          PIPER_VOICE: voices/en_US-lessac-medium.onnx
+        run: python scripts/wakeword-backbone/convert.py
+      - name: Report
+        if: always()
+        run: cat out/report.md >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: speech-embedding-onnx
+          path: out/

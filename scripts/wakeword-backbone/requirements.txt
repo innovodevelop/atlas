@@ -1,0 +1,8 @@
+tensorflow==2.15.1
+tensorflow-hub==0.16.1
+tf-keras==2.15.1
+kagglehub==0.3.12
+tf2onnx==1.16.1
+onnx==1.16.2
+onnxruntime==1.19.2
+numpy==1.26.4
