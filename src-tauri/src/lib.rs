@@ -790,11 +790,13 @@ pub fn run() {
               log::info!("[oauth] captured redirect (has_code={})", cb.code.is_some());
               // Exchange the code in Rust so it never enters the webview. The
               // flow registry says which provider issued this state, and only
-              // that provider sees the callback (they all share one redirect);
-              // it then checks the state against its own pending flow and emits
-              // its own status event.
-              // A late callback still goes to its owner, which refuses it and
-              // says so; only a state no provider issued is dropped here.
+              // that provider sees the callback (every deep-link provider
+              // shares one redirect); it then checks the state against its own
+              // pending flow and emits its own status event. A late callback
+              // still goes to its owner, which refuses it and says so; only a
+              // state no provider issued is dropped here. (Gmail isn't here:
+              // Google only accepts a loopback redirect, so its callback
+              // arrives on gmail.rs's own oauth::Loopback listener.)
               let claim = handle
                 .try_state::<oauth::FlowRegistry>()
                 .and_then(|flows| flows.claim(cb.state.as_deref()));
@@ -802,13 +804,6 @@ pub fn run() {
                 Some(oauth::Claim { provider: music::OAUTH_PROVIDER, fresh }) => {
                   if let Some(state) = handle.try_state::<music::MusicState>() {
                     music::complete_oauth(&handle, state.inner(), &cb, fresh);
-                  }
-                }
-                Some(oauth::Claim { provider: gmail::OAUTH_PROVIDER, fresh }) => {
-                  if let (Some(gmail_state), Some(db_state)) =
-                    (handle.try_state::<gmail::GmailState>(), handle.try_state::<db::DbState>())
-                  {
-                    gmail::complete_oauth(&handle, gmail_state.inner(), db_state.inner(), &cb, fresh);
                   }
                 }
                 _ => log::warn!("[oauth] callback for a sign-in no provider started — ignored"),

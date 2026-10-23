@@ -4,17 +4,15 @@
 // mail-related touches Cloudflare or any cloud service. Scope is gmail.readonly:
 // Atlas cannot send, delete, label or modify mail.
 //
-// The OAuth flow uses RFC 8252 (native app): PKCE + deep-link redirect capture.
-// The redirect is the same `atlas://oauth/callback` used by music.rs (Spotify).
-// Each sign-in registers its state with oauth::FlowRegistry, and lib.rs hands a
-// callback only to the provider that issued its state (the registry also
-// refuses states older than oauth::FLOW_TTL).
-//
-// KNOWN BLOCKER (not fixed here): Google's "Desktop app" client type only
-// accepts loopback redirects (http://127.0.0.1:<port>) and expects its
-// client_secret on the token exchange. This flow sends a custom-scheme redirect
-// and no secret, so a Desktop-app client will refuse it. It needs a loopback
-// listener before any Gmail account can actually connect.
+// The OAuth flow is RFC 8252 (native app): PKCE plus a LOOPBACK redirect
+// (oauth::Loopback, http://127.0.0.1:<random port>), not the atlas:// deep
+// link Spotify uses. Google's "Desktop app" client type accepts only loopback
+// redirects, and it requires the client's secret on the token exchange even
+// with PKCE. Google documents that secret as not confidential for installed
+// apps; it still lives in the Keychain blob next to the client id, never in
+// the repo. gmail_connect starts a listener thread per sign-in; the browser's
+// redirect lands there, the code is exchanged in Rust, and the browser tab is
+// answered with the real outcome.
 //
 // Sync is incremental through Gmail's history API (sync_cursor holds a
 // historyId). The first sync, or one whose history Gmail has expired, takes the
@@ -23,13 +21,15 @@
 // The DB mutex is never held across a network call: every other DB command in
 // the app waits on it. Network first, then short locked sections.
 
-use std::collections::HashSet;
+use std::cell::Cell;
+use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
+use std::time::Instant;
 
 use chrono::Utc;
 use rusqlite::OptionalExtension;
 use serde_json::{json, Value};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::db::DbState;
 use crate::oauth;
@@ -39,9 +39,6 @@ const GOOGLE_AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 const GOOGLE_REVOKE_URL: &str = "https://oauth2.googleapis.com/revoke";
 const GMAIL_API: &str = "https://gmail.googleapis.com/gmail/v1/users/me";
-
-/// The name Gmail registers its OAuth states under (oauth::FlowRegistry).
-pub const OAUTH_PROVIDER: &str = "gmail";
 
 /// gmail_get's error for HTTP 404, so callers can tell "gone" from "failed":
 /// a message deleted since it was listed, or history Gmail no longer keeps.
@@ -68,16 +65,28 @@ const MAX_REQUESTS_PER_SYNC: usize = 1000;
 /// mistaken for a historyId.
 const CURSOR_PREFIX: &str = "h:";
 
-/// In-flight OAuth state (the PKCE verifier + CSRF token), cleared when its
-/// callback arrives.
+/// Sign-ins that may be in flight at once. Starting another evicts the oldest,
+/// whose listener then retires and reports it. Only reachable by clicking
+/// Connect repeatedly; it bounds the listener threads and ports.
+const MAX_PENDING_SIGN_INS: usize = 4;
+
+/// One in-flight sign-in: the PKCE verifier, who started it, and the loopback
+/// redirect_uri the token exchange must repeat. Keyed by its OAuth state (the
+/// "flow" id) in GmailState.pending.
+#[derive(Clone)]
 pub struct GmailOAuthPending {
     pub verifier: String,
-    pub csrf_state: String,
     pub user_id: String,
+    pub redirect_uri: String,
+    pub started: Instant,
 }
 
 pub struct GmailState {
-    pub pending: Mutex<Option<GmailOAuthPending>>,
+    /// In-flight sign-ins by flow id. Independent of each other: a second
+    /// Connect doesn't retire the first, so two hook instances (or two
+    /// gmail_connect commands finishing out of order) can't cancel each other.
+    /// A flow leaves the map when it completes, is cancelled, or times out.
+    pub pending: Mutex<HashMap<String, GmailOAuthPending>>,
     /// Accounts with a sync running, so a double-clicked Scan (or Settings and
     /// the Mail view at once) doesn't fetch every message twice.
     syncing: Mutex<HashSet<String>>,
@@ -86,9 +95,32 @@ pub struct GmailState {
 impl GmailState {
     pub fn new() -> Self {
         Self {
-            pending: Mutex::new(None),
+            pending: Mutex::new(HashMap::new()),
             syncing: Mutex::new(HashSet::new()),
         }
+    }
+
+    /// Add a sign-in, first evicting the oldest ones beyond
+    /// MAX_PENDING_SIGN_INS (their listeners retire and report it).
+    fn register(&self, flow: &str, sign_in: GmailOAuthPending) {
+        let mut pending = self.pending.lock().unwrap();
+        while pending.len() >= MAX_PENDING_SIGN_INS {
+            let Some(oldest) = pending.iter().min_by_key(|(_, p)| p.started).map(|(id, _)| id.clone())
+            else {
+                break;
+            };
+            pending.remove(&oldest);
+        }
+        pending.insert(flow.to_string(), sign_in);
+    }
+
+    fn is_pending(&self, flow: &str) -> bool {
+        self.pending.lock().unwrap().contains_key(flow)
+    }
+
+    /// Remove a flow; Some if it was still in flight.
+    fn retire(&self, flow: &str) -> Option<GmailOAuthPending> {
+        self.pending.lock().unwrap().remove(flow)
     }
 }
 
@@ -121,20 +153,29 @@ fn now_iso() -> String {
 // OAuth helpers
 // ---------------------------------------------------------------------------
 
-/// Read Google OAuth Client ID from Keychain (stored by the user per mail-setup.md).
-fn google_client_id() -> Result<String, String> {
-    crate::secrets::core_key("google_oauth_client_id")
-        .ok_or_else(|| "Google OAuth Client ID not found in Keychain. See docs/mail-setup.md step 5.".to_string())
+/// The Google OAuth client (a "Desktop app" client), from the atlas-core
+/// Keychain blob, where the user puts it per docs/mail-setup.md.
+struct GoogleClient {
+    id: String,
+    secret: String,
 }
 
-fn build_authorize_url(challenge: &str, state: &str) -> Result<String, String> {
-    let client_id = google_client_id()?;
-    Ok(format!(
+fn google_client() -> Result<GoogleClient, String> {
+    let get = |key: &str| crate::secrets::core_key(key).filter(|v| !v.trim().is_empty());
+    match (get("google_oauth_client_id"), get("google_oauth_client_secret")) {
+        (Some(id), Some(secret)) => Ok(GoogleClient { id, secret }),
+        (None, _) => Err("Gmail isn't set up yet: no Google OAuth client ID in the Keychain. See docs/mail-setup.md.".to_string()),
+        (_, None) => Err("Gmail isn't set up yet: no Google OAuth client secret in the Keychain. See docs/mail-setup.md.".to_string()),
+    }
+}
+
+fn build_authorize_url(client: &GoogleClient, redirect_uri: &str, challenge: &str, state: &str) -> String {
+    format!(
         "{GOOGLE_AUTH_URL}?{}",
         form(&[
-            ("client_id", &client_id),
+            ("client_id", &client.id),
             ("response_type", "code"),
-            ("redirect_uri", oauth::REDIRECT_URI),
+            ("redirect_uri", redirect_uri),
             ("code_challenge_method", "S256"),
             ("code_challenge", challenge),
             ("state", state),
@@ -142,7 +183,7 @@ fn build_authorize_url(challenge: &str, state: &str) -> Result<String, String> {
             ("access_type", "offline"),
             ("prompt", "consent"),
         ])
-    ))
+    )
 }
 
 fn form(pairs: &[(&str, &str)]) -> String {
@@ -167,13 +208,14 @@ fn urlencoding(s: &str) -> String {
 }
 
 /// Exchange the authorization code for tokens. Returns (access_token, refresh_token).
-fn exchange_code(code: &str, verifier: &str) -> Result<(String, String), String> {
-    let client_id = google_client_id()?;
+fn exchange_code(code: &str, verifier: &str, redirect_uri: &str) -> Result<(String, String), String> {
+    let client = google_client()?;
     let body = form(&[
         ("grant_type", "authorization_code"),
         ("code", code),
-        ("redirect_uri", oauth::REDIRECT_URI),
-        ("client_id", &client_id),
+        ("redirect_uri", redirect_uri),
+        ("client_id", &client.id),
+        ("client_secret", &client.secret),
         ("code_verifier", verifier),
     ]);
     let v = post_token(&body)?;
@@ -190,11 +232,12 @@ fn exchange_code(code: &str, verifier: &str) -> Result<(String, String), String>
 
 /// Refresh the access token using the stored refresh token.
 fn refresh_access_token(refresh_token: &str) -> Result<String, String> {
-    let client_id = google_client_id()?;
+    let client = google_client()?;
     let body = form(&[
         ("grant_type", "refresh_token"),
         ("refresh_token", refresh_token),
-        ("client_id", &client_id),
+        ("client_id", &client.id),
+        ("client_secret", &client.secret),
     ]);
     let v = post_token(&body)?;
     v["access_token"]
@@ -251,29 +294,91 @@ fn revoke(token: &str) {
 // Tauri commands
 // ---------------------------------------------------------------------------
 
-/// Begin the Gmail OAuth flow: generate PKCE, stash state, return the consent
-/// URL and the flow id (the OAuth state, which is in the URL anyway). Every
-/// gmail:status event carries the flow it is about, so a hook instance only
-/// reacts to the flow it started.
+/// Begin a Gmail sign-in: bind a loopback listener, generate PKCE, register
+/// the flow, start the thread that waits for Google's redirect, and return the
+/// consent URL plus the flow id (the OAuth state, which is in the URL anyway).
+/// Every gmail:status event carries the flow it is about, so a hook instance
+/// only reacts to the flow it started.
 /// JS calls with `{ provider: 'gmail', userId: '<id>' }`.
 #[tauri::command(async)]
 pub fn gmail_connect(
+    app: AppHandle,
     state: State<'_, GmailState>,
-    flows: State<'_, oauth::FlowRegistry>,
     user_id: String,
     provider: Option<String>,
 ) -> Result<Value, String> {
     let _ = provider;
+    let client = google_client()?;
+    let loopback = oauth::Loopback::bind()
+        .map_err(|e| format!("Couldn't start the local sign-in listener: {e}"))?;
+    let redirect_uri = loopback.redirect_uri();
     let (verifier, challenge) = oauth::generate_pkce();
-    let csrf = uuid::Uuid::new_v4().simple().to_string();
-    let url = build_authorize_url(&challenge, &csrf)?;
-    flows.issue(OAUTH_PROVIDER, &csrf);
-    *state.pending.lock().unwrap() = Some(GmailOAuthPending {
-        verifier,
-        csrf_state: csrf.clone(),
-        user_id,
-    });
-    Ok(json!({ "authUrl": url, "flow": csrf }))
+    let flow = uuid::Uuid::new_v4().simple().to_string();
+    let url = build_authorize_url(&client, &redirect_uri, &challenge, &flow);
+
+    state.register(&flow, GmailOAuthPending { verifier, user_id, redirect_uri, started: Instant::now() });
+
+    let thread_flow = flow.clone();
+    let spawned = std::thread::Builder::new()
+        .name("gmail-oauth-loopback".into())
+        .spawn(move || await_redirect(app, loopback, thread_flow));
+    if let Err(e) = spawned {
+        // No listener means nothing would ever finish or expire this flow.
+        state.retire(&flow);
+        return Err(format!("Couldn't start the local sign-in listener: {e}"));
+    }
+
+    Ok(json!({ "authUrl": url, "flow": flow }))
+}
+
+/// The listener thread for one sign-in: wait for the redirect, finish the
+/// sign-in, answer the browser tab with the outcome. Every way it ends that
+/// the webview didn't cause itself is reported over gmail:status, so no
+/// "Waiting for Google…" is left spinning.
+fn await_redirect(app: AppHandle, loopback: oauth::Loopback, flow: String) {
+    let gmail = app.state::<GmailState>();
+    let report = |msg: &str| emit_gmail_status(&app, Some(&flow), false, Some(msg));
+
+    // Retired (cancelled, or evicted by too many sign-ins): say so once.
+    // After the hook's own Cancel nobody is listening, which is harmless.
+    let reported_retired = Cell::new(false);
+    let keep_waiting = || {
+        let live = gmail.is_pending(&flow);
+        if !live && !reported_retired.replace(true) {
+            report("This Google sign-in was cancelled. Connect again if you still want to.");
+        }
+        live
+    };
+
+    match loopback.wait(&flow, Instant::now() + oauth::FLOW_TTL, keep_waiting) {
+        oauth::LoopbackOutcome::Redirect(cb, browser) => {
+            let db = app.state::<DbState>();
+            match complete_oauth(&app, gmail.inner(), db.inner(), &flow, &cb) {
+                Ok(email) => browser.send(
+                    true,
+                    "Gmail is connected",
+                    &format!("Atlas can now read {email}. You can close this tab and return to Atlas."),
+                ),
+                Err(e) => browser.send(
+                    false,
+                    "Gmail was not connected",
+                    &format!("{e} You can close this tab and try again from Atlas."),
+                ),
+            }
+        }
+        // Only a flow still in flight is reported here; a retired one was
+        // reported when it retired.
+        oauth::LoopbackOutcome::TimedOut => {
+            if gmail.retire(&flow).is_some() {
+                report("The Google sign-in took too long. Please connect again.");
+            }
+        }
+        oauth::LoopbackOutcome::Failed(e) => {
+            if gmail.retire(&flow).is_some() {
+                report(&format!("The local sign-in listener stopped ({e}). Please connect again."));
+            }
+        }
+    }
 }
 
 /// Account ids are per Atlas user AND mailbox. Two local Atlas users can
@@ -416,12 +521,12 @@ pub fn gmail_disconnect(
 }
 
 /// Abandon the Gmail sign-in `flow` (the id gmail_connect returned), so a
-/// leftover Google tab finished after Cancel connects nothing. A no-op if that
-/// flow is no longer the pending one.
+/// Google tab finished after Cancel connects nothing, including one whose
+/// token exchange is already under way (finish_sign_in re-checks before it
+/// writes anything). A no-op if the flow already ended.
 #[tauri::command(async)]
 pub fn gmail_cancel_connect(state: State<'_, GmailState>, flow: String) -> Result<Value, String> {
-    let cancelled = oauth::take_matching(&state.pending, Some(&flow), |p| p.csrf_state.as_str()).is_some();
-    Ok(json!({ "cancelled": cancelled }))
+    Ok(json!({ "cancelled": state.retire(&flow).is_some() }))
 }
 
 /// Sync messages from Gmail into mail_messages (inbox only, metadata only).
@@ -751,89 +856,80 @@ fn received_at_iso(internal_date: Option<&str>, date_header: Option<&str>) -> Op
 // Deep-link callback handler (lib.rs calls this only for Gmail-issued states)
 // ---------------------------------------------------------------------------
 
-/// Complete the Gmail OAuth flow: validate CSRF, exchange the code, create or
-/// reactivate the mail_accounts row, then persist the refresh token.
-///
-/// lib.rs only calls this for a state the flow registry says Gmail issued.
-/// Every outcome emits gmail:status tagged with that state (the "flow" the
-/// webview got from gmail_connect), so only the hook that started this flow
-/// reacts to it.
-pub fn complete_oauth(
+/// Finish a sign-in from its loopback redirect, and report the outcome as
+/// gmail:status tagged with the flow (the id the webview got from
+/// gmail_connect), so only the hook that started this flow reacts. Returns
+/// the connected address, or the reason, for the browser tab's answer.
+fn complete_oauth(
     app: &AppHandle,
     state: &GmailState,
     db: &DbState,
+    flow: &str,
     cb: &oauth::OauthCallback,
-    fresh: bool,
-) {
-    let flow = cb.state.as_deref();
-    let fail = |msg: &str| emit_gmail_status(app, flow, false, Some(msg));
-
-    let Some(pending) =
-        oauth::take_matching(&state.pending, flow, |p| p.csrf_state.as_str())
-    else {
-        // A Gmail state, but not the flow in progress: a newer Connect replaced it.
-        fail("That Google sign-in was replaced by a newer one. Finish it in the most recent browser tab.");
-        return;
-    };
-    if !fresh {
-        fail("The Google sign-in took too long. Please connect again.");
-        return;
+) -> Result<String, String> {
+    let result = finish_sign_in(app, state, db, flow, cb);
+    // Whatever happened, this flow is over.
+    state.retire(flow);
+    match &result {
+        Ok(_) => emit_gmail_status(app, Some(flow), true, None),
+        Err(e) => emit_gmail_status(app, Some(flow), false, Some(e)),
     }
+    result
+}
+
+/// Exchange the code, then create or reactivate the mail_accounts row and
+/// persist the refresh token, unless the flow was cancelled meanwhile.
+fn finish_sign_in(
+    app: &AppHandle,
+    state: &GmailState,
+    db: &DbState,
+    flow: &str,
+    cb: &oauth::OauthCallback,
+) -> Result<String, String> {
+    const CANCELLED: &str = "This sign-in was cancelled in Atlas.";
+    // A copy, not a removal: the flow stays cancellable while the token
+    // exchange and profile fetch are on the network.
+    let pending = state.pending.lock().unwrap().get(flow).cloned().ok_or(CANCELLED)?;
     if let Some(err) = &cb.error {
-        fail(err);
-        return;
+        return Err(match err.as_str() {
+            "access_denied" => "Access to Gmail wasn't granted.".to_string(),
+            other => format!("Google reported an error ({other})."),
+        });
     }
-    let Some(code) = &cb.code else {
-        fail("No authorization code in redirect");
-        return;
-    };
+    let code = cb.code.as_deref().ok_or("No authorization code in the redirect.")?;
 
-    let (access_token, refresh_token) = match exchange_code(code, &pending.verifier) {
-        Ok(tokens) => tokens,
-        Err(e) => {
-            fail(&e);
-            return;
-        }
-    };
+    let (access_token, refresh_token) = exchange_code(code, &pending.verifier, &pending.redirect_uri)?;
     // From here on Google has issued a live grant. A failure below deliberately
     // does NOT revoke it: Google keeps one grant per app and Google account, so
     // revoking this token would also kill the stored token of a mailbox already
     // connected (this may be a reconnect, or another local user's mailbox). An
     // unused grant is the lesser harm; it can be removed from the Google
     // account, or by connecting and then disconnecting.
+
     // The mailbox's address names the account. Without it there is no honest
     // row to create, so fail rather than invent a placeholder.
-    let email = match gmail_get(&access_token, "/profile") {
-        Ok(profile) => match profile["emailAddress"].as_str() {
-            Some(e) => e.to_string(),
-            None => {
-                fail("Google did not return the mailbox address");
-                return;
-            }
-        },
-        Err(e) => {
-            fail(&e);
-            return;
-        }
-    };
+    let profile = gmail_get(&access_token, "/profile")?;
+    let email = profile["emailAddress"]
+        .as_str()
+        .ok_or("Google did not return the mailbox address.")?
+        .to_string();
+
+    // Last chance to honour a Cancel pressed during the network calls above.
+    // Removing the flow here claims it, so from this point a Cancel is a no-op
+    // and what remains is a few local writes.
+    state.retire(flow).ok_or(CANCELLED)?;
 
     // Row first, token second: a failed token write then leaves a row marked
     // 'error' that the user can see and reconnect.
     let account_id = {
         let conn = db.conn.lock().unwrap();
-        match reconnect_or_create(&conn, &pending.user_id, &email, &now_iso()) {
-            Ok(id) => id,
-            Err(e) => {
-                drop(conn);
-                fail(&format!("Failed to create account: {e}"));
-                return;
-            }
-        }
+        reconnect_or_create(&conn, &pending.user_id, &email, &now_iso())
+            .map_err(|e| format!("Failed to create the account: {e}"))?
     };
     let _ = app.emit("db:changed", json!({"table": "mail_accounts", "op": "INSERT"}));
 
     if let Err(e) = crate::secrets::set_gmail_refresh_token(&account_id, &refresh_token) {
-        let msg = format!("Failed to store token: {e}");
+        let msg = format!("Failed to store the token in the Keychain: {e}");
         {
             let conn = db.conn.lock().unwrap();
             let _ = conn.execute(
@@ -842,11 +938,9 @@ pub fn complete_oauth(
             );
         }
         let _ = app.emit("db:changed", json!({"table": "mail_accounts", "op": "UPDATE"}));
-        fail(&msg);
-        return;
+        return Err(msg);
     }
-
-    emit_gmail_status(app, flow, true, None);
+    Ok(email)
 }
 
 fn emit_gmail_status(app: &AppHandle, flow: Option<&str>, connected: bool, error: Option<&str>) {
@@ -1044,6 +1138,40 @@ mod tests {
         let b = reconnect_or_create(&conn, "B", "shared@x.com", "2026-10-01T00:00:00.000Z").unwrap();
         assert!(mailbox_shared(&conn, &a, "shared@x.com").unwrap(), "revoking A's token would break B");
         assert!(mailbox_shared(&conn, &b, "shared@x.com").unwrap());
+    }
+
+    fn sign_in(started: Instant) -> GmailOAuthPending {
+        GmailOAuthPending {
+            verifier: "v".into(),
+            user_id: "u1".into(),
+            redirect_uri: "http://127.0.0.1:1".into(),
+            started,
+        }
+    }
+
+    #[test]
+    fn a_second_sign_in_does_not_retire_the_first() {
+        let state = GmailState::new();
+        let t = Instant::now();
+        state.register("a", sign_in(t));
+        state.register("b", sign_in(t + std::time::Duration::from_secs(1)));
+        assert!(state.is_pending("a") && state.is_pending("b"));
+        // Cancelling one leaves the other alone, whatever order things ran in.
+        assert!(state.retire("a").is_some());
+        assert!(state.retire("a").is_none(), "already gone: a no-op");
+        assert!(state.is_pending("b"));
+    }
+
+    #[test]
+    fn too_many_sign_ins_evict_the_oldest() {
+        let state = GmailState::new();
+        let t = Instant::now();
+        for i in 0..MAX_PENDING_SIGN_INS + 1 {
+            state.register(&format!("f{i}"), sign_in(t + std::time::Duration::from_secs(i as u64)));
+        }
+        assert!(!state.is_pending("f0"), "the oldest is evicted");
+        assert!((1..=MAX_PENDING_SIGN_INS).all(|i| state.is_pending(&format!("f{i}"))));
+        assert_eq!(state.pending.lock().unwrap().len(), MAX_PENDING_SIGN_INS);
     }
 
     #[test]

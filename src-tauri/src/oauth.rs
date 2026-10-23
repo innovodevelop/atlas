@@ -1,11 +1,20 @@
 // Provider-agnostic OAuth plumbing for native (desktop) OAuth flows.
 //
-// Atlas is a *public* OAuth client (a shipped binary can't hold a secret), so
-// per RFC 8252 ("OAuth 2.0 for Native Apps") it uses Authorization Code + PKCE
-// and captures the redirect through an OS **deep link** instead of a loopback
-// server — the code is delivered straight back into this process.
+// Atlas is a *public* OAuth client (a shipped binary can't keep a secret
+// secret), so per RFC 8252 ("OAuth 2.0 for Native Apps") it uses Authorization
+// Code + PKCE, with one of two ways to catch the redirect:
 //
-// The redirect target is a single seam (`REDIRECT_URI`). Today it's the custom
+// - an OS **deep link** (`REDIRECT_URI`, routed by `FlowRegistry`) where the
+//   provider allows a custom scheme. Spotify.
+// - a **loopback** listener (`Loopback`, http://127.0.0.1:<random port>) where
+//   it doesn't. Google's "Desktop app" clients accept only that, and also want
+//   the client's secret, which Google documents as non-confidential for
+//   installed apps. Gmail.
+//
+// Either way the code comes straight back into this process and is exchanged
+// in Rust; it never reaches the webview.
+//
+// The deep-link target is a single seam (`REDIRECT_URI`). Today it's the custom
 // scheme `atlas://…`, which works on any build (signed or not). When Atlas gains
 // an Apple Developer Team ID + notarization, flipping to the branded universal
 // link `https://helloatlas.dk/…` is a one-line change here plus hosting the AASA
@@ -27,16 +36,15 @@ pub const FLOW_TTL: Duration = Duration::from_secs(10 * 60);
 
 /// Which provider issued which OAuth `state`.
 ///
-/// Every provider shares one redirect (`REDIRECT_URI`) and neither Google nor
-/// Spotify echoes a provider tag back, so the state is the only thing that says
-/// whose callback this is. lib.rs asks the registry and hands the callback to
-/// that provider alone. Before this, every handler saw every callback and a
-/// Spotify sign-in could consume and fail a Gmail one in flight.
+/// For providers on the shared atlas:// redirect (`REDIRECT_URI`; Spotify
+/// today: Gmail uses `Loopback` instead). No provider echoes a tag back, so the
+/// state is the only thing that says whose callback this is. lib.rs asks the
+/// registry and hands the callback to that provider alone, so a second
+/// provider on the deep link can never consume another's sign-in.
 ///
-/// Entries outlive a replaced flow on purpose: if the user clicks Connect
-/// twice and finishes the FIRST browser tab, the registry still knows that
-/// state was Spotify's, so Spotify can say "superseded" instead of the callback
-/// vanishing and the UI waiting forever.
+/// Entries outlive their FLOW_TTL on purpose (they are pruned at twice that),
+/// so a late callback is still routed to its provider, which refuses it with a
+/// message instead of the callback vanishing and the UI waiting forever.
 #[derive(Default)]
 pub struct FlowRegistry {
     issued: Mutex<HashMap<String, (&'static str, Instant)>>,
@@ -171,7 +179,13 @@ pub fn parse_callback(raw: &str) -> Option<OauthCallback> {
     if joined.trim_end_matches('/') != "oauth/callback" {
         return None;
     }
+    callback_from_query(&url)
+}
 
+/// The OAuth fields of a redirect's query, shared by the deep-link and
+/// loopback paths. A redirect with neither a code nor an error isn't
+/// actionable, so it's None.
+fn callback_from_query(url: &url::Url) -> Option<OauthCallback> {
     let mut code = None;
     let mut state = None;
     let mut error = None;
@@ -185,18 +199,181 @@ pub fn parse_callback(raw: &str) -> Option<OauthCallback> {
             _ => {}
         }
     }
-
-    // A callback with neither a code nor an error isn't actionable.
     if code.is_none() && error.is_none() {
         return None;
     }
-
     Some(OauthCallback {
         provider: provider.unwrap_or_default(),
         code,
         state,
         error,
     })
+}
+
+// ---------------------------------------------------------------------------
+// Loopback redirect (RFC 8252 §7.3)
+// ---------------------------------------------------------------------------
+
+/// A one-shot HTTP listener on 127.0.0.1 that catches an OAuth redirect.
+///
+/// For providers that refuse custom-scheme redirects: Google's "Desktop app"
+/// client type accepts only loopback redirects (on any port), so Gmail sign-in
+/// lands here instead of on the atlas:// deep link. The OS picks a free port,
+/// and only loopback connections can reach it because that is the only
+/// interface it binds.
+///
+/// tiny_http (already the control port's server) does the HTTP: it reads each
+/// connection on its own worker and only hands over complete requests, so a
+/// slow or idle socket (a browser preconnect, or a hostile local process) can't
+/// stall the real redirect, the deadline, or a cancel.
+///
+/// Any local process, or a web page requesting 127.0.0.1, can still reach the
+/// port. So only a request carrying the expected state ends the wait; anything
+/// else gets a 400 and the listener keeps waiting, so a wrong guess can't
+/// cancel or hijack the real sign-in.
+pub struct Loopback {
+    server: tiny_http::Server,
+    port: u16,
+}
+
+/// How often wait() re-checks its keep-waiting condition while live.
+const LOOPBACK_POLL: Duration = Duration::from_millis(200);
+
+/// How long a retired listener (sign-in cancelled in Atlas) stays up to tell a
+/// tab finished afterwards what happened, before freeing its port and thread.
+const RETIRED_GRACE: Duration = Duration::from_secs(2 * 60);
+
+/// How a wait() ended.
+pub enum LoopbackOutcome {
+    /// The redirect for this sign-in, with the browser's request held open so
+    /// the caller can answer with the real outcome.
+    Redirect(OauthCallback, LoopbackReply),
+    /// The deadline passed (or the retired grace period ran out).
+    TimedOut,
+    /// The listener itself failed. Not a timeout, so not reported as one.
+    Failed(String),
+}
+
+/// The browser's request, held open so it can be answered with the outcome.
+pub struct LoopbackReply(tiny_http::Request);
+
+impl LoopbackReply {
+    pub fn send(self, ok: bool, title: &str, message: &str) {
+        answer(self.0, ok, title, message);
+    }
+}
+
+impl Loopback {
+    pub fn bind() -> Result<Self, String> {
+        let server = tiny_http::Server::http("127.0.0.1:0").map_err(|e| e.to_string())?;
+        let port = server
+            .server_addr()
+            .to_ip()
+            .ok_or("loopback listener bound to a non-IP address")?
+            .port();
+        Ok(Self { server, port })
+    }
+
+    /// The redirect_uri to send, in both the authorize request and the token
+    /// exchange (the provider requires the two to match exactly).
+    pub fn redirect_uri(&self) -> String {
+        format!("http://127.0.0.1:{}", self.port)
+    }
+
+    /// Wait for the redirect that carries `expected_state`, until `deadline`.
+    ///
+    /// Once `keep_waiting` says the sign-in was cancelled in Atlas, the
+    /// listener stays up for RETIRED_GRACE (never past the deadline) only to
+    /// tell a tab finished late that this sign-in is no longer active; a closed
+    /// port would leave it on a bare "can't be reached" page.
+    pub fn wait(
+        self,
+        expected_state: &str,
+        mut deadline: Instant,
+        keep_waiting: impl Fn() -> bool,
+    ) -> LoopbackOutcome {
+        let mut live = true;
+        loop {
+            if live && !keep_waiting() {
+                live = false;
+                deadline = deadline.min(Instant::now() + RETIRED_GRACE);
+            }
+            let left = deadline.saturating_duration_since(Instant::now());
+            if left.is_zero() {
+                return LoopbackOutcome::TimedOut;
+            }
+            // Retired: nothing left to re-check, so block until the deadline.
+            let slice = if live { left.min(LOOPBACK_POLL) } else { left };
+            let request = match self.server.recv_timeout(slice) {
+                Ok(Some(request)) => request,
+                Ok(None) => continue,
+                Err(e) => return LoopbackOutcome::Failed(e.to_string()),
+            };
+            let cb = (*request.method() == tiny_http::Method::Get)
+                .then(|| parse_loopback_target(request.url()))
+                .flatten()
+                .filter(|cb| cb.state.as_deref() == Some(expected_state));
+            match cb {
+                Some(cb) if live => return LoopbackOutcome::Redirect(cb, LoopbackReply(request)),
+                Some(_) => answer(
+                    request,
+                    false,
+                    "This sign-in is no longer active",
+                    "It was cancelled in Atlas. Connect again from Atlas if you still want to.",
+                ),
+                None => answer(
+                    request,
+                    false,
+                    "Not an Atlas sign-in",
+                    "This address only accepts the sign-in Atlas is waiting for. You can close this tab.",
+                ),
+            }
+        }
+    }
+}
+
+/// Parse a loopback request-target ("/?code=…&state=…") into a callback.
+/// Only the root path, and only a request with a code or an error, counts.
+fn parse_loopback_target(target: &str) -> Option<OauthCallback> {
+    if !target.starts_with('/') {
+        return None;
+    }
+    let url = url::Url::parse(&format!("http://127.0.0.1{target}")).ok()?;
+    if url.path() != "/" {
+        return None;
+    }
+    callback_from_query(&url)
+}
+
+/// Answer the browser with a small self-contained page. no-referrer and
+/// no-store keep the code in the URL from leaking anywhere.
+fn answer(request: tiny_http::Request, ok: bool, title: &str, message: &str) {
+    let (title, message) = (escape_html(title), escape_html(message));
+    let body = format!(
+        "<!doctype html><html><head><meta charset=\"utf-8\"><title>{title}</title></head>\
+         <body style=\"font:16px -apple-system,system-ui,sans-serif;max-width:32em;margin:18vh auto;padding:0 1.5em;color:#1e1e24;background:#f9f7f4\">\
+         <h1 style=\"font-size:1.4em\">{title}</h1><p>{message}</p></body></html>"
+    );
+    let mut response = tiny_http::Response::from_string(body).with_status_code(if ok { 200 } else { 400 });
+    for (name, value) in [
+        ("Content-Type", "text/html; charset=utf-8"),
+        ("Cache-Control", "no-store"),
+        ("Referrer-Policy", "no-referrer"),
+    ] {
+        let header = tiny_http::Header::from_bytes(name.as_bytes(), value.as_bytes())
+            .expect("static header is well-formed");
+        response = response.with_header(header);
+    }
+    // A tab closed before the answer is the browser's business; nothing to do.
+    let _ = request.respond(response);
+}
+
+fn escape_html(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
 }
 
 #[cfg(test)]
@@ -229,6 +406,119 @@ mod tests {
         flows.issue("gmail", "g1");
         let later = Instant::now() + FLOW_TTL + Duration::from_secs(1);
         assert_eq!(flows.claim_at(Some("g1"), later), Some(Claim { provider: "gmail", fresh: false }));
+    }
+
+    #[test]
+    fn a_loopback_target_parses_into_a_callback() {
+        let cb = parse_loopback_target("/?state=s1&code=4%2F0Ab&scope=x").unwrap();
+        assert_eq!(cb.code.as_deref(), Some("4/0Ab"));
+        assert_eq!(cb.state.as_deref(), Some("s1"));
+        let denied = parse_loopback_target("/?error=access_denied&state=s1").unwrap();
+        assert_eq!(denied.error.as_deref(), Some("access_denied"));
+
+        assert!(parse_loopback_target("/favicon.ico").is_none());
+        assert!(parse_loopback_target("/other?code=c&state=s").is_none(), "root path only");
+        assert!(parse_loopback_target("/?state=s1").is_none(), "neither code nor error");
+        assert!(parse_loopback_target("evil.com/?code=c").is_none());
+    }
+
+    #[test]
+    fn html_in_messages_is_escaped() {
+        assert_eq!(escape_html("<b>\"x\" & 'y'</b>"), "&lt;b&gt;&quot;x&quot; &amp; &#39;y&#39;&lt;/b&gt;");
+    }
+
+    /// Send one raw request to the loopback port; return the whole response.
+    fn hit(port: u16, request: &str) -> String {
+        use std::io::{Read, Write};
+        let mut s = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
+        s.set_read_timeout(Some(Duration::from_secs(10))).unwrap();
+        s.write_all(request.as_bytes()).unwrap();
+        let mut out = String::new();
+        let _ = s.read_to_string(&mut out);
+        out
+    }
+
+    fn redirect(outcome: LoopbackOutcome) -> (OauthCallback, LoopbackReply) {
+        match outcome {
+            LoopbackOutcome::Redirect(cb, reply) => (cb, reply),
+            LoopbackOutcome::TimedOut => panic!("timed out instead of returning the redirect"),
+            LoopbackOutcome::Failed(e) => panic!("listener failed: {e}"),
+        }
+    }
+
+    fn get(port: u16, target: &str) -> String {
+        hit(port, &format!("GET {target} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n"))
+    }
+
+    #[test]
+    fn loopback_ignores_a_wrong_state_and_returns_the_right_one() {
+        let lb = Loopback::bind().unwrap();
+        assert!(lb.redirect_uri().starts_with("http://127.0.0.1:"));
+        let port = lb.port;
+        let client = std::thread::spawn(move || {
+            let forged = get(port, "/?code=evil&state=guess");
+            let junk = hit(port, "POST /?code=c&state=expected HTTP/1.1\r\nHost: x\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+            let real = get(port, "/?code=good&state=expected");
+            (forged, junk, real)
+        });
+
+        let (cb, reply) = redirect(lb.wait("expected", Instant::now() + Duration::from_secs(10), || true));
+        assert_eq!(cb.code.as_deref(), Some("good"));
+        reply.send(true, "Connected", "Done <now>");
+
+        let (forged, junk, real) = client.join().unwrap();
+        assert!(forged.starts_with("HTTP/1.1 400"), "a wrong state is answered and ignored");
+        assert!(junk.starts_with("HTTP/1.1 400"), "only GET counts");
+        assert!(real.starts_with("HTTP/1.1 200"));
+        assert!(real.contains("Done &lt;now&gt;"));
+        assert!(real.contains("Referrer-Policy: no-referrer"));
+    }
+
+    #[test]
+    fn a_stalled_connection_does_not_hold_up_the_redirect() {
+        use std::io::Write;
+        let lb = Loopback::bind().unwrap();
+        let port = lb.port;
+        // Half a request, then silence: a preconnect, or a local process
+        // trying to stall the sign-in.
+        let mut stall = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
+        stall.write_all(b"GET /?co").unwrap();
+        let client = std::thread::spawn(move || get(port, "/?code=good&state=s1"));
+
+        let start = Instant::now();
+        let (cb, reply) = redirect(lb.wait("s1", Instant::now() + Duration::from_secs(20), || true));
+        assert!(start.elapsed() < Duration::from_secs(3));
+        assert_eq!(cb.code.as_deref(), Some("good"));
+        reply.send(true, "ok", "ok");
+        assert!(client.join().unwrap().starts_with("HTTP/1.1 200"));
+        drop(stall);
+    }
+
+    #[test]
+    fn a_retired_sign_in_tells_a_late_tab_instead_of_completing() {
+        let lb = Loopback::bind().unwrap();
+        let port = lb.port;
+        let client = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(300));
+            get(port, "/?code=late&state=s1")
+        });
+        let start = Instant::now();
+        // keep_waiting false: cancelled or replaced in Atlas.
+        assert!(matches!(lb.wait("s1", Instant::now() + Duration::from_secs(2), || false), LoopbackOutcome::TimedOut));
+        assert!(start.elapsed() >= Duration::from_secs(1), "stays up to answer until the deadline");
+        let late = client.join().unwrap();
+        assert!(late.starts_with("HTTP/1.1 400"));
+        assert!(late.contains("no longer active"));
+    }
+
+    #[test]
+    fn loopback_gives_up_at_the_deadline() {
+        let lb = Loopback::bind().unwrap();
+        assert!(matches!(lb.wait("s", Instant::now(), || true), LoopbackOutcome::TimedOut));
+        let lb = Loopback::bind().unwrap();
+        let start = Instant::now();
+        assert!(matches!(lb.wait("s", Instant::now() + Duration::from_millis(500), || true), LoopbackOutcome::TimedOut));
+        assert!(start.elapsed() < Duration::from_secs(2));
     }
 
     #[test]

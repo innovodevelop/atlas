@@ -196,36 +196,54 @@ export function useMailIntelligence() {
 
   // One-time connect: open Google's consent in the system browser. Being
   // already signed in there (or Keychain autofill) makes it a single Allow
-  // click. Rust finishes the flow from the deep link and emits gmail:status,
-  // success or failure — that event ends the wait, not a row-count poll (a
-  // reconnect of the same mailbox adds no row, and failures add nothing).
+  // click. Google redirects to a loopback listener Rust started for this
+  // sign-in (gmail.rs), Rust finishes the flow, answers the browser tab, and
+  // emits gmail:status, success or failure. That event ends the wait, not a
+  // row-count poll (a reconnect of the same mailbox adds no row, and failures
+  // add nothing).
+  //
   // Each connect() is one attempt. A newer attempt (or cancel, or unmount)
   // makes an older one stale, and a stale attempt registers nothing after its
   // awaits resolve.
   const attempt = useRef(0);
 
-  // The flow id of the attempt in progress, so Cancel can abandon it in Rust
-  // too: otherwise a leftover Google tab finished later would still connect.
+  // The flow id of the attempt in progress. Rust is told to abandon it when
+  // the user presses Cancel, or when this attempt fails before the browser
+  // opened (nobody could finish it). NOT on unmount: closing the Mail view
+  // while the user is in Google's tab must not kill their sign-in. Rust still
+  // finishes it, and the account shows up the next time the view loads.
   const currentFlow = useRef<string | null>(null);
+  // Every sign-in this instance started that hasn't ended. Rust keeps an
+  // earlier one alive when Connect is clicked again, so finishing that older
+  // tab must still count here as connected.
+  const myFlows = useRef<Set<string>>(new Set());
+
+  const abandonFlow = useCallback((flow: string | null | undefined) => {
+    if (!flow) return;
+    if (currentFlow.current === flow) currentFlow.current = null;
+    myFlows.current.delete(flow);
+    // A no-op in Rust if `flow` already ended.
+    void supabase.functions.invoke('mail-oauth-cancel', { body: { flow } });
+  }, []);
 
   const cancelConnect = useCallback(() => {
     attempt.current += 1;
     connectCleanup.current?.();
     setIsConnecting(false);
-    const flow = currentFlow.current;
-    currentFlow.current = null;
-    if (flow) void supabase.functions.invoke('mail-oauth-cancel', { body: { flow } });
-  }, []);
+    for (const flow of [...myFlows.current]) abandonFlow(flow);
+  }, [abandonFlow]);
 
   const connect = useCallback(async () => {
     if (!user) return;
     connectCleanup.current?.();
     const mine = ++attempt.current;
     const stale = () => !mounted.current || mine !== attempt.current;
+    let flow: string | undefined;
     setError(null);
     setIsConnecting(true);
     const fail = (message: string) => {
       connectCleanup.current?.();
+      abandonFlow(flow);
       setError(message);
       setIsConnecting(false);
     };
@@ -234,34 +252,51 @@ export function useMailIntelligence() {
       const { data, error } = await supabase.functions.invoke('mail-oauth-start', {
         body: { provider: 'gmail', userId: user.id },
       });
-      if (stale()) return;
+      flow = data?.flow;
+      if (stale()) {
+        abandonFlow(flow);
+        return;
+      }
       if (error || !data?.authUrl) throw new Error(error?.message ?? 'No auth URL returned');
-      const flow: string | undefined = data.flow;
       currentFlow.current = flow ?? null;
+      if (flow) myFlows.current.add(flow);
 
       const { listen } = await import('@tauri-apps/api/event');
       const unlisten = await listen<{ flow: string | null; connected: boolean; error: string | null }>(
         'gmail:status',
         ({ payload }) => {
-          // Every hook instance hears every gmail:status. React only to the
-          // flow this attempt started: a superseded flow's "replaced" error
-          // belongs to whoever started that one, not to this live attempt.
-          if (payload.flow !== flow) return;
+          // Every hook instance hears every gmail:status. React only to
+          // sign-ins this instance started.
+          const f = payload.flow;
+          if (!f || !myFlows.current.has(f)) return;
           if (payload.connected) {
+            // Any of them connecting ends the wait.
+            myFlows.current.clear();
+            currentFlow.current = null;
             connectCleanup.current?.();
             setIsConnecting(false);
             refresh();
-          } else {
+          } else if (f === flow) {
             fail(payload.error ?? 'Connecting Gmail failed.');
+          } else {
+            // An earlier tab ended without connecting; the latest is still live.
+            myFlows.current.delete(f);
           }
         },
       );
       if (stale()) {
         unlisten();
+        abandonFlow(flow);
         return;
       }
-      // Matches the Rust side's 10-minute OAuth expiry (oauth::FLOW_TTL).
-      const timeout = window.setTimeout(() => fail('Timed out waiting for Google. Please try again.'), 10 * 60 * 1000);
+      // A backstop only. Rust gives up at oauth::FLOW_TTL (10 min) and says
+      // so over gmail:status; waiting longer here means a redirect accepted
+      // just before that deadline can still finish its token exchange and
+      // report success, instead of racing a webview timer.
+      const timeout = window.setTimeout(
+        () => fail('Timed out waiting for Google. Please try again.'),
+        12 * 60 * 1000,
+      );
       connectCleanup.current = () => {
         unlisten();
         window.clearTimeout(timeout);
@@ -269,13 +304,17 @@ export function useMailIntelligence() {
       };
 
       const { openUrl } = await import('@tauri-apps/plugin-opener');
-      if (stale()) return;
+      if (stale()) {
+        abandonFlow(flow);
+        return;
+      }
       await openUrl(data.authUrl);
     } catch (e) {
       console.error('[mail] connect failed:', e);
-      if (!stale()) fail(e instanceof Error ? e.message : String(e));
+      if (stale()) abandonFlow(flow);
+      else fail(e instanceof Error ? e.message : String(e));
     }
-  }, [user, refresh]);
+  }, [user, refresh, abandonFlow]);
 
   const disconnect = useCallback(async (accountId: string) => {
     if (!user) return;
