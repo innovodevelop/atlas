@@ -92,29 +92,85 @@ export function useVersionDetail(versionId: string | null) {
   return { features: data?.features ?? [], changelog: data?.changelog ?? [], isLoading };
 }
 
+/** The app's own build commit, or null when the build didn't record one
+ *  (or outside Vite, e.g. under bun test, where the define doesn't exist). */
+export const BUILD_COMMIT: string | null =
+  typeof __ATLAS_BUILD_COMMIT__ === 'string' && __ATLAS_BUILD_COMMIT__ ? __ATLAS_BUILD_COMMIT__ : null;
+
+const buildQuery = () => (BUILD_COMMIT ? `?build=${BUILD_COMMIT}` : '');
+
+/** Mirrors PlanSyncStatus in services/atlas-brain/src/planSync.ts. */
+export interface PlanSyncStatus {
+  checkedAt: string;
+  repo: string;
+  ref: string;
+  github: {
+    ok: boolean;
+    error: string | null;
+    headSha: string | null;
+    plan: { sha: string; date: string | null; message: string | null } | null;
+    applied: boolean;
+  };
+  local: {
+    path: string | null;
+    headSha: string | null;
+    branch: string | null;
+    planDirty: boolean;
+    containsPlan: boolean | null;
+    behindBy: number | null;
+    error: string | null;
+  };
+  app: { buildSha: string | null; containsPlan: boolean | null; behindBy: number | null };
+  githubOnly: { id: string; title: string; github: string; local: string | null }[];
+  source: 'github' | 'local' | null;
+}
+
+async function brainFetch(path: string, init?: RequestInit): Promise<Response> {
+  const token = getToken();
+  if (!token) throw new Error('Not authenticated');
+  const brain = await getBrainEndpoint();
+  if (!brain) throw new Error('Atlas brain is only available in the desktop app.');
+  return fetch(`${brain.baseUrl}${path}`, {
+    ...init,
+    headers: { Authorization: `Bearer ${token}`, 'x-sidecar-token': brain.token },
+  });
+}
+
+/**
+ * Where the roadmap stands across GitHub, this Mac's checkout and the running
+ * build. The brain re-checks GitHub every 5 minutes on its own and caches the
+ * answer for a minute, so polling here is cheap. A tick that applied a new
+ * plan also refreshes the version queries.
+ */
+export function usePlanSyncStatus() {
+  const qc = useQueryClient();
+  return useQuery({
+    queryKey: ['admin', 'plan-sync-status'],
+    queryFn: async (): Promise<PlanSyncStatus> => {
+      const res = await brainFetch(`/admin/versions/sync-status${buildQuery()}`);
+      if (!res.ok) throw new Error(await res.text());
+      const status = (await res.json()) as PlanSyncStatus;
+      if (status.github.applied) {
+        qc.invalidateQueries({ queryKey: ['admin', 'versions'] });
+        qc.invalidateQueries({ queryKey: ['admin', 'version-detail'] });
+      }
+      return status;
+    },
+    refetchInterval: 60_000,
+    ...ADMIN_QUERY_OPTIONS,
+  });
+}
+
 export function useSyncVersionPlan() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      const token = getToken();
-      if (!token) {
-        throw new Error('Not authenticated');
-      }
-      const brain = await getBrainEndpoint();
-      if (!brain) {
-        throw new Error('Atlas brain is only available in the desktop app.');
-      }
-      const res = await fetch(`${brain.baseUrl}/admin/versions/sync`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'x-sidecar-token': brain.token,
-        },
-      });
+      const res = await brainFetch(`/admin/versions/sync${buildQuery()}`, { method: 'POST' });
       if (!res.ok) throw new Error(await res.text());
-      return res.json();
+      return res.json() as Promise<{ status: PlanSyncStatus }>;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      qc.setQueryData(['admin', 'plan-sync-status'], data.status);
       qc.invalidateQueries({ queryKey: ['admin', 'versions'] });
       qc.invalidateQueries({ queryKey: ['admin', 'version-detail'] });
     },

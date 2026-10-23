@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import { execSync } from "child_process";
 
 /**
  * The edition this build is for — see `src/surfaces.ts` for the mechanism.
@@ -27,6 +28,23 @@ if (RAW_EDITION !== undefined && RAW_EDITION !== "consumer" && RAW_EDITION !== "
 /** Unset ⇒ admin, matching `src/surfaces.ts`: an unconfigured build ships everything. */
 const EDITION: "consumer" | "admin" = RAW_EDITION === "consumer" ? "consumer" : "admin";
 
+/**
+ * The commit this bundle was built from, so /versions can tell whether the
+ * running app already contains a roadmap change merged on GitHub. CI provides
+ * GITHUB_SHA; a local build asks git. A dirty tree still reports HEAD: the
+ * question asked of it is "does this build contain commit X", which uncommitted
+ * edits don't change. Empty when neither is available (the page then says the
+ * build is unknown).
+ */
+function buildCommit(): string {
+  if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA;
+  try {
+    return execSync("git rev-parse HEAD", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+  } catch {
+    return "";
+  }
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => ({
   esbuild: {
@@ -35,6 +53,7 @@ export default defineConfig(({ command }) => ({
   },
   define: {
     "import.meta.env.VITE_ATLAS_EDITION": JSON.stringify(EDITION),
+    __ATLAS_BUILD_COMMIT__: JSON.stringify(buildCommit()),
   },
   server: {
     host: "::",

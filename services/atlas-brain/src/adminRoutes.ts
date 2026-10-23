@@ -13,7 +13,8 @@
  */
 
 import { Database } from "bun:sqlite";
-import { parseVersionPlan, type Version } from "./versionPlan.ts";
+import { type Version } from "./versionPlan.ts";
+import { createPlanSync, defaultRepoCandidates, type PlanSyncStatus } from "./planSync.ts";
 import { ingestJsonlSessions } from "./jsonlIngest.ts";
 import { executeRepair, type RepairContext } from "./selfRepair.ts";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
@@ -28,32 +29,6 @@ const json = (data: unknown, status = 200) =>
 
 const PROJECT_ROOT = resolve(import.meta.dir, "../../..");
 
-// Where /admin/versions/sync reads the plan from. Overridable so a feature
-// branch can preview its own plan without a merge.
-const PLAN_REPO = process.env.ATLAS_PLAN_REPO ?? "innovodevelop/atlas";
-const PLAN_REF = process.env.ATLAS_PLAN_REF ?? "atlas-redesign";
-
-/**
- * Reads docs/VERSION-PLAN.md from GitHub through the `gh` CLI, the same way
- * getCiRuns does. Reusing the developer's existing `gh` login means no token
- * is stored or handled by Atlas, and private repos work unchanged. Returns
- * null on any failure (gh missing, signed out, offline, timeout) so the caller
- * can fall back to the local file.
- */
-function fetchPlanFromGitHub(): string | null {
-  try {
-    const proc = Bun.spawnSync(
-      ["gh", "api", "-H", "Accept: application/vnd.github.raw",
-        `repos/${PLAN_REPO}/contents/docs/VERSION-PLAN.md?ref=${encodeURIComponent(PLAN_REF)}`],
-      { stdout: "pipe", stderr: "pipe", timeout: 15_000 },
-    );
-    if (proc.exitCode !== 0) return null;
-    const md = new TextDecoder().decode(proc.stdout);
-    return md.trim() ? md : null;
-  } catch {
-    return null;
-  }
-}
 
 export type ApplyResult =
   | { ok: true; synced: number; features: number }
@@ -191,8 +166,20 @@ function compareSemver(a: unknown, b: unknown): number {
 }
 
 export function createAdminHandlers({ db, requireUser }: Deps) {
+  // Roadmap sync with GitHub (planSync.ts): a background loop started from
+  // index.ts, plus the two routes below. The local plan file is only read as
+  // a fallback when GitHub is unreachable. Declared above the return: a
+  // const below it would never be initialised.
+  const planSync = createPlanSync({
+    db,
+    apply: applyVersionPlan,
+    repoCandidates: defaultRepoCandidates(PROJECT_ROOT),
+  });
+
   return {
     syncVersionPlan,
+    getPlanSyncStatus,
+    startPlanSync,
     getVersions,
     getVersionDetail,
     getChangelog,
@@ -213,24 +200,32 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
     initiateRepair,
   };
 
-  function syncVersionPlan(req: Request): Response {
+  /** Check GitHub now, apply the plan if it changed, and return the status. */
+  async function syncVersionPlan(req: Request): Promise<Response> {
     requireUser(req);
-    // GitHub is the source of truth: the plan on disk is only as fresh as the
-    // last `git pull`, and an installed .app has no checkout at all. The local
-    // file stays as the fallback for offline use or a signed-out `gh`.
-    let md = fetchPlanFromGitHub();
-    const source = md === null ? "local" : `github:${PLAN_REPO}@${PLAN_REF}`;
-    if (md === null) {
-      try {
-        md = readFileSync(resolve(PROJECT_ROOT, "docs/VERSION-PLAN.md"), "utf8");
-      } catch {
-        return json({ error: "VERSION-PLAN.md not reachable on GitHub or on disk" }, 404);
-      }
+    const status = await planSync.sync(buildParam(req));
+    if (!status.github.ok && status.source === null) {
+      return json({ error: status.github.error ?? status.local.error ?? "No plan reachable", status }, 502);
     }
+    return json({ source: status.source, applied: status.github.applied, status });
+  }
 
-    const result = applyVersionPlan(db, parseVersionPlan(md));
-    if (!result.ok) return json({ error: result.error }, 422);
-    return json({ synced: result.synced, features: result.features, source });
+  /** The latest sync status: cached for a minute, re-checked otherwise. */
+  async function getPlanSyncStatus(req: Request): Promise<Response> {
+    requireUser(req);
+    const status: PlanSyncStatus = await planSync.status(buildParam(req));
+    return json(status);
+  }
+
+  /** Start the background sync loop; index.ts calls it once at startup. */
+  function startPlanSync(): () => void {
+    return planSync.start();
+  }
+
+  /** The app's build commit, which only the webview knows (vite define). */
+  function buildParam(req: Request): string | null {
+    const b = new URL(req.url).searchParams.get("build");
+    return b && /^[0-9a-f]{7,40}$/.test(b) ? b : null;
   }
 
   function getVersions(req: Request): Response {

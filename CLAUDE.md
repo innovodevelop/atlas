@@ -78,10 +78,14 @@ by what each is for — do not merge them back into one doc or duplicate content
 across both:
 
 - **`docs/VERSION-PLAN.md`** owns versions, features, status and target dates.
-  It is **machine-parsed**: `services/atlas-brain/src/adminRoutes.ts`
-  (`syncVersionPlan` → `versionPlan.ts`) reads it on every `/admin/versions/sync`
-  call and reconciles it straight into SQLite (`atlas_versions`,
-  `atlas_version_features`), which `/versions` renders. Its heading/list format
+  It is **machine-parsed**: the brain (`services/atlas-brain/src/planSync.ts`
+  → `versionPlan.ts`) reads it **from GitHub** (`atlas-redesign`, via the
+  Mac's `gh` login) every 5 minutes while the app runs, falling back to the
+  local checkout when GitHub is unreachable, and reconciles it straight into
+  SQLite (`atlas_versions`, `atlas_version_features`), which `/versions`
+  renders. A plan edit therefore shows up only once it is **pushed and merged
+  to `atlas-redesign`**; `/versions` also says whether the local checkout and
+  the running build contain it, and badges features that are GitHub-only. Its heading/list format
   is therefore **load-bearing** — the parser never throws, so a renamed
   heading or a changed dash character doesn't fail loudly, it silently parses
   to zero versions (see the empty-guard comment on `applyVersionPlan`). Edit it
