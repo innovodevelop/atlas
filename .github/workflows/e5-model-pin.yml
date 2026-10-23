@@ -1,0 +1,31 @@
+# Prints the pinned revision, sizes and SHA-256 of the multilingual-e5-base
+# files the brain downloads on first launch (services/atlas-brain/src/modelStore.ts),
+# so the pins can be (re)derived from a machine that can reach Hugging Face.
+# Results are raised as a notice annotation; nothing is committed.
+name: E5 model pin
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["ws-*"]
+    paths:
+      - ".github/workflows/e5-model-pin.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  pin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Resolve revision and hash the files
+        run: |
+          set -euo pipefail
+          rev=$(curl -sSf https://huggingface.co/api/models/Xenova/multilingual-e5-base | python3 -c 'import sys,json; print(json.load(sys.stdin)["sha"])')
+          out="revision $rev"
+          for f in tokenizer.json tokenizer_config.json onnx/model_quantized.onnx; do
+            curl -sSfL -o file "https://huggingface.co/Xenova/multilingual-e5-base/resolve/$rev/$f"
+            out="$out%0A$f $(stat -c %s file) $(sha256sum file | cut -d' ' -f1)"
+          done
+          echo "::notice title=e5 pins::$out"
