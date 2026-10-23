@@ -5,7 +5,9 @@ Runs in CI (.github/workflows/wakeword-backbone.yml): Kaggle / TF Hub are not
 reachable from every dev environment, and the TensorFlow toolchain is not
 something to install on the Mac. Writes into OUT_DIR:
 
-  speech_embedding.onnx   waveform [1, N] float32 in [-1, 1] -> [1, frames, 1, 96]
+  speech_embedding.onnx   waveform [1, 12400] float32 in [-1, 1] -> [1, 1, 1, 96]
+                          (one 775 ms window -> one embedding; the app slides
+                          it by 1280 samples, as it slides the mel window now)
   report.json             what was checked and how close it came
   report.md               the same, for a human
 
@@ -38,6 +40,11 @@ OUT = Path(os.environ.get("OUT_DIR", "out"))
 MODELS = Path(os.environ.get("MODELS_DIR", "public/models"))
 OPSET = int(os.environ.get("OPSET", "15"))
 SR = 16000
+# One embedding's worth of audio. A fixed length is what makes the graph
+# convertible: with an open length, tf2onnx can't infer the shapes of the
+# module's per-batch map loop or its convolutions.
+WINDOW = 12400
+HOP = 1280
 TFHUB = "https://tfhub.dev/google/speech_embedding/1"
 KAGGLE = "google/speech-embedding/tensorFlow1/speech-embedding/1"
 
@@ -167,13 +174,17 @@ def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     layer, path = load_module()
 
-    @tf.function(input_signature=[tf.TensorSpec([1, None], tf.float32, name="waveform")])
+    @tf.function(input_signature=[tf.TensorSpec([1, None], tf.float32)])
+    def embed_any(waveform):
+        return layer(waveform)
+
+    @tf.function(input_signature=[tf.TensorSpec([1, WINDOW], tf.float32, name="waveform")])
     def embed(waveform):
         return layer(waveform)
 
     rng = np.random.default_rng(0)
     probe = (rng.standard_normal(SR * 2) * 0.1).astype(np.float32)[None]
-    tf_out = embed(tf.constant(probe)).numpy()
+    tf_out = embed_any(tf.constant(probe)).numpy()
     step("tf-probe", input_shape=probe.shape, output_shape=tf_out.shape)
 
     onnx_path = OUT / "speech_embedding.onnx"
@@ -188,16 +199,25 @@ def main() -> None:
     in_name = sess.get_inputs()[0].name
 
     def g(audio: np.ndarray) -> np.ndarray:
-        return sess.run(None, {in_name: audio[None].astype(np.float32)})[0]
+        """Embeddings the way the app would stream them: one ONNX call per
+        WINDOW-sample window, sliding by HOP."""
+        out = [
+            sess.run(None, {in_name: audio[None, s:s + WINDOW].astype(np.float32)})[0].reshape(96)
+            for s in range(0, len(audio) - WINDOW + 1, HOP)
+        ]
+        return np.array(out, dtype=np.float32)
 
-    # 1. Faithful conversion, at several lengths (the app feeds windows).
+    # 1. Faithful conversion, AND streaming fidelity: sliding fixed windows
+    #    must reproduce TensorFlow's output for the whole clip at once.
     worst = 0.0
-    for n in (12400, 12400 + 1280, SR * 2, SR * 3 + 17):
+    for n in (WINDOW, WINDOW + HOP, SR * 2, SR * 3 + 17):
         a = (rng.standard_normal(n) * 0.1).astype(np.float32)
-        t = embed(tf.constant(a[None])).numpy()
+        t = embed_any(tf.constant(a[None])).numpy().reshape(-1, 96)
         o = g(a)
-        worst = max(worst, float(np.abs(t - o).max()))
-        step("onnx-vs-tf", samples=n, tf_shape=t.shape, onnx_shape=o.shape, max_abs_diff=float(np.abs(t - o).max()))
+        m = min(len(t), len(o))
+        diff = float(np.abs(t[:m] - o[:m]).max())
+        worst = max(worst, diff)
+        step("onnx-vs-tf", samples=n, tf_embeddings=len(t), onnx_embeddings=len(o), max_abs_diff=diff)
     report["onnx_vs_tf_max_abs_diff"] = worst
 
     # 2. Same audio through both backbones.
