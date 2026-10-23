@@ -6,7 +6,7 @@ import { MemoryPrivacyPanel } from '@/components/atlas-health/MemoryPrivacyPanel
 import { PersonalityPanel } from '@/components/atlas-health/PersonalityPanel';
 import { SoftwareUpdatePanel } from '@/components/atlas-health/SoftwareUpdatePanel';
 import { EDITION } from '@/surfaces';
-import { useMailIntelligence } from '@/hooks/useMailIntelligence';
+import { useMailIntelligence, isUserMailbox, type ImapSettings } from '@/hooks/useMailIntelligence';
 import { usePortfolio } from '@/hooks/usePortfolio';
 import { useMusicPlayer } from '@/hooks/useMusicPlayer';
 import { ATLAS_PERMISSIONS, readOnboarding } from '@/lib/atlasPermissions';
@@ -245,7 +245,8 @@ function PermissionsSettings({ onClose, mode }: { onClose: () => void; mode: Set
 // Compact mail-accounts management (connect / status / disconnect), reusing the
 // same read-only Gmail flow the Mail card uses.
 function MailSettings() {
-  const { accounts, hasGmail, isConnecting, error, connect, cancelConnect, disconnect, syncNow } = useMailIntelligence();
+  const { accounts, hasGmail, isConnecting, error, connect, connectImap, cancelConnect, disconnect, syncNow } = useMailIntelligence();
+  const [imapOpen, setImapOpen] = useState(false);
   return (
     <div className="col gap16">
       <div>
@@ -262,9 +263,10 @@ function MailSettings() {
               <Check className="i12" />{a.status === 'active' ? 'Active · read-only' : a.last_error ?? a.status}
             </p>
           </div>
-          {/* Scan and disconnect exist for Gmail only. The admin IMAP mailbox
-              is listed too, and disconnecting it would delete all its mail. */}
-          {a.provider === 'gmail' && (
+          {/* Scan and disconnect exist for mailboxes the user connected. The
+              admin IMAP mailbox is listed too, and disconnecting it would
+              delete all its mail. */}
+          {isUserMailbox(a) && (
             <div className="fx ac gap8">
               <Button size="icon" variant="ghost" title="Scan now" aria-label="Scan now" onClick={() => syncNow(a.id)}><RefreshCw className="i14" /></Button>
               <Button size="icon" variant="danger" title="Disconnect" aria-label="Disconnect mailbox" onClick={() => disconnect(a.id)}><Trash2 className="i14" /></Button>
@@ -285,7 +287,70 @@ function MailSettings() {
       {/* The button is disabled while waiting, so an abandoned Google tab
           would otherwise lock it until the 10-minute timeout. */}
       {isConnecting && <Button variant="ghost" size="sm" onClick={cancelConnect}>Cancel</Button>}
+      {imapOpen
+        ? <ImapConnectForm onConnect={connectImap} onClose={() => setImapOpen(false)} />
+        : (
+          <Button variant="ghost" icon={<Plus className="i16" />} onClick={() => setImapOpen(true)} style={{ width: '100%' }}>
+            Connect another mailbox (IMAP)
+          </Button>
+        )}
     </div>
+  );
+}
+
+const imapFieldStyle = {
+  width: '100%',
+  padding: '8px 10px',
+  borderRadius: 8,
+  border: '1px solid var(--line, rgba(127,127,127,.3))',
+  background: 'transparent',
+  color: 'var(--ink)',
+  fontSize: 13,
+} as const;
+
+// IMAP needs the server settings Gmail's OAuth flow doesn't. Rust logs in
+// before saving, so the server's own verdict on the password shows up here.
+function ImapConnectForm({ onConnect, onClose }: {
+  onConnect: (s: ImapSettings) => Promise<boolean>;
+  onClose: () => void;
+}) {
+  const [email, setEmail] = useState('');
+  const [host, setHost] = useState('');
+  const [port, setPort] = useState('993');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    setBusy(true);
+    const ok = await onConnect({
+      email,
+      host,
+      port: Number(port) || 993,
+      username: username || undefined,
+      password,
+    });
+    setBusy(false);
+    if (ok) onClose();
+  };
+  return (
+    <Panel pad="sm" className="col gap8">
+      <p className="fs12 m0" style={{ color: 'var(--ink2)', lineHeight: 1.5 }}>
+        For iCloud, Fastmail, Yahoo and most other providers. Atlas reads the inbox over TLS only and never changes it. Many providers need an app-specific password here, not your normal one.
+      </p>
+      <input style={imapFieldStyle} placeholder="Email address" type="email" autoComplete="off" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <div className="fx gap8">
+        <input style={{ ...imapFieldStyle, flex: 1 }} placeholder="IMAP server, e.g. imap.mail.me.com" autoComplete="off" value={host} onChange={(e) => setHost(e.target.value)} />
+        <input style={{ ...imapFieldStyle, width: 72 }} placeholder="993" inputMode="numeric" aria-label="Port" value={port} onChange={(e) => setPort(e.target.value.replace(/\D/g, ''))} />
+      </div>
+      <input style={imapFieldStyle} placeholder="Username (if not the email address)" autoComplete="off" value={username} onChange={(e) => setUsername(e.target.value)} />
+      <input style={imapFieldStyle} placeholder="Password" type="password" autoComplete="off" value={password} onChange={(e) => setPassword(e.target.value)} />
+      <div className="fx gap8">
+        <Button variant="primary" loading={busy} disabled={!email || !host || !password} onClick={() => void submit()} style={{ flex: 1 }}>
+          {busy ? 'Signing in…' : 'Connect'}
+        </Button>
+        <Button variant="ghost" onClick={onClose} disabled={busy}>Cancel</Button>
+      </div>
+    </Panel>
   );
 }
 

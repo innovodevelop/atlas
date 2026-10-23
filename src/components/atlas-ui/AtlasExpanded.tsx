@@ -12,7 +12,7 @@ import { useStocks } from '@/hooks/useStocks';
 import { useNews } from '@/hooks/useNews';
 import { useTasks } from '@/hooks/useTasks';
 import { useCalendarEvents } from '@/hooks/useCalendarEvents';
-import { useMailIntelligence } from '@/hooks/useMailIntelligence';
+import { useMailIntelligence, isUserMailbox } from '@/hooks/useMailIntelligence';
 import { usePortfolio, type HistoryPoint } from '@/hooks/usePortfolio';
 import type { WakeWordState, AIState } from '@/types';
 import type { AtlasExpandedKey } from '@/pages/atlas/AtlasDashboard';
@@ -435,7 +435,7 @@ const MAIL_CATEGORIES = [
 
 function EmailView({ onClose }: { onClose: () => void }) {
   const {
-    messages, alerts, accounts, isConnected, hasGmail, isConnecting, error,
+    messages, alerts, accounts, isConnected, isConnecting, error,
     connect, cancelConnect, disconnect, acknowledge, syncNow,
   } = useMailIntelligence();
   const [filter, setFilter] = useState<string>('all');
@@ -486,18 +486,19 @@ function EmailView({ onClose }: { onClose: () => void }) {
                         {a.status === 'active' ? `Synced ${a.last_synced_at ? fmtEventTime(a.last_synced_at) : 'pending'}` : a.last_error ?? a.status}
                       </p>
                     </div>
-                    {/* Gmail only: disconnecting the admin IMAP mailbox would delete all its mail. */}
-                    {a.provider === 'gmail' && (
+                    {/* User mailboxes only: disconnecting the admin IMAP mailbox would delete all its mail. */}
+                    {isUserMailbox(a) && (
                       <Button size="icon" title="Disconnect" aria-label="Disconnect mailbox" onClick={() => disconnect(a.id)}><Archive className="i14" /></Button>
                     )}
                   </div>
                 ))}
-                {hasGmail ? (
+                {accounts.some(isUserMailbox) ? (
                   <Button icon={<Send className="i14" />} style={{ width: '100%', marginTop: 6 }} onClick={() => syncNow()} title="Scan now">
                     Scan now
                   </Button>
                 ) : (
-                  // Only the admin IMAP mailbox is connected: still offer Gmail.
+                  // Only the admin IMAP mailbox is connected: still offer Gmail
+                  // (IMAP mailboxes connect from Settings).
                   <Button
                     icon={<Mail className="i14" />}
                     loading={isConnecting}
