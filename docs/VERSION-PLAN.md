@@ -11,6 +11,7 @@
 _Striking the first light with no external fuel: the local-first migration._
 Status: released
 Target: 2026-08-04
+_Complete and installed locally; never published. No tag or GitHub release exists yet (see v0.6.0)._
 
 ### Features
 - [x] Local-first migration complete {id: feat-001}
@@ -27,27 +28,33 @@ Target: 2026-08-04
 ## v0.3.0 — Lens
 _The instrument of seeing: the admin suite and the control port._
 Status: in-progress
-Target: 2026-09-01
+Target: 2026-11-01
 
 ### Features
 - [x] Version tracking surface (/versions) {id: feat-010, agent: claude-code}
 - [x] Live agent view (/agent-view) {id: feat-011, agent: claude-code}
-- [x] Design sync surface (/design-sync) {id: feat-012, agent: claude-code}
+- [ ] Design sync surface (/design-sync) {id: feat-012, agent: claude-code, status: in-progress}
 - [x] Test management surface (/tests) {id: feat-013, agent: claude-code}
-- [x] Internal changelog {id: feat-014, agent: claude-code}
-- [x] Claude Code JSONL ingestion (file watcher) {id: feat-015, agent: claude-code}
+- [ ] Internal changelog {id: feat-014, agent: claude-code, status: in-progress}
+- [x] Claude Code JSONL ingestion (on demand) {id: feat-015, agent: claude-code}
+- [ ] JSONL ingestion file watcher {id: feat-018, agent: claude-code}
 - [x] CI pipeline monitoring {id: feat-016, agent: claude-code}
 - [x] VERSION-PLAN.md parser + DB sync {id: feat-017, agent: claude-code}
+
+_Corrected 2026-10-23: feat-012 and feat-014 were ticked while their UIs read tables nothing writes, and feat-015 promised a file watcher that ingestion never had. The admin routes also need the brain run from a source checkout: in the compiled sidecar the repo root resolves to `/`._
 
 ---
 
 ## v0.4.0 — Waypoint
 _Connectors and plumbing: mail, voice, and the paths between them._
-Status: planned
-Target: 2026-10-01
+Status: in-progress
+Target: 2026-11-29
 
 ### Features
-- [ ] Mail Stage 6e: Gmail/Outlook/IMAP connectors {id: feat-020}
+- [ ] Mail Stage 6e: Gmail/Outlook/IMAP connectors {id: feat-020, status: in-progress}
+
+_Gmail connector built and merged 2026-10-23 (loopback OAuth, history-API inbox sync, metadata only); not yet run against a real Google account. Outlook and IMAP not started._
+
 - [ ] Mail sending (SES production access) {id: feat-021}
 - [ ] Mail 6b-6d runtime verification {id: feat-022}
 - [ ] Wake-word model licensing resolution (Google speech_embedding) {id: feat-023, design: linked}
@@ -59,7 +66,7 @@ Target: 2026-10-01
 ## v0.5.0 — Bluewater
 _The sailing term for open-ocean capability: autonomous agents and far models._
 Status: planned
-Target: 2026-11-01
+Target: after v1.0 (not on the MVP path)
 
 ### Features
 - [ ] Fable 5 / Opus 5 / Sonnet 5 Bedrock enablement {id: feat-030}
@@ -74,7 +81,7 @@ Target: 2026-11-01
 ## v0.6.0 — Drydock
 _Where the vessel is serviced and certified: release infrastructure and signing._
 Status: planned
-Target: 2026-12-01
+Target: 2026-12-20
 
 ### Features
 - [ ] S3/CloudFront updater release home {id: feat-040}
@@ -89,7 +96,7 @@ Target: 2026-12-01
 ## v1.0.0 — First Light
 _When a lighthouse first shows its lamp, and a telescope takes its first image._
 Status: planned
-Target: 2027-Q1
+Target: 2027-02
 
 ### Features
 - [ ] All commercial blockers resolved {id: feat-050}

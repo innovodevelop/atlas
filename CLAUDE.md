@@ -47,15 +47,18 @@ the Mac).
 ## Local-first migration (Supabase removed)
 
 Supabase is gone. Local-first is the architecture, not a migration in progress.
-- **Data:** SQLite core (rusqlite) + generic CRUD + Tauri events; sqlite-vec +
-  FTS5 recall (local hybrid semantic search, ported from the old
-  `recall_memories` RPC).
-- **AI:** Bun "brain" sidecar (`services/atlas-brain/`) is the sole chat/tool
+- **Data:** SQLite core (rusqlite) + generic CRUD + Tauri events. Recall today
+  runs in the brain: local `e5` embeddings, JS cosine + keyword score + BM25
+  rerank. A Rust sqlite-vec + FTS5 hybrid recall exists in `db.rs` but nothing
+  feeds its index yet.
+- **AI:** Bun "brain" sidecar (`services/atlas-brain/`) is the chat/tool
   orchestrator, importing the runtime-neutral `supabase/functions/_shared/`
   modules directly (that directory name is legacy — it holds shared TS, not a
-  Supabase dependency). Reasoning is **Anthropic Claude first-party** for chat
-  and **Amazon Bedrock (EU)** for background/batch work, selected per
-  `ATLAS_AI_PROVIDER`; local `e5` embeddings for recall.
+  Supabase dependency). `ATLAS_AI_PROVIDER` is one global switch: Anthropic
+  Claude first-party (default) or Amazon Bedrock (EU); requests that need
+  native web search bridge to Anthropic either way. A Rust port of the brain
+  has begun (`src-tauri/src/brain.rs`, memory and personality commands only);
+  retiring the sidecar is a post-MVP decision.
 - **Auth = Cloudflare D1** (not local): email/password + entitlement on D1;
   users sign in / manage billing on web + app; Atlas itself runs locally.
   `supabase.from/channel/rpc` calls are shimmed to local equivalents
@@ -63,11 +66,9 @@ Supabase is gone. Local-first is the architecture, not a migration in progress.
   the app.
 - **Everything else local:** data-fetch (weather/stocks/news) → Rust;
   ElevenLabs → voice gateway; scheduler → local Tauri background task.
-- **Inert leftovers (cosmetic only):** `@supabase/supabase-js` / `supabase` CLI
-  / `postgres` deps, `tests/auth.spec.ts` and `supabase/migrations/` are still
-  in the tree but sit on **no runtime path**. Other docs describe Supabase as
-  "fully excised" — both statements are true and describe the same thing:
-  excised from every code path, not yet deleted from disk.
+- **Inert leftovers (cosmetic only):** `tests/auth.spec.ts` and
+  `supabase/migrations/` are still in the tree but sit on **no runtime path**
+  (the Supabase npm deps were removed in 6b16d45).
 
 ## Where the plan lives
 
@@ -113,7 +114,7 @@ see `docs/RELEASE.md`.
 
 ## Conventions
 
-- Converse in Danish; write code, UI copy, comments, and commit messages in
+- Converse in English (changed from Danish 2026-07-26); write code, UI copy, comments, and commit messages in
   English.
 - Keep the WebGL / particle sphere unless told otherwise.
 - Design CSS lands in `src/styles/workshop.css` verbatim-with-attribution;
