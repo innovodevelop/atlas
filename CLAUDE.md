@@ -70,6 +70,10 @@ Supabase is gone. Local-first is the architecture, not a migration in progress.
   `supabase/migrations/` are still in the tree but sit on **no runtime path**
   (the Supabase npm deps were removed in 6b16d45).
 
+> **Open handoff:** `docs/handoff/2026-10-23-cloud-session.md` — what a cloud
+> session merged on 2026-10-23, what is unverified on the Mac, and what to do
+> next. Read it first; delete it (and this note) once acted on.
+
 ## Where the plan lives
 
 Planning state used to be spread across five disagreeing sources, so work was
