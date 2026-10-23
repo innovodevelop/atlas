@@ -489,6 +489,7 @@ pub fn run() {
     .plugin(tauri_plugin_deep_link::init())
     .manage(gateway)
     .manage(brain)
+    .manage(oauth::FlowRegistry::default())
     .manage(music::MusicState::new())
     .manage(gmail::GmailState::new())
     .manage(home::HomeState::new())
@@ -546,6 +547,7 @@ pub fn run() {
       gmail::gmail_connect,
       gmail::gmail_disconnect,
       gmail::gmail_sync,
+      gmail::gmail_cancel_connect,
       // The webview's yes/no on a queued control-port action. Execution stays
       // in Rust: this command takes an approval id and a boolean, and the
       // arguments it would run with never leave the Rust process — the webview
@@ -786,16 +788,30 @@ pub fn run() {
           for u in event.urls() {
             if let Some(cb) = oauth::parse_callback(u.as_str()) {
               log::info!("[oauth] captured redirect (has_code={})", cb.code.is_some());
-              // Exchange the code in Rust so it never enters the webview; the
-              // provider owner (music.rs) validates CSRF state and emits its own
-              // status event. Dispatch to each provider that could be in flight.
-              if let Some(state) = handle.try_state::<music::MusicState>() {
-                music::complete_oauth(&handle, state.inner(), &cb);
-              }
-              if let Some(gmail_state) = handle.try_state::<gmail::GmailState>() {
-                if let Some(db_state) = handle.try_state::<db::DbState>() {
-                  gmail::complete_oauth(&handle, gmail_state.inner(), db_state.inner(), &cb);
+              // Exchange the code in Rust so it never enters the webview. The
+              // flow registry says which provider issued this state, and only
+              // that provider sees the callback (they all share one redirect);
+              // it then checks the state against its own pending flow and emits
+              // its own status event.
+              // A late callback still goes to its owner, which refuses it and
+              // says so; only a state no provider issued is dropped here.
+              let claim = handle
+                .try_state::<oauth::FlowRegistry>()
+                .and_then(|flows| flows.claim(cb.state.as_deref()));
+              match claim {
+                Some(oauth::Claim { provider: music::OAUTH_PROVIDER, fresh }) => {
+                  if let Some(state) = handle.try_state::<music::MusicState>() {
+                    music::complete_oauth(&handle, state.inner(), &cb, fresh);
+                  }
                 }
+                Some(oauth::Claim { provider: gmail::OAUTH_PROVIDER, fresh }) => {
+                  if let (Some(gmail_state), Some(db_state)) =
+                    (handle.try_state::<gmail::GmailState>(), handle.try_state::<db::DbState>())
+                  {
+                    gmail::complete_oauth(&handle, gmail_state.inner(), db_state.inner(), &cb, fresh);
+                  }
+                }
+                _ => log::warn!("[oauth] callback for a sign-in no provider started — ignored"),
               }
               // Sanitized signal for the generic seam (src/lib/deepLinkOauth.ts):
               // no auth code crosses the boundary.

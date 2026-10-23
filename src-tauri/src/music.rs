@@ -27,7 +27,8 @@ use crate::secrets;
 
 use crate::music_engine::{self, EngineCmd, EngineHandle};
 
-const PROVIDER: &str = "spotify";
+/// Also the name this provider registers its OAuth states under (oauth::FlowRegistry).
+pub const OAUTH_PROVIDER: &str = "spotify";
 pub(crate) const CLIENT_ID: &str = "29af1118819f4086a68dfc21b2359625"; // public-safe
 const AUTH_URL: &str = "https://accounts.spotify.com/authorize";
 const TOKEN_URL: &str = "https://accounts.spotify.com/api/token";
@@ -234,7 +235,7 @@ pub fn music_status(state: State<'_, MusicState>) -> MusicStatus {
     let audio_ready = state.engine.lock().unwrap().is_some();
     MusicStatus {
         available: true,
-        provider: PROVIDER,
+        provider: OAUTH_PROVIDER,
         connected,
         premium,
         audio_ready,
@@ -272,10 +273,14 @@ fn send_cmd(app: &AppHandle, state: &MusicState, cmd: EngineCmd) -> Result<(), S
 /// Spotify consent URL for the webview to open in the system browser. The
 /// redirect comes back through the atlas:// deep link into `complete_oauth`.
 #[tauri::command(async)]
-pub fn music_connect(state: State<'_, MusicState>) -> Result<String, String> {
+pub fn music_connect(
+    state: State<'_, MusicState>,
+    flows: State<'_, oauth::FlowRegistry>,
+) -> Result<String, String> {
     let (verifier, challenge) = oauth::generate_pkce();
     let csrf = uuid::Uuid::new_v4().simple().to_string();
     let url = build_authorize_url(&challenge, &csrf);
+    flows.issue(OAUTH_PROVIDER, &csrf);
     *state.pending.lock().unwrap() = Some(PendingAuth {
         verifier,
         state: csrf,
@@ -298,20 +303,36 @@ pub fn music_disconnect(state: State<'_, MusicState>) -> Result<(), String> {
 /// CSRF state, exchanges the code in Rust, persists the refresh token, and
 /// emits `music:status` so the UI updates. The auth code never reaches the JS
 /// layer.
-pub fn complete_oauth(app: &AppHandle, state: &MusicState, cb: &oauth::OauthCallback) {
-    let Some(pending) = state.pending.lock().unwrap().take() else {
-        return; // no flow in progress — not ours
+///
+/// lib.rs only calls this for a state the flow registry says Spotify issued.
+/// Failures of the flow in progress are reported, because the connect UI has
+/// no timeout and would otherwise wait forever: a callback after
+/// oauth::FLOW_TTL (`fresh` false), a denied consent, a failed code exchange.
+/// A callback for a flow a newer Connect click replaced is ignored: the newer
+/// flow is either still pending (its own result will end the wait) or already
+/// done, and Spotify events carry no flow id, so an error here would land on
+/// whichever attempt the UI is showing.
+///
+/// Failures go out as `music:oauth-error`, NOT `music:status {connected:false}`.
+/// A failed or stale sign-in attempt says nothing about the connection the user
+/// may already have: reporting it as a status flipped a working player to "Not
+/// connected" and cleared the track on screen.
+pub fn complete_oauth(app: &AppHandle, state: &MusicState, cb: &oauth::OauthCallback, fresh: bool) {
+    let Some(pending) = oauth::take_matching(&state.pending, cb.state.as_deref(), |p| p.state.as_str())
+    else {
+        log::info!("[music] callback for a replaced Spotify sign-in — ignored");
+        return;
     };
-    if cb.state.as_deref() != Some(pending.state.as_str()) {
-        emit_status(app, false, Some("OAuth state mismatch (possible CSRF) — please retry"));
+    if !fresh {
+        emit_sign_in_error(app, "The Spotify sign-in took too long. Please connect again.");
         return;
     }
     if let Some(err) = &cb.error {
-        emit_status(app, false, Some(err));
+        emit_sign_in_error(app, err);
         return;
     }
     let Some(code) = &cb.code else {
-        emit_status(app, false, Some("No authorization code in redirect"));
+        emit_sign_in_error(app, "No authorization code in redirect");
         return;
     };
     match exchange_code(code, &pending.verifier) {
@@ -320,8 +341,12 @@ pub fn complete_oauth(app: &AppHandle, state: &MusicState, cb: &oauth::OauthCall
             *state.access.lock().unwrap() = None; // force a fresh token next call
             emit_status(app, true, None);
         }
-        Err(e) => emit_status(app, false, Some(&e)),
+        Err(e) => emit_sign_in_error(app, &e),
     }
+}
+
+fn emit_sign_in_error(app: &AppHandle, error: &str) {
+    let _ = app.emit("music:oauth-error", serde_json::json!({ "error": error }));
 }
 
 fn emit_status(app: &AppHandle, connected: bool, error: Option<&str>) {

@@ -13,10 +13,79 @@
 // deep-link capture → token exchange) is unchanged. Spotify/librespot is the
 // first consumer; the module is deliberately provider-neutral.
 
+use std::collections::HashMap;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
+
+/// How long a started sign-in may take before its callback is refused.
+pub const FLOW_TTL: Duration = Duration::from_secs(10 * 60);
+
+/// Which provider issued which OAuth `state`.
+///
+/// Every provider shares one redirect (`REDIRECT_URI`) and neither Google nor
+/// Spotify echoes a provider tag back, so the state is the only thing that says
+/// whose callback this is. lib.rs asks the registry and hands the callback to
+/// that provider alone. Before this, every handler saw every callback and a
+/// Spotify sign-in could consume and fail a Gmail one in flight.
+///
+/// Entries outlive a replaced flow on purpose: if the user clicks Connect
+/// twice and finishes the FIRST browser tab, the registry still knows that
+/// state was Spotify's, so Spotify can say "superseded" instead of the callback
+/// vanishing and the UI waiting forever.
+#[derive(Default)]
+pub struct FlowRegistry {
+    issued: Mutex<HashMap<String, (&'static str, Instant)>>,
+}
+
+/// Whose a callback is, and whether it arrived in time.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Claim {
+    pub provider: &'static str,
+    /// False once FLOW_TTL has passed: the provider should refuse the callback
+    /// AND say so, or its UI waits forever for a result that never comes.
+    pub fresh: bool,
+}
+
+impl FlowRegistry {
+    pub fn issue(&self, provider: &'static str, state: &str) {
+        let mut issued = self.issued.lock().unwrap();
+        // Kept for twice the TTL, so a late callback can still be attributed
+        // to its provider and refused with a message rather than dropped.
+        issued.retain(|_, (_, at)| at.elapsed() < FLOW_TTL * 2);
+        issued.insert(state.to_string(), (provider, Instant::now()));
+    }
+
+    /// Who issued `state`. None only for a state no provider issued (or one
+    /// claimed already, or very old): there is no one to report it to. A state
+    /// is answered once: claiming removes it.
+    pub fn claim(&self, state: Option<&str>) -> Option<Claim> {
+        self.claim_at(state, Instant::now())
+    }
+
+    fn claim_at(&self, state: Option<&str>, now: Instant) -> Option<Claim> {
+        let (provider, at) = self.issued.lock().unwrap().remove(state?)?;
+        Some(Claim { provider, fresh: now.saturating_duration_since(at) < FLOW_TTL })
+    }
+}
+
+/// Take `slot`'s pending flow only if `state` is the one it issued, leaving a
+/// newer flow in place when an older (superseded) callback arrives.
+pub fn take_matching<T>(
+    slot: &Mutex<Option<T>>,
+    state: Option<&str>,
+    state_of: impl Fn(&T) -> &str,
+) -> Option<T> {
+    let mut slot = slot.lock().unwrap();
+    match slot.as_ref() {
+        Some(p) if state == Some(state_of(p)) => slot.take(),
+        _ => None,
+    }
+}
 
 /// Custom-scheme redirect used now (works unsigned, in dev and prod).
 /// Consumed by the per-provider flow (music.rs) once it lands.
@@ -133,6 +202,44 @@ pub fn parse_callback(raw: &str) -> Option<OauthCallback> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_callback_goes_to_the_provider_that_issued_its_state_once() {
+        let flows = FlowRegistry::default();
+        flows.issue("spotify", "s1");
+        flows.issue("gmail", "g1");
+        assert_eq!(flows.claim(Some("g1")), Some(Claim { provider: "gmail", fresh: true }));
+        assert_eq!(flows.claim(Some("s1")), Some(Claim { provider: "spotify", fresh: true }));
+        assert_eq!(flows.claim(Some("g1")), None, "a state is answered once");
+        assert_eq!(flows.claim(Some("forged")), None);
+        assert_eq!(flows.claim(None), None);
+    }
+
+    #[test]
+    fn a_superseded_state_is_still_attributed_to_its_provider() {
+        let flows = FlowRegistry::default();
+        flows.issue("spotify", "first-click");
+        flows.issue("spotify", "second-click");
+        assert_eq!(flows.claim(Some("first-click")).map(|c| c.provider), Some("spotify"));
+    }
+
+    #[test]
+    fn a_late_state_is_attributed_but_not_fresh() {
+        let flows = FlowRegistry::default();
+        flows.issue("gmail", "g1");
+        let later = Instant::now() + FLOW_TTL + Duration::from_secs(1);
+        assert_eq!(flows.claim_at(Some("g1"), later), Some(Claim { provider: "gmail", fresh: false }));
+    }
+
+    #[test]
+    fn take_matching_leaves_a_newer_flow_in_place() {
+        let slot = Mutex::new(Some(String::from("newer")));
+        assert!(take_matching(&slot, Some("older"), |s| s.as_str()).is_none());
+        assert!(take_matching(&slot, None, |s| s.as_str()).is_none());
+        assert!(slot.lock().unwrap().is_some());
+        assert_eq!(take_matching(&slot, Some("newer"), |s| s.as_str()).as_deref(), Some("newer"));
+        assert!(slot.lock().unwrap().is_none());
+    }
 
     // RFC 7636 Appendix B: the canonical verifier → challenge vector. Pins the
     // S256 transform so a future refactor can't silently break PKCE.

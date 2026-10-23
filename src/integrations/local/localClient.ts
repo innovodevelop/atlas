@@ -463,6 +463,7 @@ const GMAIL_FNS: Record<string, string> = {
   "mail-oauth-start": "gmail_connect",
   "mail-disconnect": "gmail_disconnect",
   "mail-sync": "gmail_sync",
+  "mail-oauth-cancel": "gmail_cancel_connect",
 };
 
 const functions = {

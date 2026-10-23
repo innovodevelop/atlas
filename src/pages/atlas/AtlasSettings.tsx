@@ -245,7 +245,7 @@ function PermissionsSettings({ onClose, mode }: { onClose: () => void; mode: Set
 // Compact mail-accounts management (connect / status / disconnect), reusing the
 // same read-only Gmail flow the Mail card uses.
 function MailSettings() {
-  const { accounts, isConnected, isConnecting, connect, disconnect, syncNow } = useMailIntelligence();
+  const { accounts, hasGmail, isConnecting, error, connect, cancelConnect, disconnect, syncNow } = useMailIntelligence();
   return (
     <div className="col gap16">
       <div>
@@ -262,21 +262,29 @@ function MailSettings() {
               <Check className="i12" />{a.status === 'active' ? 'Active · read-only' : a.status}
             </p>
           </div>
-          <div className="fx ac gap8">
-            <Button size="icon" variant="ghost" title="Scan now" aria-label="Scan now" onClick={syncNow}><RefreshCw className="i14" /></Button>
-            <Button size="icon" variant="danger" title="Disconnect" aria-label="Disconnect mailbox" onClick={() => disconnect(a.id)}><Trash2 className="i14" /></Button>
-          </div>
+          {/* Scan and disconnect exist for Gmail only. The admin IMAP mailbox
+              is listed too, and disconnecting it would delete all its mail. */}
+          {a.provider === 'gmail' && (
+            <div className="fx ac gap8">
+              <Button size="icon" variant="ghost" title="Scan now" aria-label="Scan now" onClick={() => syncNow(a.id)}><RefreshCw className="i14" /></Button>
+              <Button size="icon" variant="danger" title="Disconnect" aria-label="Disconnect mailbox" onClick={() => disconnect(a.id)}><Trash2 className="i14" /></Button>
+            </div>
+          )}
         </Panel>
       ))}
+      {error && <p className="fs12" style={{ color: 'var(--negative)' }}>{error}</p>}
       <Button
         variant="primary"
         icon={<Plus className="i16" />}
         loading={isConnecting}
-        onClick={() => connect().catch(() => {})}
+        onClick={() => void connect()}
         style={{ width: '100%' }}
       >
-        {isConnecting ? 'Waiting for Google…' : isConnected ? 'Connect another mailbox' : 'Connect Gmail'}
+        {isConnecting ? 'Waiting for Google…' : hasGmail ? 'Connect another Gmail account' : 'Connect Gmail'}
       </Button>
+      {/* The button is disabled while waiting, so an abandoned Google tab
+          would otherwise lock it until the 10-minute timeout. */}
+      {isConnecting && <Button variant="ghost" size="sm" onClick={cancelConnect}>Cancel</Button>}
     </div>
   );
 }

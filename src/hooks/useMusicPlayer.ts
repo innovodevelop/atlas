@@ -592,6 +592,12 @@ function startBridge(): void {
         patch(p);
         if (e.payload.connected) { void refreshStatus(); void refreshNowPlaying(); schedulePoll(); }
       }),
+      // A sign-in attempt that failed (denied, expired, replaced by a newer
+      // Connect click). Ends the wait and says why, but leaves `connected`
+      // alone: the attempt failing says nothing about an existing connection.
+      listen<{ error: string }>('music:oauth-error', (e) => {
+        patch({ isConnecting: false, error: e.payload.error });
+      }),
       // State pushed from the LOCAL engine.
       //
       // This used to discard the payload and re-pull `/v1/me/player` instead.

@@ -435,8 +435,8 @@ const MAIL_CATEGORIES = [
 
 function EmailView({ onClose }: { onClose: () => void }) {
   const {
-    messages, alerts, accounts, isConnected, isConnecting,
-    connect, disconnect, acknowledge, syncNow,
+    messages, alerts, accounts, isConnected, hasGmail, isConnecting, error,
+    connect, cancelConnect, disconnect, acknowledge, syncNow,
   } = useMailIntelligence();
   const [filter, setFilter] = useState<string>('all');
 
@@ -460,7 +460,7 @@ function EmailView({ onClose }: { onClose: () => void }) {
       <div className="ebody">
         <div className="col gap16" style={{ width: '32%', minWidth: 320 }}>
           <div className="gpanel col">
-            {!isConnected ? (
+            {accounts.length === 0 ? (
               <>
                 <p className="t14 fw6 mb8" style={{ color: 'hsl(240 30% 88%)' }}>Connect your mailbox</p>
                 <p className="fs12 mb12" style={{ color: 'hsl(240 20% 62%)', lineHeight: 1.5 }}>
@@ -470,7 +470,7 @@ function EmailView({ onClose }: { onClose: () => void }) {
                   variant="primary"
                   icon={<Mail className="i16" />}
                   loading={isConnecting}
-                  onClick={() => connect().catch(() => {})}
+                  onClick={() => void connect()}
                   style={{ width: '100%' }}
                 >
                   {isConnecting ? 'Waiting for Google…' : 'Connect Gmail'}
@@ -486,14 +486,35 @@ function EmailView({ onClose }: { onClose: () => void }) {
                         {a.status === 'active' ? `Synced ${a.last_synced_at ? fmtEventTime(a.last_synced_at) : 'pending'}` : a.status}
                       </p>
                     </div>
-                    <Button size="icon" title="Disconnect" aria-label="Disconnect mailbox" onClick={() => disconnect(a.id)}><Archive className="i14" /></Button>
+                    {/* Gmail only: disconnecting the admin IMAP mailbox would delete all its mail. */}
+                    {a.provider === 'gmail' && (
+                      <Button size="icon" title="Disconnect" aria-label="Disconnect mailbox" onClick={() => disconnect(a.id)}><Archive className="i14" /></Button>
+                    )}
                   </div>
                 ))}
-                <Button icon={<Send className="i14" />} style={{ width: '100%', marginTop: 6 }} onClick={syncNow} title="Scan now">
-                  Scan now
-                </Button>
+                {hasGmail ? (
+                  <Button icon={<Send className="i14" />} style={{ width: '100%', marginTop: 6 }} onClick={() => syncNow()} title="Scan now">
+                    Scan now
+                  </Button>
+                ) : (
+                  // Only the admin IMAP mailbox is connected: still offer Gmail.
+                  <Button
+                    icon={<Mail className="i14" />}
+                    loading={isConnecting}
+                    style={{ width: '100%', marginTop: 6 }}
+                    onClick={() => void connect()}
+                  >
+                    {isConnecting ? 'Waiting for Google…' : 'Connect Gmail'}
+                  </Button>
+                )}
               </>
             )}
+            {/* Connect is disabled while waiting; an abandoned Google tab
+                would otherwise lock it until the 10-minute timeout. */}
+            {isConnecting && (
+              <Button variant="ghost" size="sm" style={{ marginTop: 6 }} onClick={cancelConnect}>Cancel</Button>
+            )}
+            {error && <p className="fs12" style={{ color: 'hsl(350 75% 68%)', marginTop: 8 }}>{error}</p>}
             <div className="col gap8" style={{ marginTop: 18 }}>
               <div
                 className="fx ac jb" onClick={() => setFilter('all')}

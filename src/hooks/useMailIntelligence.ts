@@ -1,10 +1,14 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { localClient as supabase } from '@/integrations/local/localClient';
 import { useAuth } from '@/hooks/useAuth';
 
 // Mail intelligence (read-only Gmail scanning — see docs/mail-setup.md).
-// Data lands server-side via the mail-sync cron; this hook reads it, streams
-// new alerts over realtime, and exposes the connect/disconnect flow.
+// Gmail connects, syncs and disconnects through the local gmail_* Rust
+// commands (localClient routes the old edge-function names to them); this hook
+// reads mail_accounts / mail_messages / mail_alerts, streams new alerts, and
+// exposes those actions. Only provider 'gmail' rows are syncable or
+// disconnectable here: the admin IMAP mailbox (mail.rs) is listed too, and
+// gmail_disconnect refuses it.
 // NOTE: mail_accounts.encrypted_refresh_token must never reach React state.
 // The local shim ignores select() column lists and returns full rows, so the
 // projection is enforced in JS here (pickAccount) — every mail_accounts result
@@ -134,14 +138,33 @@ export function useMailIntelligence() {
   const [alerts, setAlerts] = useState<MailAlert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
+  // Last connect / sync / disconnect failure, for the UI to show. Cleared when
+  // the next attempt starts.
+  const [error, setError] = useState<string | null>(null);
+  // Teardown for an in-flight connect (event listener + timeout), so an
+  // unmount mid-sign-in leaves nothing running. connect() awaits before it
+  // registers anything, so it also checks `mounted` after each await: an
+  // unmount during those awaits ran this cleanup while it was still null.
+  const connectCleanup = useRef<(() => void) | null>(null);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      connectCleanup.current?.();
+    };
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!user) { setIsLoading(false); return; }
     const [accountsRes, messagesRes, alertsRes] = await Promise.all([
-      supabase.from('mail_accounts').select(ACCOUNT_COLUMNS).order('created_at'),
+      // Scoped to the signed-in user: the local shim doesn't filter rows by
+      // user, and per-user Gmail ids mean two local users can each have one.
+      supabase.from('mail_accounts').select(ACCOUNT_COLUMNS).eq('user_id', user.id).order('created_at'),
       supabase
         .from('mail_messages')
         .select('id, from_address, subject, snippet, received_at, category, importance, extracted')
+        .eq('user_id', user.id)
         .order('received_at', { ascending: false })
         .limit(50),
       supabase
@@ -173,49 +196,94 @@ export function useMailIntelligence() {
 
   // One-time connect: open Google's consent in the system browser. Being
   // already signed in there (or Keychain autofill) makes it a single Allow
-  // click. The callback page tells the user to come back; we poll briefly.
+  // click. Rust finishes the flow from the deep link and emits gmail:status,
+  // success or failure — that event ends the wait, not a row-count poll (a
+  // reconnect of the same mailbox adds no row, and failures add nothing).
+  // Each connect() is one attempt. A newer attempt (or cancel, or unmount)
+  // makes an older one stale, and a stale attempt registers nothing after its
+  // awaits resolve.
+  const attempt = useRef(0);
+
+  // The flow id of the attempt in progress, so Cancel can abandon it in Rust
+  // too: otherwise a leftover Google tab finished later would still connect.
+  const currentFlow = useRef<string | null>(null);
+
+  const cancelConnect = useCallback(() => {
+    attempt.current += 1;
+    connectCleanup.current?.();
+    setIsConnecting(false);
+    const flow = currentFlow.current;
+    currentFlow.current = null;
+    if (flow) void supabase.functions.invoke('mail-oauth-cancel', { body: { flow } });
+  }, []);
+
   const connect = useCallback(async () => {
     if (!user) return;
+    connectCleanup.current?.();
+    const mine = ++attempt.current;
+    const stale = () => !mounted.current || mine !== attempt.current;
+    setError(null);
     setIsConnecting(true);
+    const fail = (message: string) => {
+      connectCleanup.current?.();
+      setError(message);
+      setIsConnecting(false);
+    };
     try {
+      if (!('__TAURI_INTERNALS__' in window)) throw new Error('Gmail can only be connected in the desktop app.');
       const { data, error } = await supabase.functions.invoke('mail-oauth-start', {
         body: { provider: 'gmail', userId: user.id },
       });
-      if (error || !data?.authUrl) throw error ?? new Error('No auth URL returned');
+      if (stale()) return;
+      if (error || !data?.authUrl) throw new Error(error?.message ?? 'No auth URL returned');
+      const flow: string | undefined = data.flow;
+      currentFlow.current = flow ?? null;
 
-      if ('__TAURI_INTERNALS__' in window) {
-        const { openUrl } = await import('@tauri-apps/plugin-opener');
-        await openUrl(data.authUrl);
-      } else {
-        window.open(data.authUrl, '_blank', 'noopener');
+      const { listen } = await import('@tauri-apps/api/event');
+      const unlisten = await listen<{ flow: string | null; connected: boolean; error: string | null }>(
+        'gmail:status',
+        ({ payload }) => {
+          // Every hook instance hears every gmail:status. React only to the
+          // flow this attempt started: a superseded flow's "replaced" error
+          // belongs to whoever started that one, not to this live attempt.
+          if (payload.flow !== flow) return;
+          if (payload.connected) {
+            connectCleanup.current?.();
+            setIsConnecting(false);
+            refresh();
+          } else {
+            fail(payload.error ?? 'Connecting Gmail failed.');
+          }
+        },
+      );
+      if (stale()) {
+        unlisten();
+        return;
       }
+      // Matches the Rust side's 10-minute OAuth expiry (oauth::FLOW_TTL).
+      const timeout = window.setTimeout(() => fail('Timed out waiting for Google. Please try again.'), 10 * 60 * 1000);
+      connectCleanup.current = () => {
+        unlisten();
+        window.clearTimeout(timeout);
+        connectCleanup.current = null;
+      };
 
-      // Poll for the account row while the user completes consent (3 min max)
-      const started = Date.now();
-      const poll = setInterval(async () => {
-        const { data } = await supabase.from('mail_accounts').select(ACCOUNT_COLUMNS);
-        const rows = ((data as Record<string, unknown>[] | null) || []).map(pickAccount);
-        if (rows.length > accounts.length) {
-          clearInterval(poll);
-          setIsConnecting(false);
-          refresh();
-        } else if (Date.now() - started > 3 * 60 * 1000) {
-          clearInterval(poll);
-          setIsConnecting(false);
-        }
-      }, 3000);
+      const { openUrl } = await import('@tauri-apps/plugin-opener');
+      if (stale()) return;
+      await openUrl(data.authUrl);
     } catch (e) {
       console.error('[mail] connect failed:', e);
-      setIsConnecting(false);
-      throw e;
+      if (!stale()) fail(e instanceof Error ? e.message : String(e));
     }
-  }, [user, accounts.length, refresh]);
+  }, [user, refresh]);
 
   const disconnect = useCallback(async (accountId: string) => {
     if (!user) return;
-    await supabase.functions.invoke('mail-disconnect', {
-      body: { accountId },
+    setError(null);
+    const { error } = await supabase.functions.invoke('mail-disconnect', {
+      body: { accountId, userId: user.id },
     });
+    if (error) setError(error.message);
     refresh();
   }, [user, refresh]);
 
@@ -224,13 +292,23 @@ export function useMailIntelligence() {
     await supabase.from('mail_alerts').update({ acknowledged: true }).eq('id', alertId);
   }, []);
 
-  const syncNow = useCallback(async () => {
+  // Sync one Gmail mailbox: the given one, else the first active Gmail
+  // account, else any Gmail account (a sync is how an 'error' mailbox
+  // recovers, and gmail_sync reports why if it can't). Never another
+  // provider's row: gmail_sync would refuse it, and the admin IMAP mailbox
+  // syncs through mail.rs.
+  const syncNow = useCallback(async (accountId?: string) => {
     if (!user) return;
-    const active = accounts.find((a) => a.status === 'active');
-    if (!active) return;
-    await supabase.functions.invoke('mail-sync', {
-      body: { accountId: active.id, userId: user.id },
+    const gmail = accounts.filter((a) => a.provider === 'gmail');
+    const target = accountId
+      ? gmail.find((a) => a.id === accountId)
+      : gmail.find((a) => a.status === 'active') ?? gmail[0];
+    if (!target) return;
+    setError(null);
+    const { error } = await supabase.functions.invoke('mail-sync', {
+      body: { accountId: target.id, userId: user.id },
     });
+    if (error) setError(error.message);
     refresh();
   }, [user, accounts, refresh]);
 
@@ -240,8 +318,15 @@ export function useMailIntelligence() {
     alerts,
     isLoading,
     isConnecting,
+    error,
+    // Any active mailbox of any provider (the dashboard narration's "is mail
+    // connected"). Not a Gmail signal: use hasGmail for Gmail-specific UI.
     isConnected: accounts.some((a) => a.status === 'active'),
+    // Any Gmail row, whatever its status: an 'error' mailbox still needs its
+    // Scan / Disconnect actions to recover.
+    hasGmail: accounts.some((a) => a.provider === 'gmail'),
     connect,
+    cancelConnect,
     disconnect,
     acknowledge,
     syncNow,
