@@ -13,7 +13,8 @@
  */
 
 import { Database } from "bun:sqlite";
-import { parseVersionPlan, type Version } from "./versionPlan.ts";
+import { type Version } from "./versionPlan.ts";
+import { createPlanSync, defaultRepoCandidates, type PlanSyncStatus } from "./planSync.ts";
 import { ingestJsonlSessions } from "./jsonlIngest.ts";
 import { applyChangelog, readGitLog } from "./changelog.ts";
 import { applyDesignSyncs, parseDesignManifest } from "./designSync.ts";
@@ -32,6 +33,7 @@ const json = (data: unknown, status = 200) =>
 // in the compiled sidecar it is `/`, and every route that reads the repo
 // (plan, changelog, design manifest, tests) has nothing to read.
 export const PROJECT_ROOT = resolve(import.meta.dir, "../../..");
+
 
 export type ApplyResult =
   | { ok: true; synced: number; features: number }
@@ -169,8 +171,20 @@ function compareSemver(a: unknown, b: unknown): number {
 }
 
 export function createAdminHandlers({ db, requireUser }: Deps) {
+  // Roadmap sync with GitHub (planSync.ts): a background loop started from
+  // index.ts, plus the two routes below. The local plan file is only read as
+  // a fallback when GitHub is unreachable. Declared above the return: a
+  // const below it would never be initialised.
+  const planSync = createPlanSync({
+    db,
+    apply: applyVersionPlan,
+    repoCandidates: defaultRepoCandidates(PROJECT_ROOT),
+  });
+
   return {
     syncVersionPlan,
+    getPlanSyncStatus,
+    startPlanSync,
     getVersions,
     getVersionDetail,
     getChangelog,
@@ -193,18 +207,13 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
     initiateRepair,
   };
 
-  function syncVersionPlan(req: Request): Response {
+  /** Check GitHub now, apply the plan if it changed, and return the status. */
+  async function syncVersionPlan(req: Request): Promise<Response> {
     requireUser(req);
-    const planPath = resolve(PROJECT_ROOT, "docs/VERSION-PLAN.md");
-    let md: string;
-    try {
-      md = readFileSync(planPath, "utf8");
-    } catch {
-      return json({ error: "VERSION-PLAN.md not found" }, 404);
+    const status = await planSync.sync(buildParam(req));
+    if (!status.github.ok && status.source === null) {
+      return json({ error: status.github.error ?? status.local.error ?? "No plan reachable", status }, 502);
     }
-
-    const result = applyVersionPlan(db, parseVersionPlan(md));
-    if (!result.ok) return json({ error: result.error }, 422);
 
     // The changelog is filed against the versions just reconciled, so it is
     // refreshed in the same action. Its failure (no git, not a checkout) is
@@ -212,8 +221,9 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
     const log = readGitLog(PROJECT_ROOT);
     const changelog = log.ok ? applyChangelog(db, log.commits).synced : null;
     return json({
-      synced: result.synced,
-      features: result.features,
+      source: status.source,
+      applied: status.github.applied,
+      status,
       changelog,
       ...(log.ok ? {} : { changelog_error: log.error }),
     });
@@ -225,6 +235,24 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
     const log = readGitLog(PROJECT_ROOT);
     if (!log.ok) return json({ error: log.error }, 502);
     return json(applyChangelog(db, log.commits));
+  }
+
+  /** The latest sync status: cached for a minute, re-checked otherwise. */
+  async function getPlanSyncStatus(req: Request): Promise<Response> {
+    requireUser(req);
+    const status: PlanSyncStatus = await planSync.status(buildParam(req));
+    return json(status);
+  }
+
+  /** Start the background sync loop; index.ts calls it once at startup. */
+  function startPlanSync(): () => void {
+    return planSync.start();
+  }
+
+  /** The app's build commit, which only the webview knows (vite define). */
+  function buildParam(req: Request): string | null {
+    const b = new URL(req.url).searchParams.get("build");
+    return b && /^[0-9a-f]{7,40}$/.test(b) ? b : null;
   }
 
   function getVersions(req: Request): Response {

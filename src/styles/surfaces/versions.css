@@ -159,3 +159,27 @@
   .vr-timeline .cardB { animation-duration: 0.01ms; }
   .vr-progress-fill { transition-duration: 0.01ms; }
 }
+
+/* Roadmap sync strip (GitHub / local checkout / Mac app). */
+.vr-sync { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.vr-sync-line {
+  display: grid;
+  grid-template-columns: 18px 110px 84px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.vr-sync-icon { color: var(--ink3); display: inline-flex; }
+.vr-sync-label { color: var(--ink); font-weight: 600; }
+.vr-sync-state { font-weight: 600; }
+.vr-sync-ok .vr-sync-state { color: var(--grn); }
+.vr-sync-behind .vr-sync-state { color: var(--amber); }
+.vr-sync-unknown .vr-sync-state { color: var(--ink3); }
+.vr-sync-detail { color: var(--ink3); overflow-wrap: anywhere; margin: 0; }
+.vr-sync-note { font-size: 12px; color: var(--amber); margin: 4px 0 0; }
+.vr-trail { display: inline-flex; gap: 6px; align-items: center; }
+.vr-badge-github { background: color-mix(in srgb, var(--amber) 12%, transparent); color: var(--amber); }
+@media (max-width: 640px) {
+  .vr-sync-line { grid-template-columns: 18px 1fr auto; }
+  .vr-sync-detail { grid-column: 2 / -1; }
+}

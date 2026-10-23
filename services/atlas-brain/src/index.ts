@@ -144,6 +144,9 @@ const mailDraft = createMailDraftHandlers({ db: localDb, requireUser, json });
 // requireUser as every other route — these read and write the whole admin
 // surface of atlas.db, so they are not exempt from auth (see adminRoutes.ts).
 const admin = createAdminHandlers({ db: localDb._db, requireUser });
+// Keep /versions in step with GitHub while the brain runs (planSync.ts).
+// ATLAS_PLAN_SYNC=off disables it; without `gh` each tick fails fast.
+if (process.env.ATLAS_PLAN_SYNC !== "off") admin.startPlanSync();
 
 // Live agent view (feat-018): keep atlas_agent_sessions current while Claude
 // Code works. Only from a source checkout — the admin surfaces need one anyway
@@ -455,6 +458,7 @@ const server = Bun.serve({
       if (req.method === "POST" && url.pathname === "/memory/erase-all") return await handleMemoryEraseAll(req);
       // Admin routes
       if (url.pathname === "/admin/versions/sync" && req.method === "POST") return admin.syncVersionPlan(req);
+      if (url.pathname === "/admin/versions/sync-status" && req.method === "GET") return admin.getPlanSyncStatus(req);
       if (url.pathname === "/admin/versions" && req.method === "GET") return admin.getVersions(req);
       if (url.pathname.startsWith("/admin/versions/") && req.method === "GET") return admin.getVersionDetail(req, url.pathname.split("/")[3]);
       if (url.pathname === "/admin/changelog/sync" && req.method === "POST") return admin.syncChangelog(req);
