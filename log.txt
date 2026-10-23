@@ -1,0 +1,48 @@
+2026-10-23 18:36:50.347511: I tensorflow/core/util/port.cc:113] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+2026-10-23 18:36:50.349584: I external/local_tsl/tsl/cuda/cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+2026-10-23 18:36:50.378143: E external/local_xla/xla/stream_executor/cuda/cuda_dnn.cc:9261] Unable to register cuDNN factory: Attempting to register factory for plugin cuDNN when one has already been registered
+2026-10-23 18:36:50.378185: E external/local_xla/xla/stream_executor/cuda/cuda_fft.cc:607] Unable to register cuFFT factory: Attempting to register factory for plugin cuFFT when one has already been registered
+2026-10-23 18:36:50.379174: E external/local_xla/xla/stream_executor/cuda/cuda_blas.cc:1515] Unable to register cuBLAS factory: Attempting to register factory for plugin cuBLAS when one has already been registered
+2026-10-23 18:36:50.384290: I external/local_tsl/tsl/cuda/cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+2026-10-23 18:36:50.384548: I tensorflow/core/platform/cpu_feature_guard.cc:182] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 AVX512F AVX512_VNNI AVX512_BF16 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+2026-10-23 18:36:51.675281: W tensorflow/compiler/tf2tensorrt/utils/py_utils.cc:38] TF-TRT Warning: Could not find TensorRT
+[load] {"source": "tfhub", "path": "/tmp/tfhub_modules/5b671d4330856f6efb14e8bc74e382b4582bcfdd"}
+2026-10-23 18:36:58.016245: I tensorflow/compiler/mlir/mlir_graph_optimization_pass.cc:388] MLIR V1 optimization pass is not enabled
+WARNING:tensorflow:From /home/runner/work/atlas/atlas/scripts/wakeword-backbone/convert.py:109: convert_variables_to_constants (from tensorflow.python.framework.convert_to_constants) is deprecated and will be removed in a future version.
+Instructions for updating:
+This API was designed for TensorFlow v1. See https://www.tensorflow.org/guide/migrate for instructions on how to migrate your code to TensorFlow v2.
+WARNING:tensorflow:From /home/runner/work/atlas/atlas/scripts/wakeword-backbone/convert.py:109: convert_variables_to_constants (from tensorflow.python.framework.convert_to_constants) is deprecated and will be removed in a future version.
+Instructions for updating:
+This API was designed for TensorFlow v1. See https://www.tensorflow.org/guide/migrate for instructions on how to migrate your code to TensorFlow v2.
+WARNING:tensorflow:From /opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/site-packages/tensorflow/python/framework/convert_to_constants.py:946: extract_sub_graph (from tensorflow.python.framework.graph_util_impl) is deprecated and will be removed in a future version.
+Instructions for updating:
+This API was designed for TensorFlow v1. See https://www.tensorflow.org/guide/migrate for instructions on how to migrate your code to TensorFlow v2.
+WARNING:tensorflow:From /opt/hostedtoolcache/Python/3.11.17/x64/lib/python3.11/site-packages/tensorflow/python/framework/convert_to_constants.py:946: extract_sub_graph (from tensorflow.python.framework.graph_util_impl) is deprecated and will be removed in a future version.
+Instructions for updating:
+This API was designed for TensorFlow v1. See https://www.tensorflow.org/guide/migrate for instructions on how to migrate your code to TensorFlow v2.
+[freeze] {"nodes": 682, "ops": ["AddV2", "Cast", "ComplexAbs", "ConcatV2", "Const", "Conv2D", "Cos", "Enter", "Exit", "ExpandDims", "Fill", "FloorDiv", "FloorMod", "FusedBatchNormV3", "GatherV2", "Identity", "Less", "LinSpace", "Log", "LogicalAnd", "LoopCond", "MatMul", "MaxPool", "Maximum", "Mean", "Merge", "Minimum", "Mul", "NextIteration", "Pack", "Pad", "Placeholder", "RFFT", "Range", "RealDiv", "Relu", "Reshape", "Shape", "Split", "SplitV", "Squeeze", "StridedSlice", "Sub", "Switch", "TensorArrayGatherV3", "TensorArrayReadV3", "TensorArrayScatterV3", "TensorArrayV3", "TensorArrayWriteV3"]}
+[tf-reference] {"shapes": [[1, 96], [2, 96], [16, 96], [28, 96]]}
+2026-10-23 18:36:59.919814: I tensorflow/core/grappler/devices.cc:66] Number of eligible GPUs (core count >= 8, compute capability >= 0.0): 0
+2026-10-23 18:36:59.920027: I tensorflow/core/grappler/clusters/single_machine.cc:361] Starting new session
+[convert] {"opset": 15, "ops": ["And", "BatchNormalization", "Conv", "LeakyRelu", "Less", "Loop", "Max", "MaxPool", "Relu", "Reshape", "Squeeze", "Transpose", "Unsqueeze"], "bytes": 2445999}
+[onnx-vs-tf] {"samples": 12400, "tf_embeddings": 1, "onnx_embeddings": 1, "max_abs_diff": 2.09808349609375e-05}
+[onnx-vs-tf] {"samples": 13680, "tf_embeddings": 2, "onnx_embeddings": 2, "max_abs_diff": 3.0517578125e-05}
+[onnx-vs-tf] {"samples": 32000, "tf_embeddings": 16, "onnx_embeddings": 16, "max_abs_diff": 3.814697265625e-05}
+[onnx-vs-tf] {"samples": 48017, "tf_embeddings": 28, "onnx_embeddings": 28, "max_abs_diff": 4.38690185546875e-05}
+[app-chunk-framing] {"frames_per_1280_chunk_alone": 5, "frames_per_1280_chunk_with_480_context": 8, "expected": 8}
+[backbone-compare] {"clip": "noise", "google_embeddings": 28, "oww_embeddings": 28, "best_offset": -3, "median_cosine": 0.9570389986038208, "hey_jarvis_max_score_oww": 0.0001945793628692627, "hey_jarvis_max_score_google": 5.155801773071289e-06}
+[backbone-compare] {"clip": "hey_jarvis_tts", "google_embeddings": 28, "oww_embeddings": 28, "best_offset": 0, "median_cosine": 0.9541724920272827, "hey_jarvis_max_score_oww": 0.9969913959503174, "hey_jarvis_max_score_google": 0.9990999698638916}
+[backbone-compare] {"clip": "other_speech_tts", "google_embeddings": 28, "oww_embeddings": 28, "best_offset": 0, "median_cosine": 0.9688783884048462, "hey_jarvis_max_score_oww": 0.0002917051315307617, "hey_jarvis_max_score_google": 7.867813110351562e-06}
+# speech_embedding → ONNX
+
+- Opset 15; ops: And, BatchNormalization, Conv, LeakyRelu, Less, Loop, Max, MaxPool, Relu, Reshape, Squeeze, Transpose, Unsqueeze
+- ONNX vs TensorFlow, worst absolute difference: 4.39e-05
+
+- App's mel framing: 5 frames per 1280-sample chunk (openWakeWord expects 8; with 480 samples of context: 8)
+
+| clip | Google embeddings | oWW embeddings | median cosine | hey_jarvis (oWW) | hey_jarvis (Google) |
+|---|---|---|---|---|---|
+| noise | 28 | 28 | 0.957 | 0.000 | 0.000 |
+| hey_jarvis_tts | 28 | 28 | 0.954 | 0.997 | 0.999 |
+| other_speech_tts | 28 | 28 | 0.969 | 0.000 | 0.000 |

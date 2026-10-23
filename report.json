@@ -1,0 +1,205 @@
+{
+  "opset": 15,
+  "steps": [
+    {
+      "name": "load",
+      "source": "tfhub",
+      "path": "/tmp/tfhub_modules/5b671d4330856f6efb14e8bc74e382b4582bcfdd"
+    },
+    {
+      "name": "freeze",
+      "nodes": 682,
+      "ops": [
+        "AddV2",
+        "Cast",
+        "ComplexAbs",
+        "ConcatV2",
+        "Const",
+        "Conv2D",
+        "Cos",
+        "Enter",
+        "Exit",
+        "ExpandDims",
+        "Fill",
+        "FloorDiv",
+        "FloorMod",
+        "FusedBatchNormV3",
+        "GatherV2",
+        "Identity",
+        "Less",
+        "LinSpace",
+        "Log",
+        "LogicalAnd",
+        "LoopCond",
+        "MatMul",
+        "MaxPool",
+        "Maximum",
+        "Mean",
+        "Merge",
+        "Minimum",
+        "Mul",
+        "NextIteration",
+        "Pack",
+        "Pad",
+        "Placeholder",
+        "RFFT",
+        "Range",
+        "RealDiv",
+        "Relu",
+        "Reshape",
+        "Shape",
+        "Split",
+        "SplitV",
+        "Squeeze",
+        "StridedSlice",
+        "Sub",
+        "Switch",
+        "TensorArrayGatherV3",
+        "TensorArrayReadV3",
+        "TensorArrayScatterV3",
+        "TensorArrayV3",
+        "TensorArrayWriteV3"
+      ]
+    },
+    {
+      "name": "tf-reference",
+      "shapes": [
+        [
+          1,
+          96
+        ],
+        [
+          2,
+          96
+        ],
+        [
+          16,
+          96
+        ],
+        [
+          28,
+          96
+        ]
+      ]
+    },
+    {
+      "name": "convert",
+      "opset": 15,
+      "ops": [
+        "And",
+        "BatchNormalization",
+        "Conv",
+        "LeakyRelu",
+        "Less",
+        "Loop",
+        "Max",
+        "MaxPool",
+        "Relu",
+        "Reshape",
+        "Squeeze",
+        "Transpose",
+        "Unsqueeze"
+      ],
+      "bytes": 2445999
+    },
+    {
+      "name": "onnx-vs-tf",
+      "samples": 12400,
+      "tf_embeddings": 1,
+      "onnx_embeddings": 1,
+      "max_abs_diff": 2.09808349609375e-05
+    },
+    {
+      "name": "onnx-vs-tf",
+      "samples": 13680,
+      "tf_embeddings": 2,
+      "onnx_embeddings": 2,
+      "max_abs_diff": 3.0517578125e-05
+    },
+    {
+      "name": "onnx-vs-tf",
+      "samples": 32000,
+      "tf_embeddings": 16,
+      "onnx_embeddings": 16,
+      "max_abs_diff": 3.814697265625e-05
+    },
+    {
+      "name": "onnx-vs-tf",
+      "samples": 48017,
+      "tf_embeddings": 28,
+      "onnx_embeddings": 28,
+      "max_abs_diff": 4.38690185546875e-05
+    },
+    {
+      "name": "app-chunk-framing",
+      "frames_per_1280_chunk_alone": 5,
+      "frames_per_1280_chunk_with_480_context": 8,
+      "expected": 8
+    },
+    {
+      "name": "backbone-compare",
+      "clip": "noise",
+      "google_embeddings": 28,
+      "oww_embeddings": 28,
+      "best_offset": -3,
+      "median_cosine": 0.9570389986038208,
+      "hey_jarvis_max_score_oww": 0.0001945793628692627,
+      "hey_jarvis_max_score_google": 5.155801773071289e-06
+    },
+    {
+      "name": "backbone-compare",
+      "clip": "hey_jarvis_tts",
+      "google_embeddings": 28,
+      "oww_embeddings": 28,
+      "best_offset": 0,
+      "median_cosine": 0.9541724920272827,
+      "hey_jarvis_max_score_oww": 0.9969913959503174,
+      "hey_jarvis_max_score_google": 0.9990999698638916
+    },
+    {
+      "name": "backbone-compare",
+      "clip": "other_speech_tts",
+      "google_embeddings": 28,
+      "oww_embeddings": 28,
+      "best_offset": 0,
+      "median_cosine": 0.9688783884048462,
+      "hey_jarvis_max_score_oww": 0.0002917051315307617,
+      "hey_jarvis_max_score_google": 7.867813110351562e-06
+    }
+  ],
+  "onnx_vs_tf_max_abs_diff": 4.38690185546875e-05,
+  "app_chunk_framing": {
+    "frames_per_1280_chunk_alone": 5,
+    "frames_per_1280_chunk_with_480_context": 8,
+    "expected": 8
+  },
+  "compare": [
+    {
+      "clip": "noise",
+      "google_embeddings": 28,
+      "oww_embeddings": 28,
+      "best_offset": -3,
+      "median_cosine": 0.9570389986038208,
+      "hey_jarvis_max_score_oww": 0.0001945793628692627,
+      "hey_jarvis_max_score_google": 5.155801773071289e-06
+    },
+    {
+      "clip": "hey_jarvis_tts",
+      "google_embeddings": 28,
+      "oww_embeddings": 28,
+      "best_offset": 0,
+      "median_cosine": 0.9541724920272827,
+      "hey_jarvis_max_score_oww": 0.9969913959503174,
+      "hey_jarvis_max_score_google": 0.9990999698638916
+    },
+    {
+      "clip": "other_speech_tts",
+      "google_embeddings": 28,
+      "oww_embeddings": 28,
+      "best_offset": 0,
+      "median_cosine": 0.9688783884048462,
+      "hey_jarvis_max_score_oww": 0.0002917051315307617,
+      "hey_jarvis_max_score_google": 7.867813110351562e-06
+    }
+  ]
+}
