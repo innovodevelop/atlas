@@ -103,7 +103,7 @@ impl GmailState {
 
     /// Add a sign-in, first evicting the oldest ones beyond
     /// MAX_PENDING_SIGN_INS (their listeners retire and report it).
-    fn register(&self, flow: &str, sign_in: GmailOAuthPending) {
+    pub(crate) fn register(&self, flow: &str, sign_in: GmailOAuthPending) {
         let mut pending = self.pending.lock().unwrap();
         while pending.len() >= MAX_PENDING_SIGN_INS {
             let Some(oldest) = pending.iter().min_by_key(|(_, p)| p.started).map(|(id, _)| id.clone())
@@ -115,12 +115,12 @@ impl GmailState {
         pending.insert(flow.to_string(), sign_in);
     }
 
-    fn is_pending(&self, flow: &str) -> bool {
+    pub(crate) fn is_pending(&self, flow: &str) -> bool {
         self.pending.lock().unwrap().contains_key(flow)
     }
 
     /// Remove a flow; Some if it was still in flight.
-    fn retire(&self, flow: &str) -> Option<GmailOAuthPending> {
+    pub(crate) fn retire(&self, flow: &str) -> Option<GmailOAuthPending> {
         self.pending.lock().unwrap().remove(flow)
     }
 }
@@ -188,7 +188,7 @@ fn build_authorize_url(client: &GoogleClient, redirect_uri: &str, challenge: &st
     )
 }
 
-fn form(pairs: &[(&str, &str)]) -> String {
+pub(crate) fn form(pairs: &[(&str, &str)]) -> String {
     pairs
         .iter()
         .map(|(k, v)| format!("{}={}", urlencoding(k), urlencoding(v)))
@@ -815,7 +815,7 @@ const AUTO_SYNC_INTERVAL: Duration = Duration::from_secs(15 * 60);
 /// MAX_FETCH_PER_SYNC slice per interval.
 const AUTO_SYNC_CATCH_UP_ROUNDS: usize = 5;
 
-/// Scans every active Gmail and IMAP mailbox on a timer while Atlas runs, the same
+/// Scans every active Gmail, IMAP and Outlook mailbox on a timer while Atlas runs, the same
 /// sync as Scan now. Mail is local-only, so there is no sync while the app is
 /// closed (docs/mail-setup.md).
 ///
@@ -859,8 +859,9 @@ impl GmailAutoSync {
 }
 
 fn auto_sync_once(app: &AppHandle) {
-    // IMAP mailboxes ride the same timer and owner-instance check.
+    // IMAP and Outlook mailboxes ride the same timer and owner-instance check.
     crate::mail_imap::auto_sync_once(app, AUTO_SYNC_CATCH_UP_ROUNDS);
+    crate::outlook::auto_sync_once(app, AUTO_SYNC_CATCH_UP_ROUNDS);
     let (Some(db), Some(gmail)) = (app.try_state::<DbState>(), app.try_state::<GmailState>()) else {
         return;
     };

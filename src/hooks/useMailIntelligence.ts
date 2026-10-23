@@ -6,8 +6,8 @@ import { useAuth } from '@/hooks/useAuth';
 // Gmail connects, syncs and disconnects through the local gmail_* Rust
 // commands (localClient routes the old edge-function names to them); this hook
 // reads mail_accounts / mail_messages / mail_alerts, streams new alerts, and
-// exposes those actions. IMAP mailboxes the user connected go through the
-// imap_* commands (mail_imap.rs) the same way. Only those two kinds are
+// exposes those actions. IMAP mailboxes go through the imap_* commands
+// (mail_imap.rs) and Outlook through outlook_* (outlook.rs) the same way. Only those two kinds are
 // syncable or disconnectable here (isUserMailbox): the admin IMAP mailbox
 // (mail.rs) is listed too, and both Rust modules refuse it.
 // NOTE: mail_accounts.encrypted_refresh_token must never reach React state.
@@ -53,14 +53,27 @@ const ACCOUNT_COLUMNS = 'id, provider, email_address, status, last_synced_at, la
 // project mail_accounts rows down in JS — this is the only thing standing
 // between encrypted_refresh_token and React state. Exported for the shim's
 // projection test (localClient.test.ts).
-/** A mailbox the user connected themselves (Gmail, or IMAP through
+/** A mailbox the user connected themselves (Gmail, Outlook, or IMAP through
  *  mail_imap.rs, whose ids start "imap:"), as opposed to the admin mailbox
  *  that is also provider 'imap'. Only these get Scan and Disconnect. */
 export function isUserMailbox(a: Pick<MailAccount, 'id' | 'provider'>): boolean {
-  return a.provider === 'gmail' || (a.provider === 'imap' && a.id.startsWith('imap:'));
+  return a.provider === 'gmail' || a.provider === 'outlook' || (a.provider === 'imap' && a.id.startsWith('imap:'));
 }
 
-const isImap = (accountId: string) => accountId.startsWith('imap:');
+/** The OAuth providers connect() signs in with. */
+export type OAuthMailProvider = 'gmail' | 'outlook';
+
+const OAUTH_LABELS: Record<OAuthMailProvider, { name: string; vendor: string; start: string }> = {
+  gmail: { name: 'Gmail', vendor: 'Google', start: 'mail-oauth-start' },
+  outlook: { name: 'Outlook', vendor: 'Microsoft', start: 'outlook-connect' },
+};
+
+/** The local function for a Scan or Disconnect of this account. */
+function mailFn(accountId: string, action: 'sync' | 'disconnect'): string {
+  if (accountId.startsWith('imap:')) return `imap-${action}`;
+  if (accountId.startsWith('outlook:')) return `outlook-${action}`;
+  return `mail-${action}`;
+}
 
 export interface ImapSettings {
   email: string;
@@ -160,6 +173,9 @@ export function useMailIntelligence() {
   const [alerts, setAlerts] = useState<MailAlert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
+  // Which provider the in-flight sign-in is for, so buttons can say
+  // "Waiting for Google…" or "Waiting for Microsoft…".
+  const [connectingProvider, setConnectingProvider] = useState<OAuthMailProvider | null>(null);
   // Last connect / sync / disconnect failure, for the UI to show. Cleared when
   // the next attempt starts.
   const [error, setError] = useState<string | null>(null);
@@ -255,14 +271,19 @@ export function useMailIntelligence() {
     for (const flow of [...myFlows.current]) abandonFlow(flow);
   }, [abandonFlow]);
 
-  const connect = useCallback(async () => {
+  // Outlook signs in the same way through outlook.rs: its flows share Rust's
+  // registry (so mail-oauth-cancel cancels them too) and report on
+  // outlook:status.
+  const connect = useCallback(async (provider: OAuthMailProvider = 'gmail') => {
     if (!user) return;
+    const labels = OAUTH_LABELS[provider];
     connectCleanup.current?.();
     const mine = ++attempt.current;
     const stale = () => !mounted.current || mine !== attempt.current;
     let flow: string | undefined;
     setError(null);
     setIsConnecting(true);
+    setConnectingProvider(provider);
     const fail = (message: string) => {
       connectCleanup.current?.();
       abandonFlow(flow);
@@ -270,9 +291,9 @@ export function useMailIntelligence() {
       setIsConnecting(false);
     };
     try {
-      if (!('__TAURI_INTERNALS__' in window)) throw new Error('Gmail can only be connected in the desktop app.');
-      const { data, error } = await supabase.functions.invoke('mail-oauth-start', {
-        body: { provider: 'gmail', userId: user.id },
+      if (!('__TAURI_INTERNALS__' in window)) throw new Error(`${labels.name} can only be connected in the desktop app.`);
+      const { data, error } = await supabase.functions.invoke(labels.start, {
+        body: { provider, userId: user.id },
       });
       flow = data?.flow;
       if (stale()) {
@@ -285,9 +306,9 @@ export function useMailIntelligence() {
 
       const { listen } = await import('@tauri-apps/api/event');
       const unlisten = await listen<{ flow: string | null; connected: boolean; error: string | null }>(
-        'gmail:status',
+        `${provider}:status`,
         ({ payload }) => {
-          // Every hook instance hears every gmail:status. React only to
+          // Every hook instance hears every status event. React only to
           // sign-ins this instance started.
           const f = payload.flow;
           if (!f || !myFlows.current.has(f)) return;
@@ -299,7 +320,7 @@ export function useMailIntelligence() {
             setIsConnecting(false);
             refresh();
           } else if (f === flow) {
-            fail(payload.error ?? 'Connecting Gmail failed.');
+            fail(payload.error ?? `Connecting ${labels.name} failed.`);
           } else {
             // An earlier tab ended without connecting; the latest is still live.
             myFlows.current.delete(f);
@@ -316,7 +337,7 @@ export function useMailIntelligence() {
       // just before that deadline can still finish its token exchange and
       // report success, instead of racing a webview timer.
       const timeout = window.setTimeout(
-        () => fail('Timed out waiting for Google. Please try again.'),
+        () => fail(`Timed out waiting for ${labels.vendor}. Please try again.`),
         12 * 60 * 1000,
       );
       connectCleanup.current = () => {
@@ -341,7 +362,7 @@ export function useMailIntelligence() {
   const disconnect = useCallback(async (accountId: string) => {
     if (!user) return;
     setError(null);
-    const { error } = await supabase.functions.invoke(isImap(accountId) ? 'imap-disconnect' : 'mail-disconnect', {
+    const { error } = await supabase.functions.invoke(mailFn(accountId, 'disconnect'), {
       body: { accountId, userId: user.id },
     });
     if (error) setError(error.message);
@@ -365,7 +386,7 @@ export function useMailIntelligence() {
       : own.find((a) => a.status === 'active') ?? own[0];
     if (!target) return;
     setError(null);
-    const { error } = await supabase.functions.invoke(isImap(target.id) ? 'imap-sync' : 'mail-sync', {
+    const { error } = await supabase.functions.invoke(mailFn(target.id, 'sync'), {
       body: { accountId: target.id, userId: user.id },
     });
     if (error) setError(error.message);
@@ -411,6 +432,7 @@ export function useMailIntelligence() {
     // Scan / Disconnect actions to recover.
     hasGmail: accounts.some((a) => a.provider === 'gmail'),
     connect,
+    connectingProvider,
     connectImap,
     cancelConnect,
     disconnect,

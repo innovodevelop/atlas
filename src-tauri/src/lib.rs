@@ -18,6 +18,7 @@ mod datafetch;
 mod mail;
 mod gmail;
 mod mail_imap;
+mod outlook;
 mod scheduler;
 mod integrity;
 mod control;
@@ -494,6 +495,7 @@ pub fn run() {
     .manage(music::MusicState::new())
     .manage(gmail::GmailState::new())
     .manage(mail_imap::ImapState::new())
+    .manage(outlook::OutlookState::new())
     .manage(home::HomeState::new())
     .invoke_handler(tauri::generate_handler![
       voice_gateway_info,
@@ -553,6 +555,9 @@ pub fn run() {
       mail_imap::imap_connect,
       mail_imap::imap_disconnect,
       mail_imap::imap_sync,
+      outlook::outlook_connect,
+      outlook::outlook_disconnect,
+      outlook::outlook_sync,
       // The webview's yes/no on a queued control-port action. Execution stays
       // in Rust: this command takes an approval id and a boolean, and the
       // arguments it would run with never leave the Rust process — the webview

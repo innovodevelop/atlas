@@ -245,7 +245,8 @@ function PermissionsSettings({ onClose, mode }: { onClose: () => void; mode: Set
 // Compact mail-accounts management (connect / status / disconnect), reusing the
 // same read-only Gmail flow the Mail card uses.
 function MailSettings() {
-  const { accounts, hasGmail, isConnecting, error, connect, connectImap, cancelConnect, disconnect, syncNow } = useMailIntelligence();
+  const { accounts, hasGmail, isConnecting, connectingProvider, error, connect, connectImap, cancelConnect, disconnect, syncNow } = useMailIntelligence();
+  const hasOutlook = accounts.some((a) => a.provider === 'outlook');
   const [imapOpen, setImapOpen] = useState(false);
   return (
     <div className="col gap16">
@@ -278,14 +279,25 @@ function MailSettings() {
       <Button
         variant="primary"
         icon={<Plus className="i16" />}
-        loading={isConnecting}
-        onClick={() => void connect()}
+        loading={isConnecting && connectingProvider === 'gmail'}
+        disabled={isConnecting}
+        onClick={() => void connect('gmail')}
         style={{ width: '100%' }}
       >
-        {isConnecting ? 'Waiting for Google…' : hasGmail ? 'Connect another Gmail account' : 'Connect Gmail'}
+        {isConnecting && connectingProvider === 'gmail' ? 'Waiting for Google…' : hasGmail ? 'Connect another Gmail account' : 'Connect Gmail'}
       </Button>
-      {/* The button is disabled while waiting, so an abandoned Google tab
-          would otherwise lock it until the 10-minute timeout. */}
+      <Button
+        variant="primary"
+        icon={<Plus className="i16" />}
+        loading={isConnecting && connectingProvider === 'outlook'}
+        disabled={isConnecting}
+        onClick={() => void connect('outlook')}
+        style={{ width: '100%' }}
+      >
+        {isConnecting && connectingProvider === 'outlook' ? 'Waiting for Microsoft…' : hasOutlook ? 'Connect another Outlook account' : 'Connect Outlook / Microsoft 365'}
+      </Button>
+      {/* The buttons are disabled while waiting, so an abandoned sign-in tab
+          would otherwise lock them until the 10-minute timeout. */}
       {isConnecting && <Button variant="ghost" size="sm" onClick={cancelConnect}>Cancel</Button>}
       {imapOpen
         ? <ImapConnectForm onConnect={connectImap} onClose={() => setImapOpen(false)} />

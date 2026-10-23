@@ -116,6 +116,29 @@ pub fn clear_gmail_refresh_token(account_id: &str) -> Result<(), String> {
     Ok(())
 }
 
+// --- Outlook (Microsoft Graph mail sync) -----------------------------------
+// Same scheme as Gmail: one item per mailbox, keyed by account_id. Microsoft
+// rotates refresh tokens, so outlook.rs rewrites this item on most syncs.
+
+const OUTLOOK_SERVICE: &str = "atlas-outlook";
+
+fn outlook_entry(account: &str) -> keyring::Result<keyring::Entry> {
+    keyring::Entry::new(OUTLOOK_SERVICE, account)
+}
+
+pub fn outlook_refresh_token(account_id: &str) -> Option<String> {
+    outlook_entry(account_id).ok()?.get_password().ok()
+}
+
+pub fn set_outlook_refresh_token(account_id: &str, token: &str) -> Result<(), String> {
+    set_permissive(OUTLOOK_SERVICE, account_id, token)
+}
+
+pub fn clear_outlook_refresh_token(account_id: &str) -> Result<(), String> {
+    if let Ok(e) = outlook_entry(account_id) { let _ = e.delete_password(); }
+    Ok(())
+}
+
 // --- Brain sidecar / AI provider keys -----------------------------------
 // All atlas-core secrets live in ONE Keychain item ("atlas-core" / "secrets")
 // holding a JSON object, instead of one item per key.

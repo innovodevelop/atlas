@@ -128,8 +128,56 @@ that speaks IMAP (iCloud, Fastmail, Yahoo, a hosting provider's server).
 - **Not yet:** run against a real server (the first connect on the Mac is
   the verification step).
 
-## Later phases
+## Outlook and Microsoft 365
 
-- **Outlook** (Microsoft Graph `Mail.Read`) — same local pipeline, needs an
-  Azure app registration. Outlook.com mailboxes no longer accept IMAP
-  password logins, so the IMAP connector doesn't cover them.
+Personal Outlook.com / Hotmail / Live mailboxes and work or school Microsoft
+365 mailboxes connect through Microsoft Graph with scope `Mail.Read` (plus
+`User.Read` for the address and `offline_access` for a refresh token): Atlas
+cannot send, move, flag or delete mail. Same local pipeline as Gmail
+(`src-tauri/src/outlook.rs`). Outlook.com no longer accepts IMAP password
+logins, which is why this isn't covered by the IMAP connector.
+
+### 1. Register the app with Microsoft (~5 minutes, yours)
+
+This involves credentials, so Claude doesn't perform it.
+
+1. https://entra.microsoft.com → **Applications → App registrations → New
+   registration**. Name "Atlas Mail". Supported account types: **Accounts in
+   any organizational directory and personal Microsoft accounts**.
+2. Redirect URI: platform **Public client/native (mobile & desktop)**, URI
+   `http://127.0.0.1`. Atlas signs in with a loopback redirect on a random
+   port; Microsoft ignores the port for loopback addresses on this platform.
+3. **API permissions → Add → Microsoft Graph → Delegated**: `Mail.Read`,
+   `User.Read`, `offline_access`. No admin consent is needed for these.
+4. **Authentication → Allow public client flows: Yes.** There is no client
+   secret: Atlas is a public client and uses PKCE.
+5. Copy the **Application (client) ID**.
+
+### 2. Put it into Atlas's Keychain item
+
+```bash
+security add-generic-password -U -s atlas-core -a secrets-import -T /Applications/Atlas.app/Contents/MacOS/app -w '{"microsoft_oauth_client_id":"PASTE_CLIENT_ID"}'
+```
+
+Quit Atlas fully (⌘Q) and reopen it. `microsoft_oauth_tenant` is optional:
+leave it out to allow any Microsoft account (`common`), or set a tenant id to
+restrict sign-in to one organisation. If you already imported the Google
+client, both can go in one import blob.
+
+### 3. Connect
+
+**Settings → Mail → Connect Outlook / Microsoft 365** (or **Connect Outlook**
+in the Mail view). Sign-in, Cancel and the 10-minute limit work exactly like
+Gmail's.
+
+- **Sync:** Graph's delta query on the inbox. The first scan takes the last 14
+  days; later scans take what arrived since, every 15 minutes with Gmail and
+  IMAP. Metadata and Outlook's own preview line only.
+- **Tokens:** the refresh token is in the Keychain (service `atlas-outlook`).
+  Microsoft rotates it on use; Atlas stores each new one. A revoked grant, or
+  one unused for 90 days, marks the mailbox **error** until you reconnect.
+- **Disconnect** deletes the mailbox, its scanned mail and the token. Microsoft
+  has no per-app revocation for public clients: remove Atlas at
+  account.live.com/consent/Manage (personal) or myapps.microsoft.com (work).
+- **Not yet:** run against a real Microsoft account; the first connect is the
+  verification step.

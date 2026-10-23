@@ -467,6 +467,9 @@ const GMAIL_FNS: Record<string, string> = {
   "imap-connect": "imap_connect",
   "imap-disconnect": "imap_disconnect",
   "imap-sync": "imap_sync",
+  "outlook-connect": "outlook_connect",
+  "outlook-disconnect": "outlook_disconnect",
+  "outlook-sync": "outlook_sync",
 };
 
 const functions = {
