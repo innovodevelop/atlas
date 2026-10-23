@@ -18,6 +18,62 @@ export interface SttEvents {
 }
 
 const SCRIBE_WS_URL = "wss://api.elevenlabs.io/v1/speech-to-text/realtime";
+const SCRIBE_TOKEN_URL = "https://api.elevenlabs.io/v1/single-use-token/realtime_scribe";
+/** ElevenLabs single-use tokens live 15 minutes; a prefetched one older than
+ *  this is thrown away rather than risked. */
+const TOKEN_FRESH_MS = 10 * 60_000;
+/** How long finish() waits for the final transcript after the commit. */
+const FINAL_WAIT_MS = 1200;
+
+/**
+ * Mints scribe tokens ahead of need (feat-025). Minting used to happen on
+ * wake, so every utterance paid an HTTPS round trip to ElevenLabs before the
+ * STT socket could even start opening. Now a session prefetches one token,
+ * each take() hands over the prefetched token and starts minting the next,
+ * and only a cold or stale cache mints inline.
+ */
+export class ScribeTokenCache {
+  private next: { token: Promise<string>; at: number } | null = null;
+
+  constructor(
+    private apiKey: string | undefined,
+    private mint: (apiKey: string) => Promise<string> = mintScribeToken,
+    private now: () => number = () => Date.now(),
+  ) {}
+
+  /** Start minting a token in the background, if none is waiting. */
+  prefetch(): void {
+    if (!this.apiKey || this.next) return;
+    const token = this.mint(this.apiKey);
+    // A failed prefetch is dropped; take() then mints inline and reports.
+    token.catch(() => {
+      if (this.next?.token === token) this.next = null;
+    });
+    this.next = { token, at: this.now() };
+  }
+
+  async take(): Promise<string> {
+    if (!this.apiKey) throw new Error("ELEVENLABS_API_KEY not configured");
+    const waiting = this.next;
+    this.next = null;
+    let token: string | null = null;
+    if (waiting && this.now() - waiting.at < TOKEN_FRESH_MS) {
+      token = await waiting.token.catch(() => null);
+    }
+    this.prefetch();
+    return token ?? this.mint(this.apiKey);
+  }
+}
+
+/** Mint a single-use scribe token directly from ElevenLabs. */
+export async function mintScribeToken(apiKey: string): Promise<string> {
+  const r = await fetch(SCRIBE_TOKEN_URL, {
+    method: "POST",
+    headers: { "xi-api-key": apiKey },
+  });
+  if (!r.ok) throw new Error(`scribe token failed: ${r.status}`);
+  return (await r.json()).token;
+}
 
 export class RealtimeStt {
   private ws: WebSocket | null = null;
@@ -25,27 +81,18 @@ export class RealtimeStt {
   private finalText = "";
   private partialText = "";
   private pendingFrames: Uint8Array[] = [];
+  /** Wakes finish() as soon as a final transcript lands. */
+  private finalArrived: (() => void) | null = null;
 
   constructor(
     private events: SttEvents,
-    private languageCode?: string, // e.g. "da" — Danish-first product
-    private apiKey?: string, // ElevenLabs key from the Keychain (required)
+    private languageCode: string | undefined, // e.g. "da" — Danish-first product
+    private tokens: ScribeTokenCache,
   ) {}
 
-  /** Mint a single-use scribe token directly from ElevenLabs. */
-  private async mintToken(): Promise<string> {
-    if (!this.apiKey) throw new Error("ELEVENLABS_API_KEY not configured");
-    const r = await fetch("https://api.elevenlabs.io/v1/single-use-token/realtime_scribe", {
-      method: "POST",
-      headers: { "xi-api-key": this.apiKey },
-    });
-    if (!r.ok) throw new Error(`scribe token failed: ${r.status}`);
-    return (await r.json()).token;
-  }
-
-  /** Mint a single-use token and open the WS. Resolves when ready for audio. */
+  /** Take a single-use token and open the WS. Resolves when ready for audio. */
   async start(): Promise<void> {
-    const token = await this.mintToken();
+    const token = await this.tokens.take();
 
     const params = new URLSearchParams({
       model_id: "scribe_v2_realtime",
@@ -86,6 +133,7 @@ export class RealtimeStt {
         } else if (/final|committed/i.test(type)) {
           this.finalText = this.finalText ? `${this.finalText} ${text}`.trim() : text;
           this.events.onFinal(this.finalText);
+          if (this.finalText) this.finalArrived?.();
         }
       } catch {
         /* non-JSON frames ignored */
@@ -125,10 +173,17 @@ export class RealtimeStt {
 
     // Give the final transcript up to 1.2 s to land, else fall back to the
     // last partial (latency budget beats completeness here).
-    const started = Date.now();
-    while (Date.now() - started < 1200) {
-      if (this.finalText) break;
-      await new Promise((r) => setTimeout(r, 40));
+    // Resolves the moment a final transcript arrives (it used to poll every
+    // 40 ms), or after FINAL_WAIT_MS with whatever partial there is.
+    if (!this.finalText) {
+      await new Promise<void>((resolve) => {
+        const timeout = setTimeout(resolve, FINAL_WAIT_MS);
+        this.finalArrived = () => {
+          clearTimeout(timeout);
+          resolve();
+        };
+      });
+      this.finalArrived = null;
     }
     this.close();
     return (this.finalText || this.partialText).trim();

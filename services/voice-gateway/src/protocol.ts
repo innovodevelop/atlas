@@ -124,6 +124,19 @@ export interface TurnEndMsg {
   interrupted: boolean;
 }
 
+/** Where the time went in this turn (latency.ts): ms from speech-end (voice)
+ *  or the text query arriving, to each stage reached. Sent once per turn, at
+ *  the first TTS byte. Informational; clients may ignore it. */
+export interface LatencyMsg {
+  type: "latency";
+  voice: boolean;
+  sttFinal?: number;
+  brainHeaders?: number;
+  firstToken?: number;
+  firstSentence?: number;
+  firstAudio?: number;
+}
+
 export interface ErrorMsg {
   type: "error";
   message: string;
@@ -138,4 +151,5 @@ export type ServerMsg =
   | TtsChunkEndMsg
   | BargeInMsg
   | TurnEndMsg
+  | LatencyMsg
   | ErrorMsg;

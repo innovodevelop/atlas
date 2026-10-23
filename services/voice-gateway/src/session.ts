@@ -16,6 +16,8 @@ import "./denoShim.ts";
 import { createVad, type VadEngine, type VadAssets } from "./vad.ts";
 import { RealtimeStt } from "./stt.ts";
 import { TtsPipeline, DirectTtsProvider } from "./tts.ts";
+import { TurnTimer, type LatencyBreakdown } from "./latency.ts";
+import { ScribeTokenCache } from "./stt.ts";
 
 // ElevenLabs key injected into the sidecar from the Keychain. Voice runs
 // directly against ElevenLabs for TTS + scribe tokens — no Supabase hop.
@@ -67,10 +69,13 @@ export class VoiceSession {
   private llmAbort: AbortController | null = null;
   private awaitingBargeReport = false;
 
-  // Latency instrumentation (bench + CI acceptance).
-  private tSpeechEnd = 0;
-  private tFirstAudio = 0;
-  onLatency: ((wakeToFirstAudioMs: number) => void) | null = null;
+  // Per-turn latency breakdown (latency.ts): logged and sent to the client as
+  // a `latency` message when the first audio of a turn arrives.
+  private timer: TurnTimer | null = null;
+  onLatency: ((breakdown: LatencyBreakdown) => void) | null = null;
+  // Scribe tokens are minted ahead of the wake that needs one, so opening
+  // STT is one WebSocket handshake rather than a token round trip first.
+  private sttTokens = new ScribeTokenCache(ELEVEN_KEY);
 
   private constructor(private cfg: SessionConfig) {
     // Direct ElevenLabs TTS (key from the Keychain). No Supabase fallback.
@@ -79,6 +84,7 @@ export class VoiceSession {
 
   static async create(cfg: SessionConfig): Promise<VoiceSession> {
     const s = new VoiceSession(cfg);
+    s.sttTokens.prefetch();
     s.vad = await createVad(
       {
         onSpeechStart: () => s.onSpeechStart(),
@@ -150,7 +156,7 @@ export class VoiceSession {
         onError: (e) => console.error("[session] STT error:", e.message),
       },
       this.cfg.languageCode,
-      ELEVEN_KEY,
+      this.sttTokens,
     );
     this.setState("listening");
     try {
@@ -173,26 +179,27 @@ export class VoiceSession {
 
   private async onSpeechEnd(): Promise<void> {
     if (this.state !== "listening" || !this.stt) return;
-    this.tSpeechEnd = performance.now();
+    const timer = new TurnTimer(performance.now(), true);
     const text = await this.stt.finish();
+    timer.mark("sttFinal");
     this.stt = null;
     if (!text) {
       this.setState("idle");
       return;
     }
     this.cfg.send({ type: "final_transcript", text });
-    await this.runTurn(text);
+    await this.runTurn(text, timer);
   }
 
   // -------------------------------------------------------------------------
   // The turn: orchestrator stream → sentence chunks → pipelined TTS
 
-  private async runTurn(userText: string): Promise<void> {
+  private async runTurn(userText: string, timer = new TurnTimer(performance.now(), false)): Promise<void> {
     this.setState("thinking");
     this.history.push({ role: "user", content: userText });
     this.turnChunks = [];
     this.turnFullText = "";
-    this.tFirstAudio = 0;
+    this.timer = timer;
     this.llmAbort = new AbortController();
     const llmSignal = this.llmAbort.signal;
 
@@ -228,6 +235,7 @@ export class VoiceSession {
     }
 
     if (llmSignal.aborted) return; // barged in while thinking
+    timer.mark("brainHeaders");
 
     if (!res.ok || !res.body) {
       let message = `brain error ${res.status}`;
@@ -278,6 +286,7 @@ export class VoiceSession {
             const json = JSON.parse(payload);
             const delta: string | undefined = json.choices?.[0]?.delta?.content;
             if (delta) {
+              timer.mark("firstToken");
               this.turnFullText += delta;
               this.speakChunks(chunker.push(delta));
             }
@@ -302,19 +311,20 @@ export class VoiceSession {
       const chunkIndex = this.turnChunks.length;
       const meta: ChunkMeta = { ...chunk, chunkIndex };
       this.turnChunks.push(meta);
+      this.timer?.mark("firstSentence");
 
       this.tts.enqueue(
         chunkIndex,
         speakText,
         { voiceId: this.cfg.voiceId, modelId: this.cfg.ttsModelId, voiceSettings: this.cfg.voiceSettings },
         () => {
-          if (this.tFirstAudio === 0) {
-            this.tFirstAudio = performance.now();
-            if (this.tSpeechEnd > 0) {
-              const ms = Math.round(this.tFirstAudio - this.tSpeechEnd);
-              console.log(`[latency] speech-end → first TTS byte: ${ms}ms`);
-              this.onLatency?.(ms);
-            }
+          const timer = this.timer;
+          if (timer && !timer.has("firstAudio")) {
+            timer.mark("firstAudio");
+            const breakdown = timer.breakdown();
+            console.log(`[latency] ${timer.describe()}`);
+            this.cfg.send({ type: "latency", ...breakdown });
+            this.onLatency?.(breakdown);
             this.setState("speaking");
           }
           this.cfg.send({
