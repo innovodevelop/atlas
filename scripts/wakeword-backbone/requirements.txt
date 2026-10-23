@@ -1,5 +1,5 @@
 tensorflow==2.15.1
-tensorflow-hub==0.16.1
+tensorflow-hub==0.15.0  # last release with hub.Module, which TF1-format modules need
 tf-keras==2.15.1
 kagglehub==0.3.12
 tf2onnx==1.16.1
