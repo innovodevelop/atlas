@@ -23,8 +23,9 @@
 
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
+use std::sync::mpsc::{self, RecvTimeoutError, Sender};
 use std::sync::Mutex;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use chrono::Utc;
 use rusqlite::OptionalExtension;
@@ -542,11 +543,45 @@ pub fn gmail_sync(
     if own_gmail_account(&db, &account_id, &user_id)?.is_none() {
         return Err("No such Gmail mailbox.".to_string());
     }
-    let Some(_guard) = SyncGuard::acquire(&gmail.syncing, &account_id) else {
+    sync_and_record(&app, &db, &gmail, &account_id, &user_id, limit)
+}
+
+/// Run one sync and, when it fails, write why onto the mailbox row, so a
+/// background sync that fails is visible in the UI rather than only in a log.
+/// See SyncFailure for which failures stop background sync.
+fn sync_and_record(
+    app: &AppHandle,
+    db: &DbState,
+    gmail: &GmailState,
+    account_id: &str,
+    user_id: &str,
+    limit: Option<u32>,
+) -> Result<Value, String> {
+    let result = sync_account(app, db, gmail, account_id, user_id, limit);
+    if let Err(e) = &result {
+        {
+            let conn = db.conn.lock().unwrap();
+            let _ = record_sync_failure(&conn, account_id, e);
+        }
+        let _ = app.emit("db:changed", json!({"table": "mail_accounts", "op": "UPDATE"}));
+    }
+    result
+}
+
+/// The sync itself, for a mailbox whose ownership the caller has checked.
+fn sync_account(
+    app: &AppHandle,
+    db: &DbState,
+    gmail: &GmailState,
+    account_id: &str,
+    user_id: &str,
+    limit: Option<u32>,
+) -> Result<Value, String> {
+    let Some(_guard) = SyncGuard::acquire(&gmail.syncing, account_id) else {
         return Ok(json!({ "accountId": account_id, "alreadyRunning": true }));
     };
-    let refresh_token = crate::secrets::gmail_refresh_token(&account_id)
-        .ok_or("Gmail not connected — no refresh token found.")?;
+    let refresh_token = crate::secrets::gmail_refresh_token(account_id)
+        .ok_or(NO_REFRESH_TOKEN)?;
     let access_token = refresh_access_token(&refresh_token)?;
 
     let max_results = limit.unwrap_or(50).clamp(1, 100);
@@ -554,7 +589,7 @@ pub fn gmail_sync(
     let cursor: Option<String> = {
         let conn = db.conn.lock().unwrap();
         let stored: Option<String> = conn
-            .query_row("SELECT sync_cursor FROM mail_accounts WHERE id = ?1", [&account_id], |r| r.get(0))
+            .query_row("SELECT sync_cursor FROM mail_accounts WHERE id = ?1", [account_id], |r| r.get(0))
             .optional()
             .map_err(|e| e.to_string())?
             .flatten();
@@ -582,7 +617,7 @@ pub fn gmail_sync(
         let mut fresh = Vec::new();
         for id in &listed {
             if !stmt
-                .exists(rusqlite::params![&account_id, id])
+                .exists(rusqlite::params![account_id, id])
                 .map_err(|e| e.to_string())?
             {
                 fresh.push(id.clone());
@@ -652,7 +687,7 @@ pub fn gmail_sync(
         // without it the inserts fail on the deleted account's foreign key.
         let still_connected = conn
             .prepare("SELECT 1 FROM mail_accounts WHERE id = ?1")
-            .and_then(|mut s| s.exists([&account_id]))
+            .and_then(|mut s| s.exists([account_id]))
             .map_err(|e| e.to_string())?;
         if !still_connected {
             return Ok(json!({ "accountId": account_id, "disconnected": true }));
@@ -700,6 +735,154 @@ pub fn gmail_sync(
         "hasMore": has_more,
         "lastSyncedAt": now,
     }))
+}
+
+// ---------------------------------------------------------------------------
+// Background sync
+// ---------------------------------------------------------------------------
+
+/// Why a sync failed, as far as background sync cares: whether trying again
+/// later can help, or the user has to act first.
+#[derive(Debug, PartialEq)]
+enum SyncFailure {
+    /// Network down, Google unavailable, rate limited: the next tick retries.
+    Transient,
+    /// The grant was revoked or expired, the token is missing, or the OAuth
+    /// client isn't in the Keychain. Retrying would fail the same way every
+    /// tick, so the mailbox is marked 'error' and background sync leaves it
+    /// alone until a reconnect or a successful Scan sets it 'active' again.
+    NeedsUser(String),
+}
+
+fn classify_sync_error(err: &str) -> SyncFailure {
+    if err.starts_with("Google token endpoint") && err.contains("invalid_grant") {
+        return SyncFailure::NeedsUser(
+            "Google no longer accepts Atlas's access to this mailbox (revoked, expired or password changed). Reconnect it."
+                .to_string(),
+        );
+    }
+    if err.starts_with("Google token endpoint") && err.contains("invalid_client") {
+        return SyncFailure::NeedsUser(
+            "Google rejected Atlas's OAuth client. Check the client ID and secret in the Keychain (docs/mail-setup.md)."
+                .to_string(),
+        );
+    }
+    if err == NO_REFRESH_TOKEN || err.starts_with("Gmail isn't set up yet") {
+        return SyncFailure::NeedsUser(err.to_string());
+    }
+    SyncFailure::Transient
+}
+
+const NO_REFRESH_TOKEN: &str = "Gmail not connected — no refresh token found. Reconnect the mailbox.";
+
+/// Write a failed sync onto the mailbox row. A failure the user must fix sets
+/// status 'error'; a transient one only notes the error and leaves the status,
+/// so one dropped connection doesn't paint a working mailbox red. A later
+/// successful sync clears both (see the UPDATE at the end of sync_account).
+fn record_sync_failure(conn: &rusqlite::Connection, account_id: &str, err: &str) -> rusqlite::Result<usize> {
+    match classify_sync_error(err) {
+        SyncFailure::NeedsUser(msg) => conn.execute(
+            "UPDATE mail_accounts SET status = 'error', last_error = ?1 WHERE id = ?2",
+            rusqlite::params![msg, account_id],
+        ),
+        SyncFailure::Transient => conn.execute(
+            "UPDATE mail_accounts SET last_error = ?1 WHERE id = ?2",
+            rusqlite::params![format!("Last scan failed: {err}"), account_id],
+        ),
+    }
+}
+
+/// Mailboxes background sync should scan: active Gmail rows, with their owner.
+/// 'error' rows are skipped (see SyncFailure::NeedsUser); other providers sync
+/// elsewhere (the admin IMAP mailbox through mail.rs).
+fn background_sync_targets(conn: &rusqlite::Connection) -> rusqlite::Result<Vec<(String, String)>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, user_id FROM mail_accounts WHERE provider = 'gmail' AND status = 'active' ORDER BY created_at",
+    )?;
+    let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+    rows.collect()
+}
+
+/// First background sync waits for app startup to settle (the Keychain read
+/// and the sidecar spawns), like the proactive scheduler's first tick.
+const AUTO_SYNC_STARTUP_DELAY: Duration = Duration::from_secs(90);
+/// How stale the inbox may get while Atlas runs. One history request per
+/// mailbox when nothing is new, so this is cheap against Gmail's quota.
+const AUTO_SYNC_INTERVAL: Duration = Duration::from_secs(15 * 60);
+/// Extra syncs in one tick while a sync reports more to fetch (a first sync
+/// after a long time offline), so a backlog lands in one tick rather than one
+/// MAX_FETCH_PER_SYNC slice per interval.
+const AUTO_SYNC_CATCH_UP_ROUNDS: usize = 5;
+
+/// Scans every active Gmail mailbox on a timer while Atlas runs, the same
+/// sync as Scan now. Mail is local-only, so there is no sync while the app is
+/// closed (docs/mail-setup.md).
+///
+/// A plain thread with an mpsc `recv_timeout` as an interruptible sleep, like
+/// scheduler.rs. It is started only by the instance that owns the sidecars,
+/// so two running bundles sharing one atlas.db don't both sync it; the
+/// per-process SyncGuard would not stop the other process.
+pub struct GmailAutoSync {
+    stop_tx: Mutex<Option<Sender<()>>>,
+}
+
+impl GmailAutoSync {
+    pub fn spawn(app: AppHandle) -> Self {
+        let (stop_tx, stop_rx) = mpsc::channel::<()>();
+        let spawned = std::thread::Builder::new()
+            .name("gmail-auto-sync".into())
+            .spawn(move || {
+                let mut wait = AUTO_SYNC_STARTUP_DELAY;
+                loop {
+                    match stop_rx.recv_timeout(wait) {
+                        Ok(()) | Err(RecvTimeoutError::Disconnected) => return,
+                        Err(RecvTimeoutError::Timeout) => {}
+                    }
+                    wait = AUTO_SYNC_INTERVAL;
+                    auto_sync_once(&app);
+                }
+            });
+        if let Err(e) = spawned {
+            eprintln!("[atlas] gmail auto-sync not started: {e}");
+        }
+        Self { stop_tx: Mutex::new(Some(stop_tx)) }
+    }
+
+    /// Wake the thread so it exits. A sync in flight is not waited for: the
+    /// process teardown reaps it, as with the proactive scheduler.
+    pub fn stop(&self) {
+        if let Ok(mut tx) = self.stop_tx.lock() {
+            tx.take();
+        }
+    }
+}
+
+fn auto_sync_once(app: &AppHandle) {
+    let (Some(db), Some(gmail)) = (app.try_state::<DbState>(), app.try_state::<GmailState>()) else {
+        return;
+    };
+    let targets = {
+        let conn = db.conn.lock().unwrap();
+        match background_sync_targets(&conn) {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("[atlas] gmail auto-sync: could not list mailboxes: {e}");
+                return;
+            }
+        }
+    };
+    for (account_id, user_id) in targets {
+        for _ in 0..AUTO_SYNC_CATCH_UP_ROUNDS {
+            match sync_and_record(app, &db, &gmail, &account_id, &user_id, None) {
+                Ok(v) if v["hasMore"].as_bool() == Some(true) => continue,
+                Ok(_) => break,
+                Err(e) => {
+                    eprintln!("[atlas] gmail auto-sync of {account_id} failed: {e}");
+                    break;
+                }
+            }
+        }
+    }
 }
 
 /// The historyId in a stored sync_cursor, or None for anything that isn't one
@@ -971,6 +1154,84 @@ mod tests {
 
     fn count(conn: &rusqlite::Connection, sql: &str) -> i64 {
         conn.query_row(sql, [], |r| r.get(0)).unwrap()
+    }
+
+    fn status_and_error(conn: &rusqlite::Connection, id: &str) -> (String, Option<String>) {
+        conn.query_row(
+            "SELECT status, last_error FROM mail_accounts WHERE id = ?1",
+            [id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn a_revoked_grant_or_missing_setup_needs_the_user_and_everything_else_is_retried() {
+        let revoked = r#"Google token endpoint (400): {"error": "invalid_grant", "error_description": "Token has been expired or revoked."}"#;
+        assert!(matches!(classify_sync_error(revoked), SyncFailure::NeedsUser(_)));
+        assert!(matches!(
+            classify_sync_error(r#"Google token endpoint (401): {"error": "invalid_client"}"#),
+            SyncFailure::NeedsUser(_)
+        ));
+        assert!(matches!(classify_sync_error(NO_REFRESH_TOKEN), SyncFailure::NeedsUser(_)));
+        assert!(matches!(
+            classify_sync_error("Gmail isn't set up yet: no Google OAuth client ID in the Keychain. See docs/mail-setup.md."),
+            SyncFailure::NeedsUser(_)
+        ));
+
+        for transient in [
+            "Could not reach Google: dns error",
+            "Google token endpoint (503): unavailable",
+            "Could not reach Gmail API: timed out",
+            "Gmail API error (429).",
+            // Gmail also answers rate limiting with 403, so 403 must not stop sync.
+            "Gmail API access denied — check the OAuth scope.",
+        ] {
+            assert_eq!(classify_sync_error(transient), SyncFailure::Transient, "{transient}");
+        }
+    }
+
+    #[test]
+    fn a_failure_the_user_must_fix_takes_the_mailbox_out_of_background_sync() {
+        let conn = db();
+        upsert_gmail_account(&conn, "gmail:a@x.com", "u1", "a@x.com", "2026-10-01T00:00:00.000Z").unwrap();
+        upsert_gmail_account(&conn, "gmail:b@x.com", "u2", "b@x.com", "2026-10-02T00:00:00.000Z").unwrap();
+        assert_eq!(
+            background_sync_targets(&conn).unwrap(),
+            vec![("gmail:a@x.com".to_string(), "u1".to_string()), ("gmail:b@x.com".to_string(), "u2".to_string())]
+        );
+
+        record_sync_failure(&conn, "gmail:a@x.com", r#"Google token endpoint (400): {"error": "invalid_grant"}"#).unwrap();
+        let (status, err) = status_and_error(&conn, "gmail:a@x.com");
+        assert_eq!(status, "error");
+        assert!(err.unwrap().contains("Reconnect"), "the row says what to do, not Google's raw JSON");
+        assert_eq!(background_sync_targets(&conn).unwrap(), vec![("gmail:b@x.com".to_string(), "u2".to_string())]);
+
+        // Reconnecting brings it back.
+        upsert_gmail_account(&conn, "gmail:a@x.com", "u1", "a@x.com", "2026-10-03T00:00:00.000Z").unwrap();
+        assert_eq!(background_sync_targets(&conn).unwrap().len(), 2);
+    }
+
+    #[test]
+    fn a_transient_failure_is_noted_without_marking_the_mailbox_broken() {
+        let conn = db();
+        upsert_gmail_account(&conn, "gmail:a@x.com", "u1", "a@x.com", "2026-10-01T00:00:00.000Z").unwrap();
+        record_sync_failure(&conn, "gmail:a@x.com", "Could not reach Google: dns error").unwrap();
+        let (status, err) = status_and_error(&conn, "gmail:a@x.com");
+        assert_eq!(status, "active");
+        assert_eq!(err.as_deref(), Some("Last scan failed: Could not reach Google: dns error"));
+        assert_eq!(background_sync_targets(&conn).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn background_sync_never_touches_other_providers() {
+        let conn = db();
+        conn.execute(
+            "INSERT INTO mail_accounts (id, user_id, provider, email_address) VALUES ('imap-1', 'u1', 'imap', 'admin@x.com')",
+            [],
+        )
+        .unwrap();
+        assert!(background_sync_targets(&conn).unwrap().is_empty());
     }
 
     #[test]

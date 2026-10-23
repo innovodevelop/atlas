@@ -226,11 +226,12 @@ test("mail_accounts projection: encrypted_refresh_token cannot survive pickAccou
   expect(data.length).toBe(1);
   expect(data[0].encrypted_refresh_token).toBe("SECRET-TOKEN");
 
-  // ...so pickAccount is the enforcement point: exactly the 5 public keys.
+  // ...so pickAccount is the enforcement point: exactly the 6 public keys.
   const account = pickAccount(data[0]);
   expect(Object.keys(account).sort()).toEqual([
     "email_address",
     "id",
+    "last_error",
     "last_synced_at",
     "provider",
     "status",

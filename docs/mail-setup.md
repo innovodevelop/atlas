@@ -68,7 +68,15 @@ tab shows whether the mailbox connected. Back in Atlas, use **Scan now** to sync
 - First scan: the newest 50 inbox messages. Later scans: everything added to
   the inbox since the last one, via Gmail's history API. Older mail is not
   backfilled.
-- Manual: **Scan now**. There is no scheduled sync yet.
+- Automatic: every 15 minutes while Atlas is open (the first scan about 90
+  seconds after launch), plus **Scan now** at any time. A mailbox far behind
+  catches up in up to five back-to-back scans per round. Nothing syncs while
+  Atlas is closed.
+- When a scan fails, the mailbox says why in Settings → Mail. A dropped
+  connection or a Google outage is retried on the next round and the mailbox
+  stays active. A revoked or expired grant, a missing token or a missing OAuth
+  client marks it **error** and stops background scans for it: reconnect it,
+  or fix the client and press **Scan now**, and it resumes.
 - Not built yet: categorising mail, bill/deadline/document alerts, attachment
   parsing, threads.
 

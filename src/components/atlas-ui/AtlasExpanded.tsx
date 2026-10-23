@@ -482,8 +482,8 @@ function EmailView({ onClose }: { onClose: () => void }) {
                   <div className="fx ac jb mb8" key={a.id}>
                     <div style={{ minWidth: 0 }}>
                       <p className="t14 fw6 trunc m0" style={{ color: 'hsl(240 30% 88%)' }}>{a.email_address}</p>
-                      <p className="fs12 m0" style={{ color: a.status === 'active' ? 'hsl(160 58% 56%)' : 'hsl(350 75% 68%)' }}>
-                        {a.status === 'active' ? `Synced ${a.last_synced_at ? fmtEventTime(a.last_synced_at) : 'pending'}` : a.status}
+                      <p className="fs12 m0" title={a.last_error ?? undefined} style={{ color: a.status === 'active' ? 'hsl(160 58% 56%)' : 'hsl(350 75% 68%)' }}>
+                        {a.status === 'active' ? `Synced ${a.last_synced_at ? fmtEventTime(a.last_synced_at) : 'pending'}` : a.last_error ?? a.status}
                       </p>
                     </div>
                     {/* Gmail only: disconnecting the admin IMAP mailbox would delete all its mail. */}

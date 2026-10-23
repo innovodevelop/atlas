@@ -20,6 +20,9 @@ export interface MailAccount {
   email_address: string;
   status: string;
   last_synced_at: string | null;
+  // Why the last sync failed, if it did: with status 'error' the user has to
+  // act (reconnect); with 'active' it was transient and background sync retries.
+  last_error: string | null;
 }
 
 export interface MailMessage {
@@ -43,7 +46,7 @@ export interface MailAlert {
   created_at: string;
 }
 
-const ACCOUNT_COLUMNS = 'id, provider, email_address, status, last_synced_at';
+const ACCOUNT_COLUMNS = 'id, provider, email_address, status, last_synced_at, last_error';
 
 // The shim returns whole rows regardless of the select() column string, so
 // project mail_accounts rows down in JS — this is the only thing standing
@@ -56,6 +59,7 @@ export function pickAccount(r: Record<string, unknown>): MailAccount {
     email_address: r.email_address as string,
     status: r.status as string,
     last_synced_at: (r.last_synced_at as string | null) ?? null,
+    last_error: (r.last_error as string | null) ?? null,
   };
 }
 
