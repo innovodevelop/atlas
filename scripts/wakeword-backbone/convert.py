@@ -57,27 +57,59 @@ def step(name: str, **data) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 1. Load the TF1 Hub module
+# 1. Load the TF1 Hub module as a frozen TF1 graph
 # ---------------------------------------------------------------------------
 
-def load_module():
+def resolve_module() -> str:
+    """Local path of the module: TF Hub first (it redirects to Kaggle's
+    storage), Kaggle's own client second."""
     import tensorflow_hub as hub
 
     errors = []
-    for source in (TFHUB, "kaggle"):
-        try:
-            if source == "kaggle":
-                import kagglehub
+    try:
+        path = hub.resolve(TFHUB)
+        step("load", source="tfhub", path=path)
+        return path
+    except Exception as e:  # noqa: BLE001 - every failure is reported
+        errors.append(f"tfhub: {type(e).__name__}: {e}")
+    try:
+        import kagglehub
 
-                path = kagglehub.model_download(KAGGLE)
-            else:
-                path = source
-            layer = hub.KerasLayer(path, trainable=False)
-            step("load", source=source, path=str(path))
-            return layer, str(path)
-        except Exception as e:  # noqa: BLE001 - every failure is reported
-            errors.append(f"{source}: {type(e).__name__}: {e}")
+        path = kagglehub.model_download(KAGGLE)
+        step("load", source="kaggle", path=path)
+        return path
+    except Exception as e:  # noqa: BLE001
+        errors.append(f"kaggle: {type(e).__name__}: {e}")
     raise SystemExit("could not load speech_embedding:\n" + "\n".join(errors))
+
+
+def freeze_with_references(arrays: list[np.ndarray]):
+    """The module as a frozen TF1 GraphDef with input `waveform` [1, WINDOW]
+    and output `embedding`, plus TensorFlow's own full-length output for each
+    of `arrays` (the reference the ONNX model is checked against).
+
+    TF1 graph mode, not the TF2 KerasLayer: through the Keras wrapper the
+    module's graph reaches tf2onnx without static shapes, and its per-batch
+    map loop and convolutions then can't be converted at all."""
+    import tensorflow.compat.v1 as tf1
+    import tensorflow_hub as hub
+
+    tf1.disable_eager_execution()
+    path = resolve_module()
+    graph = tf1.Graph()
+    with graph.as_default():
+        module = hub.Module(path)
+        x = tf1.placeholder(tf1.float32, [1, WINDOW], name="waveform")
+        tf1.identity(module(x), name="embedding")
+        x_any = tf1.placeholder(tf1.float32, [1, None], name="waveform_any")
+        y_any = module(x_any)
+        with tf1.Session(graph=graph) as sess:
+            sess.run([tf1.global_variables_initializer(), tf1.tables_initializer()])
+            refs = [sess.run(y_any, {x_any: a[None]}).reshape(-1, 96) for a in arrays]
+            frozen = tf1.graph_util.convert_variables_to_constants(sess, graph.as_graph_def(), ["embedding"])
+    frozen = tf1.graph_util.extract_sub_graph(frozen, ["embedding"])
+    step("freeze", nodes=len(frozen.node), ops=sorted({n.op for n in frozen.node}))
+    return frozen, refs
 
 
 # ---------------------------------------------------------------------------
@@ -168,28 +200,17 @@ def cosine(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 def main() -> None:
     import onnx
     import onnxruntime as ort
-    import tensorflow as tf
     import tf2onnx
 
     OUT.mkdir(parents=True, exist_ok=True)
-    layer, path = load_module()
-
-    @tf.function(input_signature=[tf.TensorSpec([1, None], tf.float32)])
-    def embed_any(waveform):
-        return layer(waveform)
-
-    @tf.function(input_signature=[tf.TensorSpec([1, WINDOW], tf.float32, name="waveform")])
-    def embed(waveform):
-        return layer(waveform)
-
     rng = np.random.default_rng(0)
-    probe = (rng.standard_normal(SR * 2) * 0.1).astype(np.float32)[None]
-    tf_out = embed_any(tf.constant(probe)).numpy()
-    step("tf-probe", input_shape=probe.shape, output_shape=tf_out.shape)
+    tests = [(rng.standard_normal(n) * 0.1).astype(np.float32) for n in (WINDOW, WINDOW + HOP, SR * 2, SR * 3 + 17)]
+    frozen, refs = freeze_with_references(tests)
+    step("tf-reference", shapes=[r.shape for r in refs])
 
     onnx_path = OUT / "speech_embedding.onnx"
-    model_proto, _ = tf2onnx.convert.from_function(
-        embed, input_signature=embed.input_signature, opset=OPSET, output_path=str(onnx_path),
+    model_proto, _ = tf2onnx.convert.from_graph_def(
+        frozen, input_names=["waveform:0"], output_names=["embedding:0"], opset=OPSET, output_path=str(onnx_path),
     )
     ops = sorted({n.op_type for n in model_proto.graph.node})
     step("convert", opset=OPSET, ops=ops, bytes=onnx_path.stat().st_size)
@@ -210,9 +231,8 @@ def main() -> None:
     # 1. Faithful conversion, AND streaming fidelity: sliding fixed windows
     #    must reproduce TensorFlow's output for the whole clip at once.
     worst = 0.0
-    for n in (WINDOW, WINDOW + HOP, SR * 2, SR * 3 + 17):
-        a = (rng.standard_normal(n) * 0.1).astype(np.float32)
-        t = embed_any(tf.constant(a[None])).numpy().reshape(-1, 96)
+    for a, t in zip(tests, refs):
+        n = len(a)
         o = g(a)
         m = min(len(t), len(o))
         diff = float(np.abs(t[:m] - o[:m]).max())
