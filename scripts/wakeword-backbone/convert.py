@@ -154,28 +154,53 @@ def padded(clip: np.ndarray, seconds: float = 3.0) -> np.ndarray:
 # Backbones
 # ---------------------------------------------------------------------------
 
-def oww_embeddings(audio: np.ndarray) -> np.ndarray | None:
-    """openWakeWord's two-stage backbone, the way src/lib/wakeWordRuntime.ts
-    runs it: mel per 1280-sample chunk (int16-range input), scaled x/10 + 2,
-    then a 76-frame window hopping 8 frames."""
+def oww_sessions():
     import onnxruntime as ort
 
     mel_p, emb_p = MODELS / "melspectrogram.onnx", MODELS / "embedding_model.onnx"
     if not (mel_p.exists() and emb_p.exists()):
         return None
-    mel = ort.InferenceSession(str(mel_p))
-    emb = ort.InferenceSession(str(emb_p))
-    pcm = audio * 32767.0
-    frames = []
-    for i in range(0, len(pcm) - 1280 + 1, 1280):
-        out = mel.run(None, {mel.get_inputs()[0].name: pcm[None, i:i + 1280].astype(np.float32)})[0]
-        frames.extend(out[0, 0] / 10 + 2)
-    frames = np.array(frames, dtype=np.float32)
-    embs = []
-    for s in range(0, len(frames) - 76 + 1, 8):
-        w = frames[s:s + 76][None, :, :, None]
-        embs.append(emb.run(None, {emb.get_inputs()[0].name: w})[0].reshape(96))
+    return ort.InferenceSession(str(mel_p)), ort.InferenceSession(str(emb_p))
+
+
+def oww_mel(mel, pcm: np.ndarray) -> np.ndarray:
+    out = mel.run(None, {mel.get_inputs()[0].name: pcm[None].astype(np.float32)})[0]
+    return out[0, 0] / 10 + 2  # openWakeWord's scaling, as in wakeWordRuntime.ts
+
+
+def oww_embeddings(audio: np.ndarray) -> np.ndarray | None:
+    """openWakeWord's two-stage backbone with its intended framing: mel over
+    the whole clip (int16-range input, 10 ms frames), then a 76-frame window
+    hopping 8 frames, i.e. one embedding per 1280 samples."""
+    sessions = oww_sessions()
+    if sessions is None:
+        return None
+    mel, emb = sessions
+    frames = oww_mel(mel, audio * 32767.0)
+    embs = [
+        emb.run(None, {emb.get_inputs()[0].name: frames[s:s + 76][None, :, :, None].astype(np.float32)})[0].reshape(96)
+        for s in range(0, len(frames) - 76 + 1, 8)
+    ]
     return np.array(embs, dtype=np.float32)
+
+
+def app_chunk_framing() -> dict | None:
+    """How many mel frames src/lib/wakeWordRuntime.ts gets per 1280-sample
+    chunk: it runs the mel model on each chunk alone, with no overlap.
+    openWakeWord's own streaming prepends 480 samples of context so each
+    chunk yields 8 frames (80 ms of 10 ms frames); fewer means the app's
+    76-frame windows span more than 760 ms of audio."""
+    sessions = oww_sessions()
+    if sessions is None:
+        return None
+    mel, _ = sessions
+    zeros = np.zeros(1280, dtype=np.float32)
+    with_context = np.zeros(1280 + 480, dtype=np.float32)
+    return {
+        "frames_per_1280_chunk_alone": int(oww_mel(mel, zeros).shape[0]),
+        "frames_per_1280_chunk_with_480_context": int(oww_mel(mel, with_context).shape[0]),
+        "expected": 8,
+    }
 
 
 def phrase_scores(model: Path, embs: np.ndarray) -> list[float]:
@@ -240,6 +265,11 @@ def main() -> None:
         step("onnx-vs-tf", samples=n, tf_embeddings=len(t), onnx_embeddings=len(o), max_abs_diff=diff)
     report["onnx_vs_tf_max_abs_diff"] = worst
 
+    framing = app_chunk_framing()
+    if framing is not None:
+        step("app-chunk-framing", **framing)
+        report["app_chunk_framing"] = framing
+
     # 2. Same audio through both backbones.
     clips = {"noise": (rng.standard_normal(SR * 3) * 0.05).astype(np.float32)}
     jarvis = tts_clip("hey jarvis")
@@ -276,6 +306,12 @@ def main() -> None:
         f"- Opset {OPSET}; ops: {', '.join(ops)}",
         f"- ONNX vs TensorFlow, worst absolute difference: {worst:.2e}",
         "",
+        *(
+            [f"- App's mel framing: {framing['frames_per_1280_chunk_alone']} frames per 1280-sample chunk "
+             f"(openWakeWord expects {framing['expected']}; with 480 samples of context: "
+             f"{framing['frames_per_1280_chunk_with_480_context']})", ""]
+            if framing else []
+        ),
         "| clip | Google embeddings | oWW embeddings | median cosine | hey_jarvis (oWW) | hey_jarvis (Google) |",
         "|---|---|---|---|---|---|",
     ]
