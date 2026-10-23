@@ -15,6 +15,8 @@
 import { Database } from "bun:sqlite";
 import { parseVersionPlan, type Version } from "./versionPlan.ts";
 import { ingestJsonlSessions } from "./jsonlIngest.ts";
+import { applyChangelog, readGitLog } from "./changelog.ts";
+import { applyDesignSyncs, parseDesignManifest } from "./designSync.ts";
 import { executeRepair, type RepairContext } from "./selfRepair.ts";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { resolve } from "path";
@@ -26,7 +28,10 @@ const json = (data: unknown, status = 200) =>
     headers: { "Content-Type": "application/json" },
   });
 
-const PROJECT_ROOT = resolve(import.meta.dir, "../../..");
+// Resolves to the repo root only when the brain runs from a source checkout;
+// in the compiled sidecar it is `/`, and every route that reads the repo
+// (plan, changelog, design manifest, tests) has nothing to read.
+export const PROJECT_ROOT = resolve(import.meta.dir, "../../..");
 
 export type ApplyResult =
   | { ok: true; synced: number; features: number }
@@ -169,6 +174,7 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
     getVersions,
     getVersionDetail,
     getChangelog,
+    syncChangelog,
     getAgentSessions,
     getAgentEvents,
     getTestSuites,
@@ -176,6 +182,7 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
     runTest,
     discoverTests,
     getDesignSyncs,
+    syncDesignSyncs,
     ingestSessions,
     getCiRuns,
     getSystemHealth,
@@ -198,7 +205,26 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
 
     const result = applyVersionPlan(db, parseVersionPlan(md));
     if (!result.ok) return json({ error: result.error }, 422);
-    return json({ synced: result.synced, features: result.features });
+
+    // The changelog is filed against the versions just reconciled, so it is
+    // refreshed in the same action. Its failure (no git, not a checkout) is
+    // reported alongside the plan result rather than failing the plan sync.
+    const log = readGitLog(PROJECT_ROOT);
+    const changelog = log.ok ? applyChangelog(db, log.commits).synced : null;
+    return json({
+      synced: result.synced,
+      features: result.features,
+      changelog,
+      ...(log.ok ? {} : { changelog_error: log.error }),
+    });
+  }
+
+  /** POST /admin/changelog/sync — rebuild atlas_changelog from `git log`. */
+  function syncChangelog(req: Request): Response {
+    requireUser(req);
+    const log = readGitLog(PROJECT_ROOT);
+    if (!log.ok) return json({ error: log.error }, 502);
+    return json(applyChangelog(db, log.commits));
   }
 
   function getVersions(req: Request): Response {
@@ -411,6 +437,19 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
     requireUser(req);
     const rows = db.query(`SELECT * FROM atlas_design_syncs ORDER BY synced_at DESC LIMIT 20`).all();
     return json(rows);
+  }
+
+  /** POST /admin/design-syncs/sync — mirror design/.sync-manifest.json. */
+  function syncDesignSyncs(req: Request): Response {
+    requireUser(req);
+    let manifest: unknown;
+    try {
+      manifest = JSON.parse(readFileSync(resolve(PROJECT_ROOT, "design/.sync-manifest.json"), "utf8"));
+    } catch (err) {
+      return json({ error: `design/.sync-manifest.json unreadable: ${String(err).slice(0, 200)}` }, 404);
+    }
+    const { entries, skipped } = parseDesignManifest(manifest);
+    return json({ ...applyDesignSyncs(db, entries), skipped });
   }
 
   function ingestSessions(req: Request): Response {

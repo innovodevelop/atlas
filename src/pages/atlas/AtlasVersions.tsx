@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { GitBranch, RefreshCw, CheckCircle2, Clock, Circle, AlertTriangle } from 'lucide-react';
 import { Card, Panel, Row, Empty, Button } from '@/components/atlas-ui/primitives';
 import { useAuth } from '@/hooks/useAuth';
-import { useVersions, useVersionDetail, useSyncVersionPlan, type VersionRow, type FeatureRow } from '@/hooks/useVersions';
+import { useVersions, useVersionDetail, useSyncVersionPlan, CHANGELOG_PAGE, type VersionRow, type FeatureRow } from '@/hooks/useVersions';
 import '@/styles/surfaces/versions.css';
 
 export const surface = {
@@ -104,6 +104,10 @@ export default function AtlasVersions() {
         </Button>
       </header>
 
+      {syncPlan.data?.changelog_error && (
+        <Empty status="error" title="Changelog not refreshed" body={syncPlan.data.changelog_error} />
+      )}
+
       {isLoading ? (
         <Empty status="stale" body="Loading versions…" />
       ) : versions.length === 0 ? (
@@ -142,7 +146,10 @@ export default function AtlasVersions() {
               </Panel>
 
               {changelog.length > 0 && (
-                <Panel title="Changelog" tone="recessed">
+                <Panel
+                  title={changelog.length >= CHANGELOG_PAGE ? `Changelog · latest ${CHANGELOG_PAGE}` : 'Changelog'}
+                  tone="recessed"
+                >
                   {changelog.map(c => (
                     <Row
                       key={c.id}
@@ -150,6 +157,7 @@ export default function AtlasVersions() {
                       lead={<span className={`vr-cat vr-cat-${c.category}`}>{c.category}</span>}
                       title={c.title}
                       meta={c.description ?? undefined}
+                      trail={<span>{c.related_feature ? `${c.related_feature} · ` : ''}{c.created_at.slice(0, 10)}</span>}
                     />
                   ))}
                 </Panel>

@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import { Database } from "bun:sqlite";
-import { ingestJsonlSessions } from "./jsonlIngest.ts";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { ACTIVE_WINDOW_MS, ingestJsonlSessions } from "./jsonlIngest.ts";
+import { mkdirSync, writeFileSync, rmSync, statSync } from "node:fs";
 import { resolve } from "path";
 import { homedir } from "os";
 
@@ -70,6 +70,32 @@ describe("jsonlIngest", () => {
       const result2 = ingestJsonlSessions(db, "_test_atlas_ingest_");
       expect(result2.skipped).toBe(1);
       expect(result2.sessions_upserted).toBe(0);
+    } finally {
+      rmSync(testDir, { recursive: true, force: true });
+    }
+  });
+
+  test("a transcript still being written is active, and settles to completed once it goes quiet", () => {
+    // The file watcher (feat-018) re-ingests on change, but a session that
+    // simply stops produces no change — so the skip path has to settle it, or
+    // the live agent view would show it running forever.
+    const db = new Database(":memory:");
+    db.exec(SCHEMA);
+    const testDir = resolve(homedir(), ".claude/projects/_test_atlas_live_");
+    mkdirSync(testDir, { recursive: true });
+    const sessionId = "test-session-live";
+    const file = resolve(testDir, `${sessionId}.jsonl`);
+    writeFileSync(file, JSON.stringify({ type: "custom-title", customTitle: "Live", sessionId }));
+    const mtime = statSync(file).mtimeMs;
+    const status = () => (db.query("SELECT status FROM atlas_agent_sessions WHERE id = ?").get(sessionId) as { status: string }).status;
+
+    try {
+      ingestJsonlSessions(db, "_test_atlas_live_", mtime + 1_000);
+      expect(status()).toBe("active");
+
+      const later = ingestJsonlSessions(db, "_test_atlas_live_", mtime + ACTIVE_WINDOW_MS + 1_000);
+      expect(later.skipped).toBe(1);
+      expect(status()).toBe("completed");
     } finally {
       rmSync(testDir, { recursive: true, force: true });
     }

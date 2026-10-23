@@ -42,8 +42,24 @@ export interface ChangelogRow {
   category: 'added' | 'changed' | 'fixed' | 'removed' | 'security' | 'infrastructure';
   title: string;
   description: string | null;
+  related_feature: string | null;
   semver?: string;
   created_at: string;
+}
+
+/**
+ * The changelog is the git log filed against versions (brain changelog.ts), so
+ * a long-lived version holds hundreds of rows. The panel shows the newest.
+ */
+export const CHANGELOG_PAGE = 50;
+
+/** POST /admin/versions/sync's response. */
+export interface SyncPlanResult {
+  synced: number;
+  features: number;
+  /** Changelog rows written, or null when git was unavailable. */
+  changelog: number | null;
+  changelog_error?: string;
 }
 
 export function useVersions() {
@@ -78,7 +94,8 @@ export function useVersionDetail(versionId: string | null) {
         .from('atlas_changelog')
         .select('*')
         .eq('version_id', versionId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(CHANGELOG_PAGE);
       return {
         features: (features ?? []) as unknown as FeatureRow[],
         changelog: (changelog ?? []) as unknown as ChangelogRow[],
@@ -95,7 +112,7 @@ export function useVersionDetail(versionId: string | null) {
 export function useSyncVersionPlan() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (): Promise<SyncPlanResult> => {
       const token = getToken();
       if (!token) {
         throw new Error('Not authenticated');

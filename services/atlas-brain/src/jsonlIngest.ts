@@ -49,12 +49,20 @@ interface JsonlMessageLine {
   compactMetadata?: { trigger?: string; preTokens?: number };
 }
 
-const CLAUDE_PROJECTS_DIR = resolve(homedir(), ".claude/projects");
+export const CLAUDE_PROJECTS_DIR = resolve(homedir(), ".claude/projects");
 
 // Only ingest sessions from the helloatlas project directory
 const PROJECT_DIR_PATTERN = /Users-magnuspilegaard-Desktop-Vibe-Coding-Projects/;
 
 const MAX_EVENTS_PER_SESSION = 500;
+
+/**
+ * A transcript written to within this window is a session still running.
+ * Claude Code appends to the .jsonl on every turn, so "recently modified" is
+ * the only liveness signal the file gives; a session idle longer than this is
+ * shown as completed, and flips back to active if it is resumed.
+ */
+export const ACTIVE_WINDOW_MS = 5 * 60 * 1000;
 
 function isToolCall(block: { type: string }): boolean {
   return block.type === "tool_use";
@@ -64,7 +72,7 @@ function isFileEdit(block: { type: string; name?: string }): boolean {
   return block.type === "tool_use" && (block.name === "Edit" || block.name === "Write");
 }
 
-export function ingestJsonlSessions(db: Database, projectFilter?: string): IngestResult {
+export function ingestJsonlSessions(db: Database, projectFilter?: string, now = Date.now()): IngestResult {
   const result: IngestResult = { sessions_upserted: 0, events_inserted: 0, skipped: 0, errors: [] };
 
   if (!existsSync(CLAUDE_PROJECTS_DIR)) {
@@ -93,7 +101,8 @@ export function ingestJsonlSessions(db: Database, projectFilter?: string): Inges
   `);
 
   // Track which sessions we already ingested (by checking last modified time)
-  const getSessionMeta = db.prepare(`SELECT metadata FROM atlas_agent_sessions WHERE id = ?`);
+  const getSessionMeta = db.prepare(`SELECT metadata, status FROM atlas_agent_sessions WHERE id = ?`);
+  const settleSession = db.prepare(`UPDATE atlas_agent_sessions SET status = 'completed' WHERE id = ?`);
 
   for (const projDir of projectDirs) {
     const projPath = resolve(CLAUDE_PROJECTS_DIR, projDir);
@@ -117,12 +126,18 @@ export function ingestJsonlSessions(db: Database, projectFilter?: string): Inges
         continue;
       }
 
-      // Skip if we already ingested this file at this mtime
-      const existing = getSessionMeta.get(sessionId) as { metadata: string } | null;
+      const live = now - stat.mtimeMs < ACTIVE_WINDOW_MS;
+
+      // Skip if we already ingested this file at this mtime — but an unchanged
+      // file can still go quiet, so a session stored as active whose file has
+      // aged out of the window is settled to completed here. Without this it
+      // would read "active" forever: no new write means no re-ingest.
+      const existing = getSessionMeta.get(sessionId) as { metadata: string; status: string } | null;
       if (existing) {
         try {
           const meta = JSON.parse(existing.metadata);
           if (meta._ingest_mtime === stat.mtimeMs) {
+            if (existing.status === "active" && !live) settleSession.run(sessionId);
             result.skipped++;
             continue;
           }
@@ -135,7 +150,7 @@ export function ingestJsonlSessions(db: Database, projectFilter?: string): Inges
           upsertSession.run(
             sessionId,
             filePath,
-            session.status,
+            live ? "active" : session.status,
             session.title,
             session.startedAt,
             session.endedAt,

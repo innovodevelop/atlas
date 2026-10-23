@@ -33,15 +33,17 @@ Target: 2026-11-01
 ### Features
 - [x] Version tracking surface (/versions) {id: feat-010, agent: claude-code}
 - [x] Live agent view (/agent-view) {id: feat-011, agent: claude-code}
-- [ ] Design sync surface (/design-sync) {id: feat-012, agent: claude-code, status: in-progress}
+- [x] Design sync surface (/design-sync) {id: feat-012, agent: claude-code}
 - [x] Test management surface (/tests) {id: feat-013, agent: claude-code}
-- [ ] Internal changelog {id: feat-014, agent: claude-code, status: in-progress}
+- [x] Internal changelog {id: feat-014, agent: claude-code}
 - [x] Claude Code JSONL ingestion (on demand) {id: feat-015, agent: claude-code}
-- [ ] JSONL ingestion file watcher {id: feat-018, agent: claude-code}
+- [x] JSONL ingestion file watcher {id: feat-018, agent: claude-code}
 - [x] CI pipeline monitoring {id: feat-016, agent: claude-code}
 - [x] VERSION-PLAN.md parser + DB sync {id: feat-017, agent: claude-code}
 
 _Corrected 2026-10-23: feat-012 and feat-014 were ticked while their UIs read tables nothing writes, and feat-015 promised a file watcher that ingestion never had. The admin routes also need the brain run from a source checkout: in the compiled sidecar the repo root resolves to `/`._
+
+_Built 2026-10-23: feat-012 mirrors `design/.sync-manifest.json` (now with status, version, surfaces and the recovered bundle history) into `atlas_design_syncs`; feat-014 files the git log against versions by `feat-NNN` reference, else by date; feat-018 watches `~/.claude/projects` from a source checkout only and marks sessions written in the last 5 minutes active. Exercised over HTTP against a running brain on Linux; the two surfaces have not yet been looked at in the app on the Mac._
 
 ---
 

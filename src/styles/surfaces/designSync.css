@@ -36,3 +36,20 @@
   padding: 3px 8px;
   border-radius: var(--r-pill);
 }
+
+/* Status pills — same shape as the /versions changelog pills (.vr-cat). */
+.ds-status {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: var(--r-pill);
+  background: var(--sk);
+  color: var(--ink2);
+  white-space: nowrap;
+}
+.ds-status-complete { background: color-mix(in srgb, var(--grn) 12%, transparent); color: var(--grn); }
+.ds-status-implementing,
+.ds-status-auditing { background: var(--wash); color: var(--acc); }
+.ds-status-rejected { background: color-mix(in srgb, var(--red) 12%, transparent); color: var(--red); }

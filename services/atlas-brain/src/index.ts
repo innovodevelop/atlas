@@ -37,7 +37,11 @@ import { createLearningHandlers } from "./learningRoutes.ts";
 import { createProactiveHandlers } from "./proactive.ts";
 import { createGreetingHandlers } from "./greeting.ts";
 import { createMailDraftHandlers } from "./mailDraft.ts";
-import { createAdminHandlers } from "./adminRoutes.ts";
+import { createAdminHandlers, PROJECT_ROOT } from "./adminRoutes.ts";
+import { CLAUDE_PROJECTS_DIR, ingestJsonlSessions } from "./jsonlIngest.ts";
+import { startJsonlWatcher } from "./jsonlWatcher.ts";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { createControlClient } from "./control.ts";
 import { embedText } from "./localEmbed.ts";
 import { AUTO_EMBED_BATCH, embedPending, scheduleAutoEmbed } from "./autoEmbed.ts";
@@ -140,6 +144,16 @@ const mailDraft = createMailDraftHandlers({ db: localDb, requireUser, json });
 // requireUser as every other route — these read and write the whole admin
 // surface of atlas.db, so they are not exempt from auth (see adminRoutes.ts).
 const admin = createAdminHandlers({ db: localDb._db, requireUser });
+
+// Live agent view (feat-018): keep atlas_agent_sessions current while Claude
+// Code works. Only from a source checkout — the admin surfaces need one anyway
+// (see PROJECT_ROOT), and the compiled sidecar shipped to consumers must never
+// start reading ~/.claude on its own. ATLAS_JSONL_WATCH=0 turns it off, =1
+// forces it on.
+const jsonlWatchSetting = process.env.ATLAS_JSONL_WATCH;
+if (jsonlWatchSetting === "1" || (jsonlWatchSetting !== "0" && existsSync(resolve(PROJECT_ROOT, ".git")))) {
+  startJsonlWatcher({ dir: CLAUDE_PROJECTS_DIR, ingest: () => ingestJsonlSessions(localDb._db) });
+}
 
 // POST /chat-with-memory — full orchestrator: memory recall, tools, streaming.
 async function handleChatWithMemory(req: Request): Promise<Response> {
@@ -443,6 +457,7 @@ const server = Bun.serve({
       if (url.pathname === "/admin/versions/sync" && req.method === "POST") return admin.syncVersionPlan(req);
       if (url.pathname === "/admin/versions" && req.method === "GET") return admin.getVersions(req);
       if (url.pathname.startsWith("/admin/versions/") && req.method === "GET") return admin.getVersionDetail(req, url.pathname.split("/")[3]);
+      if (url.pathname === "/admin/changelog/sync" && req.method === "POST") return admin.syncChangelog(req);
       if (url.pathname === "/admin/changelog" && req.method === "GET") return admin.getChangelog(req, url.searchParams.get("version_id") ?? undefined);
       if (url.pathname === "/admin/agent-sessions" && req.method === "GET") return admin.getAgentSessions(req, url.searchParams.get("status") ?? undefined);
       if (url.pathname.startsWith("/admin/agent-events/") && req.method === "GET") return admin.getAgentEvents(req, url.pathname.split("/")[3]);
@@ -451,6 +466,7 @@ const server = Bun.serve({
       if (url.pathname === "/admin/tests/discover" && req.method === "POST") return admin.discoverTests(req);
       if (url.pathname.startsWith("/admin/tests/run/") && req.method === "POST") return admin.runTest(req, url.pathname.split("/")[4]);
       if (url.pathname === "/admin/design-syncs" && req.method === "GET") return admin.getDesignSyncs(req);
+      if (url.pathname === "/admin/design-syncs/sync" && req.method === "POST") return admin.syncDesignSyncs(req);
       if (url.pathname === "/admin/ingest-sessions" && req.method === "POST") return admin.ingestSessions(req);
       if (url.pathname === "/admin/ci-runs" && req.method === "POST") return admin.getCiRuns(req);
       if (url.pathname === "/admin/system/health" && req.method === "GET") return admin.getSystemHealth(req);
