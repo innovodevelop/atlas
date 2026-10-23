@@ -71,10 +71,13 @@ function cosine(a: Float32Array, b: Float32Array): number {
   return dot / (Math.sqrt(na) * Math.sqrt(nb));
 }
 
-function keywordScore(queryText: string, chunk: string): number {
+// Exported for its test. Tokens are runs of Unicode letters and digits: an
+// ASCII-only split cut Danish words apart at æ/ø/å ("købmand" -> "k", "bmand"),
+// so keyword recall scored Danish memories on fragments.
+export function keywordScore(queryText: string, chunk: string): number {
   const toks = queryText
     .toLowerCase()
-    .split(/[^a-z0-9]+/)
+    .split(/[^\p{L}\p{N}]+/u)
     .filter((t) => t.length >= 2);
   if (toks.length === 0) return 0;
   const hay = chunk.toLowerCase();
