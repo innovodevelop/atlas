@@ -1,115 +1,140 @@
-# Train the "Hey Atlas" / "Atlas" wake-word models
+# Train the "Hey Atlas" wake-word model
 
-Atlas detects its wake phrase fully on-device with
-[openWakeWord](https://github.com/dscripka/openWakeWord) (**Apache-2.0**).
-The app currently ships openWakeWord's stock `hey_jarvis_v0.1.onnx` as a
-fallback phrase. This kit produces the two custom phrase models that replace
-it:
+`hey_atlas.py` produces `public/models/hey_atlas.onnx`, the phrase model the
+app listens with (`src/lib/wakeWord.ts`). It replaced openWakeWord's stock
+`hey_jarvis_v0.1.onnx`, which is CC BY-NC-SA and could never ship.
 
-| Output           | Phrase      |
-| ---------------- | ----------- |
-| `hey_atlas.onnx` | "Hey Atlas" |
-| `atlas.onnx`     | "Atlas"     |
+The model reads exactly what the app's detector feeds it: the last 16
+embeddings from `public/models/speech_embedding.onnx` (one per 80 ms), as
+float32 `[1, 16, 96]`, and returns one probability `[1, 1]`. Training computes
+its features with that same backbone, so training and runtime see the same
+numbers.
 
-**Activation is zero-code:** copy the trained `.onnx` files into
-`public/models/` and rebuild/reload. `src/lib/wakeWord.ts` probes for them at
-startup, activates every model it finds, and automatically drops the
-"Hey Jarvis" fallback the moment any Atlas model loads. The dashboard label
-("Listening for …") follows automatically.
+## Licensing: every input, and why it may ship
 
-## Licensing — read before shipping anything
+| Input | Used for | Licence |
+|---|---|---|
+| [Piper](https://github.com/OHF-Voice/piper1-gpl) `piper-tts` 1.8 | speaking the synthetic clips | GPL-3.0 (the tool; its licence does not reach the audio it generates) |
+| Piper voice `en_US-libritts_r-medium` | 904 US speakers saying "hey atlas", near-misses, other speech | voice trained on LibriTTS-R, **CC BY 4.0** |
+| Piper voice `en_GB-vctk-medium` | 109 British speakers, same | voice trained on VCTK, **CC BY 4.0** |
+| Piper voice `da_DK-talesyntese-medium` | a Danish accent, plus Danish speech as negatives | voice trained on talesyntese, **CC0** |
+| [LibriSpeech](https://www.openslr.org/12) | 100 h of real speech as negatives, background speech, and the held-out test | **CC BY 4.0** |
+| `speech_embedding.onnx` | features | **Apache-2.0** (Google) |
+| noise, reverb, mic EQ | augmentation | generated in code, no dataset |
 
-- **Do NOT ship the community "hey atlas" model** (e.g. the atlas-voice /
-  home-assistant community collections). It is licensed **CC BY-NC 4.0 —
-  non-commercial only** and can never be bundled with Atlas.
-- **Models trained with this kit as configured are NOT ours to ship.** The
-  reasoning below is half right, and the missing half is disqualifying:
+Two things to know, stated rather than buried:
 
-  - ✅ openWakeWord's training **pipeline** is Apache-2.0.
-  - ✅ The **positive** clips are synthetic Piper TTS (MIT tool; LibriTTS-R
-    checkpoint, CC BY 4.0) — genuinely our own work product.
-  - ❌ The **negative** features this script downloads —
-    `davidscripka/openwakeword_features` on Hugging Face — are
-    **CC BY-NC-SA 4.0**. NonCommercial, and ShareAlike on top.
-  - ❌ The **feature backbone** the phrase model sits on
-    (`melspectrogram.onnx` + `embedding_model.onnx`) are openWakeWord
-    pre-trained models, also **CC BY-NC-SA 4.0**. Even a phrase model trained
-    on perfectly clean data still needs those two at runtime.
+- All three Piper voices were fine-tuned from Piper's `lessac` voice, whose
+  dataset (Blizzard 2013) has a research licence. What goes into training is
+  speech those voices generate, not lessac recordings; this is the same
+  unsettled "are weights derivative of their training data" question as
+  anywhere else, one step removed.
+- CC BY 4.0 asks for attribution. LibriSpeech (Panayotov et al., 2015),
+  LibriTTS-R (Koizumi et al., 2023) and VCTK (Yamagishi et al., 2019) belong
+  in the app's third-party notices.
 
-  So swapping the negative data alone does not fix it. Both halves have to go.
+Never use openWakeWord's pre-computed features
+(`davidscripka/openwakeword_features`, CC BY-NC-SA), its `melspectrogram` /
+`embedding_model` ONNX files (CC BY-NC-SA), or the community "hey atlas"
+model (CC BY-NC). The old `train.sh` used the first two; it is gone.
 
-- **Whether trained weights are a "derivative work" of training data is
-  unsettled law.** Do not rely on the optimistic reading. Using **CC0** data
-  (Mozilla Common Voice) removes the question rather than answering it, which
-  is why it is the preferred source below.
+## Setup (macOS, about 11 GB of disk)
 
-- **The clean path (verified 2026-08-02).** Google's `speech_embedding` module
-  on Kaggle Models is **Apache 2.0** per its model card
-  (google/speech-embedding, TensorFlow1, v1) — the very model openWakeWord
-  re-implemented, and it computes its own log-mel internally, so it replaces
-  **both** backbone files with no retraining. Then train the phrase model on
-  CC0/CC-BY negatives. Details in `public/models/README.md`.
-
-## Path A — Google Colab (recommended, free, ~1 hour per model)
-
-openWakeWord's maintained notebook does everything on a free T4 GPU.
-
-1. Open `notebooks/automatic_model_training.ipynb` from the
-   [dscripka/openWakeWord](https://github.com/dscripka/openWakeWord) repo in
-   Google Colab (the repo README links a one-click Colab badge, often named
-   `training_models.ipynb` in older revisions). Runtime → T4 GPU.
-2. Run it **twice**, once per model, with these config values:
-
-   **Run 1 — hey_atlas.onnx**
-   - `target_phrase`: `["hey atlas", "hey atlas!"]` (the punctuated variant
-     changes Piper's prosody and improves robustness)
-   - `model_name`: `hey_atlas`
-   - `n_samples`: `5000` (positive training clips; more = better, slower)
-   - `n_samples_val`: `1000`
-   - `steps`: `10000` (default is fine)
-
-   **Run 2 — atlas.onnx**
-   - `target_phrase`: `["atlas", "atlas!"]`
-   - `model_name`: `atlas`
-   - `n_samples`: `5000`, `n_samples_val`: `1000`, `steps`: `10000`
-
-   Single-word phrases trigger more false positives than multi-word ones —
-   expect to raise the in-app threshold for `atlas.onnx` if it fires on
-   "at last", "atlantic", etc. (per-model `threshold` in
-   `src/lib/wakeWord.ts` `WAKE_MODELS`).
-3. Each run takes roughly an hour on a T4 (sample generation + augmentation +
-   training). Download the resulting ONNX file, name it exactly
-   `hey_atlas.onnx` / `atlas.onnx`, and copy it to `public/models/`.
-
-## Path B — local training (`train.sh`)
-
-> **WARNING — big downloads, long runtime. Do not run casually.**
-> The pipeline downloads **multiple gigabytes** of pre-computed negative
-> features, augmentation audio (noise/music), and room-impulse responses
-> (roughly 10 GB+ on disk), and training takes **hours on CPU** (no Apple
-> Silicon GPU support in the training stack — it is CUDA-or-CPU). The Colab
-> path is faster and free. Use this only if you need offline/reproducible
-> training.
+Python 3.12 via [uv](https://docs.astral.sh/uv/); everything lands in the
+gitignored `work/clean/`.
 
 ```bash
 cd scripts/train-wakeword
-./train.sh            # trains both models into ./output/
+mkdir -p work/clean && cd work/clean
+uv venv --python 3.12 .venv
+uv pip install --python .venv/bin/python -r ../../requirements.txt
+
+# Piper voices (about 220 MB), each with its model card.
+mkdir -p voices
+B=https://huggingface.co/rhasspy/piper-voices/resolve/main
+for v in en/en_US/libritts_r/medium/en_US-libritts_r-medium \
+         en/en_GB/vctk/medium/en_GB-vctk-medium \
+         da/da_DK/talesyntese/medium/da_DK-talesyntese-medium; do
+  curl -sSfL -o "voices/$(basename $v).onnx" "$B/$v.onnx"
+  curl -sSfL -o "voices/$(basename $v).onnx.json" "$B/$v.onnx.json"
+done
+
+# LibriSpeech (7.6 GB unpacked): train-clean-100 to train, dev/test to evaluate.
+mkdir -p dl && cd dl
+for s in dev-clean test-clean dev-other test-other train-clean-100; do
+  curl -sSfL "https://www.openslr.org/resources/12/$s.tar.gz" | tar xz
+done
 ```
 
-The script creates a `python3` venv, installs `requirements.txt` plus
-openWakeWord's training extras, clones `piper-sample-generator` for synthetic
-speech, downloads the negative/augmentation datasets, then runs openWakeWord's
-automatic pipeline (`--generate_clips` → `--augment_clips` → `--train_model`)
-once per phrase. Outputs land in `output/hey_atlas.onnx` and
-`output/atlas.onnx` — copy them to `public/models/`.
+## Run
 
-## After training
+```bash
+cd scripts/train-wakeword
+work/clean/.venv/bin/python hey_atlas.py all
+```
 
-1. Copy `hey_atlas.onnx` and `atlas.onnx` to `public/models/`.
-2. Rebuild (`bun run build`) — no code changes needed; the detector and the
-   "Listening for …" label pick them up automatically.
-3. Update the atlas-site privacy policy in the same release: it currently
-   states the beta wake phrase is "Hey Jarvis", which stops being true once
-   these models ship.
-4. Test real-world false-positive rates; tune per-model `threshold` in
-   `WAKE_MODELS` (`src/lib/wakeWord.ts`) if needed.
+`all` runs the five steps in order; each can also run alone and skips work
+whose output already exists (`--force` redoes it):
+
+| Step | Does | Time on an M5 |
+|---|---|---|
+| `synth` | ~31,000 TTS clips: "hey atlas" (8,000); a fixed near-miss list such as "hey alexa", "at last" (4,000); "hey <word>" over thousands of real words (7,000); "atlas" without "hey", e.g. "ask atlas", "the atlas" (4,000); other English and Danish speech (4,000); plus held-out sets | ~6 min |
+| `embed` | puts each clip in a simulated room (level, reverb, mic EQ, background speech or noise, noise floor), then backbone embeddings for everything, LibriSpeech included | ~25 min |
+| `train` | a small MLP (1536 → 256 → 256 → 1); negatives weigh more as training goes on, and every 2,000 steps every negative window is rescored and the ones the model likes most go back in as hard negatives | ~4 min |
+| `eval` | streams held-out audio through the model the way the app does (80 ms hops, `consecutive` scores in a row, 1.5 s refractory) | ~3 min |
+| `export` | `model.pt` → `public/models/hey_atlas.onnx`, checked against torch with onnxruntime | seconds |
+
+Speakers with `id % 10 == 0` are held out of training, so evaluation hears
+voices the model never trained on.
+
+## Results
+
+Held out of training: 800 "hey atlas" clips from unseen speakers, 21.4 h of
+LibriSpeech dev/test speech, 400 near-misses, 400 "atlas without hey" phrases
+and 800 other TTS sentences, all in the same simulated rooms (5–30 dB SNR,
+reverb, levels down to someone across the room). `k` is the app's
+`consecutive`: scores in a row, 80 ms apart, at or above the threshold.
+
+**Shipped: `hey_atlas.onnx` at k = 2, threshold 0.5** (`src/lib/wakeWord.ts`).
+
+| model | k | thr | recall | false wakes / h | near-misses | "…atlas…" | other TTS speech |
+|---|---|---|---|---|---|---|---|
+| **hey_atlas** | 2 | 0.5 | **91.0%** | **0.047** (1 in 21.4 h) | 4/400 | 9/400 | 0/800 |
+| hey_atlas | 1 | 0.5 | 93.1% | 0.281 | 13/400 | 13/400 | 0/800 |
+| hey_atlas | 3 | 0.5 | 88.0% | 0 | 1/400 | 5/400 | 0/800 |
+| stock hey_jarvis, as it shipped | 1 | 0.5 | 94.8% | 0.047 | — | — | 0/800 |
+| stock hey_jarvis | 2 | 0.5 | 92.2% | 0 | — | — | 0/800 |
+
+(Jarvis was scored on 400 synthetic "hey jarvis" clips; the near-miss and
+"atlas" columns are Atlas phrases, so they say nothing about it.)
+
+The same exported file, run through the app's own runtime in a production
+build (onnxruntime-web WASM, `wakeWordFraming.ts`, the consecutive rule):
+loads in ~280 ms, ~2.4 ms per 80 ms hop, wakes once on each of 8 held-out
+clips, stays silent through 4 minutes of held-out speech.
+
+How it got there, so nobody repeats the dead ends:
+
+| change | recall | false wakes / h | what it fixed |
+|---|---|---|---|
+| first model, mining 100k sampled windows per round | 95.3% | 1.78 | — it woke on "thanks laughed", "tobacco", "she added" with full confidence |
+| mine **all** negative windows each round | 94.8% | 0.75 | the confident false wakes; it now overfit the mined windows (0 on training speech, 16 held out) |
+| + "hey <word>" near-misses, + `consecutive` | 92.5% (k = 2) | 0 | "hey adam", "hey at": it had learned "hey + a vowel" |
+| + "atlas" without "hey" | 91.0% (k = 2) | 0.047 | "the atlas" woke it; "…atlas…" accepts 6.5% → 2.25% |
+
+Hidden width 256 beat 128 at every operating point (at equal false wakes,
+~1 point more recall and fewer near-miss accepts).
+
+Known weak spots, measured: the Danish voice is missed more often than the
+English ones (12% vs 7% at an earlier checkpoint), and "atlas" said without
+"hey" still wakes it about 2% of the time. Everything above is synthetic
+speech in simulated rooms: a real microphone is the test that counts.
+
+## Retuning
+
+The threshold lives in `src/lib/wakeWord.ts` (`HEY_ATLAS_THRESHOLD`). Change it
+against the table above, not by feel. Synthetic positives are the weak spot:
+the real test is a microphone. If real "Hey Atlas" is missed, the cheapest fix
+is a lower threshold; the better one is 20–50 real recordings mixed into
+`pos_train`. If it fires on the TV, record that audio and add it to the
+negatives.

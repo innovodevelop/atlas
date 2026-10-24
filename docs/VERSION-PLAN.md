@@ -59,10 +59,12 @@ _Gmail connector built and merged 2026-10-23 (loopback OAuth, history-API inbox 
 
 - [ ] Mail sending (SES production access) {id: feat-021}
 - [ ] Mail 6b-6d runtime verification {id: feat-022}
-- [ ] Wake-word model licensing resolution (Google speech_embedding) {id: feat-023, status: in-progress, design: linked}
+- [x] Wake-word model licensing resolution (Google speech_embedding) {id: feat-023, design: linked}
 
-_2026-10-23: backbone done — Google speech_embedding (Apache-2.0) converted to ONNX in CI and shipping in place of openWakeWord's NC mel + embedding models; verified equivalent in CI (hey_jarvis 0.999 vs 0.997 on a TTS clip), not yet on a real microphone. Remaining: train the Hey Atlas phrase model on CC0 negatives (feat-024)._
-- [ ] Hey Atlas custom wake phrase {id: feat-024}
+_2026-10-23: backbone done — Google speech_embedding (Apache-2.0) converted to ONNX in CI and shipping in place of openWakeWord's NC mel + embedding models. 2026-10-24: the phrase model followed (feat-024); nothing non-commercial ships._
+- [ ] Hey Atlas custom wake phrase {id: feat-024, status: in-progress}
+
+_2026-10-24: `hey_atlas.onnx` trained on permissively licensed data (Piper TTS voices, LibriSpeech; `scripts/train-wakeword/`) and shipping; the stock Hey Jarvis model is deleted. Held out: 91% recall, one false wake in 21.4 h of speech. Also fixed the wake word not starting at all since 2026-08-11 (onnxruntime-web import). Remaining: say "Hey Atlas" into the Mac's microphone._
 - [ ] Voice latency optimization {id: feat-025, status: in-progress}
 
 _2026-10-23: each turn now logs where its time went (`[latency]` lines from the voice gateway: STT final, brain response, first token, first sentence, first audio) and sends it to the client as a `latency` message. Scribe tokens are prefetched instead of minted on wake, and the final transcript is awaited on its event rather than polled. Next: read real breakdowns on the Mac and cut the largest stage._
