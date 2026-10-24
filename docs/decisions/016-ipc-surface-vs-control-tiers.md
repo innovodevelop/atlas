@@ -171,6 +171,12 @@ CREATE TRIGGER IF NOT EXISTS trg_approvals_no_delete BEFORE DELETE ON approvals
 
 **Delete-only, not update.** Rust legitimately UPDATEs both tables (`audit.rs:456` status transitions, `audit.rs:590` / `audit.rs:616` approval settlement), so a `BEFORE UPDATE` trigger would break `approval_resolve`. Claim exactly what this buys and no more: it stops Atlas erasing its own record through a bug or a careless `localClient.from('tool_calls').delete()`. It does not stop anyone with the file open in `sqlite3` — the existing comment at `db_schema.sql:880-890` already says so about the mail pair, and the same sentence must be written for these.
 
+**Done 2026-10-24, with two changes to the proposal.**
+- *No `approvals` trigger.* `runs.agent_id` cascades from `agents` and `approvals.run_id` cascades from `runs`, so the trigger would have made deleting an agent (`useAgents.ts`) fail. `tool_calls` got its trigger; it survives that cascade (`run_id ON DELETE SET NULL`).
+- *The IPC route is closed at the command too.* `db_insert`/`db_update`/`db_delete` refuse `tool_calls` and `approvals` outright (`db.rs`, `AUDIT_TABLES`; a webview-inserted approval would be a forged one) and refuse to edit or delete `mail_audit_events`, whose insert stays open for `useAtlasMail`'s `appendAudit`. That covers direct `approvals` writes; deleting an agent still removes its runs' approvals by cascade, a user-initiated delete of that agent's history.
+
+Doing this exposed an older bug: neither erase path handled the mail triggers. The brain's `eraseUserData` threw on the first `mail_audit_events` row and stopped half done; `brain_memory_erase_all` swallowed the abort and left the audit rows on disk. Both now lift every `BEFORE DELETE … RAISE(ABORT)` trigger inside one transaction, delete, and put the triggers back before commit.
+
 ### G2 — HIGH: every mutating IPC command except mail writes no audit row
 
 `policy.rs:118-121` calls the Write-tier audit row *"what makes 'Atlas added a task overnight' answerable instead of mysterious."* On the IPC route, none of these produce one: `db_insert`, `db_update`, `db_delete`, `home_device_set`, `home_device_colour`, `home_lock_set`, `home_scene_run`, `home_link_home_assistant`, `home_unlink`, `health_import`, `health_forget`, `brain_set_ai_key`, `music_play/pause/volume/load/seek`, `portfolio_sync`, `portfolio_disconnect`. Mail is the sole exception, and it is thorough (`mail.rs:108-133` → the protected `mail_audit_events`).

@@ -218,7 +218,7 @@ impl DbState {
     }
 
     #[cfg(test)]
-    fn open_in_memory() -> Result<Self, String> {
+    pub(crate) fn open_in_memory() -> Result<Self, String> {
         ensure_vec_extension();
         let conn = Connection::open_in_memory().map_err(|e| e.to_string())?;
         conn.execute_batch("PRAGMA foreign_keys = ON;").map_err(|e| e.to_string())?;
@@ -673,6 +673,30 @@ pub fn db_select(
     )
 }
 
+/// Atlas's audit trail. Through the generic commands below, any script in the
+/// webview could rewrite or delete the record of what Atlas did (ADR 016, G1),
+/// so they refuse these tables, except for one append:
+///
+/// - `tool_calls`, `approvals`: Rust writes them with its own SQL
+///   (control/audit.rs); the webview only reads them (db_select stays open). A
+///   webview-inserted approval would also be a forged one.
+/// - `mail_audit_events`: the mail UI appends its own actions (useAtlasMail's
+///   appendAudit), so db_insert stays open for it; editing and deleting are
+///   refused here and by its triggers in db_schema.sql.
+///
+/// Cascades are outside this guard: deleting an agent deletes its runs, and
+/// with them their approvals (approvals.run_id ON DELETE CASCADE). tool_calls
+/// survives that (run_id SET NULL) and has its own delete trigger.
+pub const AUDIT_TABLES: &[&str] = &["tool_calls", "approvals", "mail_audit_events"];
+const WEBVIEW_APPENDS: &[&str] = &["mail_audit_events"];
+
+fn refuse_audit_write(table: &str, op: &str) -> Result<(), String> {
+    if !AUDIT_TABLES.contains(&table) || (op == "insert" && WEBVIEW_APPENDS.contains(&table)) {
+        return Ok(());
+    }
+    Err(format!("{table} is Atlas's audit trail; only the app itself can {op} its rows."))
+}
+
 #[tauri::command]
 pub fn db_insert(
     app: tauri::AppHandle,
@@ -680,6 +704,7 @@ pub fn db_insert(
     table: String,
     values: Json,
 ) -> Result<Json, String> {
+    refuse_audit_write(&table, "insert")?;
     let out = {
         let conn = state.conn.lock().map_err(|e| e.to_string())?;
         insert(&conn, &table, &values)?
@@ -698,6 +723,7 @@ pub fn db_update(
     filters: Map<String, Json>,
     patch: Map<String, Json>,
 ) -> Result<Json, String> {
+    refuse_audit_write(&table, "update")?;
     let out = {
         let conn = state.conn.lock().map_err(|e| e.to_string())?;
         update(&conn, &table, &filters, &patch)?
@@ -713,6 +739,7 @@ pub fn db_delete(
     table: String,
     filters: Map<String, Json>,
 ) -> Result<Json, String> {
+    refuse_audit_write(&table, "delete")?;
     let out = {
         let conn = state.conn.lock().map_err(|e| e.to_string())?;
         delete(&conn, &table, &filters)?
@@ -799,6 +826,46 @@ mod tests {
 
     fn obj(v: Json) -> Map<String, Json> {
         v.as_object().unwrap().clone()
+    }
+
+    #[test]
+    fn generic_writes_refuse_the_audit_trail_except_the_mail_append() {
+        for op in ["insert", "update", "delete"] {
+            assert!(refuse_audit_write("tool_calls", op).is_err(), "tool_calls {op}");
+            assert!(refuse_audit_write("approvals", op).is_err(), "approvals {op}");
+            assert!(refuse_audit_write("user_tasks", op).is_ok(), "user_tasks {op}");
+        }
+        // useAtlasMail's appendAudit inserts through db_insert; nothing edits.
+        assert!(refuse_audit_write("mail_audit_events", "insert").is_ok());
+        assert!(refuse_audit_write("mail_audit_events", "update").is_err());
+        assert!(refuse_audit_write("mail_audit_events", "delete").is_err());
+    }
+
+    #[test]
+    fn tool_calls_is_delete_guarded_and_deleting_an_agent_still_works() {
+        let db = DbState::open_in_memory().unwrap();
+        let conn = db.conn.lock().unwrap();
+        conn.execute_batch(
+            "INSERT INTO agents (id, user_id, name, system_prompt) VALUES ('a1', 'u1', 'Mail', 'p');
+             INSERT INTO runs (id, user_id, agent_id, goal_text) VALUES ('r1', 'u1', 'a1', 'tidy');
+             INSERT INTO tool_calls (id, run_id, user_id, tool_name) VALUES ('t1', 'r1', 'u1', 'mail.archive');
+             INSERT INTO approvals (id, user_id, run_id, tool_call_id, action_summary)
+               VALUES ('ap1', 'u1', 'r1', 't1', 'archive');",
+        )
+        .unwrap();
+        // control/audit.rs moves rows through their statuses: updates stay open.
+        conn.execute("UPDATE tool_calls SET status = 'completed' WHERE id = 't1'", []).unwrap();
+        let err = conn.execute("DELETE FROM tool_calls WHERE id = 't1'", []).unwrap_err();
+        assert!(err.to_string().contains("append-only"), "{err}");
+
+        // Why approvals has no delete trigger: agent -> runs -> approvals cascades,
+        // and a trigger there would make this delete fail. tool_calls survives it.
+        conn.execute("DELETE FROM agents WHERE id = 'a1'", []).unwrap();
+        let approvals: i64 = conn.query_row("SELECT COUNT(*) FROM approvals", [], |r| r.get(0)).unwrap();
+        let run_id: Option<String> =
+            conn.query_row("SELECT run_id FROM tool_calls WHERE id = 't1'", [], |r| r.get(0)).unwrap();
+        assert_eq!(approvals, 0);
+        assert_eq!(run_id, None);
     }
 
     #[test]

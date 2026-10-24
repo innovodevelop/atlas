@@ -148,6 +148,40 @@ test("erase-all wipes every user-scoped table for the caller only", async () => 
   expect((db._db.query(`SELECT COUNT(*) AS n FROM ai_memory WHERE user_id='u2'`).get() as any).n).toBe(1);
 });
 
+test("erase-all also wipes the append-only audit trail, and leaves its guards in place", () => {
+  const db = freshDb()._db;
+  for (const user of ["u1", "u2"]) {
+    db.query(`INSERT INTO tool_calls (id, user_id, tool_name) VALUES (?, ?, 'mail.archive')`).run(`tc-${user}`, user);
+    db.query(`INSERT INTO approvals (id, user_id, tool_call_id, action_summary) VALUES (?, ?, ?, 'archive')`)
+      .run(`ap-${user}`, user, `tc-${user}`);
+    db.query(`INSERT INTO mail_audit_events (id, user_id, actor, action) VALUES (?, ?, 'atlas', 'archived')`)
+      .run(`ma-${user}`, user);
+  }
+  const guards = () =>
+    (db.query(`SELECT name FROM sqlite_master WHERE type = 'trigger' ORDER BY name`).all() as { name: string }[])
+      .map((r) => r.name);
+  const before = guards();
+  expect(before).toContain("trg_tool_calls_no_delete");
+  expect(before).toContain("trg_mail_audit_no_delete");
+  // The guard is real: outside erasure, a delete aborts.
+  expect(() => db.exec(`DELETE FROM tool_calls WHERE user_id = 'u1'`)).toThrow(/append-only/);
+
+  // Before the guards were lifted for erasure, this threw on mail_audit_events
+  // and left the erase half done.
+  const deleted = eraseUserData(db, "u1");
+  expect(deleted.tool_calls).toBe(1);
+  expect(deleted.mail_audit_events).toBe(1);
+
+  const count = (table: string, user: string) =>
+    (db.query(`SELECT COUNT(*) AS n FROM ${table} WHERE user_id = ?`).get(user) as { n: number }).n;
+  for (const table of ["tool_calls", "approvals", "mail_audit_events"]) {
+    expect(count(table, "u1")).toBe(0);
+    expect(count(table, "u2")).toBe(1);
+  }
+  expect(guards()).toEqual(before);
+  expect(() => db.exec(`DELETE FROM tool_calls WHERE user_id = 'u2'`)).toThrow(/append-only/);
+});
+
 test("captured turn round-trips with its system-prompt snapshot", async () => {
   const db = freshDb();
   const turnId = captureChatTurn(db._db, {

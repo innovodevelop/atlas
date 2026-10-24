@@ -544,6 +544,35 @@ export function forgetMemories(
 
 /** Erase everything Atlas stores about one user. Returns per-table counts. */
 export function eraseUserData(db: Database, userId: string): Record<string, number> {
+  // One transaction: if anything fails, the lifted triggers come back with the
+  // rollback.
+  return db.transaction(() => {
+    const guards = liftAppendOnlyGuards(db);
+    const counts = eraseRows(db, userId);
+    for (const sql of guards) db.exec(sql);
+    return counts;
+  })();
+}
+
+/**
+ * Drop every append-only guard (a BEFORE DELETE trigger that RAISEs ABORT:
+ * mail_audit_events, tool_calls) and return each one's CREATE SQL to put back.
+ * Erasure is the one legitimate delete on those tables; without this, the first
+ * guarded DELETE below threw and left the erase half done. Read from the live
+ * schema, so a guard added later is covered without touching this.
+ */
+function liftAppendOnlyGuards(db: Database): string[] {
+  const guards = db
+    .query(
+      `SELECT name, sql FROM sqlite_master WHERE type = 'trigger'
+         AND sql LIKE '%BEFORE DELETE%' AND sql LIKE '%RAISE(ABORT%'`,
+    )
+    .all() as { name: string; sql: string }[];
+  for (const g of guards) db.exec(`DROP TRIGGER "${g.name.replace(/"/g, '""')}"`);
+  return guards.map((g) => g.sql);
+}
+
+function eraseRows(db: Database, userId: string): Record<string, number> {
   const counts: Record<string, number> = {};
   const vectorIds = hasTable(db, "memory_vectors")
     ? (db.query(`SELECT id FROM memory_vectors WHERE user_id = ?`).all(userId) as { id: string }[]).map((r) => r.id)
