@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef } from 'react';
 import {
   CloudSun, Calendar, Check, Activity, Mail, Newspaper,
-  Droplets, Wind, Sun, Sunrise, Sunset,
+  Droplets, Wind, Sunrise, Sunset,
 } from 'lucide-react';
 import { WeatherIcon } from './atlasIcons';
 import { sparklinePoints, fmtPct, fmtEventTime, WATCHLIST } from '@/pages/atlas/atlasHelpers';
@@ -51,12 +51,13 @@ const WeatherCardCanvas = memo(({ condition }: { condition: string }) => {
 WeatherCardCanvas.displayName = 'WeatherCardCanvas';
 
 export const AtlasWeatherCard = memo(({ onOpen }: { onOpen: () => void }) => {
-  const { weather } = useWeather();
+  const { weather, isFallback } = useWeather();
   const hourly = weather.hourly.slice(0, 6);
   return (
     <Card size="l" delay={1} className="wxcard" onOpen={onOpen}
       bleed={<WeatherCardCanvas condition={weather.condition} />}>
-      <Card.Header label="Weather" icon={<CloudSun className="i14" />} />
+      <Card.Header label="Weather" icon={<CloudSun className="i14" />}
+        sample={isFallback && 'Built-in sample: the weather service has not answered.'} />
       <Card.Body>
         <p className="tempB tnum">{Math.round(weather.temp)}°</p>
         <p className="condB">
@@ -68,7 +69,6 @@ export const AtlasWeatherCard = memo(({ onOpen }: { onOpen: () => void }) => {
         <div className="fx ac gap16 mt16 metaB">
           <span className="fx ac" style={{ gap: 6 }}><Droplets className="i12" />{weather.humidity}%</span>
           <span className="fx ac" style={{ gap: 6 }}><Wind className="i12" />{Math.round(weather.windSpeed)} mph</span>
-          <span className="fx ac" style={{ gap: 6 }}><Sun className="i12" />UV 6</span>
         </div>
         <hr className="hrB" />
         <div className="fx">
@@ -168,7 +168,7 @@ const areaPath = (series: number[]) => {
 };
 
 export const AtlasStocksCard = memo(({ onOpen }: { onOpen: () => void }) => {
-  const { stocks, indices } = useStocks(WATCHLIST);
+  const { stocks, indices, isFallback } = useStocks(WATCHLIST);
   const { available, connected, summary, history } = usePortfolio();
   const rows = stocks.slice(0, 4);
 
@@ -192,7 +192,10 @@ export const AtlasStocksCard = memo(({ onOpen }: { onOpen: () => void }) => {
 
   return (
     <Card size="xl" delay={4} onOpen={onOpen}>
-      <Card.Header label="Watchlist · Market open" icon={<Activity className="i14" />} />
+      {/* "· Market open" used to follow the label, at any hour: nothing here
+          knows the market's state. */}
+      <Card.Header label="Watchlist" icon={<Activity className="i14" />}
+        sample={isFallback && 'Built-in sample: the stocks service has not answered.'} />
       <Card.Body>
         <div className="stkhero">
           <div>
@@ -311,11 +314,12 @@ export const AtlasInboxCard = memo(({ onOpen }: { onOpen: () => void }) => {
 AtlasInboxCard.displayName = 'AtlasInboxCard';
 
 export const AtlasBriefingCard = memo(({ onOpen }: { onOpen: () => void }) => {
-  const { news } = useNews();
+  const { news, isFallback } = useNews();
   const rows = news.slice(0, 3);
   return (
     <Card size="l" delay={6} onOpen={onOpen}>
-      <Card.Header label="Briefing" icon={<Newspaper className="i14" />} />
+      <Card.Header label="Briefing" icon={<Newspaper className="i14" />}
+        sample={isFallback && 'Built-in sample: the news service has not answered.'} />
       <Card.Body>
         {/* Not a <Row>: a briefing item is a stacked editorial block, not a
             lead/title/trail line, and forcing it through the row slots would

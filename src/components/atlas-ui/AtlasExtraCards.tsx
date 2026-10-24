@@ -1,9 +1,10 @@
 /**
  * The four supplementary dashboard cards from "Atlas Dashboard (Current)":
- * Air quality (real, OpenWeather air-pollution via get-weather), Now playing
- * (real — the Music Player v2 compact widget), Activity rings (demo until a
- * Health source exists), World clock (real, Intl timezones). Markup mirrors
- * the design file; CSS for all classes already ships in workshop.css.
+ * Air quality (real, OpenWeather air-pollution via get-weather; "No reading"
+ * without it), Now playing (real — the Music Player v2 compact widget),
+ * Activity rings (sample, stamped as such, until it reads Health data), World
+ * clock (real, Intl timezones). Markup mirrors the design file; CSS for all
+ * classes already ships in workshop.css.
  */
 import { memo, useEffect, useState } from 'react';
 import { Leaf, Flame, Globe } from 'lucide-react';
@@ -39,10 +40,24 @@ function usAqiFromPm25(pm25: number): number {
 
 export const AtlasAirQualityCard = memo(() => {
   const { weather } = useWeather();
-  const pm25 = weather.air?.pm25 ?? 8;
+  const city = weather.location.split(' ')[0];
+  // No reading means no number. This used to default PM2.5 to 8 and show a
+  // confident "Good" whenever get-weather had no air data (always, on its
+  // built-in sample).
+  const pm25 = weather.air?.pm25;
+  if (pm25 == null) {
+    return (
+      <Card size="s" delay={7}>
+        <Card.Header label="Air quality" icon={<Leaf className="i14" />} />
+        <Card.Body className="fx col" style={{ justifyContent: 'center' }}>
+          <p className="tempB tnum" style={{ fontSize: 42, margin: 0 }}>—</p>
+          <p className="metaB" style={{ marginTop: 2 }}>No reading · {city}</p>
+        </Card.Body>
+      </Card>
+    );
+  }
   const band = AQI_BANDS.find((b) => pm25 <= b.max) ?? AQI_BANDS[0];
   const aqi = usAqiFromPm25(pm25);
-  const city = weather.location.split(' ')[0];
   return (
     <Card size="s" delay={7}>
       <Card.Header label="Air quality" icon={<Leaf className="i14" />} />
@@ -82,7 +97,8 @@ export const AtlasNowPlayingCard = memo(({ onOpen }: { onOpen?: () => void }) =>
 AtlasNowPlayingCard.displayName = 'AtlasNowPlayingCard';
 
 // ---------------------------------------------------------------------------
-// Activity rings — demo content until a Health data source exists.
+// Activity rings — sample content, stamped as such. Atlas can import Apple
+// Health (useHealth); wiring these rings to it is what removes the stamp.
 
 const RINGS = [
   { r: 42, dash: 264, off: 58, color: 'var(--acc)', track: 'rgba(52,97,242,.16)' },
@@ -92,7 +108,8 @@ const RINGS = [
 
 export const AtlasActivityCard = memo(() => (
   <Card size="m" delay={9}>
-    <Card.Header label="Activity" icon={<Flame className="i14" />} />
+    <Card.Header label="Activity" icon={<Flame className="i14" />}
+      sample="Sample rings: this card does not read your health data yet." />
     <Card.Body className="fx ac gap20">
       <svg className="rings" viewBox="0 0 100 100">
         {RINGS.map((ring) => (

@@ -57,6 +57,8 @@ body{margin:0;background:hsl(240 28% 7%);color:hsl(240 30% 96%);font-family:'Gei
 @keyframes riseB{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
 .chB{display:flex;align-items:center;justify-content:space-between;padding:22px 26px 0}
 .mlblB{font-size:11px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:hsl(240 20% 58%);margin:0}
+/* Card.Header's `sample` stamp: the dashboard's twin of health.css .hl-stamp. */
+.sampleB{flex-shrink:0;font-size:9px;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:var(--amber-text);background:rgba(224,122,31,.12);padding:3px 7px;border-radius:var(--r-pill)}
 .icboxB{width:32px;height:32px;border-radius:10px;background:hsl(243 75% 58% / .12);color:hsl(243 80% 78%)}
 .cbB{flex:1;padding:18px 26px 26px;min-height:0}
 .tnum{font-family:'Geist',system-ui,sans-serif;font-variant-numeric:tabular-nums}

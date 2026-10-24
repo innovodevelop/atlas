@@ -77,11 +77,25 @@ interface CardHeaderProps {
   icon?: ReactNode;
   /** Right-aligned control. Stops propagation so it cannot also open the card. */
   action?: ReactNode;
+  /**
+   * Why the card shows built-in sample data, when it does: draws the `Sample`
+   * stamp beside the label, with this as its tooltip. Pass it from the data
+   * hook's own flag (`isFallback`), not a constant, unless the card has no
+   * real source at all.
+   */
+  sample?: string | false | null;
 }
 
-const CardHeader = ({ label, icon, action }: CardHeaderProps) => (
+const CardHeader = ({ label, icon, action, sample }: CardHeaderProps) => (
   <div className="chB">
-    <p className="mlblB">{label}</p>
+    {sample ? (
+      <div className="fx ac" style={{ gap: 8, minWidth: 0 }}>
+        <p className="mlblB">{label}</p>
+        <span className="sampleB" title={sample}>Sample</span>
+      </div>
+    ) : (
+      <p className="mlblB">{label}</p>
+    )}
     {action ?? (icon ? <div className="icboxB fx ac jc">{icon}</div> : null)}
   </div>
 );
