@@ -21,8 +21,8 @@ import { selectModel } from "../../../supabase/functions/_shared/providerRouting
 import { Database } from "bun:sqlite";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "path";
+import { PROJECT_ROOT } from "./projectRoot.ts";
 
-const PROJECT_ROOT = resolve(import.meta.dir, "../../..");
 const REPAIR_WALL_CLOCK_MS = 90_000;
 const MAX_FILE_LINES = 200;
 const TEST_TIMEOUT_MS = 120_000;

@@ -21,6 +21,7 @@ import { applyDesignSyncs, parseDesignManifest } from "./designSync.ts";
 import { executeRepair, type RepairContext } from "./selfRepair.ts";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { resolve } from "path";
+import { PROJECT_ROOT } from "./projectRoot.ts";
 
 type Json = Record<string, unknown>;
 const json = (data: unknown, status = 200) =>
@@ -29,10 +30,9 @@ const json = (data: unknown, status = 200) =>
     headers: { "Content-Type": "application/json" },
   });
 
-// Resolves to the repo root only when the brain runs from a source checkout;
-// in the compiled sidecar it is `/`, and every route that reads the repo
-// (plan, changelog, design manifest, tests) has nothing to read.
-export const PROJECT_ROOT = resolve(import.meta.dir, "../../..");
+// The repo checkout these routes read; see projectRoot.ts for how the
+// compiled sidecar finds it.
+export { PROJECT_ROOT } from "./projectRoot.ts";
 
 
 export type ApplyResult =

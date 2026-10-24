@@ -37,11 +37,10 @@ import { createLearningHandlers } from "./learningRoutes.ts";
 import { createProactiveHandlers } from "./proactive.ts";
 import { createGreetingHandlers } from "./greeting.ts";
 import { createMailDraftHandlers } from "./mailDraft.ts";
-import { createAdminHandlers, PROJECT_ROOT } from "./adminRoutes.ts";
+import { createAdminHandlers } from "./adminRoutes.ts";
+import { RUNNING_FROM_SOURCE } from "./projectRoot.ts";
 import { CLAUDE_PROJECTS_DIR, ingestJsonlSessions } from "./jsonlIngest.ts";
 import { startJsonlWatcher } from "./jsonlWatcher.ts";
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
 import { createControlClient } from "./control.ts";
 import { embedText } from "./localEmbed.ts";
 import { AUTO_EMBED_BATCH, embedPending, scheduleAutoEmbed } from "./autoEmbed.ts";
@@ -149,12 +148,12 @@ const admin = createAdminHandlers({ db: localDb._db, requireUser });
 if (process.env.ATLAS_PLAN_SYNC !== "off") admin.startPlanSync();
 
 // Live agent view (feat-018): keep atlas_agent_sessions current while Claude
-// Code works. Only from a source checkout — the admin surfaces need one anyway
-// (see PROJECT_ROOT), and the compiled sidecar shipped to consumers must never
-// start reading ~/.claude on its own. ATLAS_JSONL_WATCH=0 turns it off, =1
-// forces it on.
+// Code works. Only from a source checkout (RUNNING_FROM_SOURCE, not "the repo
+// is known": the installed app learns the repo from ATLAS_REPO_DIR too), and
+// the compiled sidecar shipped to consumers must never start reading ~/.claude
+// on its own. ATLAS_JSONL_WATCH=0 turns it off, =1 forces it on.
 const jsonlWatchSetting = process.env.ATLAS_JSONL_WATCH;
-if (jsonlWatchSetting === "1" || (jsonlWatchSetting !== "0" && existsSync(resolve(PROJECT_ROOT, ".git")))) {
+if (jsonlWatchSetting === "1" || (jsonlWatchSetting !== "0" && RUNNING_FROM_SOURCE)) {
   startJsonlWatcher({ dir: CLAUDE_PROJECTS_DIR, ingest: () => ingestJsonlSessions(localDb._db) });
 }
 
