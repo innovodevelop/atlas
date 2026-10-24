@@ -185,7 +185,16 @@ pub fn brain_memory_erase_all(
     if !confirm {
         return Err("confirm: true required".to_string());
     }
-    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let mut conn = state.conn.lock().map_err(|e| e.to_string())?;
+    erase_all(&mut conn, &user_id)
+}
+
+fn erase_all(conn: &mut rusqlite::Connection, user_id: &str) -> Result<Json, String> {
+    // One transaction: if anything below fails, the lifted triggers come back
+    // with the rollback (dropping `tx` without commit rolls it back).
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    let guards = lift_append_only_guards(&tx)?;
+    let conn = &tx;
 
     // Discover all tables carrying a user_id column — avoids a hardcoded list
     // that silently goes stale whenever a new table is added.
@@ -254,7 +263,35 @@ pub fn brain_memory_erase_all(
         counts.insert(table.clone(), json!(n));
     }
 
+    for sql in &guards {
+        tx.execute_batch(sql).map_err(|e| e.to_string())?;
+    }
+    tx.commit().map_err(|e| e.to_string())?;
     Ok(Json::Object(counts))
+}
+
+/// Drop every append-only guard (a BEFORE DELETE trigger that RAISEs ABORT:
+/// mail_audit_events, tool_calls) and return each one's CREATE SQL to put back
+/// before commit. Erasure is the one legitimate delete on those tables; without
+/// this, their DELETEs below aborted and, swallowed by `unwrap_or(0)`, left the
+/// audit rows on disk after "erase all my data". Read from the live schema, so a
+/// guard added later is covered without touching this.
+fn lift_append_only_guards(conn: &rusqlite::Connection) -> Result<Vec<String>, String> {
+    let guards: Vec<(String, String)> = conn
+        .prepare(
+            "SELECT name, sql FROM sqlite_master WHERE type = 'trigger' \
+             AND sql LIKE '%BEFORE DELETE%' AND sql LIKE '%RAISE(ABORT%'",
+        )
+        .map_err(|e| e.to_string())?
+        .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    for (name, _) in &guards {
+        conn.execute_batch(&format!("DROP TRIGGER \"{}\"", name.replace('"', "\"\"")))
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(guards.into_iter().map(|(_, sql)| sql).collect())
 }
 
 // ---------------------------------------------------------------------------
@@ -561,5 +598,54 @@ fn personality_style_hint(state: &State<'_, DbState>, user_id: &str) -> String {
         String::new()
     } else {
         format!("Communication style: {}.", hints.join("; "))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn count(conn: &rusqlite::Connection, table: &str, user: &str) -> i64 {
+        conn.query_row(&format!("SELECT COUNT(*) FROM {table} WHERE user_id = ?1"), [user], |r| r.get(0))
+            .unwrap()
+    }
+
+    fn triggers(conn: &rusqlite::Connection) -> Vec<String> {
+        conn.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' ORDER BY name")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap()
+    }
+
+    #[test]
+    fn erase_all_wipes_the_audit_trail_and_puts_its_guards_back() {
+        let db = DbState::open_in_memory().unwrap();
+        let mut conn = db.conn.lock().unwrap();
+        for u in ["u1", "u2"] {
+            conn.execute_batch(&format!(
+                "INSERT INTO tool_calls (id, user_id, tool_name) VALUES ('tc-{u}', '{u}', 'mail.archive');
+                 INSERT INTO approvals (id, user_id, tool_call_id, action_summary)
+                   VALUES ('ap-{u}', '{u}', 'tc-{u}', 'archive');
+                 INSERT INTO mail_audit_events (id, user_id, actor, action) VALUES ('ma-{u}', '{u}', 'atlas', 'archived');"
+            ))
+            .unwrap();
+        }
+        let before = triggers(&conn);
+        assert!(before.iter().any(|t| t == "trg_tool_calls_no_delete"));
+        assert!(before.iter().any(|t| t == "trg_mail_audit_no_delete"));
+
+        // Before the guards were lifted, these DELETEs aborted and unwrap_or(0)
+        // hid it: the audit rows outlived "erase all my data".
+        let counts = erase_all(&mut conn, "u1").unwrap();
+        assert_eq!(counts["tool_calls"], json!(1));
+        assert_eq!(counts["mail_audit_events"], json!(1));
+        for table in ["tool_calls", "approvals", "mail_audit_events"] {
+            assert_eq!(count(&conn, table, "u1"), 0, "{table} u1");
+            assert_eq!(count(&conn, table, "u2"), 1, "{table} u2");
+        }
+        assert_eq!(triggers(&conn), before);
+        assert!(conn.execute("DELETE FROM tool_calls WHERE user_id = 'u2'", []).is_err());
     }
 }

@@ -883,7 +883,9 @@ CREATE INDEX IF NOT EXISTS idx_mail_audit_thread ON mail_audit_events(thread_id,
 -- bug or a careless query.
 --
 -- Erasure is the one legitimate delete, and it works by DROPPING the delete
--- trigger, deleting, and recreating it (see eraseUserData in the brain). A
+-- trigger, deleting, and recreating it, all in one transaction (eraseUserData
+-- in the brain, brain_memory_erase_all in brain.rs; both lift every
+-- BEFORE DELETE ... RAISE(ABORT) trigger and put back its own SQL). A
 -- WHEN-clause escape hatch was tried first and is not possible: SQLite refuses
 -- to compile a trigger that references temp.* ("cannot reference objects in
 -- database temp"). If the process dies mid-erase the trigger is restored on the
@@ -892,6 +894,17 @@ CREATE TRIGGER IF NOT EXISTS trg_mail_audit_no_update BEFORE UPDATE ON mail_audi
   BEGIN SELECT RAISE(ABORT, 'mail_audit_events is append-only'); END;
 CREATE TRIGGER IF NOT EXISTS trg_mail_audit_no_delete BEFORE DELETE ON mail_audit_events
   BEGIN SELECT RAISE(ABORT, 'mail_audit_events is append-only (erase via the account-erase path)'); END;
+
+-- The control port's audit trail gets the same delete guard (ADR 016, G1). Not
+-- an update guard: Rust legitimately moves tool_calls through its statuses
+-- (control/audit.rs). The webview route is closed separately, in db.rs
+-- (AUDIT_TABLES). Same claim as above, no more: this stops Atlas erasing its
+-- own record through a bug; it does not stop anyone with the file open in
+-- sqlite3. approvals gets NO delete trigger, unlike the ADR proposed:
+-- approvals.run_id cascades from runs, which cascade from agents, so the
+-- trigger would make deleting an agent fail.
+CREATE TRIGGER IF NOT EXISTS trg_tool_calls_no_delete BEFORE DELETE ON tool_calls
+  BEGIN SELECT RAISE(ABORT, 'tool_calls is append-only (erase via the account-erase path)'); END;
 
 -- ---------------------------------------------------------------------------
 -- updated_at triggers (mirror Postgres update_updated_at_column()).
