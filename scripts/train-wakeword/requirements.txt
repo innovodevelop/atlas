@@ -1,20 +1,11 @@
-# Base deps for openWakeWord automatic training (train.sh installs the
-# openWakeWord repo itself editable, plus piper-sample-generator's own
-# requirements, on top of these).
-#
-# NOTE: torch here is CPU (or CUDA on Linux/NVIDIA). There is no Apple
-# Silicon GPU path for this training stack — expect hours per model on CPU.
-openwakeword>=0.6.0
-torch>=2.0
-torchaudio
-torchmetrics
-speechbrain
-audiomentations
-torch-audiomentations
-datasets
-scipy
-numpy
-tqdm
-mutagen
-pyyaml
-onnx
+# hey_atlas.py, Python 3.12. Pinned to the versions the shipped model was
+# trained with. Setup: see README.md.
+numpy==2.5.4
+scipy==1.18.1
+soundfile==0.14.0
+onnx==1.23.2
+onnxruntime==1.31.0
+torch==2.14.1
+# Piper TTS, for the synthetic "hey atlas" clips. GPL-3.0 since 1.3; the
+# licence covers the tool, not the audio it generates.
+piper-tts==1.8.0

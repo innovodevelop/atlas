@@ -90,3 +90,19 @@ Ranked alternatives considered: ask dscripka for permissively-licensed weights
 Google (chosen); switch engines; accept the risk on legal advice (rejected —
 inconsistent with the posture already taken against the CC BY-NC community
 "hey atlas" model).
+
+## Update (2026-10-24) — "Hey Atlas" ships; nothing non-commercial remains
+
+Both halves of the licence problem are closed. The backbone became Google's
+Apache-2.0 `speech_embedding` (2026-10-23), and the placeholder phrase model
+is gone: `hey_atlas.onnx`, trained by `scripts/train-wakeword/hey_atlas.py` on
+Piper TTS voices (CC BY 4.0 / CC0), LibriSpeech (CC BY 4.0) and generated
+augmentation, replaced `hey_jarvis_v0.1`. The UI and the trigger now agree.
+
+Detection changed with it: a model can require several scores in a row
+(`consecutive`, 80 ms apart) before waking. "Hey Atlas" uses 2 at threshold
+0.5. Most false wakes are a single-hop spike while a real phrase holds for
+several hops, so this cut held-out false wakes about fourfold for a ~2-point
+recall cost. Numbers and the threshold rationale:
+`scripts/train-wakeword/README.md`.
+

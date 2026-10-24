@@ -6,10 +6,9 @@ import { getActiveWakePhrases } from '@/lib/wakeWord';
 export function atlasStateLabel(
   state: string,
   // Defaults to the wake lib's active set so the label only ever advertises
-  // phrase(s) the detector can actually hear: stock "Hey Jarvis" today,
-  // "Hey Atlas"/"Atlas" automatically once trained models land in
-  // public/models/ (see src/lib/wakeWord.ts). getActiveWakePhrases is a pure
-  // read — this module stays side-effect-free at import time.
+  // phrase(s) the detector can actually hear (see src/lib/wakeWord.ts).
+  // getActiveWakePhrases is a pure read — this module stays side-effect-free
+  // at import time.
   wakePhrases: string[] = getActiveWakePhrases(),
 ): string {
   switch (state) {

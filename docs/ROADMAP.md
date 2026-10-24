@@ -30,19 +30,30 @@ noise and other speech. It also fixed a framing bug (the app fed the mel
 model 1280-sample chunks without context: 5 frames per chunk instead of 8).
 Not yet heard through a real microphone on the Mac.
 
-**Still blocking: the phrase model.** `hey_jarvis_v0.1.onnx` is CC BY-NC-SA.
-Train `hey_atlas.onnx` on CC0 negatives (Mozilla Common Voice) with embeddings
-from `speech_embedding.onnx`; `scripts/train-wakeword/` as written still uses
-openWakeWord's NC negative feature set and needs that swap first.
+**Phrase model — resolved 2026-10-24.** `hey_atlas.onnx` replaced the stock
+`hey_jarvis_v0.1.onnx` (CC BY-NC-SA), trained by
+`scripts/train-wakeword/hey_atlas.py` on Piper TTS (LibriTTS-R and VCTK
+voices, CC BY 4.0; a Danish voice, CC0), LibriSpeech (CC BY 4.0) and
+synthetic augmentation, with features from `speech_embedding.onnx`. Held out:
+91% recall, one false wake in 21.4 h of speech, at 2 consecutive scores over
+0.5. Nothing non-commercial ships. LibriSpeech was chosen over Common Voice
+because it needs no account; the old `train.sh` (openWakeWord's NC features)
+is gone. Not yet heard through a real microphone on the Mac.
+
+The same work found the wake word could not start at all since 50b9cab
+(2026-08-11): that commit swapped `public/ort` to the wasm-only files but left
+the import on onnxruntime-web's default WebGPU entry, which asks for the
+deleted `.jsep.mjs`. `wakeWordRuntime.ts` now imports `onnxruntime-web/wasm`.
 
 Full detail: `public/models/README.md`, `docs/decisions/002-wake-word-openwakeword.md`
 (licence correction section) and `scripts/train-wakeword/README.md`.
 
-### 2. The wake phrase is a lie in the UI
+### 2. The wake phrase is a lie in the UI — resolved 2026-10-24
 
-The app listens for **"Hey Jarvis"** (the only model that ships) while the UI and
-the atlas-site privacy policy say **"Hey Atlas"**. Either train the model
-(blocked on item 1) or correct the copy. Do not ship the mismatch.
+The app listened for "Hey Jarvis" while the UI said "Hey Atlas". It now
+listens for "Hey Atlas" only (item 1). The atlas-site privacy policy still
+says the beta wake phrase is "Hey Jarvis"; that line changes with the next
+privacy-policy deploy (item 3).
 
 ### 3. Privacy-policy delta for Bedrock — now two deltas, one deploy
 

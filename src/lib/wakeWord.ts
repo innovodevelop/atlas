@@ -9,16 +9,15 @@
  *                          It replaced openWakeWord's melspectrogram +
  *                          embedding_model pair (CC BY-NC-SA) with no
  *                          retraining: same features, same phrase models.
- *   <phrase>.onnx          last 16 embeddings → wake probability
+ *   hey_atlas.onnx         last 16 embeddings → "Hey Atlas" probability.
+ *                          Atlas's own model, trained on permissively licensed
+ *                          data by scripts/train-wakeword/hey_atlas.py.
  *
  * The phrase stage scores every loaded model in parallel per frame and wakes
- * when ANY crosses its threshold. All WAKE_MODELS candidates are attempted at
- * init; files that are missing or invalid are skipped without error, so
- * dropping trained hey_atlas.onnx / atlas.onnx into public/models/ activates
- * them with zero code changes (scripts/train-wakeword/ packages the training).
- * Stock "Hey Jarvis" is a fallback, not a roommate: the moment any
- * Atlas-branded model loads, jarvis is dropped from the active set so the app
- * never triggers on a phrase the UI no longer advertises — ADR 002.
+ * when ANY crosses its threshold. A WAKE_MODELS entry whose file is missing or
+ * invalid is skipped without error, so a new phrase is one entry plus its
+ * .onnx in public/models/. The stock "Hey Jarvis" model that stood in before
+ * hey_atlas.onnx was trained is gone: it is CC BY-NC-SA — ADR 002.
  *
  * Everything runs client-side: pre-wake audio never leaves the process, which
  * is both the latency and the GDPR story.
@@ -42,29 +41,30 @@ export interface WakeModelSpec {
   phrase: string;
   /** Per-model trigger threshold (defaults to DEFAULT_THRESHOLD). */
   threshold?: number;
-  /** Fallback entries are dropped when any non-fallback model loads. */
-  fallback?: boolean;
+  /**
+   * Scores in a row (80 ms apart) that must reach the threshold before waking;
+   * defaults to 1. A real "Hey Atlas" holds a high score for several hops,
+   * while most false wakes are a single-hop spike.
+   */
+  consecutive?: number;
 }
 
 /**
- * Candidate phrase models, tried in order at init. Only hey_jarvis ships
- * today; the two Atlas models activate automatically once trained copies land
- * in public/models/ (see scripts/train-wakeword/README.md).
+ * The phrase models Atlas ships, tried at init. Threshold and `consecutive`
+ * come from the held-out evaluation in scripts/train-wakeword/README.md
+ * (91% recall, one false wake in 21 h of speech); retune them against that
+ * table, not by feel.
  */
 export const WAKE_MODELS: WakeModelSpec[] = [
-  { file: "/models/hey_atlas.onnx", phrase: "Hey Atlas" },
-  { file: "/models/atlas.onnx", phrase: "Atlas" },
-  { file: "/models/hey_jarvis_v0.1.onnx", phrase: "Hey Jarvis", fallback: true },
+  { file: "/models/hey_atlas.onnx", phrase: "Hey Atlas", threshold: 0.5, consecutive: 2 },
 ];
 
-const FALLBACK_PHRASES = WAKE_MODELS.filter((m) => m.fallback).map((m) => m.phrase);
-
-// Last-known active set. Starts at the fallback (the only model guaranteed to
-// ship today) and is corrected as soon as a detector finishes loading.
-let activePhrases: string[] = [...FALLBACK_PHRASES];
+// Last-known active set. Starts at everything that ships and is corrected as
+// soon as a detector finishes loading (a model that failed to load drops out).
+let activePhrases: string[] = WAKE_MODELS.map((m) => m.phrase);
 
 /**
- * Phrases the detector actually listens for. Fallback phrase(s) until a
+ * Phrases the detector actually listens for. Every shipped phrase until a
  * detector has been created; the real loaded set afterwards. UI labels should
  * derive from this instead of hardcoding a phrase.
  */

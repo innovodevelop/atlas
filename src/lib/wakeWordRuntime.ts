@@ -12,10 +12,14 @@
  * actually created — which already happens well after first paint, on mic
  * activation.
  *
- * Pipeline documentation, model provenance and the fallback-phrase rule live
- * in wakeWord.ts, which owns the public surface. This file owns execution.
+ * Pipeline documentation and model provenance live in wakeWord.ts, which
+ * owns the public surface. This file owns execution.
  */
-import * as ort from "onnxruntime-web";
+// The wasm-only entry, matching the two files in public/ort. The package's
+// default entry is the WebGPU build, which asks /ort/ for
+// ort-wasm-simd-threaded.jsep.mjs; that file left public/ort in 50b9cab and
+// every detector failed to start from then until this import changed.
+import * as ort from "onnxruntime-web/wasm";
 import { DEFAULT_THRESHOLD, WAKE_MODELS, _setActivePhrases, type WakeModelSpec } from "./wakeWord";
 import { EmbeddingFramer, WINDOW } from "./wakeWordFraming";
 
@@ -34,7 +38,10 @@ interface LoadedWakeModel {
   session: ort.InferenceSession;
   phrase: string;
   threshold: number;
+  consecutive: number;
   score: number;
+  /** Scores in a row at or above `threshold`, up to now. */
+  run: number;
 }
 
 export class WakeWordDetectorImpl {
@@ -82,17 +89,16 @@ export class WakeWordDetectorImpl {
         }
       }),
     );
-    let loaded = attempts.filter((a): a is NonNullable<typeof a> => a !== null);
-    // Drop the fallback once any Atlas-branded model is live — keeping jarvis
-    // active alongside would trigger on a phrase the UI no longer advertises.
-    if (loaded.some((a) => !a.spec.fallback)) loaded = loaded.filter((a) => !a.spec.fallback);
+    const loaded = attempts.filter((a): a is NonNullable<typeof a> => a !== null);
     if (loaded.length === 0) throw new Error("no wake-word phrase model available under /models/");
 
     d.models = loaded.map((a) => ({
       session: a.session,
       phrase: a.spec.phrase,
       threshold: opts?.threshold ?? a.spec.threshold ?? DEFAULT_THRESHOLD,
+      consecutive: a.spec.consecutive ?? 1,
       score: 0,
+      run: 0,
     }));
     _setActivePhrases(d.models.map((m) => m.phrase));
     d.running = true;
@@ -126,13 +132,15 @@ export class WakeWordDetectorImpl {
       this.models.map(async (m) => {
         const res = await m.session.run({ [m.session.inputNames[0]]: input });
         m.score = (res[m.session.outputNames[0]].data as Float32Array)[0];
+        m.run = m.score >= m.threshold ? m.run + 1 : 0;
       }),
     );
     this.score = Math.max(...this.models.map((m) => m.score));
     if (this.embeddings.length > EMB_WINDOW * 4) this.embeddings.splice(0, EMB_WINDOW);
 
     const now = performance.now();
-    const hit = this.models.find((m) => m.score >= m.threshold);
+    // Same rule the training evaluation scores (hey_atlas.py, `fires`).
+    const hit = this.models.find((m) => m.run >= m.consecutive);
     if (hit && now - this.lastFire > REFRACTORY_MS) {
       this.lastFire = now;
       this.onWake(hit.phrase);
@@ -143,7 +151,10 @@ export class WakeWordDetectorImpl {
     this.framer.reset();
     this.embeddings = [];
     this.score = 0;
-    for (const m of this.models) m.score = 0;
+    for (const m of this.models) {
+      m.score = 0;
+      m.run = 0;
+    }
   }
 
   destroy(): void {
