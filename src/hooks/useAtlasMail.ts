@@ -25,7 +25,7 @@ import { isTauri, localClient } from '@/integrations/local/localClient';
 import { getToken } from '@/lib/authClient';
 import { getBrainEndpoint } from '@/lib/brainClient';
 import { useAuth } from '@/hooks/useAuth';
-import { MAIL_AUDIT_ACTIONS, MailSendBlockedError } from '@/types/mail';
+import { MAIL_AUDIT_ACTIONS, MailSendBlockedError, NEEDS_YOU_STATUSES } from '@/types/mail';
 import type {
   MailAccount,
   MailAuditActor,
@@ -86,6 +86,8 @@ export interface UseAtlasMail {
    */
   accountAudit: MailAuditEvent[];
   rules: MailRule[];
+  /** Lower-cased, de-duplicated participants across every thread. */
+  knownAddresses: string[];
 
   // ---- view state ----
   view: MailView;
@@ -317,7 +319,7 @@ const MAIL_VIEWS: readonly MailView[] = [
 ] as const;
 
 /** 'snoozed' is the view, 'snooze' is the status — the one place they differ. */
-const VIEW_STATUS: Record<Exclude<MailView, 'sent_today'>, MailThreadStatus> = {
+const VIEW_STATUS: Record<Exclude<MailView, 'sent_today' | 'needs_you' | 'inbox'>, MailThreadStatus> = {
   triage: 'triage',
   approve: 'approve',
   drafting: 'drafting',
@@ -538,15 +540,26 @@ export function useAtlasMail(): UseAtlasMail {
     (v: MailView) =>
       v === 'sent_today'
         ? allThreads.filter((t) => sentTodayThreadIds.has(t.id))
-        : allThreads.filter((t) => t.status === VIEW_STATUS[v]),
+        : v === 'needs_you'
+          ? allThreads.filter((t) => NEEDS_YOU_STATUSES.includes(t.status))
+          : v === 'inbox'
+            ? allThreads.filter((t) => t.status !== 'snooze')
+            : allThreads.filter((t) => t.status === VIEW_STATUS[v]),
     [allThreads, sentTodayThreadIds],
   );
 
   const counts = useMemo(() => {
     const out = {} as MailCounts;
-    for (const v of MAIL_VIEWS) out[v] = threadsInView(v).length;
+    for (const v of [...MAIL_VIEWS, 'needs_you', 'inbox'] as MailView[]) out[v] = threadsInView(v).length;
     return out;
   }, [threadsInView]);
+
+  /** Every address a thread has carried — the Beta compose's "first time writing to" check. */
+  const knownAddresses = useMemo(() => {
+    const out = new Set<string>();
+    for (const t of allThreads) for (const p of t.participants ?? []) out.add(p.trim().toLowerCase());
+    return [...out];
+  }, [allThreads]);
 
   const inView = useMemo(() => threadsInView(view), [threadsInView, view]);
   const inMailbox = useMemo(
@@ -1184,6 +1197,7 @@ export function useAtlasMail(): UseAtlasMail {
     audit,
     accountAudit,
     rules,
+    knownAddresses,
 
     view,
     mailbox,

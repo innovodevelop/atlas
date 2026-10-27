@@ -18,6 +18,7 @@ import { OnboardingGate } from "./components/OnboardingGate";
 // neither may depend on a runtime chunk fetch that can fail in the webview.
 import AtlasDashboard from "./pages/atlas/AtlasDashboard";
 import BetaHome from "./pages/atlas/BetaHome";
+import BetaMail from "./pages/atlas/BetaMail";
 import { isBetaUi } from "./lib/betaFlag";
 import AtlasPermissions from "./pages/AtlasPermissions";
 
@@ -79,6 +80,8 @@ const ROUTE_OVERRIDES: Readonly<Record<string, RouteOverride>> = {
   // OnboardingGate and Auth, which made AtlasPermissions' own "you can change
   // it later" a broken promise.
   "/permissions": { Component: AtlasPermissions },
+  // Phase 3: the Beta Mail takes `/mail` while the flag is on.
+  ...(isBetaUi() ? { "/mail": { Component: BetaMail } } : {}),
 };
 
 const App = () => (

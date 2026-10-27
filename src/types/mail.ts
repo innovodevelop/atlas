@@ -244,7 +244,14 @@ export type MailView =
   | 'snoozed'
   | 'handled'
   | 'handoff'
-  | 'sent_today';
+  | 'sent_today'
+  // The Beta Mail's lanes (design "Needs you" and "Inbox"): composites over
+  // the statuses above. Not in MAIL_VIEWS, so the Workshop sidebar is unchanged.
+  | 'needs_you'
+  | 'inbox';
+
+/** The statuses the Beta's "Needs you" lane gathers: every thread waiting on the user. */
+export const NEEDS_YOU_STATUSES: readonly MailThreadStatus[] = ['triage', 'approve', 'drafting', 'escalate', 'handoff'] as const;
 
 export type MailCounts = Record<MailView, number>;
 

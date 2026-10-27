@@ -523,3 +523,195 @@ html[data-beta-tone="ink"] .b-topbar-btn.on { background: var(--b-on-ink); color
 @media (prefers-reduced-motion: reduce) {
   .b-greet-word, .bw, .b-stage, .b-fullview, .b-editor, .b-editor-head, .b-status-panel, .b-talk--anchored { animation: none; }
 }
+
+/* ── Phase 3: Mail ─────────────────────────────────────────────────────────────
+   Source: Atlas Mail Beta.dc.html (hero, lanes, list, reading, compose, toast). */
+
+html[data-ui="beta"] .beta-page:has(> .b-mail) { padding-bottom: 0; }
+.b-mail { height: calc(100vh - var(--b-topbar)); display: flex; flex-direction: column; gap: var(--b-gap); padding: 14px 20px 96px; box-sizing: border-box; overflow: hidden; }
+.b-mail .mail-notice, .b-mail .mail-notices { flex: none; }
+.b-mail-hero { flex: none; height: clamp(118px, 15vh, 160px); padding: 12px 18px 12px 8px; gap: 16px; animation: b-pop .6s var(--b-spring) both; }
+.b-mail-hero-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.b-mail-hero-text .b-eyebrow, .b-mail-hero-text .b-intro { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-mail-greet { align-self: flex-start; padding: 0; background: none; color: var(--b-ink); font-family: var(--b-font-display); font-size: clamp(24px, 2.8vw, 40px); font-weight: 500; letter-spacing: -.045em; line-height: 1.02; text-align: left; cursor: pointer; transition: opacity .2s; }
+.b-mail-greet:hover { opacity: .8; }
+.b-mail-hero-tools { flex: none; display: flex; align-items: center; gap: 8px; }
+.b-mail-search { display: flex; align-items: center; gap: 10px; width: 320px; height: 44px; padding: 0 8px 0 16px; border-radius: var(--b-r-pill); background: var(--b-card); color: var(--b-ink2); box-sizing: border-box; }
+.b-mail-search input { flex: 1; min-width: 0; height: 100%; background: none; color: var(--b-ink); font-size: 14px; }
+.b-mail-search input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.b-mail-search kbd { height: 28px; padding: 0 9px; display: flex; align-items: center; border-radius: var(--b-r-pill); background: var(--b-panel); font-family: var(--b-font-mono); font-size: 11.5px; color: var(--b-ink2); }
+.b-mail-write { height: 44px; padding: 0 20px; font-size: 14px; }
+.b-mail--mid .b-mail-search { width: 220px; }
+.b-mail--narrow .b-mail-search { width: 150px; }
+.b-mail--stacked .b-mail-search { display: none; }
+.b-mail-lanechips { flex: none; display: flex; gap: 6px; overflow-x: auto; padding: 0 2px; }
+.b-mail-lanechips .b-chip { flex: none; height: 32px; font-size: 12.5px; }
+.b-mail-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: 260px 380px minmax(0, 1fr); gap: var(--b-gap); }
+.b-mail--mid .b-mail-grid { grid-template-columns: 230px 320px minmax(0, 1fr); }
+.b-mail--narrow .b-mail-grid { grid-template-columns: 300px minmax(0, 1fr); }
+.b-mail--stacked .b-mail-grid { grid-template-columns: minmax(0, 1fr); }
+.nosb { scrollbar-width: none; } .nosb::-webkit-scrollbar { display: none; }
+
+/* Lanes */
+.b-mail-side { min-height: 0; overflow-y: auto; padding: 10px; border-radius: var(--b-r-hero); background: var(--b-panel); display: flex; flex-direction: column; gap: 14px; }
+.b-mail-lanes { display: flex; flex-direction: column; gap: 2px; }
+.b-mail-lane { width: 100%; display: flex; align-items: center; gap: 11px; height: 42px; padding: 0 12px; border-radius: var(--b-r-row); background: transparent; color: var(--b-ink); font-size: 13.5px; font-weight: 500; cursor: pointer; text-align: left; transition: background .2s; }
+.b-mail-lane:hover { background: var(--b-hover); }
+.b-mail-lane.on { background: var(--b-card); font-weight: 600; }
+.b-mail-lane svg { flex: none; }
+.b-mail-lane-l { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-mail-lane-n { flex: none; min-width: 22px; height: 22px; padding: 0 7px; display: flex; align-items: center; justify-content: center; border-radius: var(--b-r-pill); font-size: 11.5px; font-weight: 600; color: var(--b-ink2); }
+.b-mail-lane-n.hot { background: var(--b-red); color: #fff; }
+.b-mail-accts { display: flex; flex-direction: column; gap: 4px; }
+.b-mail-accts .b-eyebrow { padding: 0 12px 4px; letter-spacing: .14em; color: var(--b-ink2); }
+.b-mail-acct { width: 100%; text-align: left; display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: var(--b-r-inset); background: var(--b-page); color: var(--b-ink); cursor: pointer; transition: background .2s; }
+.b-mail-acct:hover { background: #fdfbf7; }
+.b-mail-acct.on { background: var(--b-card); }
+.b-mail-acct--none { cursor: default; }
+.b-mail-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; }
+.b-mail-acct-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.b-mail-acct-text b { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-mail-acct-text span { font-size: 11.5px; color: var(--b-ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-mail-acct-n { flex: none; font-size: 11.5px; color: var(--b-ink2); }
+.b-mail-how { margin-top: auto; padding: 14px 16px; border-radius: 20px; background: var(--b-card); display: flex; flex-direction: column; gap: 8px; }
+.b-mail-how-t { font-size: 13px; font-weight: 600; }
+.b-mail-how-b { font-size: 12.5px; line-height: 1.5; color: var(--b-ink2); }
+.b-mail-how .b-btn { align-self: flex-start; height: 32px; background: var(--b-panel); font-weight: 600; }
+
+/* List */
+.b-mail-list { min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: var(--b-r-hero); background: var(--b-panel); }
+.b-mail-list-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px 6px; }
+.b-mail-list-title { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.b-mail-list-title span:first-child { font-family: var(--b-font-display); font-size: 19px; font-weight: 600; letter-spacing: -.025em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-mail-list-title span:last-child { font-size: 12px; color: var(--b-ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-seg--small { background: var(--b-page); flex: none; }
+.b-seg--small button { height: 28px; padding: 0 11px; font-size: 12px; }
+.b-seg--small button.on { background: var(--b-ink); color: var(--b-on-ink); box-shadow: none; }
+.b-mail-rows { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.b-mail-row { width: 100%; text-align: left; display: flex; flex-direction: column; gap: 5px; padding: 14px 16px; border-radius: 18px; background: var(--b-page); color: var(--b-ink); cursor: pointer; transition: background .15s; }
+.b-mail-row:hover { background: #fdfbf7; }
+.b-mail-row.on { background: var(--b-card); }
+.b-mail-row-l1 { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; }
+.b-mail-unread { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--b-blue); }
+.b-mail-row-from { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-mail-row.unread .b-mail-row-from { font-weight: 700; }
+.b-mail-row-org { flex: 1; min-width: 0; font-size: 12px; color: var(--b-ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-mail-row-time { flex: none; font-size: 12px; color: var(--b-ink2); }
+.b-mail-row-subject { width: 100%; font-size: 13.5px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-mail-row.unread .b-mail-row-subject { font-weight: 600; }
+.b-mail-row-snippet { width: 100%; min-height: 1.45em; font-size: 12.5px; line-height: 1.45; color: var(--b-ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-mail-row-l4 { display: flex; align-items: center; gap: 8px; margin-top: 3px; min-width: 0; width: 100%; }
+.b-mail-chip { flex: none; white-space: nowrap; height: 22px; padding: 0 9px; display: inline-flex; align-items: center; gap: 6px; border-radius: var(--b-r-pill); font-size: 11px; font-weight: 600; }
+.b-mail-chip i { width: 6px; height: 6px; border-radius: 50%; }
+.b-mail-chip--need { background: var(--b-destructive-hover); color: var(--b-red-deep); } .b-mail-chip--need i { background: var(--b-red); }
+.b-mail-chip--held { background: var(--b-emphasis); color: var(--b-blue-deep); } .b-mail-chip--held i { background: var(--b-blue); }
+.b-mail-chip--done { background: var(--b-green-fill); color: var(--b-green-deep); } .b-mail-chip--done i { background: var(--b-green); }
+.b-mail-chip--quiet { background: var(--b-panel); color: var(--b-ink2); } .b-mail-chip--quiet i { background: var(--b-tertiary); }
+.b-mail-row-acct { min-width: 0; display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--b-ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-mail-row-acct i { flex: none; width: 6px; height: 6px; border-radius: 50%; }
+.b-mail-empty { margin: 12px 4px; padding: 28px 20px; border-radius: 20px; background: var(--b-page); display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+.b-mail-empty-t { font-family: var(--b-font-display); font-size: 17px; font-weight: 600; }
+.b-mail-empty-b { max-width: 260px; font-size: 12.5px; line-height: 1.5; color: var(--b-ink2); }
+
+/* Reading */
+.b-mail-read { min-width: 0; min-height: 0; display: flex; flex-direction: column; border-radius: var(--b-r-hero); background: var(--b-card); overflow: hidden; }
+.b-mail-read-head { flex: none; display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; padding: 22px 24px 14px; }
+.b-mail-read-title { flex: 1 1 280px; min-width: 0; }
+.b-mail-read-chips { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.b-mail-read-chips .b-mail-chip { height: 24px; padding: 0 10px; font-size: 11.5px; }
+.b-mail-h1 { margin: 10px 0 0; font-family: var(--b-font-display); font-size: clamp(22px, 2.2vw, 28px); font-weight: 600; letter-spacing: -.03em; line-height: 1.15; text-wrap: pretty; }
+.b-mail-people { margin: 6px 0 0; font-size: 13px; color: var(--b-ink2); }
+.b-mail-read-actions { flex: none; display: flex; gap: 4px; }
+.b-mail-round { width: 38px; height: 38px; border-radius: 50%; background: var(--b-panel); color: var(--b-ink); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .2s; }
+.b-mail-round:hover { background: var(--b-hover); }
+.b-mail-round.on { background: var(--b-emphasis); color: var(--b-blue-deep); }
+.b-mail-round:disabled { opacity: .45; cursor: default; }
+.b-mail-round--card { width: 36px; height: 36px; background: var(--b-card); }
+.b-mail-snooze { flex: none; margin: 0 24px 8px; display: flex; flex-wrap: wrap; gap: 6px; animation: b-pop .25s both; }
+.b-mail-snooze button { height: 34px; padding: 0 13px; border-radius: var(--b-r-pill); background: var(--b-panel); color: var(--b-ink); font-size: 12.5px; font-weight: 600; cursor: pointer; transition: background .2s; }
+.b-mail-snooze button:hover { background: var(--b-hover); }
+.b-mail-snooze button span { margin-left: 6px; font-weight: 500; color: var(--b-ink2); }
+.b-mail-read-body { flex: 1; min-height: 160px; overflow-y: auto; padding: 4px 24px 24px; display: flex; flex-direction: column; gap: 12px; }
+.b-mail-card { padding: 16px 18px; border-radius: 20px; display: flex; gap: 14px; animation: b-pop .4s var(--b-spring) both; }
+.b-mail-card--need { background: var(--b-destructive-hover); color: var(--b-ink); }
+.b-mail-card--held { background: var(--b-emphasis); }
+.b-mail-card--done, .b-mail-card--quiet { background: var(--b-panel); }
+.b-mail-card-ico { flex: none; width: 32px; height: 32px; border-radius: 10px; background: var(--b-blue); color: #fff; display: flex; align-items: center; justify-content: center; }
+.b-mail-card--need .b-mail-card-ico { background: var(--b-red); }
+.b-mail-card-text { flex: 1; min-width: 0; }
+.b-mail-card-t { margin: 0; font-size: 14px; font-weight: 600; }
+.b-mail-card--need .b-mail-card-t { color: var(--b-red-deep); }
+.b-mail-card--held .b-mail-card-t { color: var(--b-blue-deep); }
+.b-mail-card-b { margin: 5px 0 0; font-size: 13.5px; line-height: 1.55; text-wrap: pretty; }
+.b-mail-facts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.b-mail-facts span { height: 24px; padding: 0 10px; display: inline-flex; align-items: center; border-radius: var(--b-r-pill); background: var(--b-card); font-size: 11.5px; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-mail-card-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.b-btn--card { background: var(--b-card); font-weight: 600; }
+.b-btn--card:hover { background: var(--b-page); }
+.b-mail-undo { margin-top: 10px; height: 32px; }
+.b-mail-msg { padding: 18px 20px; border-radius: 20px; background: var(--b-page); }
+.b-mail-msg--out { background: var(--b-emphasis); }
+.b-mail-msg header { display: flex; align-items: center; gap: 11px; margin-bottom: 10px; }
+.b-mail-av { flex: none; width: 32px; height: 32px; border-radius: 50%; background: var(--b-ink); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; }
+.b-mail-msg--out .b-mail-av { background: var(--b-blue); }
+.b-mail-msg-who { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.b-mail-msg-who b { font-size: 13.5px; font-weight: 600; }
+.b-mail-msg-who span { font-size: 12px; color: var(--b-ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-mail-msg time { flex: none; font-size: 12px; color: var(--b-ink2); }
+.b-mail-msg-body { margin: 0; font-size: 14.5px; line-height: 1.65; white-space: pre-line; text-wrap: pretty; overflow-wrap: anywhere; }
+.b-mail-att { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.b-mail-att > span { height: 36px; padding: 0 12px; display: inline-flex; align-items: center; gap: 8px; border-radius: var(--b-r-small); background: var(--b-panel); font-size: 12.5px; font-weight: 600; }
+.b-mail-att small { font-weight: 400; color: var(--b-ink2); }
+.b-mail-note { margin: 0; font-size: 12.5px; color: var(--b-ink2); line-height: 1.5; }
+.b-mail-note--err { color: var(--b-red-deep); }
+.b-mail-reply { padding: 12px 14px; border-radius: 20px; background: var(--b-emphasis); display: flex; flex-direction: column; gap: 8px; }
+.b-mail-reply--empty { flex-direction: row; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--b-panel); }
+.b-mail-reply-head { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--b-blue-deep); min-width: 0; }
+.b-mail-reply-head svg { flex: none; }
+.b-mail-reply-head > span:nth-child(2) { white-space: nowrap; }
+.b-mail-reply-hint { flex: 1; min-width: 0; text-align: right; font-weight: 500; font-size: 12px; color: var(--b-ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-mail-reply--empty .b-mail-reply-hint { text-align: left; }
+.b-mail-reply-text { width: 100%; resize: none; background: none; color: var(--b-ink); font-size: 14.5px; line-height: 1.55; box-sizing: border-box; }
+.b-mail-reply-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.b-mail-reply-actions .b-btn--primary { height: 34px; padding: 0 15px; font-size: 13px; }
+.b-mail-rewrite { height: 30px; padding: 0 11px; border-radius: var(--b-r-pill); background: transparent; color: var(--b-blue-deep); font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background .2s; }
+.b-mail-rewrite:hover { background: var(--b-emphasis-hover); }
+.b-mail-rewrite:disabled { opacity: .5; cursor: default; }
+.b-mail-rewrite--quiet { color: var(--b-ink2); }
+.b-mail-reply-sp, .b-mail-sheet-sp { flex: 1; }
+.b-mail-none { align-items: center; justify-content: center; gap: 8px; padding: 40px; text-align: center; }
+.b-mail-none-t { font-family: var(--b-font-display); font-size: 22px; font-weight: 600; letter-spacing: -.02em; }
+.b-mail-none-b { max-width: 320px; font-size: 13.5px; line-height: 1.55; color: var(--b-ink2); }
+.b-mail-none .b-btn { margin-top: 8px; }
+
+/* Compose sheet */
+.b-mail-veil { position: fixed; inset: 0; z-index: 70; background: rgba(30, 30, 36, .28); display: flex; align-items: flex-end; justify-content: center; padding: 20px; animation: b-fade .25s both; }
+.b-mail-sheet { width: min(760px, 100%); max-height: calc(100vh - 40px); display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: var(--b-r-band); background: var(--b-panel); color: var(--b-ink); box-shadow: 0 40px 80px -30px rgba(30, 30, 36, .5); animation: b-sheet .4s var(--b-spring) both; box-sizing: border-box; }
+@keyframes b-sheet { from { opacity: 0; transform: translateY(24px) scale(.985); } to { opacity: 1; transform: none; } }
+.b-mail-sheet-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 8px; }
+.b-mail-sheet-t { font-family: var(--b-font-display); font-size: 20px; font-weight: 600; letter-spacing: -.02em; }
+.b-mail-fields { padding: 6px; border-radius: 22px; background: var(--b-card); display: flex; flex-direction: column; gap: 2px; }
+.b-mail-field { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: var(--b-r-row); background: var(--b-page); }
+.b-mail-field--from { background: transparent; }
+.b-mail-field > span:first-child { width: 56px; flex: none; font-size: 12.5px; color: var(--b-ink2); }
+.b-mail-field input { flex: 1; min-width: 0; height: 32px; background: none; color: var(--b-ink); font-size: 14.5px; }
+.b-mail-from { height: 30px; padding: 0 11px; display: inline-flex; align-items: center; gap: 6px; border-radius: var(--b-r-pill); background: var(--b-panel); font-size: 12.5px; font-weight: 600; }
+.b-mail-from.on { background: var(--b-ink); color: var(--b-on-ink); }
+.b-mail-from i { width: 6px; height: 6px; border-radius: 50%; }
+.b-mail-first { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: var(--b-r-inset); background: var(--b-emphasis); color: var(--b-blue-deep); font-size: 13px; font-weight: 600; }
+.b-mail-first i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--b-blue); }
+.b-mail-sheet-body { position: relative; padding: 14px 16px; border-radius: 22px; background: var(--b-card); min-height: 200px; display: flex; flex-direction: column; gap: 8px; }
+.b-mail-sheet-body textarea { flex: 1; min-height: 170px; resize: none; background: none; color: var(--b-ink); font-size: 15px; line-height: 1.6; }
+.b-mail-sheet-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 2px 4px; }
+.b-mail-send { height: 44px; padding: 0 22px; font-size: 14px; font-weight: 600; background: #e3dfd9; color: var(--b-ink2); }
+.b-mail-send:disabled { cursor: default; }
+.b-mail-ask { height: 44px; padding: 0 16px; color: var(--b-blue-deep); font-size: 13.5px; }
+.b-mail-ask:hover { background: var(--b-emphasis); }
+.b-mail-sheet-hint { font-size: 12px; color: var(--b-ink2); white-space: nowrap; }
+
+/* Rules drawer and toast */
+.b-mail-drawer { position: fixed; top: calc(var(--b-topbar) + 10px); right: 16px; bottom: 110px; z-index: 75; width: min(560px, calc(100vw - 32px)); padding: 18px; border-radius: var(--b-r-hero); background: var(--b-card); overflow-y: auto; box-shadow: var(--b-shadow-panel); animation: b-panel-in .4s var(--b-spring) both; box-sizing: border-box; }
+.b-mail-toast { position: fixed; left: 50%; bottom: 80px; transform: translateX(-50%); z-index: 80; display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 8px 0 18px; border-radius: var(--b-r-pill); background: var(--b-ink); color: var(--b-on-ink); font-size: 13.5px; font-weight: 600; box-shadow: 0 18px 40px -20px rgba(30, 30, 36, .5); animation: b-pop .3s both; white-space: nowrap; }
+.b-mail-toast button { height: 30px; padding: 0 12px; border-radius: var(--b-r-pill); background: rgba(249, 247, 244, .14); color: var(--b-on-ink); font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.b-mail-toast button:hover { background: rgba(249, 247, 244, .22); }
+@media (prefers-reduced-motion: reduce) { .b-mail-hero, .b-mail-card, .b-mail-sheet, .b-mail-veil, .b-mail-drawer, .b-mail-toast { animation: none; } }
