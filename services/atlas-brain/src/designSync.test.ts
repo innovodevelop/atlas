@@ -22,14 +22,19 @@ function freshDb(): Database {
 }
 
 describe("parseDesignManifest", () => {
-  test("the committed manifest parses to one complete bundle linked to v0.2.0", () => {
+  test("the committed manifest: the Beta bundle being implemented, then the complete v0.2.0 suite", () => {
     const manifest = JSON.parse(readFileSync(join(ROOT, "design/.sync-manifest.json"), "utf8"));
     const { entries, skipped } = parseDesignManifest(manifest);
     expect(skipped).toEqual([]);
-    expect(entries.length).toBeGreaterThanOrEqual(1);
-    expect(entries[0].status).toBe("complete");
-    expect(entries[0].version_id).toBe("v0-2-0");
+    expect(entries.length).toBeGreaterThanOrEqual(2);
+    // The current bundle (2026-10-27 Beta redesign) is in progress, and says
+    // so in the parser's own vocabulary — never "complete" by default.
+    expect(entries[0].status).toBe("implementing");
+    expect(entries[0].version_id).toBe("v0-3-0");
     expect(entries[0].surfaces.length).toBeGreaterThan(0);
+    // The suite v2 port it is diffed against stays on record as shipped.
+    expect(entries[1].status).toBe("complete");
+    expect(entries[1].version_id).toBe("v0-2-0");
   });
 
   test("the top level is the current bundle and history follows it", () => {
