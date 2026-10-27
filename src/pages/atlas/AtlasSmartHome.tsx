@@ -181,7 +181,7 @@ const bridgePill = (b: LiveBridge): string => {
  * stale is a fact about the bridge, not about each device, so it is said once,
  * here, above them — with the two things the user can actually do about it.
  */
-const OutageNotice = ({
+export const OutageNotice = ({
   state, lastReached, onRetry, onSetup, retrying,
 }: {
   state: string;
@@ -219,7 +219,7 @@ const OutageNotice = ({
    Keychain only if the probe succeeded — a token that does not work is never
    stored, so a failed link leaves nothing behind. */
 
-const LinkForm = ({
+export const LinkForm = ({
   onLink, linking,
 }: { onLink: (baseUrl: string, token: string) => Promise<void>; linking: boolean }) => {
   const [baseUrl, setBaseUrl] = useState('');

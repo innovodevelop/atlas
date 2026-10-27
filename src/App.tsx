@@ -20,6 +20,8 @@ import AtlasDashboard from "./pages/atlas/AtlasDashboard";
 import BetaHome from "./pages/atlas/BetaHome";
 import BetaMail from "./pages/atlas/BetaMail";
 import BetaVoice from "./pages/atlas/BetaVoice";
+import BetaMoney from "./pages/atlas/BetaMoney";
+import BetaHealth from "./pages/atlas/BetaHealth";
 import { isBetaUi } from "./lib/betaFlag";
 import AtlasPermissions from "./pages/AtlasPermissions";
 
@@ -82,7 +84,7 @@ const ROUTE_OVERRIDES: Readonly<Record<string, RouteOverride>> = {
   // it later" a broken promise.
   "/permissions": { Component: AtlasPermissions },
   // Phase 3: the Beta Mail takes `/mail` while the flag is on.
-  ...(isBetaUi() ? { "/mail": { Component: BetaMail }, "/home": { Component: BetaVoice } } : {}),
+  ...(isBetaUi() ? { "/mail": { Component: BetaMail }, "/home": { Component: BetaVoice }, "/money": { Component: BetaMoney }, "/health": { Component: BetaHealth } } : {}),
 };
 
 const App = () => (

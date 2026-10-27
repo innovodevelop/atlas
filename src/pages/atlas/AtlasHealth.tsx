@@ -405,7 +405,7 @@ const FreshnessNotice = ({
 
 /* ── Sources & import ─────────────────────────────────────────────────────── */
 
-const SourcesView = ({ health }: { health: ReturnType<typeof useHealth> }) => {
+export const SourcesView = ({ health }: { health: ReturnType<typeof useHealth> }) => {
   const { snapshot } = health;
 
   return (
@@ -465,7 +465,7 @@ const SourcesView = ({ health }: { health: ReturnType<typeof useHealth> }) => {
  * for when the window is not accepting drops (and the only route available to
  * anyone driving this by keyboard).
  */
-const ImportPanel = ({ health }: { health: ReturnType<typeof useHealth> }) => {
+export const ImportPanel = ({ health }: { health: ReturnType<typeof useHealth> }) => {
   const [path, setPath] = useState('');
   const [hovering, setHovering] = useState(false);
   const { importFromPath, importing, supported, today } = health;
@@ -570,7 +570,7 @@ const ImportPanel = ({ health }: { health: ReturnType<typeof useHealth> }) => {
  * — and deliberately absent from the control port, so Atlas itself cannot reach
  * this even if it is asked to.
  */
-const ForgetPanel = ({ health }: { health: ReturnType<typeof useHealth> }) => {
+export const ForgetPanel = ({ health }: { health: ReturnType<typeof useHealth> }) => {
   const [armed, setArmed] = useState(false);
   const has = !!health.snapshot && health.snapshot.hasData;
 
