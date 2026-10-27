@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>(function(){window.addEventListener("unhandledrejection",function(e){var m=String(e.reason&&e.reason.message||e.reason);if(/Transition was aborted|ViewTransition/.test(m))e.preventDefault()});var top=false;try{top=window.self===window.top}catch(e){}var s=document.createElement("style");if(top){s.textContent="@view-transition{navigation:auto}";}else{s.textContent="html{animation:atlas-in .45s cubic-bezier(.22,1,.36,1) both}html.atlas-out{transition:opacity .22s ease,transform .22s ease;opacity:0;transform:scale(.988)}@keyframes atlas-in{from{opacity:0;transform:scale(1.012)}}";document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a||e.defaultPrevented||e.metaKey||e.ctrlKey||a.target)return;var h=a.getAttribute("href");if(!/\.dc\.html/.test(h)||/^https?:/.test(h))return;if(h.split("#")[0]===""||location.pathname.endsWith(encodeURI(h.split("#")[0]))&&h.indexOf("#")>0)return;e.preventDefault();document.documentElement.classList.add("atlas-out");setTimeout(function(){location.href=h},210)},true);}document.head.appendChild(s)})();</script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script>window.addEventListener("pagereveal",function(e){var t=e.viewTransition;if(t){["ready","finished","updateCallbackDone"].forEach(function(p){t[p]&&t[p].catch(function(){})})}});window.addEventListener("unhandledrejection",function(e){if(/Transition was aborted|ViewTransition/.test(String(e.reason&&e.reason.message||e.reason)))e.preventDefault()});</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+@keyframes spin{to{transform:rotate(360deg)}}
+::view-transition-group(*){animation-duration:.55s;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+::view-transition-old(root){animation:.4s cubic-bezier(.22,1,.36,1) both vt-out}
+::view-transition-new(root){animation:.55s cubic-bezier(.22,1,.36,1) both vt-in}
+@keyframes vt-out{to{opacity:0;transform:scale(.985)}}
+@keyframes vt-in{from{opacity:0;transform:scale(1.015)}}
+*{box-sizing:border-box}
+body{margin:0;background:#f9f7f4}
+button,input,textarea{border:none;font:inherit;background:none;color:inherit}
+a{color:#3461f2;text-decoration:none}a:hover{color:#2748bd}
+::selection{background:#e8d8c2}
+::placeholder{color:#b6b1aa}
+.nosb{scrollbar-width:none}.nosb::-webkit-scrollbar{display:none}
+@keyframes bpop{from{opacity:0;transform:translateY(14px) scale(.986)}to{opacity:1;transform:none}}
+@keyframes bdot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
+</style>
+<script src="atlas-quickstart-sphere.js"></script>
+<script src="atlas-orb.js"></script>
+<script src="atlas-topbar.js"></script>
+</helmet>
+
+<div data-screen-label="Atlas Teach — Beta" style="height:100vh;display:flex;flex-direction:column;gap:12px;padding:26px 26px 88px;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden">
+
+<header data-screen-label="Teach hero" style="flex:none;view-transition-name:hero;position:relative;border-radius:36px;background:#f1eeea;padding:clamp(22px,3vw,40px);display:flex;flex-wrap:wrap;align-items:center;gap:32px"><a href="Atlas Dashboard Beta.dc.html" title="Back · Esc" style="position:absolute;right:18px;top:18px;height:34px;padding:0 12px;display:flex;align-items:center;gap:6px;border-radius:9999px;background:#fffdfa;color:#1e1e24;font-size:12.5px;font-weight:600;z-index:2">← Home</a>
+<button onClick="{{ toggleMic }}" title="{{ micTitle }}" aria-label="{{ micTitle }}" style="border:none;position:relative;width:200px;height:200px;flex:none;border-radius:50%;background:transparent;cursor:pointer;padding:0"><canvas ref="{{ sphereRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas><span style="position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);height:30px;padding:0 12px;display:flex;align-items:center;border-radius:9999px;background:#1e1e24;color:#f9f7f4;font-size:12px;font-weight:600;white-space:nowrap">{{ micTitle }}</span></button>
+<div style="flex:1;min-width:260px;display:flex;flex-direction:column;gap:10px"><span style="font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#6d6a67">{{ eyebrow }}</span><h1 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(40px,5vw,76px);font-weight:500;letter-spacing:-.055em;line-height:.95;text-wrap:balance">Tell Atlas who you are.</h1><p style="margin:0;max-width:560px;font-size:15.5px;line-height:1.55;color:#6d6a67;text-wrap:pretty">It listens for the durable things, like values, people and plans, and shows you everything it keeps. Tap the sphere and start talking.</p></div>
+</header>
+
+<div class="nosb" style="flex:1;min-height:0;display:grid;grid-template-columns:{{ cols }};gap:12px;overflow:{{ bodyOvf }}">
+
+<section aria-label="Conversation" style="min-height:{{ convMin }};display:flex;flex-direction:column;border-radius:28px;background:#f1eeea;padding:12px;gap:12px;animation:bpop .65s cubic-bezier(.22,1,.36,1) .04s both">
+<div style="display:flex;align-items:center;gap:10px;padding:6px 8px 0">
+<span style="flex:none;white-space:nowrap;display:flex;align-items:center;gap:7px;height:28px;padding:0 11px;border-radius:9999px;background:{{ micChipBg }};color:{{ micChipFg }};font-size:12px;font-weight:600"><span style="width:7px;height:7px;border-radius:50%;background:{{ micDot }};animation:{{ micAnim }}"></span>{{ micLabel }}</span>
+<span style="flex:1"></span>
+<button onClick="{{ newSession }}" style="border:none;flex:none;white-space:nowrap;height:30px;padding:0 13px;border-radius:9999px;background:transparent;color:#6d6a67;font-family:inherit;font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:#edebe7;color:#1e1e24">New session</button>
+</div>
+<div ref="{{ msgsRef }}" class="nosb" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px 6px">
+<sc-for list="{{ msgs }}" as="m" hint-placeholder-count="3">
+<div style="display:flex;flex-direction:column;align-items:{{ m.align }};gap:5px;animation:bpop .4s cubic-bezier(.22,1,.36,1) both">
+<div style="max-width:min(560px,86%);padding:12px 15px;border-radius:{{ m.rad }};background:{{ m.bg }};color:{{ m.fg }};font-size:14px;line-height:1.55;text-wrap:pretty">{{ m.t }}</div>
+<sc-if value="{{ m.hasLearn }}" hint-placeholder-val="{{ false }}"><span style="display:flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:9999px;background:#e3f4ec;color:#0a7a53;font-size:11.5px;font-weight:600"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>{{ m.learn }}</span></sc-if>
+</div>
+</sc-for>
+<sc-if value="{{ thinking }}" hint-placeholder-val="{{ false }}"><div style="align-self:flex-start;display:flex;gap:5px;padding:14px 16px;border-radius:20px;border-bottom-left-radius:6px;background:#fffdfa"><span style="width:6px;height:6px;border-radius:50%;background:#8b8681;animation:bdot 1.2s ease-in-out infinite"></span><span style="width:6px;height:6px;border-radius:50%;background:#8b8681;animation:bdot 1.2s ease-in-out .15s infinite"></span><span style="width:6px;height:6px;border-radius:50%;background:#8b8681;animation:bdot 1.2s ease-in-out .3s infinite"></span></div></sc-if>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:6px;padding:0 4px"><sc-for list="{{ prompts }}" as="p" hint-placeholder-count="3"><button onClick="{{ usePrompt }}" data-q="{{ p.q }}" style="border:none;flex:none;white-space:nowrap;height:32px;padding:0 13px;border-radius:9999px;background:#fffdfa;color:#1e1e24;font-family:inherit;font-size:12.5px;cursor:pointer;transition:background .2s" style-hover="background:#edebe7"><span style="color:#8b8681">{{ p.cat }} · </span>{{ p.t }}</button></sc-for></div>
+<div style="display:flex;align-items:flex-end;gap:8px;padding:8px;border-radius:22px;background:#fffdfa">
+<button onClick="{{ toggleMic }}" title="{{ micTitle }}" aria-label="{{ micTitle }}" style="border:none;flex:none;width:44px;height:44px;border-radius:50%;background:{{ micBtnBg }};color:{{ micBtnFg }};display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .2s"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{ micIco }}"></path></svg></button>
+<textarea ref="{{ inputRef }}" value="{{ draft }}" onInput="{{ onDraft }}" onKeyDown="{{ onKey }}" rows="1" placeholder="Tell Atlas something about you…" aria-label="Message" style="border:none;outline:none;resize:none;flex:1;min-width:0;min-height:44px;max-height:120px;padding:12px 6px;background:transparent;color:#1e1e24;font-family:inherit;font-size:14px;line-height:1.45"></textarea>
+<button onClick="{{ send }}" aria-label="Send" style="border:none;flex:none;height:44px;padding:0 18px;border-radius:9999px;background:{{ sendBg }};color:{{ sendFg }};font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s">Send</button>
+</div>
+</section>
+
+<aside class="nosb" style="min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px">
+
+<div style="border-radius:28px;background:#f1eeea;padding:18px;display:flex;flex-direction:column;gap:12px;animation:bpop .65s cubic-bezier(.22,1,.36,1) .08s both">
+<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:0 4px"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em">What Atlas knows about you</p><span style="font-size:12px;color:#6d6a67;font-variant-numeric:tabular-nums">{{ total }} things</span></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px">
+<sc-for list="{{ cats }}" as="c" hint-placeholder-count="11">
+<button onClick="{{ pickCat }}" data-k="{{ c.k }}" title="{{ c.title }}" style="border:none;display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:11px 12px;border-radius:14px;background:{{ c.bg }};font-family:inherit;text-align:left;cursor:pointer;transition:background .25s" style-hover="background:{{ c.hov }}">
+<span style="display:flex;align-items:center;justify-content:space-between;width:100%;font-size:12.5px;font-weight:600;color:{{ c.fg }}">{{ c.l }}<span style="font-variant-numeric:tabular-nums;color:{{ c.nFg }}">{{ c.n }}</span></span>
+<span style="display:flex;gap:2px;width:100%"><sc-for list="{{ c.pips }}" as="p" hint-placeholder-count="5"><span style="flex:1;height:4px;border-radius:9999px;background:{{ p }}"></span></sc-for></span>
+</button>
+</sc-for>
+</div>
+<p style="margin:0;padding:0 4px;font-size:12px;line-height:1.5;color:#6d6a67">{{ gapLine }}</p>
+</div>
+
+<div style="border-radius:28px;background:#fffdfa;padding:18px;display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:0 4px 8px"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em">{{ listTitle }}</p><sc-if value="{{ hasFilter }}" hint-placeholder-val="{{ false }}"><button onClick="{{ pickCat }}" data-k="" style="border:none;height:28px;padding:0 11px;border-radius:9999px;background:#f1eeea;color:#6d6a67;font-family:inherit;font-size:12px;font-weight:500;cursor:pointer" style-hover="background:#edebe7">Show all</button></sc-if></div>
+<sc-for list="{{ learned }}" as="l" hint-placeholder-count="4">
+<div style="display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:14px;background:{{ l.bg }};transition:background .6s;animation:{{ l.anim }}">
+<div style="flex:1;min-width:0"><p style="margin:0;font-size:13.5px;font-weight:600;line-height:1.4;text-wrap:pretty">{{ l.v }}</p><p style="margin:2px 0 0;font-size:11.5px;color:#6d6a67">{{ l.cat }} · {{ l.src }}</p></div>
+<button onClick="{{ forget }}" data-k="{{ l.id }}" title="Forget this" style="border:none;flex:none;white-space:nowrap;height:28px;padding:0 11px;border-radius:9999px;background:transparent;color:#8b8681;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer" style-hover="background:#f7e6e4;color:#a3352c">Forget</button>
+</div>
+</sc-for>
+<sc-if value="{{ noLearned }}" hint-placeholder-val="{{ false }}"><div style="padding:20px 16px;border-radius:16px;background:#f9f7f4;text-align:center;font-size:12.5px;color:#6d6a67">Nothing here yet. Tell Atlas about this part of you.</div></sc-if>
+</div>
+
+<div style="border-radius:28px;background:#fffdfa;padding:18px;display:flex;flex-direction:column;gap:10px">
+<div style="padding:0 4px"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em">Teach it from something you've written</p><p style="margin:3px 0 0;font-size:12.5px;line-height:1.5;color:#6d6a67">A CV, a brief, a page of notes. Atlas reads it and proposes. It doesn't decide.</p></div>
+<sc-if value="{{ docIdle }}" hint-placeholder-val="{{ true }}">
+<button onClick="{{ readDoc }}" style="border:none;display:flex;flex-direction:column;align-items:center;gap:6px;padding:22px 16px;border-radius:18px;background:#f9f7f4;font-family:inherit;cursor:pointer;transition:background .2s" style-hover="background:#edebe7"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8b8681" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{ upIco }}"></path></svg><span style="font-size:13px;font-weight:600;color:#1e1e24">Drop a file, or choose one</span><span style="font-size:11.5px;color:#6d6a67">PDF, DOCX, TXT or Markdown · read on this Mac</span></button>
+</sc-if>
+<sc-if value="{{ docReading }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:11px;padding:14px;border-radius:16px;background:#eef2fe"><span style="width:8px;height:8px;border-radius:50%;background:#3461f2;animation:bdot 1.2s ease-in-out infinite"></span><span style="flex:1;font-size:13px;font-weight:600;color:#2748bd">Reading Marcus_Hale_CV_2026.pdf…</span><span style="font-size:12px;color:#2748bd">2 pages</span></div></sc-if>
+<sc-if value="{{ docHasProps }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 4px"><span style="font-size:12px;font-weight:600;color:#8b8681">{{ propsLabel }}</span><button onClick="{{ acceptAll }}" style="border:none;flex:none;white-space:nowrap;height:28px;padding:0 11px;border-radius:9999px;background:#eef2fe;color:#2748bd;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer">Keep all</button></div>
+<sc-for list="{{ props }}" as="p" hint-placeholder-count="4">
+<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:#f9f7f4">
+<div style="flex:1;min-width:0"><p style="margin:0;font-size:13px;font-weight:600;line-height:1.4;text-wrap:pretty">{{ p.v }}</p><p style="margin:2px 0 0;font-size:11.5px;color:#6d6a67">{{ p.cat }} · “{{ p.quote }}”</p></div>
+<button onClick="{{ propKeep }}" data-k="{{ p.id }}" style="border:none;flex:none;white-space:nowrap;height:28px;padding:0 11px;border-radius:9999px;background:#3461f2;color:#fff;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer">Keep</button>
+<button onClick="{{ propSkip }}" data-k="{{ p.id }}" style="border:none;flex:none;white-space:nowrap;height:28px;padding:0 11px;border-radius:9999px;background:#fffdfa;color:#6d6a67;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer" style-hover="background:#edebe7">Skip</button>
+</div>
+</sc-for>
+</sc-if>
+<sc-if value="{{ docDone }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;background:#e3f4ec;font-size:12.5px;font-weight:600;color:#0a7a53"><span style="flex:1">{{ docDoneText }}</span><button onClick="{{ resetDoc }}" style="border:none;flex:none;height:28px;padding:0 11px;border-radius:9999px;background:#fffdfa;color:#0a7a53;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer">Another file</button></div></sc-if>
+</div>
+
+<div style="border-radius:28px;background:#1e1e24;color:#f9f7f4;padding:20px;display:flex;flex-direction:column;gap:10px">
+<span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:rgba(249,247,244,.62)">Worth teaching</span>
+<p style="margin:0;font-size:13.5px;line-height:1.6;color:rgba(249,247,244,.78);text-wrap:pretty">Things that will still be true next month: who you are, the people around you, what you value, what you're working towards.</p>
+<span style="margin-top:4px;font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:rgba(249,247,244,.62)">Not worth it</span>
+<p style="margin:0;font-size:13.5px;line-height:1.6;color:rgba(249,247,244,.78);text-wrap:pretty">Passwords, card numbers and one-off errands. Atlas won't store secrets, and it already sees your calendar.</p>
+</div>
+
+</aside>
+</div>
+
+<nav aria-label="Atlas" data-dock="beta" style="view-transition-name:atlas-dock;position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:4px;padding:6px;border-radius:9999px;background:rgba(255,253,250,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 18px 40px -20px rgba(30,30,36,.28)">
+<a href="Atlas Dashboard Beta.dc.html" title="Home" aria-label="Home" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M3.5 10.9 10.7 4.3a2 2 0 0 1 2.6 0l7.2 6.6v6.9a3 3 0 0 1-3 3h-3v-5.4a2.5 2.5 0 0 0-5 0v5.4h-3a3 3 0 0 1-3-3z"></path></svg></a>
+<a href="Atlas Core Beta.dc.html" title="Core" aria-label="Core" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.6a8.4 8.4 0 1 1 0 16.8 8.4 8.4 0 0 1 0-16.8M12 8.8a3.2 3.2 0 1 1 0 6.4 3.2 3.2 0 0 1 0-6.4M12 3.6v5.2M12 15.2v5.2M3.6 12h5.2M15.2 12h5.2"></path></svg></a>
+<span aria-current="page" style="flex:none;display:flex;align-items:center;gap:8px;height:42px;padding:0 16px 0 13px;border-radius:9999px;background:#1e1e24;color:#f9f7f4;font-size:13px;font-weight:600;white-space:nowrap"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 7.4a5.2 5.2 0 0 0-3.9-1.8H5a1.2 1.2 0 0 0-1.2 1.2v9.6A1.2 1.2 0 0 0 5 17.6h3.1A5.2 5.2 0 0 1 12 19.4a5.2 5.2 0 0 1 3.9-1.8H19a1.2 1.2 0 0 0 1.2-1.2V6.8A1.2 1.2 0 0 0 19 5.6h-3.1A5.2 5.2 0 0 0 12 7.4zM12 7.4v12"></path></svg>Teach</span>
+<a href="Atlas Mail Beta.dc.html" title="Mail" aria-label="Mail" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M6.6 5.6h10.8a3.2 3.2 0 0 1 3.2 3.2v6.4a3.2 3.2 0 0 1-3.2 3.2H6.6a3.2 3.2 0 0 1-3.2-3.2V8.8a3.2 3.2 0 0 1 3.2-3.2zM3.8 7.6l7 4.8a2.2 2.2 0 0 0 2.4 0l7-4.8"></path></svg></a>
+<a href="Atlas Architecture Beta.dc.html" title="Architecture" aria-label="Architecture" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.4 3.4 7.9 12 12.4l8.6-4.5zM3.4 12.1 12 16.6l8.6-4.5M3.4 16.3 12 20.8l8.6-4.5"></path></svg></a>
+<a href="Atlas Voice Beta.dc.html" title="Voice" aria-label="Voice" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.5a2.6 2.6 0 0 1 2.6 2.6v5.4a2.6 2.6 0 0 1-5.2 0V6.1A2.6 2.6 0 0 1 12 3.5zM18.1 11.5a6.1 6.1 0 0 1-12.2 0M12 17.6v3"></path></svg></a>
+<a href="Atlas Settings Beta.dc.html" title="Marcus · Settings" aria-label="Settings" style="flex:none;display:flex;align-items:center;justify-content:center;gap:8px;height:42px;width:42px;border-radius:9999px;background:transparent;color:#1e1e24;font-size:13px;font-weight:600;white-space:nowrap" style-hover="background:#f1eeea;color:#1e1e24"><span style="width:34px;height:34px;border-radius:50%;background:#1e1e24;color:#f9f7f4;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">M</span></a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    vw: window.innerWidth, ico: {}, mic: 'passive', draft: '', thinking: false, speaking: false, cat: '',
+    msgs: [{ id: 1, who: 'atlas', t: 'I’d like to understand you a little better: not facts, but who you are. What’s something that’s been on your mind lately?' }],
+    learned: [
+      { id: 'l1', cat: 'Work', v: 'Leads a design team of six at Fogware', src: 'Conversation · 12 Oct' },
+      { id: 'l2', cat: 'Relationships', v: 'Partner Sam works at Linden Studio', src: 'Conversation · 9 Oct' },
+      { id: 'l3', cat: 'Joys', v: 'Long walks with no destination, especially in new cities', src: 'Conversation · 2 Oct' },
+      { id: 'l4', cat: 'Values', v: 'Would rather be honest than agreeable', src: 'Conversation · 28 Sep' },
+      { id: 'l5', cat: 'Personality', v: 'Plans obsessively, then improvises on the day', src: 'Conversation · 28 Sep' },
+      { id: 'l6', cat: 'Work', v: 'Wants to move into a design director role within two years', src: 'Conversation · 21 Sep' },
+      { id: 'l7', cat: 'Identity', v: 'Grew up between Manchester and Lisbon', src: 'Conversation · 14 Sep' }
+    ],
+    doc: 'idle', props: []
+  };
+  componentDidMount() {
+    this.onResize = () => this.setState({ vw: window.innerWidth });
+    window.addEventListener('resize', this.onResize);
+    this.onEsc = (e) => { if (e.key === 'Escape' && !/INPUT|TEXTAREA/.test(document.activeElement && document.activeElement.tagName)) window.location.href = 'Atlas Dashboard Beta.dc.html'; };
+    window.addEventListener('keydown', this.onEsc);
+    fetch('atlas-icon-data.js').then((r) => r.text()).then((t) => {
+      const SET = new Function(t.replace(/export\s+const\s+SET\s*=/, 'return'))(), ico = {};
+      SET.forEach((g) => g[2].forEach(([n, d]) => { ico[n] = d; }));
+      this.setState({ ico });
+    }).catch(() => {});
+  }
+  componentDidUpdate() { const sig = this.state.msgs.length + ':' + this.state.thinking; if (sig !== this.lastSig) { this.lastSig = sig; const el = this.msgsEl; if (el) el.scrollTop = el.scrollHeight; } this.syncSphere(); }
+  componentWillUnmount() { window.removeEventListener('resize', this.onResize); window.removeEventListener('keydown', this.onEsc); (this.timers || []).forEach(clearTimeout); if (this.sph) this.sph.destroy(); }
+  later(fn, ms) { (this.timers = this.timers || []).push(setTimeout(fn, ms)); }
+  sphState() { const s = this.state; return s.thinking ? 'thinking' : s.speaking ? 'speaking' : s.mic === 'active' ? 'listening' : s.mic === 'muted' ? 'muted' : 'idle'; }
+  syncSphere() { const ns = this.sphState(); if (this.sph && this.lastS !== ns) { this.lastS = ns; this.sph.set({ state: ns }); } }
+  reply(text) {
+    const t = text.toLowerCase();
+    const R = [
+      [/afraid|worr|scared|anxious|nervous/, 'Fears', 'That sounds like it weighs on you. What would it look like if that worry turned out to be wrong?', (x) => 'Worries about ' + x],
+      [/dream|someday|always wanted|one day|wish/, 'Dreams', 'I love that. What’s the first small step that would make it feel real?', (x) => 'Dreams of ' + x],
+      [/love|enjoy|happiest|favourite|favorite|lights me up/, 'Joys', 'I can hear how much that means to you. When did you first notice it?', (x) => 'Loves ' + x],
+      [/believe|think that|faith|meaning/, 'Beliefs', 'That says a lot about how you see the world. Where do you think that comes from?', (x) => 'Believes ' + x],
+      [/important|matters|value|principle/, 'Values', 'That tells me a lot about who you are. I’ll keep it in mind when I help you decide things.', (x) => 'Values ' + x],
+      [/mum|mom|dad|sister|brother|friend|partner|sam|maya|wife|husband/, 'Relationships', 'They sound important to you. What do you most appreciate about them?', (x) => x.charAt(0).toUpperCase() + x.slice(1)],
+      [/work|job|team|career|project|manager|design/, 'Work', 'That’s useful to know. Is that something you want more of, or less?', (x) => x.charAt(0).toUpperCase() + x.slice(1)],
+      [/remember|when i was|grew up|childhood|years ago/, 'Memories', 'Thank you for sharing that. Moments like that shape a person.', (x) => x.charAt(0).toUpperCase() + x.slice(1)],
+      [/i'm the kind|i am the kind|usually the one|i tend to|i'm usually/, 'Personality', 'I’ll remember that about you. It explains a few things!', (x) => x.charAt(0).toUpperCase() + x.slice(1)],
+      [/feel|tired|excited|stressed|happy|sad/, 'Feelings', 'Thanks for telling me how you’re doing. Do you want me to keep tomorrow lighter?', (x) => 'Recently feeling ' + x]
+    ];
+    const clean = text.replace(/^(i|i'm|i am|my)\s+/i, '').replace(/[.!?]+$/, '');
+    for (const [re, cat, rep, fmt] of R) if (re.test(t)) return { cat, rep, v: fmt(clean.length > 70 ? clean.slice(0, 68) + '…' : clean) };
+    return { cat: null, rep: 'Tell me more. What makes that matter to you?' };
+  }
+  send = () => {
+    const text = this.state.draft.trim(); if (!text || this.state.thinking) return;
+    const id = Date.now();
+    this.setState((s) => ({ draft: '', msgs: s.msgs.concat([{ id, who: 'me', t: text }]), thinking: true }));
+    const r = this.reply(text);
+    this.later(() => {
+      const lid = 'n' + id;
+      this.setState((s) => ({ thinking: false, speaking: true, msgs: s.msgs.concat([{ id: id + 1, who: 'atlas', t: r.rep, learn: r.cat ? 'Learned · ' + r.cat : '' }]),
+        learned: r.cat ? [{ id: lid, cat: r.cat, v: r.v, src: 'Just now', fresh: true }].concat(s.learned) : s.learned }));
+      this.later(() => this.setState((s) => ({ speaking: false, learned: s.learned.map((l) => (l.id === lid ? Object.assign({}, l, { fresh: false }) : l)) })), 2200);
+    }, 1300);
+  };
+  renderVals() {
+    const st = this.state, I = st.ico, ic = (n) => I[n] || '';
+    const narrow = st.vw < 1080;
+    const CATS = ['Identity', 'Personality', 'Values', 'Beliefs', 'Feelings', 'Fears', 'Dreams', 'Joys', 'Relationships', 'Work', 'Memories'];
+    const count = (c) => st.learned.filter((l) => l.cat === c).length;
+    const PROMPTS = { Identity: 'Where do you feel most at home?', Personality: 'What would a close friend say you’re like?', Values: 'What would you never compromise on?', Beliefs: 'What’s something you believe that most people don’t?', Feelings: 'How have you been feeling this week?', Fears: 'What’s been worrying you lately?', Dreams: 'What have you always wanted to do?', Joys: 'What reliably makes your day better?', Relationships: 'Who do you call when something good happens?', Work: 'What part of your work do you love most?', Memories: 'What’s a moment that shaped you?' };
+    const gaps = CATS.filter((c) => !count(c));
+    const promptCats = (st.cat ? [st.cat] : []).concat(gaps).concat(CATS).filter((c, i, a) => a.indexOf(c) === i).slice(0, 3);
+    const micOn = st.mic === 'active', muted = st.mic === 'muted';
+    const DOC = [
+      { id: 'p1', cat: 'Work', v: 'Senior design lead at Fogware since 2022', quote: 'Senior Design Lead, Fogware · 2022–present' },
+      { id: 'p2', cat: 'Identity', v: 'Studied interaction design at the Royal College of Art', quote: 'MA Interaction Design, RCA' },
+      { id: 'p3', cat: 'Work', v: 'Built a design system used by four product teams', quote: 'led the Atlas design system across 4 teams' },
+      { id: 'p4', cat: 'Joys', v: 'Mentors junior designers outside work', quote: 'volunteer mentor, ADPList' }
+    ];
+    const list = st.learned.filter((l) => !st.cat || l.cat === st.cat);
+    return {
+      sphereRef: (el) => {
+        if (!el || el.__q) return;
+        const go = () => { if (el.__q || !el.isConnected) return; if (!window.QuickSphere) return setTimeout(go, 60);
+          el.__q = this.sph = window.QuickSphere.mount(el, { mode: 'veil', bg: 'transparent', dust: [122, 148, 246], strand: [52, 97, 242], blend: 'source-over', alpha: 0.7, seed: 11, count: 9000, scale: 0.42, state: this.sphState() }); this.lastS = this.sphState(); };
+        go();
+      },
+      msgsRef: (el) => { this.msgsEl = el; }, inputRef: (el) => { this.inputEl = el; },
+      eyebrow: st.thinking ? 'Teach · thinking' : st.speaking ? 'Teach · speaking' : micOn ? 'Teach · listening' : muted ? 'Teach · muted' : 'Teach · say “Atlas” to talk',
+      cols: narrow ? 'minmax(0,1fr)' : 'minmax(0,1.45fr) minmax(320px,1fr)', bodyOvf: narrow ? 'auto' : 'hidden', convMin: narrow ? '560px' : '0',
+      micLabel: micOn ? 'Listening' : muted ? 'Muted' : 'Waiting for “Atlas”', micChipBg: micOn ? '#eef2fe' : muted ? '#f7e6e4' : '#fffdfa', micChipFg: micOn ? '#2748bd' : muted ? '#a3352c' : '#6d6a67', micDot: micOn ? '#3461f2' : muted ? '#d0453a' : '#8b8681', micAnim: micOn ? 'bdot 1.4s ease-in-out infinite' : 'none',
+      micBtnBg: micOn ? '#3461f2' : muted ? '#f7e6e4' : '#f1eeea', micBtnFg: micOn ? '#fff' : muted ? '#a3352c' : '#1e1e24', micIco: muted ? 'M12 3.5a2.6 2.6 0 0 1 2.6 2.6v5.4a2.6 2.6 0 0 1-5.2 0V6.1A2.6 2.6 0 0 1 12 3.5zM18.1 11.5a6.1 6.1 0 0 1-12.2 0M12 17.6v3M4.4 4.4l15.2 15.2' : ic('mic'),
+      micTitle: micOn ? 'Mute' : muted ? 'Unmute' : 'Start listening',
+      toggleMic: () => this.setState((s) => ({ mic: s.mic === 'passive' ? 'active' : s.mic === 'active' ? 'muted' : 'passive' })),
+      newSession: () => this.setState({ msgs: [{ id: Date.now(), who: 'atlas', t: 'New session. Everything I learned before is still kept. What would you like to tell me?' }] }),
+      msgs: st.msgs.map((m) => { const me = m.who === 'me'; return { t: m.t, align: me ? 'flex-end' : 'flex-start', rad: me ? '20px 20px 6px 20px' : '20px 20px 20px 6px', bg: me ? '#3461f2' : '#fffdfa', fg: me ? '#fffdfa' : '#1e1e24', hasLearn: !!m.learn, learn: m.learn }; }),
+      thinking: st.thinking,
+      prompts: promptCats.map((c) => ({ cat: c, t: PROMPTS[c], q: PROMPTS[c] })),
+      usePrompt: (e) => { const q = e.currentTarget.getAttribute('data-q'); this.setState((s) => ({ msgs: s.msgs.concat([{ id: Date.now(), who: 'atlas', t: q }]) })); if (this.inputEl) this.inputEl.focus(); },
+      draft: st.draft, onDraft: (e) => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = Math.min(120, el.scrollHeight) + 'px'; this.setState({ draft: el.value }); },
+      onKey: (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.send(); } },
+      send: this.send, sendBg: st.draft.trim() ? '#3461f2' : '#f1eeea', sendFg: st.draft.trim() ? '#fffdfa' : '#b6b1aa',
+      total: String(st.learned.length),
+      cats: CATS.map((c) => { const n = count(c), on = st.cat === c; return { k: c, l: c, n: String(n), title: n ? n + ' things about your ' + c.toLowerCase() : 'Nothing yet', bg: on ? '#3461f2' : n ? '#fffdfa' : '#f9f7f4', hov: on ? '#3461f2' : '#edebe7', fg: on ? '#fff' : n ? '#1e1e24' : '#8b8681', nFg: on ? 'rgba(255,255,255,.8)' : '#8b8681', pips: [0, 1, 2, 3, 4].map((i) => (i < Math.min(5, n) ? (on ? '#fff' : '#3461f2') : (on ? 'rgba(255,255,255,.3)' : '#edebe7'))) }; }),
+      pickCat: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.setState((s) => ({ cat: s.cat === k ? '' : k })); },
+      gapLine: gaps.length ? 'Atlas hasn’t heard about your ' + gaps.slice(0, 3).map((g) => g.toLowerCase()).join(', ') + ' yet. The suggestions below the conversation start there.' : 'Atlas has heard about every part of you. Keep going: depth beats breadth.',
+      listTitle: st.cat ? st.cat : 'Recently learned', hasFilter: !!st.cat,
+      learned: list.slice(0, st.cat ? 20 : 8).map((l) => ({ id: l.id, v: l.v, cat: l.cat, src: l.src, bg: l.fresh ? '#e3f4ec' : '#f9f7f4', anim: l.fresh ? 'bpop .45s cubic-bezier(.22,1,.36,1) both' : 'none' })),
+      noLearned: list.length === 0,
+      forget: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.setState((s) => ({ learned: s.learned.filter((l) => l.id !== k) })); },
+      upIco: ic('upload'),
+      docIdle: st.doc === 'idle', docReading: st.doc === 'reading', docHasProps: st.doc === 'review' && st.props.length > 0, docDone: st.doc === 'review' && st.props.length === 0,
+      readDoc: () => { this.setState({ doc: 'reading' }); this.later(() => this.setState({ doc: 'review', props: DOC.map((d) => d.id), kept: 0 }), 1700); },
+      props: DOC.filter((d) => st.props.includes(d.id)),
+      propsLabel: st.props.length + ' proposals from Marcus_Hale_CV_2026.pdf',
+      propKeep: (e) => { const k = e.currentTarget.getAttribute('data-k'), d = DOC.find((x) => x.id === k); this.setState((s) => ({ props: s.props.filter((x) => x !== k), kept: (s.kept || 0) + 1, learned: [{ id: 'd' + k + Date.now(), cat: d.cat, v: d.v, src: 'From your CV', fresh: true }].concat(s.learned) })); },
+      propSkip: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.setState((s) => ({ props: s.props.filter((x) => x !== k) })); },
+      acceptAll: () => this.setState((s) => ({ kept: (s.kept || 0) + s.props.length, learned: DOC.filter((d) => s.props.includes(d.id)).map((d) => ({ id: 'd' + d.id + Date.now(), cat: d.cat, v: d.v, src: 'From your CV', fresh: true })).concat(s.learned), props: [] })),
+      docDoneText: (st.kept || 0) ? 'Kept ' + st.kept + ' of 4. The file itself wasn’t stored.' : 'Nothing kept. The file itself wasn’t stored.',
+      resetDoc: () => this.setState({ doc: 'idle', props: [], kept: 0 })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>(function(){window.addEventListener("unhandledrejection",function(e){var m=String(e.reason&&e.reason.message||e.reason);if(/Transition was aborted|ViewTransition/.test(m))e.preventDefault()});var top=false;try{top=window.self===window.top}catch(e){}var s=document.createElement("style");if(top){s.textContent="@view-transition{navigation:auto}";}else{s.textContent="html{animation:atlas-in .45s cubic-bezier(.22,1,.36,1) both}html.atlas-out{transition:opacity .22s ease,transform .22s ease;opacity:0;transform:scale(.988)}@keyframes atlas-in{from{opacity:0;transform:scale(1.012)}}";document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a||e.defaultPrevented||e.metaKey||e.ctrlKey||a.target)return;var h=a.getAttribute("href");if(!/\.dc\.html/.test(h)||/^https?:/.test(h))return;if(h.split("#")[0]===""||location.pathname.endsWith(encodeURI(h.split("#")[0]))&&h.indexOf("#")>0)return;e.preventDefault();document.documentElement.classList.add("atlas-out");setTimeout(function(){location.href=h},210)},true);}document.head.appendChild(s)})();</script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script>window.addEventListener("pagereveal",function(e){var t=e.viewTransition;if(t){["ready","finished","updateCallbackDone"].forEach(function(p){t[p]&&t[p].catch(function(){})})}});window.addEventListener("unhandledrejection",function(e){if(/Transition was aborted|ViewTransition/.test(String(e.reason&&e.reason.message||e.reason)))e.preventDefault()});</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+::view-transition-group(*){animation-duration:.55s;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+::view-transition-old(root){animation:.4s cubic-bezier(.22,1,.36,1) both vt-out}
+::view-transition-new(root){animation:.55s cubic-bezier(.22,1,.36,1) both vt-in}
+@keyframes vt-out{to{opacity:0;transform:scale(.985)}}
+@keyframes vt-in{from{opacity:0;transform:scale(1.015)}}
+*{box-sizing:border-box}
+body{margin:0;background:#f9f7f4}
+button,input{border:none;font:inherit;background:none;color:inherit}
+a{color:#3461f2;text-decoration:none}a:hover{color:#2748bd}
+.nosb{scrollbar-width:none}.nosb::-webkit-scrollbar{display:none}
+@keyframes bpop{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;transition:none !important}}
+</style>
+<script src="atlas-quickstart-sphere.js"></script>
+<script src="atlas-orb.js"></script>
+<script src="atlas-topbar.js"></script>
+</helmet>
+<div data-screen-label="Atlas Money · {{ viewName }}" class="nosb" style="height:100vh;overflow-y:auto;padding:20px 20px 92px;display:flex;flex-direction:column;gap:12px;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased">
+
+<div style="display:grid;grid-template-columns:{{ heroCols }};gap:12px;animation:bpop .6s cubic-bezier(.22,1,.36,1) both">
+<section style="flex:none;view-transition-name:hero;position:relative;padding:clamp(22px,3vw,36px);border-radius:36px;background:#1e1e24;color:#f9f7f4;display:grid;grid-template-columns:{{ coinCols }};gap:28px;align-items:center;overflow:hidden">
+<div style="position:relative;width:min(300px,100%);aspect-ratio:1;justify-self:center">
+<div style="position:absolute;inset:16%;border-radius:50%;overflow:hidden"><canvas ref="{{ sphereRef }}" style="position:absolute;inset:-14%;width:128%;height:128%;display:block"></canvas></div>
+<svg viewBox="0 0 300 300" style="position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)"><circle cx="150" cy="150" r="138" fill="none" stroke="rgba(249,247,244,.08)" stroke-width="12"></circle><sc-for list="{{ arcs }}" as="a" hint-placeholder-count="5"><circle cx="150" cy="150" r="138" fill="none" stroke="{{ a.c }}" stroke-width="12" stroke-dasharray="{{ a.dash }}" stroke-dashoffset="{{ a.off }}" style="transition:stroke-dasharray 1s cubic-bezier(.22,1,.36,1)"></circle></sc-for><circle cx="150" cy="150" r="138" fill="none" stroke="#f9f7f4" stroke-width="3" stroke-dasharray="2 865" stroke-dashoffset="{{ paceOff }}"></circle></svg>
+<div style="position:absolute;left:0;right:0;bottom:-6px;text-align:center;font-size:11.5px;color:rgba(249,247,244,.62)">{{ ringCaption }}</div>
+</div>
+<div style="min-width:0;display:flex;flex-direction:column;gap:14px">
+<a href="Atlas Dashboard Beta.dc.html" title="Back to Home · Esc" style="font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:rgba(249,247,244,.62)" style-hover="color:#f9f7f4">Money · October</a>
+<div><span style="display:block;font-size:13px;color:rgba(249,247,244,.78)">Left to spend this month</span><span style="display:block;margin-top:4px;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(52px,6vw,96px);font-weight:500;letter-spacing:-.06em;line-height:.92;font-variant-numeric:tabular-nums">{{ left }}</span><span style="display:block;margin-top:8px;font-size:14px;color:{{ paceFg }};font-weight:600">{{ paceLine }}</span></div>
+<p style="margin:0;font-size:15px;line-height:1.6;color:rgba(249,247,244,.78);text-wrap:pretty">{{ atlasLine }}</p>
+<div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ cats }}" as="c" hint-placeholder-count="5"><button onClick="{{ pickCat }}" data-k="{{ c.k }}" style="border:none;height:34px;padding:0 13px;display:flex;align-items:center;gap:8px;border-radius:9999px;background:{{ c.bg }};color:#f9f7f4;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap"><span style="width:8px;height:8px;border-radius:50%;background:{{ c.c }}"></span>{{ c.l }}<span style="font-family:'Geist Mono',monospace;font-weight:500;color:rgba(249,247,244,.78)">{{ c.v }}</span></button></sc-for></div>
+</div>
+</section>
+<section style="display:flex;flex-direction:column;gap:8px;min-width:0">
+<sc-for list="{{ accounts }}" as="a" hint-placeholder-count="3"><div style="padding:18px 20px;border-radius:26px;background:{{ a.bg }};color:{{ a.fg }};display:flex;align-items:center;gap:14px"><span style="flex:none;width:44px;height:44px;border-radius:14px;background:{{ a.icoBg }};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">{{ a.i }}</span><span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:600">{{ a.n }}</span><span style="display:block;margin-top:2px;font-size:12px;color:{{ a.sub }}">{{ a.d }}</span></span><span style="font-family:'Hanken Grotesk',sans-serif;font-size:24px;font-weight:500;letter-spacing:-.03em;font-variant-numeric:tabular-nums">{{ a.v }}</span></div></sc-for>
+<div style="padding:16px 18px;border-radius:24px;background:#eef2fe;display:flex;flex-direction:column;gap:10px"><span style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#2748bd"><span style="width:8px;height:8px;border-radius:50%;background:#3461f2"></span>{{ heldTitle }}</span><span style="font-size:14px;line-height:1.5">{{ heldBody }}</span><sc-if value="{{ heldOpen }}" hint-placeholder-val="{{ true }}"><div style="display:flex;gap:6px"><button onClick="{{ approve }}" style="border:none;height:38px;padding:0 16px;border-radius:9999px;background:#3461f2;color:#fff;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#2748bd">Approve €62,000</button><button onClick="{{ hold }}" style="border:none;height:38px;padding:0 14px;border-radius:9999px;background:#fffdfa;font-size:13px;font-weight:600;cursor:pointer">Not yet</button></div></sc-if></div>
+</section>
+</div>
+
+<section data-screen-label="Cash flow" style="padding:20px 22px;border-radius:32px;background:#fffdfa;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:10px"><span style="font-family:'Hanken Grotesk',sans-serif;font-size:22px;font-weight:600;letter-spacing:-.02em">The next 30 days</span><span style="font-size:13px;color:#6d6a67">Atlas projects your balance from bills, salary and how you usually spend</span></div>
+<div style="position:relative;height:170px">
+<svg viewBox="0 0 300 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%"><polygon points="{{ flowArea }}" fill="#eef2fe"></polygon><polyline points="{{ flowLine }}" fill="none" stroke="#3461f2" stroke-width="2.2" vector-effect="non-scaling-stroke" stroke-linejoin="round"></polyline><line x1="0" x2="300" y1="{{ floorY }}" y2="{{ floorY }}" stroke="#d0453a" stroke-width="1.2" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"></line></svg>
+<sc-for list="{{ events }}" as="e" hint-placeholder-count="6"><button onClick="{{ pickEvent }}" data-k="{{ e.i }}" title="{{ e.t }}" style="border:none;position:absolute;left:{{ e.x }};top:{{ e.y }};transform:translate(-50%,-50%);height:26px;padding:0 9px;display:flex;align-items:center;gap:6px;border-radius:9999px;background:{{ e.bg }};color:{{ e.fg }};font-size:11.5px;font-weight:600;cursor:pointer;white-space:nowrap">{{ e.l }}</button></sc-for>
+</div>
+<div style="display:flex;justify-content:space-between;font-family:'Geist Mono',monospace;font-size:11.5px;color:#6d6a67"><span>Today</span><span>1 Nov</span><span>8 Nov</span><span>15 Nov</span><span>26 Nov</span></div>
+<div style="padding:12px 16px;border-radius:16px;background:#f9f7f4;font-size:14px;line-height:1.5">{{ eventLine }}</div>
+</section>
+
+<div style="display:grid;grid-template-columns:{{ triCols }};gap:12px;align-items:start">
+<section style="padding:10px;border-radius:32px;background:#f1eeea;display:flex;flex-direction:column;gap:4px"><div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px"><span style="font-family:'Hanken Grotesk',sans-serif;font-size:19px;font-weight:600;letter-spacing:-.02em">{{ txTitle }}</span><sc-if value="{{ hasCat }}" hint-placeholder-val="{{ false }}"><button onClick="{{ clearCat }}" style="border:none;height:28px;padding:0 11px;border-radius:9999px;background:#fffdfa;font-size:12px;font-weight:600;cursor:pointer">Show all</button></sc-if></div>
+<sc-for list="{{ tx }}" as="t" hint-placeholder-count="7"><div style="display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 14px;border-radius:18px;background:#fffdfa"><span style="width:40px;height:40px;border-radius:12px;background:{{ t.c }};color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">{{ t.i }}</span><span style="min-width:0"><span style="display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.n }}</span><span style="display:block;margin-top:2px;font-size:12px;color:#6d6a67">{{ t.d }}</span></span><span style="text-align:right"><span style="display:block;font-family:'Geist Mono',monospace;font-size:13.5px;font-weight:500;color:{{ t.vFg }}">{{ t.v }}</span><sc-if value="{{ t.hasTag }}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex;margin-top:4px;height:20px;padding:0 8px;align-items:center;border-radius:9999px;background:{{ t.tagBg }};color:{{ t.tagFg }};font-size:10.5px;font-weight:600">{{ t.tag }}</span></sc-if></span></div></sc-for>
+</section>
+<section style="padding:10px;border-radius:32px;background:#f1eeea;display:flex;flex-direction:column;gap:4px"><span style="padding:8px 12px;font-family:'Hanken Grotesk',sans-serif;font-size:19px;font-weight:600;letter-spacing:-.02em">Subscriptions</span>
+<sc-for list="{{ subs }}" as="s" hint-placeholder-count="5"><div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:18px;background:#fffdfa;opacity:{{ s.op }}"><span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:600;text-decoration:{{ s.deco }}">{{ s.n }}</span><span style="display:block;margin-top:2px;font-size:12px;color:{{ s.subFg }}">{{ s.d }}</span></span><span style="font-family:'Geist Mono',monospace;font-size:13px">{{ s.v }}</span><sc-if value="{{ s.unused }}" hint-placeholder-val="{{ false }}"><button onClick="{{ cancelSub }}" data-k="{{ s.n }}" style="border:none;height:30px;padding:0 11px;border-radius:9999px;background:{{ s.btnBg }};color:{{ s.btnFg }};font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">{{ s.btn }}</button></sc-if></div></sc-for>
+<div style="padding:12px 14px;font-size:12.5px;color:#6d6a67">{{ subsTotal }}</div>
+</section>
+<section style="display:flex;flex-direction:column;gap:8px">
+<sc-for list="{{ goals }}" as="g" hint-placeholder-count="3"><div style="padding:18px 20px;border-radius:26px;background:{{ g.bg }};color:{{ g.fg }};display:flex;flex-direction:column;gap:10px"><span style="display:flex;justify-content:space-between;gap:10px;font-size:14px;font-weight:600">{{ g.n }}<span style="font-weight:500;color:{{ g.sub }}">{{ g.when }}</span></span><span style="font-family:'Hanken Grotesk',sans-serif;font-size:30px;font-weight:500;letter-spacing:-.04em;font-variant-numeric:tabular-nums">{{ g.have }}<span style="font-size:15px;color:{{ g.sub }}"> of {{ g.of }}</span></span><span style="height:8px;border-radius:9999px;background:{{ g.track }};overflow:hidden"><span style="display:block;height:100%;width:{{ g.w }};border-radius:9999px;background:{{ g.bar }};transition:width .6s"></span></span><button onClick="{{ addGoal }}" data-k="{{ g.k }}" style="border:none;align-self:flex-start;height:32px;padding:0 13px;border-radius:9999px;background:{{ g.btnBg }};color:{{ g.btnFg }};font-size:12.5px;font-weight:600;cursor:pointer">+ €100</button></div></sc-for>
+</section>
+</div>
+
+<nav aria-label="Atlas" data-dock="beta" style="view-transition-name:atlas-dock;position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:4px;padding:6px;border-radius:9999px;background:rgba(255,253,250,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 18px 40px -20px rgba(30,30,36,.28)">
+<sc-for list="{{ dock }}" as="d" hint-placeholder-count="6"><a href="{{ d.h }}" title="{{ d.l }}" aria-label="{{ d.l }}" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{ d.ico }}"></path></svg></a></sc-for>
+<a href="Atlas Settings Beta.dc.html" title="Marcus · Settings" aria-label="Settings" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px" style-hover="background:#f1eeea"><span style="width:34px;height:34px;border-radius:50%;background:#1e1e24;color:#f9f7f4;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">M</span></a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const CATS = [['home', 'Home', '#8fa9ff', 1240], ['food', 'Food', '#50dca0', 612], ['travel', 'Travel', '#ffb36b', 356], ['fun', 'Going out', '#b6a8ff', 214], ['other', 'Other', 'rgba(249,247,244,.5)', 298]];
+const TX = [['food', 'Irma', 'Groceries · today 08:12', -46.8], ['travel', 'DSB', 'Train to Lund · yesterday', -24], ['other', 'Studio Kern', 'Order #8812 · Mon', -129, 'Delivery Wed'], ['fun', 'Mikkeller', 'Bar · Sat', -38.5], ['home', 'Ørsted', 'Electricity · Fri', -86, 'Lower than Sep'], ['food', 'Wolt', 'Dinner · Thu', -31.2], ['other', 'Northwind', 'Invoice #2207 paid', 12400, 'Income']];
+class Component extends DCLogic {
+  state = { vw: window.innerWidth, ico: {}, cat: null, ev: 2, held: 'open', cancelled: {}, goals: { lisbon: 1240, buffer: 6800, mac: 900 }, grown: false };
+  componentDidMount() {
+    fetch('atlas-icon-data.js').then((r) => r.text()).then((t) => { const SET = new Function(t.replace(/export\s+const\s+SET\s*=/, 'return'))(), ico = {}; SET.forEach((g) => g[2].forEach(([n, d]) => { ico[n] = d; })); this.setState({ ico }); }).catch(() => {});
+    this.onResize = () => this.setState({ vw: window.innerWidth }); window.addEventListener('resize', this.onResize);
+    this.gt = setTimeout(() => this.setState({ grown: true }), 120);
+    this.onKey = (e) => { if (e.key === 'Escape') window.location.href = 'Atlas Dashboard Beta.dc.html'; }; window.addEventListener('keydown', this.onKey);
+  }
+  componentWillUnmount() { clearTimeout(this.gt); window.removeEventListener('resize', this.onResize); window.removeEventListener('keydown', this.onKey); if (this.sph) this.sph.destroy(); }
+  renderVals() {
+    const s = this.state, ic = (n) => s.ico[n] || '', vw = s.vw, eur = (v) => (v < 0 ? '−' : '') + '€' + Math.abs(v).toLocaleString('en-GB', { minimumFractionDigits: Math.abs(v) % 1 ? 2 : 0, maximumFractionDigits: 2 });
+    const budget = 3400, spent = CATS.reduce((a, c) => a + c[3], 0), C = 2 * Math.PI * 138, pace = 27 / 31;
+    let acc = 0; const arcs = CATS.map(([k, l, c, v]) => { const len = s.grown ? (v / budget) * C : 0, o = { c, dash: len.toFixed(1) + ' ' + C.toFixed(1), off: (-acc).toFixed(1) }; acc += len; return o; });
+    const over = spent / budget > pace, sel = s.cat ? CATS.find((c) => c[0] === s.cat) : null;
+    const EV = [[3, 'Rent', -1450], [6, 'Salary', 4800], [9, 'Lisbon', -620], [14, 'Insurance', -96], [20, 'Gym', -39], [26, 'Phone', -25]];
+    let bal = 2120; const pts = []; for (let d = 0; d <= 30; d++) { bal -= 28; EV.forEach(([day, , v]) => { if (day === d) bal += v; }); pts.push(bal); }
+    const mx = 6000, y = (v) => (100 - (v / mx) * 100).toFixed(1);
+    const flowLine = pts.map((v, i) => (i * 10).toFixed(1) + ',' + y(v)).join(' ');
+    const cancelledSave = Object.keys(s.cancelled).filter((k) => s.cancelled[k]).length;
+    return {
+      sphereRef: (el) => { if (!el || el.__q) return; const go = () => { if (el.__q || !el.isConnected) return; if (!window.QuickSphere) return setTimeout(go, 60); el.__q = this.sph = window.QuickSphere.mount(el, { mode: 'veil', bg: '#1e1e24', dust: [92, 122, 248], strand: [176, 196, 255], blend: 'lighter', alpha: 0.5, seed: 11, count: 7000, scale: 0.42, state: 'idle' }); }; go(); },
+      _sync: (() => { const ns = s.held === 'open' ? 'listening' : over ? 'alert' : 'idle'; if (this.sph && this._ls !== ns) { this._ls = ns; this.sph.set({ state: ns }); } return ''; })(),
+      viewName: sel ? sel[1] : 'Overview',
+      heroCols: vw >= 1180 ? 'minmax(0,1.7fr) minmax(0,1fr)' : 'minmax(0,1fr)', coinCols: vw >= 760 ? 'minmax(220px,300px) minmax(0,1fr)' : 'minmax(0,1fr)', triCols: vw >= 1180 ? 'repeat(3,minmax(0,1fr))' : vw >= 760 ? 'repeat(2,minmax(0,1fr))' : 'minmax(0,1fr)',
+      arcs, paceOff: (-(C * pace)).toFixed(1), ringCaption: 'Ring = budget · white tick = where you’d be on an even pace',
+      left: eur(budget - spent), paceFg: over ? '#ffb36b' : '#50dca0', paceLine: over ? 'Slightly ahead of an even pace, by €' + Math.round(spent - budget * pace) : 'On pace for the month',
+      atlasLine: sel ? sel[1] + ' is ' + eur(sel[3]) + ' this month, ' + Math.round(sel[3] / budget * 100) + '% of your budget.' : 'Atlas is holding one payment for you and found two subscriptions you haven’t used since summer.',
+      cats: CATS.map(([k, l, c, v]) => ({ k, l, c, v: eur(v), bg: s.cat === k ? 'rgba(249,247,244,.18)' : 'rgba(249,247,244,.06)' })),
+      pickCat: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.setState((x) => ({ cat: x.cat === k ? null : k })); },
+      accounts: [['DB', 'Danske Bank · everyday', '•••• 4421', '€2,120', 0], ['LS', 'Lunar · savings', '2.5% interest', '€18,940', 0], ['IB', 'Brokerage', '+1.8% this month', '€48.2k', 1]].map(([i, n, d, v, dark]) => ({ i, n, d, v, bg: dark ? '#1e1e24' : '#f1eeea', fg: dark ? '#f9f7f4' : '#1e1e24', sub: dark ? 'rgba(249,247,244,.62)' : '#6d6a67', icoBg: dark ? 'rgba(249,247,244,.1)' : '#fffdfa' })),
+      heldOpen: s.held === 'open', heldTitle: s.held === 'open' ? 'Held for you' : s.held === 'done' ? 'Approved and sent' : 'Still held',
+      heldBody: s.held === 'open' ? 'Ledgerline’s Q4 retainer is €62,000, above your €50,000 limit. It matches the signed contract.' : s.held === 'done' ? 'Paid at ' + new Date().toTimeString().slice(0, 5) + ' and logged in your audit trail.' : 'Atlas will remind you at 13:30, before the 14:00 cut-off.',
+      approve: () => this.setState({ held: 'done' }), hold: () => this.setState({ held: 'later' }),
+      flowLine, flowArea: '0,100 ' + flowLine + ' 300,100', floorY: y(500),
+      events: EV.map(([d, l, v], i) => ({ i: String(i), l: l + ' ' + (v > 0 ? '+' : '') + eur(v), t: l, x: (d / 30 * 100).toFixed(1) + '%', y: Math.max(12, Math.min(88, +y(pts[d]) - 14)) + '%', bg: s.ev === i ? '#1e1e24' : v > 0 ? '#e3f4ec' : '#f1eeea', fg: s.ev === i ? '#f9f7f4' : v > 0 ? '#0a7a53' : '#1e1e24' })),
+      pickEvent: (e) => this.setState({ ev: +e.currentTarget.getAttribute('data-k') }),
+      eventLine: ['Rent leaves on 1 November. You’ll still have about €650 until salary.', 'Salary of €4,800 arrives on 3 November, as usual.', 'The Lisbon trip is €620 on 5 November. Your Lisbon goal covers it, so your everyday account stays above €500.', 'Insurance renews on 10 November. Atlas found the same cover €8 a month cheaper.', 'Gym on 16 November. You went 3 times in October.', 'Phone on 22 November.'][s.ev],
+      hasCat: !!s.cat, clearCat: () => this.setState({ cat: null }), txTitle: sel ? sel[1] : 'Latest',
+      tx: TX.filter((t) => !s.cat || t[0] === s.cat).map(([k, n, d, v, tag]) => { const c = CATS.find((x) => x[0] === k); return { i: n.slice(0, 2).toUpperCase(), n, d, v: (v > 0 ? '+' : '') + eur(v), vFg: v > 0 ? '#0a7a53' : '#1e1e24', c: k === 'other' ? '#8b8681' : { home: '#3461f2', food: '#0fae76', travel: '#e07a1f', fun: '#7854ff' }[k], hasTag: !!tag, tag: tag || '', tagBg: v > 0 ? '#e3f4ec' : '#f1eeea', tagFg: v > 0 ? '#0a7a53' : '#6d6a67' }; }),
+      subs: [['Spotify Family', 'Used daily', 17.99, false], ['Atlas Plus', 'Yearly · renews 1 Mar', 20, false], ['iCloud+ 2 TB', 'Used', 9.99, false], ['Headspace', 'Last opened in June', 12.99, true], ['Adobe Lightroom', 'Last opened in July', 11.99, true]].map(([n, d, v, unused]) => { const c = !!s.cancelled[n]; return { n, d: c ? 'Cancelled by Atlas · ends 30 Nov' : d, subFg: unused && !c ? '#9a5410' : '#6d6a67', v: '€' + v.toFixed(2), unused, btn: c ? 'Undo' : 'Cancel it', btnBg: c ? '#f1eeea' : '#fdf0e2', btnFg: c ? '#1e1e24' : '#9a5410', op: c ? '.6' : '1', deco: c ? 'line-through' : 'none' }; }),
+      cancelSub: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.setState((x) => ({ cancelled: Object.assign({}, x.cancelled, { [k]: !x.cancelled[k] }) })); },
+      subsTotal: cancelledSave ? 'Saving €' + (cancelledSave === 2 ? '24.98' : '12.99') + ' a month from cancellations' : '€72.96 a month · €24.98 of it unused',
+      goals: [['lisbon', 'Lisbon trip', '5 Nov', 1500, 0], ['buffer', 'Three-month buffer', 'Mar 2027', 12000, 1], ['mac', 'New MacBook', 'Feb 2027', 2400, 0]].map(([k, n, when, of, dark]) => { const have = s.goals[k]; return { k, n, when, have: '€' + have.toLocaleString('en-GB'), of: '€' + of.toLocaleString('en-GB'), w: Math.min(100, Math.round(have / of * 100)) + '%', bg: dark ? '#1e1e24' : '#fffdfa', fg: dark ? '#f9f7f4' : '#1e1e24', sub: dark ? 'rgba(249,247,244,.62)' : '#6d6a67', track: dark ? 'rgba(249,247,244,.14)' : '#f1eeea', bar: dark ? '#8fa9ff' : '#3461f2', btnBg: dark ? 'rgba(249,247,244,.1)' : '#f1eeea', btnFg: dark ? '#f9f7f4' : '#1e1e24' }; }),
+      addGoal: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.setState((x) => ({ goals: Object.assign({}, x.goals, { [k]: x.goals[k] + 100 }) })); },
+      dock: [['home', 'Home', 'Atlas Dashboard Beta.dc.html'], ['core', 'Core', 'Atlas Core Beta.dc.html'], ['teach', 'Teach', 'Atlas Teach Beta.dc.html'], ['mail', 'Mail', 'Atlas Mail Beta.dc.html'], ['architecture', 'Architecture', 'Atlas Architecture Beta.dc.html'], ['voice', 'Voice', 'Atlas Voice Beta.dc.html']].map(([k, l, h]) => ({ l, h, ico: ic(k) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

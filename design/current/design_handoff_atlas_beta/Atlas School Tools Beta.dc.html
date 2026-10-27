@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>(function(){window.addEventListener("unhandledrejection",function(e){var m=String(e.reason&&e.reason.message||e.reason);if(/Transition was aborted|ViewTransition/.test(m))e.preventDefault()});var top=false;try{top=window.self===window.top}catch(e){}var s=document.createElement("style");if(top){s.textContent="@view-transition{navigation:auto}";}else{s.textContent="html{animation:atlas-in .45s cubic-bezier(.22,1,.36,1) both}html.atlas-out{transition:opacity .22s ease,transform .22s ease;opacity:0;transform:scale(.988)}@keyframes atlas-in{from{opacity:0;transform:scale(1.012)}}";document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a||e.defaultPrevented||e.metaKey||e.ctrlKey||a.target)return;var h=a.getAttribute("href");if(!/\.dc\.html/.test(h)||/^https?:/.test(h))return;if(h.split("#")[0]===""||location.pathname.endsWith(encodeURI(h.split("#")[0]))&&h.indexOf("#")>0)return;e.preventDefault();document.documentElement.classList.add("atlas-out");setTimeout(function(){location.href=h},210)},true);}document.head.appendChild(s)})();</script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script>window.addEventListener("pagereveal",function(e){var t=e.viewTransition;if(t){["ready","finished","updateCallbackDone"].forEach(function(p){t[p]&&t[p].catch(function(){})})}});window.addEventListener("unhandledrejection",function(e){if(/Transition was aborted|ViewTransition/.test(String(e.reason&&e.reason.message||e.reason)))e.preventDefault()});</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Hanken+Grotesk:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet">
+<style>
+::view-transition-group(*){animation-duration:.55s;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+::view-transition-old(root){animation:.4s cubic-bezier(.22,1,.36,1) both vt-out}
+::view-transition-new(root){animation:.55s cubic-bezier(.22,1,.36,1) both vt-in}
+@keyframes vt-out{to{opacity:0;transform:scale(.985)}}
+@keyframes vt-in{from{opacity:0;transform:scale(1.015)}}
+*{box-sizing:border-box}
+body{margin:0;background:#f9f7f4}
+button,input,textarea{border:none;font:inherit;background:none;color:inherit}
+a{color:#3461f2;text-decoration:none}a:hover{color:#2748bd}
+::selection{background:#e8d8c2}
+::placeholder{color:#b6b1aa}
+.nosb{scrollbar-width:none}.nosb::-webkit-scrollbar{display:none}
+@keyframes bpop{from{opacity:0;transform:translateY(14px) scale(.986)}to{opacity:1;transform:none}}
+</style>
+<script src="atlas-quickstart-sphere.js"></script>
+<script src="atlas-orb.js"></script>
+<script src="atlas-topbar.js"></script>
+</helmet>
+
+<div data-screen-label="{{ screenLabel }}" class="nosb" style="height:100vh;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding:26px 26px 88px;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased">
+
+<header style="flex:none;height:clamp(118px,16vh,160px);border-radius:32px;background:#f1eeea;padding:12px 22px 12px 8px;display:flex;align-items:center;gap:18px;animation:bpop .6s cubic-bezier(.22,1,.36,1) both">
+<div style="position:relative;height:100%;aspect-ratio:1;flex:none"><canvas ref="{{ sphereRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas></div>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px">
+<span style="font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#8b8681">{{ eyebrow }}</span>
+<a href="Atlas School Beta.dc.html" title="Back to School · Esc" style="align-self:flex-start;max-width:100%;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(24px,2.6vw,38px);font-weight:500;letter-spacing:-.045em;line-height:1.05;color:#1e1e24;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" style-hover="color:#1e1e24;opacity:.8">{{ title }}</a>
+<p style="margin:0;max-width:720px;font-size:13.5px;line-height:1.5;color:#6d6a67;text-wrap:pretty">{{ subline }}</p>
+</div>
+<div role="tablist" aria-label="Tool" style="flex:none;display:flex;gap:2px;padding:4px;border-radius:9999px;background:#fffdfa"><sc-for list="{{ tabs }}" as="t" hint-placeholder-count="2"><button role="tab" aria-selected="{{ t.on }}" onClick="{{ pickTab }}" data-k="{{ t.k }}" style="border:none;flex:none;white-space:nowrap;height:32px;padding:0 14px;border-radius:9999px;background:{{ t.bg }};color:{{ t.fg }};font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer">{{ t.l }}</button></sc-for></div>
+</header>
+
+<sc-if value="{{ isSheet }}" hint-placeholder-val="{{ true }}">
+<div style="display:grid;grid-template-columns:{{ cols }};gap:12px;align-items:start">
+<section style="min-width:0;border-radius:28px;background:#f1eeea;padding:12px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;align-items:center;gap:8px;padding:4px;border-radius:9999px;background:#fffdfa">
+<span style="flex:none;width:54px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:9999px;background:#f1eeea;font-family:'Geist Mono',ui-monospace,monospace;font-size:12px;font-weight:600">{{ selRef }}</span>
+<span style="flex:none;font-family:'Geist Mono',ui-monospace,monospace;font-size:12px;color:#8b8681">ƒx</span>
+<input value="{{ editVal }}" onInput="{{ onEdit }}" onKeyDown="{{ editKey }}" aria-label="Cell contents" style="border:none;outline:none;flex:1;min-width:0;height:32px;padding:0 6px;background:transparent;color:#1e1e24;font-family:'Geist Mono',ui-monospace,monospace;font-size:13px">
+</div>
+<div class="nosb" style="overflow-x:auto;border-radius:18px">
+<div role="grid" aria-label="Spreadsheet" style="display:grid;grid-template-columns:44px repeat({{ nCols }},minmax(96px,1fr));gap:2px;min-width:{{ gridMin }}">
+<span style="height:30px"></span>
+<sc-for list="{{ colHeads }}" as="h" hint-placeholder-count="6"><span style="height:30px;display:flex;align-items:center;justify-content:center;border-radius:8px;background:{{ h.bg }};font-size:11.5px;font-weight:600;color:{{ h.fg }}">{{ h.l }}</span></sc-for>
+<sc-for list="{{ rows }}" as="r" hint-placeholder-count="10">
+<span style="height:34px;display:flex;align-items:center;justify-content:center;border-radius:8px;background:{{ r.hbg }};font-size:11.5px;font-weight:600;color:{{ r.hfg }};font-variant-numeric:tabular-nums">{{ r.n }}</span>
+<sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="6"><button role="gridcell" aria-selected="{{ c.sel }}" onClick="{{ pickCell }}" data-k="{{ c.ref }}" title="{{ c.title }}" style="border:none;height:34px;padding:0 10px;display:flex;align-items:center;justify-content:{{ c.align }};border-radius:8px;background:{{ c.bg }};color:{{ c.fg }};box-shadow:{{ c.ring }};font-family:inherit;font-size:13px;font-weight:{{ c.fw }};font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:cell;transition:background .15s">{{ c.v }}</button></sc-for>
+</sc-for>
+</div>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:6px;padding:0 4px;font-size:12px;color:#6d6a67"><span>{{ selStats }}</span></div>
+</section>
+<aside style="display:flex;flex-direction:column;gap:12px">
+<section style="border-radius:28px;background:#fffdfa;padding:18px;display:flex;flex-direction:column;gap:8px">
+<p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em">Ask Atlas about this sheet</p>
+<p style="margin:0;font-size:12.5px;line-height:1.5;color:#6d6a67">Atlas explains and proposes. Anything it suggests appears as a pale draft you accept or discard; it never types into your cells.</p>
+<sc-for list="{{ asks }}" as="q" hint-placeholder-count="3"><button onClick="{{ ask }}" data-k="{{ q.k }}" style="border:none;display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:14px;background:#f9f7f4;font-family:inherit;text-align:left;cursor:pointer" style-hover="background:#edebe7"><span style="flex:1;font-size:13px;font-weight:600;color:#1e1e24">{{ q.l }}</span><span style="flex:none;font-size:11.5px;color:#8b8681">{{ q.s }}</span></button></sc-for>
+</section>
+<sc-if value="{{ hasAnswer }}" hint-placeholder-val="{{ false }}"><section style="border-radius:28px;background:#eef2fe;padding:18px;display:flex;flex-direction:column;gap:8px;animation:bpop .4s cubic-bezier(.22,1,.36,1) both"><span style="font-size:11.5px;font-weight:600;color:#2748bd">{{ ansTitle }}</span><p style="margin:0;font-size:13.5px;line-height:1.55;color:#1e1e24;text-wrap:pretty">{{ ansBody }}</p><sc-if value="{{ hasDraft }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:6px"><button onClick="{{ acceptDraft }}" style="border:none;flex:none;height:32px;padding:0 13px;border-radius:9999px;background:#3461f2;color:#fff;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer">Keep column</button><button onClick="{{ discardDraft }}" style="border:none;flex:none;height:32px;padding:0 13px;border-radius:9999px;background:#fffdfa;color:#1e1e24;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer">Discard</button></div></sc-if></section></sc-if>
+<section style="border-radius:28px;background:#f1eeea;padding:18px;display:flex;flex-direction:column;gap:6px"><p style="margin:0;font-size:12.5px;font-weight:600">Why there are no gridlines</p><p style="margin:0;font-size:12px;line-height:1.55;color:#6d6a67;text-wrap:pretty">Cells are separated by a 2px gutter of the panel colour, so the grid stays flat and borderless. Headers sit one step darker, the selection is blue fill, and a range is a lighter blue. The one exception is a 2px inset ring on the active cell, so you never lose your place while typing. It’s drawn only there.</p></section>
+</aside>
+</div>
+</sc-if>
+
+<sc-if value="{{ isWrite }}" hint-placeholder-val="{{ false }}">
+<div style="display:grid;grid-template-columns:{{ cols }};gap:12px;align-items:start">
+<section style="min-width:0;border-radius:28px;background:#fffdfa;padding:clamp(20px,3vw,40px);display:flex;flex-direction:column;gap:18px">
+<input value="{{ docTitle }}" onInput="{{ onTitle }}" aria-label="Title" style="border:none;outline:none;width:100%;background:transparent;color:#1e1e24;font-family:'Newsreader',Georgia,serif;font-size:clamp(28px,3vw,38px);font-weight:500;letter-spacing:-.02em;line-height:1.15">
+<sc-for list="{{ secs }}" as="s" hint-placeholder-count="5">
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;align-items:center;gap:8px"><span style="font-size:11.5px;font-weight:600;color:#8b8681">{{ s.l }}</span><sc-if value="{{ s.hasNote }}" hint-placeholder-val="{{ false }}"><button onClick="{{ focusNote }}" data-k="{{ s.k }}" style="border:none;flex:none;width:18px;height:18px;border-radius:50%;background:{{ s.noteBg }};color:#fff;font-size:10px;font-weight:700;cursor:pointer">{{ s.noteN }}</button></sc-if></div>
+<textarea value="{{ s.v }}" onInput="{{ onSec }}" data-k="{{ s.k }}" placeholder="{{ s.ph }}" style="border:none;outline:none;resize:none;width:100%;min-height:{{ s.h }};padding:10px 12px;margin:0 -12px;border-radius:12px;background:{{ s.bg }};color:#1e1e24;font-family:'Newsreader',Georgia,serif;font-size:18px;line-height:1.65;transition:background .2s" style-focus="background:#f9f7f4"></textarea>
+</div>
+</sc-for>
+</section>
+<aside style="display:flex;flex-direction:column;gap:12px">
+<section style="border-radius:28px;background:#1e1e24;color:#f9f7f4;padding:18px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px"><span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:rgba(249,247,244,.62)">Length</span><span style="font-size:12px;color:rgba(249,247,244,.62)">900–1200 ord</span></div>
+<span style="font-family:'Hanken Grotesk',sans-serif;font-size:36px;font-weight:600;letter-spacing:-.045em;font-variant-numeric:tabular-nums">{{ words }} <span style="font-size:14px;font-weight:600;color:rgba(249,247,244,.62)">ord</span></span>
+<div style="height:6px;border-radius:9999px;background:rgba(249,247,244,.14);overflow:hidden"><div style="width:{{ wPct }};height:100%;border-radius:9999px;background:{{ wBar }};transition:width .3s"></div></div>
+<span style="font-size:12px;color:rgba(249,247,244,.78)">All written by you. Atlas hasn’t added a word.</span>
+</section>
+<section style="border-radius:28px;background:#f1eeea;padding:16px;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:2px 4px"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:15px;font-weight:600;letter-spacing:-.02em">Atlas in the margin</p><button onClick="{{ toggleNotes }}" role="switch" aria-label="Show Atlas notes" style="display:flex;flex:none;width:42px;height:25px;padding:3px;border:none;border-radius:9999px;background:{{ nSwBg }};justify-content:{{ nSwPos }};cursor:pointer;transition:background .25s"><span style="width:19px;height:19px;border-radius:50%;background:#fff;box-shadow:0 2px 5px rgba(30,30,36,.22)"></span></button></div>
+<p style="margin:0;padding:0 4px;font-size:12px;line-height:1.5;color:#6d6a67">Questions and pointers, never rewrites. Help stays here, beside the page, not in it.</p>
+<sc-for list="{{ notes }}" as="n" hint-placeholder-count="3"><div style="padding:12px 14px;border-radius:16px;background:{{ n.bg }};display:flex;flex-direction:column;gap:6px;transition:background .25s"><div style="display:flex;align-items:center;gap:8px"><span style="flex:none;width:18px;height:18px;border-radius:50%;background:#3461f2;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ n.n }}</span><span style="flex:1;font-size:11.5px;font-weight:600;color:#6d6a67">{{ n.sec }}</span><button onClick="{{ dismissNote }}" data-k="{{ n.id }}" aria-label="Dismiss" style="border:none;flex:none;width:22px;height:22px;border-radius:50%;background:transparent;color:#8b8681;cursor:pointer">×</button></div><p style="margin:0;font-size:13px;line-height:1.5;color:#1e1e24;text-wrap:pretty">{{ n.t }}</p></div></sc-for>
+<sc-if value="{{ noNotes }}" hint-placeholder-val="{{ false }}"><div style="padding:16px;border-radius:14px;background:#f9f7f4;font-size:12.5px;color:#6d6a67;text-align:center">{{ noNotesText }}</div></sc-if>
+</section>
+<section style="border-radius:28px;background:#fffdfa;padding:16px;display:flex;flex-direction:column;gap:6px"><p style="margin:0;padding:2px 4px 6px;font-size:12.5px;font-weight:600">Your texts</p><sc-for list="{{ texts }}" as="t" hint-placeholder-count="2"><div style="padding:10px 12px;border-radius:12px;background:#f9f7f4"><p style="margin:0;font-size:12.5px;font-weight:600">{{ t.a }}</p><p style="margin:1px 0 0;font-size:11.5px;color:#6d6a67">{{ t.b }}</p></div></sc-for></section>
+</aside>
+</div>
+</sc-if>
+
+<nav aria-label="Atlas" data-dock="beta" style="view-transition-name:atlas-dock;position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:4px;padding:6px;border-radius:9999px;background:rgba(255,253,250,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 18px 40px -20px rgba(30,30,36,.28)">
+<a href="Atlas Dashboard Beta.dc.html" title="Home" aria-label="Home" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M3.5 10.9 10.7 4.3a2 2 0 0 1 2.6 0l7.2 6.6v6.9a3 3 0 0 1-3 3h-3v-5.4a2.5 2.5 0 0 0-5 0v5.4h-3a3 3 0 0 1-3-3z"></path></svg></a>
+<a href="Atlas Core Beta.dc.html" title="Core" aria-label="Core" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.6a8.4 8.4 0 1 1 0 16.8 8.4 8.4 0 0 1 0-16.8M12 8.8a3.2 3.2 0 1 1 0 6.4 3.2 3.2 0 0 1 0-6.4M12 3.6v5.2M12 15.2v5.2M3.6 12h5.2M15.2 12h5.2"></path></svg></a>
+<a href="Atlas Teach Beta.dc.html" title="Teach" aria-label="Teach" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 7.4a5.2 5.2 0 0 0-3.9-1.8H5a1.2 1.2 0 0 0-1.2 1.2v9.6A1.2 1.2 0 0 0 5 17.6h3.1A5.2 5.2 0 0 1 12 19.4a5.2 5.2 0 0 1 3.9-1.8H19a1.2 1.2 0 0 0 1.2-1.2V6.8A1.2 1.2 0 0 0 19 5.6h-3.1A5.2 5.2 0 0 0 12 7.4zM12 7.4v12"></path></svg></a>
+<a href="Atlas Mail Beta.dc.html" title="Mail" aria-label="Mail" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M6.6 5.6h10.8a3.2 3.2 0 0 1 3.2 3.2v6.4a3.2 3.2 0 0 1-3.2 3.2H6.6a3.2 3.2 0 0 1-3.2-3.2V8.8a3.2 3.2 0 0 1 3.2-3.2zM3.8 7.6l7 4.8a2.2 2.2 0 0 0 2.4 0l7-4.8"></path></svg></a>
+<a href="Atlas Architecture Beta.dc.html" title="Architecture" aria-label="Architecture" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.4 3.4 7.9 12 12.4l8.6-4.5zM3.4 12.1 12 16.6l8.6-4.5M3.4 16.3 12 20.8l8.6-4.5"></path></svg></a>
+<a href="Atlas Voice Beta.dc.html" title="Voice" aria-label="Voice" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.5a2.6 2.6 0 0 1 2.6 2.6v5.4a2.6 2.6 0 0 1-5.2 0V6.1A2.6 2.6 0 0 1 12 3.5zM18.1 11.5a6.1 6.1 0 0 1-12.2 0M12 17.6v3"></path></svg></a>
+<a href="Atlas Settings Beta.dc.html" title="Marcus · Settings" aria-label="Settings" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#1e1e24" style-hover="background:#f1eeea;color:#1e1e24"><span style="width:34px;height:34px;border-radius:50%;background:#1e1e24;color:#f9f7f4;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">M</span></a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { vw: window.innerWidth, tab: 'sheet', sel: 'C3', edit: null, cells: null, ans: null, draft: false, kept: false,
+    title: 'Ung i en digital tid: frihed eller afhængighed?', secs: { rubrik: 'Ung i en digital tid: frihed eller afhængighed?', manchet: 'Unge bruger i gennemsnit fire timer om dagen på deres telefon. Men er det et problem, eller er det bare en ny måde at være ung på?', indledning: 'I denne artikel vil jeg undersøge, hvordan to debattører ser på unges brug af sociale medier.', t1: '', t2: '', konklusion: '' }, notesOn: true, dismissed: {}, focus: '' };
+  componentDidMount() {
+    this.onResize = () => this.setState({ vw: window.innerWidth });
+    window.addEventListener('resize', this.onResize);
+    this.onKey = (e) => { if (e.key === 'Escape' && !/INPUT|TEXTAREA/.test(document.activeElement && document.activeElement.tagName)) window.location.href = 'Atlas School Beta.dc.html'; };
+    window.addEventListener('keydown', this.onKey);
+    if ((window.location.hash || '') === '#writing') this.setState({ tab: 'write' });
+  }
+  componentWillUnmount() { window.removeEventListener('resize', this.onResize); window.removeEventListener('keydown', this.onKey); if (this.sph) this.sph.destroy(); }
+  base() {
+    return this.state.cells || {
+      A1: 'Vinkel (°)', B1: 'Vidde (m)', C1: 'Tid (s)', D1: 'v₀ (m/s)',
+      A2: '30', B2: '3.42', C2: '0.61', D2: '=B2/(C2*COS(A2))',
+      A3: '40', B3: '3.88', C3: '0.74', D3: '=B3/(C3*COS(A3))',
+      A4: '45', B4: '3.97', C4: '0.80', D4: '=B4/(C4*COS(A4))',
+      A5: '50', B5: '3.85', C5: '0.86', D5: '=B5/(C5*COS(A5))',
+      A6: '60', B6: '3.31', C6: '0.96', D6: '=B6/(C6*COS(A6))',
+      A8: 'Gennemsnit', B8: '=AVERAGE(B2:B6)', C8: '=AVERAGE(C2:C6)', D8: '=AVERAGE(D2:D6)'
+    };
+  }
+  evalCell(ref, cells, depth) {
+    const raw = cells[ref]; if (raw == null || raw === '') return '';
+    if (String(raw)[0] !== '=') return isNaN(+raw) ? raw : +raw;
+    if ((depth || 0) > 8) return '#REF';
+    const num = (r) => { const v = this.evalCell(r, cells, (depth || 0) + 1); return typeof v === 'number' ? v : 0; };
+    const range = (a, b) => { const c1 = a.charCodeAt(0), c2 = b.charCodeAt(0), r1 = +a.slice(1), r2 = +b.slice(1), out = []; for (let c = c1; c <= c2; c++) for (let r = r1; r <= r2; r++) out.push(num(String.fromCharCode(c) + r)); return out; };
+    let ex = String(raw).slice(1).toUpperCase();
+    ex = ex.replace(/(SUM|AVERAGE|MIN|MAX)\(([A-H]\d+):([A-H]\d+)\)/g, (m, fn, a, b) => { const v = range(a, b); const s = v.reduce((x, y) => x + y, 0); return String(fn === 'SUM' ? s : fn === 'AVERAGE' ? s / (v.length || 1) : fn === 'MIN' ? Math.min.apply(null, v) : Math.max.apply(null, v)); });
+    ex = ex.replace(/COS\(([^()]+)\)/g, 'Math.cos(($1)*Math.PI/180)').replace(/SIN\(([^()]+)\)/g, 'Math.sin(($1)*Math.PI/180)');
+    ex = ex.replace(/\b([A-H])(\d+)\b/g, (m) => '(' + num(m) + ')');
+    if (/[^0-9+\-*/().\sMathcosinPI]/.test(ex.replace(/Math\.(cos|sin|PI)/g, ''))) return '#FEJL';
+    try { const v = Function('return ' + ex)(); return isFinite(v) ? v : '#DIV/0'; } catch (e) { return '#FEJL'; }
+  }
+  renderVals() {
+    const st = this.state, narrow = st.vw < 1050;
+    const cells = this.base();
+    const COLS = ['A', 'B', 'C', 'D', 'E', 'F'], NR = 10;
+    const draftOn = st.draft && !st.kept;
+    const show = Object.assign({}, cells);
+    if (draftOn || st.kept) { show.E1 = 'Teori-vidde (m)'; for (let r = 2; r <= 6; r++) show['E' + r] = '=D' + r + '*D' + r + '*SIN(2*A' + r + ')/9.82'; }
+    const fmt = (v) => (typeof v === 'number' ? (Math.abs(v) >= 100 ? v.toFixed(0) : Math.round(v * 100) / 100).toString().replace('.', ',') : v);
+    const selCol = st.sel[0], selRow = +st.sel.slice(1);
+    const rangeTarget = (cells[st.sel] || '').match(/([A-H]\d+):([A-H]\d+)/);
+    const inRange = (ref) => { if (!rangeTarget) return false; const c = ref[0], r = +ref.slice(1); return c >= rangeTarget[1][0] && c <= rangeTarget[2][0] && r >= +rangeTarget[1].slice(1) && r <= +rangeTarget[2].slice(1); };
+    const rows = Array.from({ length: NR }, (_, i) => {
+      const r = i + 1;
+      return { n: String(r), hbg: r === selRow ? '#eef2fe' : '#f9f7f4', hfg: r === selRow ? '#2748bd' : '#8b8681',
+        cells: COLS.map((c) => {
+          const ref = c + r, raw = show[ref], isDraft = c === 'E' && draftOn && raw != null;
+          const v = this.evalCell(ref, show); const sel = ref === st.sel, rng = inRange(ref);
+          const header = r === 1 && raw != null;
+          return { ref, v: fmt(v), sel: sel ? 'true' : 'false', title: raw && String(raw)[0] === '=' ? raw : '',
+            bg: sel ? '#eef2fe' : isDraft ? '#f3f6fe' : rng ? '#f5f7fe' : header ? '#f9f7f4' : '#fffdfa',
+            fg: isDraft ? '#6b85e8' : typeof v === 'string' && v[0] === '#' ? '#a3352c' : '#1e1e24', fw: header || r === 8 ? 600 : 400, align: typeof v === 'number' ? 'flex-end' : 'flex-start',
+            ring: sel ? 'inset 0 0 0 2px #3461f2' : 'none' };
+        }) };
+    });
+    const selRaw = st.edit != null ? st.edit : (show[st.sel] != null ? String(show[st.sel]) : '');
+    const selV = this.evalCell(st.sel, show);
+    const ANS = {
+      explain: ['What D3 does', 'D3 divides the distance (B3) by the time (C3) multiplied by cos of the angle (A3). That gives the launch speed v₀ from the horizontal motion: x = v₀·cos(α)·t, solved for v₀. You built this; Atlas only read it.'],
+      check: ['Something to look at', 'Your v₀ values range from 6.4 to 7.1 m/s. If the launcher fired at the same speed every time, that spread is worth a sentence under Fejlkilder. The 60° row is the furthest from the others.'],
+      theory: ['Draft: theoretical range', 'Atlas drafted column E with the theoretical range v₀²·sin(2α)/g from your own v₀ values, so you can compare it with what you measured. It’s pale until you keep it.']
+    };
+    const secsDef = [['rubrik', 'Rubrik', 'En rubrik der fanger', '48px'], ['manchet', 'Manchet', 'To sætninger der siger, hvad artiklen handler om', '72px'], ['indledning', 'Indledning', 'Problemformulering og hvorfor emnet er vigtigt nu', '110px'], ['t1', 'Analyse af tekst 1', '“Skærmfri skole”: argumenter, appelformer, sproglige virkemidler', '150px'], ['t2', 'Analyse af tekst 2', '“Vi er ikke afhængige”: sammenlign med tekst 1', '150px'], ['konklusion', 'Perspektivering og konklusion', 'Hvad betyder det for unge i dag?', '110px']];
+    const words = Object.keys(st.secs).filter((k) => k !== 'rubrik').map((k) => st.secs[k]).join(' ').trim().split(/\s+/).filter(Boolean).length;
+    const NOTES = [
+      { id: 'n1', sec: 'indledning', t: 'Your problemformulering is implied but not stated. What exactly do you want to find out? One question, in one sentence.', when: (s) => s.indledning.length > 0 && !/\?/.test(s.indledning) },
+      { id: 'n2', sec: 'manchet', t: 'The “fire timer” figure: which of your texts does it come from? A reader will want to know.', when: (s) => /fire timer/i.test(s.manchet) },
+      { id: 'n3', sec: 't1', t: 'Lise’s notes on appelformer could help here: logos, etos, patos. Which one carries “Skærmfri skole”?', when: (s) => s.t1.trim().length === 0 },
+      { id: 'n4', sec: 'konklusion', t: 'Your conclusion should answer the question in your introduction. Re-read it before you start this part.', when: (s) => s.t1.trim().length > 40 && s.konklusion.trim().length === 0 }
+    ];
+    const live = st.notesOn ? NOTES.filter((n) => !st.dismissed[n.id] && n.when(st.secs)) : [];
+    const numFor = {}; live.forEach((n, i) => { numFor[n.sec] = numFor[n.sec] || String(i + 1); });
+    const wPct = Math.min(100, Math.round(words / 1200 * 100));
+    return {
+      sphereRef: (el) => {
+        if (!el || el.__q) return;
+        const go = () => { if (el.__q || !el.isConnected) return; if (!window.QuickSphere) return setTimeout(go, 60);
+          el.__q = this.sph = window.QuickSphere.mount(el, { mode: 'veil', bg: 'transparent', dust: [122, 148, 246], strand: [52, 97, 242], blend: 'source-over', alpha: 0.62, seed: 11, count: 7000, scale: 0.42, state: 'idle' }); };
+        go();
+      },
+      screenLabel: st.tab === 'sheet' ? 'Atlas School — Spreadsheet' : 'Atlas School — Writing',
+      eyebrow: st.tab === 'sheet' ? 'School · Fysik B · Det skrå kast' : 'School · Dansk A · Analyserende artikel',
+      title: st.tab === 'sheet' ? 'Gruppedata.xlsx' : 'Ung i en digital tid',
+      subline: st.tab === 'sheet' ? 'Your group’s measurements. Formulas work as you’d expect; Atlas can explain them and draft a column, but never edits your cells.' : 'Your article, section by section. Atlas leaves questions in the margin; the words on the page are only yours.',
+      tabs: [['sheet', 'Regneark'], ['write', 'Skrivning']].map(([k, l]) => { const on = st.tab === k; return { k, l, on: on ? 'true' : 'false', bg: on ? '#1e1e24' : 'transparent', fg: on ? '#f9f7f4' : '#6d6a67' }; }),
+      pickTab: (e) => this.setState({ tab: e.currentTarget.getAttribute('data-k') }),
+      isSheet: st.tab === 'sheet', isWrite: st.tab === 'write', cols: narrow ? 'minmax(0,1fr)' : 'minmax(0,1fr) 320px',
+      nCols: String(COLS.length), gridMin: (44 + COLS.length * 98) + 'px',
+      colHeads: COLS.map((c) => ({ l: c, bg: c === selCol ? '#eef2fe' : '#f9f7f4', fg: c === selCol ? '#2748bd' : '#8b8681' })),
+      rows, selRef: st.sel, editVal: selRaw,
+      onEdit: (e) => this.setState({ edit: e.currentTarget.value }),
+      editKey: (e) => { if (e.key === 'Enter') { const v = this.state.edit; if (v != null) { const c = Object.assign({}, this.base(), { [this.state.sel]: v }); this.setState({ cells: c, edit: null, sel: this.state.sel[0] + Math.min(NR, +this.state.sel.slice(1) + 1) }); } } if (e.key === 'Escape') this.setState({ edit: null }); },
+      pickCell: (e) => this.setState({ sel: e.currentTarget.getAttribute('data-k'), edit: null }),
+      selStats: typeof selV === 'number' ? st.sel + ' = ' + fmt(selV) + (rangeTarget ? ' · range ' + rangeTarget[1] + ':' + rangeTarget[2] : '') : st.sel + (selRaw ? ' · text' : ' · empty'),
+      asks: [['explain', 'Explain the formula in D3', 'Read-only'], ['check', 'Anything odd in my data?', 'Read-only'], ['theory', 'Add the theoretical range', 'Drafts a column']].map(([k, l, s]) => ({ k, l, s })),
+      ask: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.setState({ ans: k, draft: k === 'theory' ? true : this.state.draft, sel: k === 'explain' ? 'D3' : this.state.sel }); },
+      hasAnswer: !!st.ans, ansTitle: st.ans ? ANS[st.ans][0] : '', ansBody: st.ans ? (st.ans === 'theory' && st.kept ? 'Column E is yours now. Compare it with B: the measured ranges come out about 10% shorter, which is a point for Fejlkilder.' : ANS[st.ans][1]) : '', hasDraft: st.ans === 'theory' && draftOn,
+      acceptDraft: () => { const c = Object.assign({}, this.base()); c.E1 = 'Teori-vidde (m)'; for (let r = 2; r <= 6; r++) c['E' + r] = '=D' + r + '*D' + r + '*SIN(2*A' + r + ')/9.82'; this.setState({ cells: c, kept: true, draft: false }); },
+      discardDraft: () => this.setState({ draft: false, ans: null }),
+      docTitle: st.secs.rubrik, onTitle: (e) => { const v = e.currentTarget.value; this.setState((s) => ({ secs: Object.assign({}, s.secs, { rubrik: v }) })); },
+      secs: secsDef.filter((d) => d[0] !== 'rubrik').map(([k, l, ph, h]) => ({ k, l, ph, h, v: st.secs[k], hasNote: !!numFor[k], noteN: numFor[k] || '', noteBg: '#3461f2', bg: st.focus === k ? '#eef2fe' : 'transparent' })),
+      onSec: (e) => { const k = e.currentTarget.getAttribute('data-k'), el = e.currentTarget, v = el.value; el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; this.setState((s) => ({ secs: Object.assign({}, s.secs, { [k]: v }) })); },
+      focusNote: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.setState({ focus: k }); setTimeout(() => this.setState({ focus: '' }), 1400); },
+      words: String(words), wPct: wPct + '%', wBar: words >= 900 && words <= 1200 ? '#50dca0' : words > 1200 ? '#ffb36b' : '#f9f7f4',
+      notesOn: st.notesOn, nSwBg: st.notesOn ? '#3461f2' : '#d8d4cd', nSwPos: st.notesOn ? 'flex-end' : 'flex-start', toggleNotes: () => this.setState((s) => ({ notesOn: !s.notesOn })),
+      notes: live.map((n, i) => ({ id: n.id, n: String(i + 1), sec: secsDef.find((d) => d[0] === n.sec)[1], t: n.t, bg: st.focus === n.sec ? '#eef2fe' : '#fffdfa' })),
+      noNotes: live.length === 0, noNotesText: st.notesOn ? 'Nothing to point out right now. Keep writing.' : 'Notes are hidden. Your page is just yours.',
+      dismissNote: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.setState((s) => ({ dismissed: Object.assign({}, s.dismissed, { [k]: true }) })); },
+      texts: [['“Skærmfri skole”', 'Kronik · Politiken 2025'], ['“Vi er ikke afhængige”', 'Debatindlæg · Information']].map(([a, b]) => ({ a, b }))
+    };
+  }
+}
+</script>
+</body>
+</html>

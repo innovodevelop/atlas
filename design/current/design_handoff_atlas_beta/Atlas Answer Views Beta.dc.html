@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>(function(){window.addEventListener("unhandledrejection",function(e){var m=String(e.reason&&e.reason.message||e.reason);if(/Transition was aborted|ViewTransition/.test(m))e.preventDefault()});var top=false;try{top=window.self===window.top}catch(e){}var s=document.createElement("style");if(top){s.textContent="@view-transition{navigation:auto}";}else{s.textContent="html{animation:atlas-in .45s cubic-bezier(.22,1,.36,1) both}html.atlas-out{transition:opacity .22s ease,transform .22s ease;opacity:0;transform:scale(.988)}@keyframes atlas-in{from{opacity:0;transform:scale(1.012)}}";document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a||e.defaultPrevented||e.metaKey||e.ctrlKey||a.target)return;var h=a.getAttribute("href");if(!/\.dc\.html/.test(h)||/^https?:/.test(h))return;if(h.split("#")[0]===""||location.pathname.endsWith(encodeURI(h.split("#")[0]))&&h.indexOf("#")>0)return;e.preventDefault();document.documentElement.classList.add("atlas-out");setTimeout(function(){location.href=h},210)},true);}document.head.appendChild(s)})();</script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script>window.addEventListener("pagereveal",function(e){var t=e.viewTransition;if(t){["ready","finished","updateCallbackDone"].forEach(function(p){t[p]&&t[p].catch(function(){})})}});window.addEventListener("unhandledrejection",function(e){if(/Transition was aborted|ViewTransition/.test(String(e.reason&&e.reason.message||e.reason)))e.preventDefault()});</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+::view-transition-group(*){animation-duration:.55s;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+::view-transition-old(root){animation:.4s cubic-bezier(.22,1,.36,1) both vt-out}
+::view-transition-new(root){animation:.55s cubic-bezier(.22,1,.36,1) both vt-in}
+@keyframes vt-out{to{opacity:0;transform:scale(.985)}}
+@keyframes vt-in{from{opacity:0;transform:scale(1.015)}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#f9f7f4}
+button,input{border:none;font:inherit;background:none;color:inherit}
+a{color:#3461f2;text-decoration:none}a:hover{color:#2748bd}
+::placeholder{color:#b6b1aa}
+.nosb{scrollbar-width:none}.nosb::-webkit-scrollbar{display:none}
+@keyframes bpop{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes rise{from{opacity:0;transform:translateY(28px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;transition:none !important}}
+</style>
+<script src="atlas-quickstart-sphere.js"></script>
+<script src="atlas-topbar.js"></script>
+</helmet>
+<div data-screen-label="Answer · {{ typeName }}" style="position:relative;height:100vh;display:flex;flex-direction:column;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden">
+
+<div style="position:absolute;z-index:5;left:{{ sphL }};top:{{ sphTop }};width:{{ sphS }};height:{{ sphS }};transform-origin:0 0;transform:{{ sphT }};transition:left .9s cubic-bezier(.22,1,.36,1),top .9s cubic-bezier(.22,1,.36,1),transform .9s cubic-bezier(.22,1,.36,1);will-change:transform"><canvas ref="{{ sphereRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas></div>
+
+<sc-if value="{{ thinking }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:0 24px 150px;text-align:center;pointer-events:none">
+<p key="{{ q }}" style="margin:0;max-width:820px;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(28px,3.6vw,52px);font-weight:500;letter-spacing:-.045em;line-height:1.08;text-wrap:balance;animation:bpop .5s both">{{ q }}</p>
+<p style="margin:24px 0 0;display:flex;align-items:center;gap:10px;font-size:14px;color:#6d6a67"><span style="width:7px;height:7px;border-radius:50%;background:#7854ff;animation:blink 1s infinite"></span>{{ step }}</p>
+</div>
+</sc-if>
+
+<sc-if value="{{ answered }}" hint-placeholder-val="{{ true }}">
+<header style="flex:none;display:flex;align-items:center;gap:16px;padding:20px 24px 12px calc(clamp(64px,7vw,92px) + 34px);min-height:110px">
+<div style="flex:1;min-width:0;animation:bpop .6s cubic-bezier(.22,1,.36,1) .2s both"><span style="display:block;font-size:12.5px;color:#6d6a67;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">“{{ q }}”</span><h1 style="margin:4px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(24px,2.8vw,40px);font-weight:500;letter-spacing:-.04em;line-height:1.08;text-wrap:balance">{{ headline }}</h1></div>
+<span style="flex:none;display:flex;gap:6px"><sc-for list="{{ srcs }}" as="s" hint-placeholder-count="2"><span style="height:28px;padding:0 11px;display:flex;align-items:center;gap:6px;border-radius:9999px;background:#f1eeea;font-size:12px;font-weight:600;white-space:nowrap"><span style="width:6px;height:6px;border-radius:50%;background:#3461f2"></span>{{ s }}</span></sc-for></span>
+</header>
+<main key="{{ type }}" class="nosb" style="flex:1;min-height:0;overflow-y:auto;padding:0 20px 170px;animation:rise .7s cubic-bezier(.22,1,.36,1) .25s both">
+
+<sc-if value="{{ isRain }}" hint-placeholder-val="{{ false }}">
+<section style="min-height:100%;border-radius:40px;background:#1e1e24;color:#f9f7f4;padding:clamp(24px,4vw,56px);display:flex;flex-direction:column;gap:28px">
+<div style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:16px 40px"><span style="font-family:'Hanken Grotesk',sans-serif;font-size:clamp(84px,13vw,200px);font-weight:500;letter-spacing:-.07em;line-height:.82">Yes.</span><span style="max-width:420px;font-size:18px;line-height:1.5;color:rgba(249,247,244,.78)">Rain from 15:00 to about 19:00, heaviest at 16:00. Your walk to the studio at 15:30 is right in it.</span></div>
+<div style="position:relative;display:flex;align-items:flex-end;gap:4px;height:220px"><sc-for list="{{ rain }}" as="h" hint-placeholder-count="24"><span title="{{ h.tip }}" style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px;height:100%"><span style="width:100%;height:{{ h.h }};border-radius:8px;background:{{ h.c }};transition:height .8s cubic-bezier(.22,1,.36,1)"></span><span style="font-family:'Geist Mono',monospace;font-size:10.5px;color:rgba(249,247,244,.62)">{{ h.l }}</span></span></sc-for></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:8px"><sc-for list="{{ rainEvents }}" as="e" hint-placeholder-count="3"><div style="padding:16px 18px;border-radius:22px;background:{{ e.bg }};display:flex;flex-direction:column;gap:4px"><span style="font-family:'Geist Mono',monospace;font-size:12.5px;color:rgba(249,247,244,.62)">{{ e.t }}</span><span style="font-size:15px;font-weight:600">{{ e.n }}</span><span style="font-size:13px;color:{{ e.fg }}">{{ e.d }}</span></div></sc-for></div>
+<button onClick="{{ act }}" style="border:none;align-self:flex-start;height:48px;padding:0 22px;border-radius:9999px;background:{{ actBg }};color:{{ actFg }};font-size:14.5px;font-weight:600;cursor:pointer">{{ actL }}</button>
+</section>
+</sc-if>
+
+<sc-if value="{{ isSpend }}" hint-placeholder-val="{{ false }}">
+<section style="display:grid;grid-template-columns:{{ splitCols }};gap:12px;min-height:100%">
+<div style="padding:clamp(24px,4vw,56px);border-radius:40px;background:#f1eeea;display:flex;flex-direction:column;justify-content:space-between;gap:24px"><span style="font-size:14px;font-weight:600;color:#6d6a67">Food · 1–27 October</span><span style="font-family:'Hanken Grotesk',sans-serif;font-size:clamp(96px,14vw,220px);font-weight:500;letter-spacing:-.07em;line-height:.82;font-variant-numeric:tabular-nums">€612</span><div style="display:flex;flex-wrap:wrap;gap:8px"><span style="height:34px;padding:0 14px;display:flex;align-items:center;border-radius:9999px;background:#fdf0e2;color:#9a5410;font-size:13px;font-weight:600">+€84 on September</span><span style="height:34px;padding:0 14px;display:flex;align-items:center;border-radius:9999px;background:#fffdfa;font-size:13px;font-weight:600">18% of spending</span></div><div style="display:flex;align-items:flex-end;gap:10px;height:160px"><sc-for list="{{ weeks }}" as="w" hint-placeholder-count="4"><span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end"><span style="font-family:'Geist Mono',monospace;font-size:12px">{{ w.v }}</span><span style="width:100%;height:{{ w.h }};border-radius:12px;background:{{ w.c }}"></span><span style="font-size:12px;color:#6d6a67">{{ w.l }}</span></span></sc-for></div></div>
+<div style="display:flex;flex-direction:column;gap:8px"><div style="padding:10px;border-radius:32px;background:#fffdfa;display:flex;flex-direction:column;gap:4px"><span style="padding:8px 12px;font-size:14px;font-weight:600">Where it went</span><sc-for list="{{ merchants }}" as="m" hint-placeholder-count="5"><div style="display:grid;grid-template-columns:minmax(0,1fr) 120px 70px;gap:12px;align-items:center;padding:12px 14px;border-radius:16px;background:#f9f7f4;font-size:14px"><span style="font-weight:600">{{ m.n }}<span style="margin-left:8px;font-weight:500;color:#6d6a67">{{ m.k }}</span></span><span style="height:8px;border-radius:9999px;background:#f1eeea;overflow:hidden"><span style="display:block;height:100%;width:{{ m.w }};background:#0fae76"></span></span><span style="text-align:right;font-family:'Geist Mono',monospace">{{ m.v }}</span></div></sc-for></div>
+<div style="padding:18px 20px;border-radius:28px;background:#eef2fe;display:flex;flex-direction:column;gap:10px"><span style="font-size:14.5px;line-height:1.5">Delivery is up: 9 orders this month against 4 in September. Cooking twice more a week would bring you back to about €530.</span><button onClick="{{ act }}" style="border:none;align-self:flex-start;height:40px;padding:0 18px;border-radius:9999px;background:{{ actBg }};color:{{ actFg }};font-size:13.5px;font-weight:600;cursor:pointer">{{ actL }}</button></div></div>
+</section>
+</sc-if>
+
+<sc-if value="{{ isTrain }}" hint-placeholder-val="{{ false }}">
+<section style="min-height:100%;border-radius:40px;background:#1e1e24;color:#f9f7f4;padding:clamp(20px,3vw,40px);display:flex;flex-direction:column;gap:18px">
+<div style="display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:12px"><span style="font-family:'Hanken Grotesk',sans-serif;font-size:clamp(28px,3vw,44px);font-weight:500;letter-spacing:-.04em">Nørreport → Lund C</span><span style="font-family:'Geist Mono',monospace;font-size:14px;color:rgba(249,247,244,.62)">{{ clock }}</span></div>
+<div style="display:flex;flex-direction:column;gap:6px"><sc-for list="{{ trains }}" as="t" hint-placeholder-count="5"><div style="display:grid;grid-template-columns:110px minmax(0,1fr) 90px 150px;gap:16px;align-items:center;padding:20px 22px;border-radius:24px;background:{{ t.bg }};color:{{ t.fg }}"><span style="font-family:'Hanken Grotesk',sans-serif;font-size:40px;font-weight:500;letter-spacing:-.04em;font-variant-numeric:tabular-nums;text-decoration:{{ t.deco }}">{{ t.time }}</span><span style="min-width:0"><span style="display:block;font-size:16px;font-weight:600">{{ t.line }}</span><span style="display:block;margin-top:3px;font-size:13px;color:{{ t.sub }}">{{ t.note }}</span></span><span style="text-align:center"><span style="display:block;font-size:11px;color:{{ t.sub }}">Platform</span><span style="font-family:'Hanken Grotesk',sans-serif;font-size:28px;font-weight:600">{{ t.pf }}</span></span><span style="text-align:right;font-size:15px;font-weight:600;color:{{ t.cdFg }}">{{ t.cd }}</span></div></sc-for></div>
+<div style="padding:16px 18px;border-radius:22px;background:#26262d;font-size:14.5px;line-height:1.5;color:rgba(249,247,244,.78)">Leave by <strong style="color:#f9f7f4">{{ leaveBy }}</strong> to walk to platform 2 comfortably. The 14:22 is 6 minutes late, so the 14:42 gets you to Lund first if you miss it.</div>
+</section>
+</sc-if>
+
+<sc-if value="{{ isCompare }}" hint-placeholder-val="{{ false }}">
+<section style="display:grid;grid-template-columns:{{ splitCols }};gap:12px">
+<sc-for list="{{ flats }}" as="f" hint-placeholder-count="2"><div style="padding:clamp(22px,3vw,40px);border-radius:40px;background:{{ f.bg }};color:{{ f.fg }};display:flex;flex-direction:column;gap:18px"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px"><span><span style="display:block;font-size:13px;font-weight:600;color:{{ f.sub }}">{{ f.area }}</span><span style="display:block;margin-top:6px;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(28px,3vw,44px);font-weight:500;letter-spacing:-.04em;line-height:1">{{ f.n }}</span></span><sc-if value="{{ f.win }}" hint-placeholder-val="{{ false }}"><span style="height:30px;padding:0 13px;display:flex;align-items:center;border-radius:9999px;background:#3461f2;color:#fff;font-size:12.5px;font-weight:600">Atlas’s pick</span></sc-if></div><span style="font-family:'Hanken Grotesk',sans-serif;font-size:clamp(60px,7vw,104px);font-weight:500;letter-spacing:-.06em;line-height:.9">{{ f.score }}<span style="font-size:.3em;color:{{ f.sub }}"> / 100</span></span><div style="display:flex;flex-direction:column;gap:4px"><sc-for list="{{ f.rows }}" as="r" hint-placeholder-count="6"><div style="display:flex;justify-content:space-between;gap:12px;padding:13px 16px;border-radius:16px;background:{{ r.bg }};font-size:14.5px"><span style="color:{{ f.sub }}">{{ r.k }}</span><span style="font-weight:600">{{ r.v }}<sc-if value="{{ r.best }}" hint-placeholder-val="{{ false }}"><span style="margin-left:8px;color:{{ f.best }}">●</span></sc-if></span></div></sc-for></div></div></sc-for>
+</section>
+<p style="margin:14px 8px 0;font-size:14px;line-height:1.6;color:#6d6a67">● marks the better of the two. Atlas weighed your commute and the 4-room ask from your notes highest. Nørrebro is €2,400 more a year but saves you 3 hours a week.</p>
+</sc-if>
+
+<sc-if value="{{ isPerson }}" hint-placeholder-val="{{ false }}">
+<section style="display:grid;grid-template-columns:{{ splitCols }};gap:12px">
+<div style="padding:clamp(24px,4vw,48px);border-radius:40px;background:#1e1e24;color:#f9f7f4;display:flex;flex-direction:column;gap:16px"><span style="width:120px;height:120px;border-radius:50%;background:#f9f7f4;color:#1e1e24;display:flex;align-items:center;justify-content:center;font-family:'Hanken Grotesk',sans-serif;font-size:44px;font-weight:600">PR</span><span style="font-family:'Hanken Grotesk',sans-serif;font-size:clamp(36px,4vw,60px);font-weight:500;letter-spacing:-.05em;line-height:1">Priya Raman</span><span style="font-size:16px;color:rgba(249,247,244,.78)">Founder, Raman Studio · Paris since July</span><div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px"><sc-for list="{{ pStats }}" as="s" hint-placeholder-count="3"><div style="padding:14px;border-radius:18px;background:#26262d"><span style="display:block;font-size:11.5px;color:rgba(249,247,244,.62)">{{ s.k }}</span><span style="display:block;margin-top:4px;font-size:18px;font-weight:600">{{ s.v }}</span></div></sc-for></div><div style="display:flex;flex-wrap:wrap;gap:6px"><a href="Atlas Mail Beta.dc.html" style="height:42px;padding:0 18px;display:flex;align-items:center;border-radius:9999px;background:#f9f7f4;color:#1e1e24;font-size:13.5px;font-weight:600" style-hover="color:#1e1e24">Reply to her email</a><button onClick="{{ act }}" style="border:none;height:42px;padding:0 18px;border-radius:9999px;background:rgba(249,247,244,.1);color:#f9f7f4;font-size:13.5px;font-weight:600;cursor:pointer">{{ actL }}</button></div></div>
+<div style="display:flex;flex-direction:column;gap:8px"><div style="padding:10px;border-radius:32px;background:#f1eeea;display:flex;flex-direction:column;gap:4px"><span style="padding:8px 12px;font-size:14px;font-weight:600">What Atlas remembers</span><sc-for list="{{ memories }}" as="m" hint-placeholder-count="4"><div style="display:flex;align-items:center;gap:12px;padding:13px 16px;border-radius:16px;background:#fffdfa;opacity:{{ m.op }}"><span style="flex:1;min-width:0"><span style="display:block;font-size:14px;text-decoration:{{ m.deco }}">{{ m.t }}</span><span style="display:block;margin-top:2px;font-size:12px;color:#6d6a67">{{ m.src }}</span></span><button onClick="{{ forget }}" data-k="{{ m.i }}" style="border:none;height:30px;padding:0 11px;border-radius:9999px;background:#f1eeea;color:{{ m.btnFg }};font-size:12px;font-weight:600;cursor:pointer" style-hover="background:#f7e6e4">{{ m.btn }}</button></div></sc-for></div>
+<div style="padding:10px;border-radius:32px;background:#fffdfa;display:flex;flex-direction:column;gap:2px"><span style="padding:8px 12px;font-size:14px;font-weight:600">Together recently</span><sc-for list="{{ pTimeline }}" as="t" hint-placeholder-count="4"><div style="display:grid;grid-template-columns:80px 10px minmax(0,1fr);gap:12px;align-items:baseline;padding:11px 12px;font-size:14px"><span style="font-family:'Geist Mono',monospace;font-size:12px;color:#6d6a67">{{ t.d }}</span><span style="width:7px;height:7px;border-radius:50%;background:{{ t.c }}"></span><span>{{ t.t }}</span></div></sc-for></div></div>
+</section>
+</sc-if>
+
+<sc-if value="{{ isExplain }}" hint-placeholder-val="{{ false }}">
+<section style="max-width:1100px;margin:0 auto;display:grid;grid-template-columns:{{ readCols }};gap:28px;align-items:start;padding:16px 4px">
+<article style="display:flex;flex-direction:column;gap:22px"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(24px,2.4vw,34px);font-weight:500;letter-spacing:-.03em;line-height:1.3;text-wrap:pretty">{{ exLead }}</p><sc-for list="{{ exPoints }}" as="p" hint-placeholder-count="4"><div style="display:grid;grid-template-columns:48px minmax(0,1fr);gap:16px;padding:20px 22px;border-radius:24px;background:{{ p.bg }}"><span style="font-family:'Hanken Grotesk',sans-serif;font-size:30px;font-weight:500;letter-spacing:-.04em;color:#3461f2">{{ p.n }}</span><span><span style="display:block;font-size:17px;font-weight:600">{{ p.t }}</span><span style="display:block;margin-top:6px;font-size:15px;line-height:1.6;color:#6d6a67">{{ p.d }}</span></span></div></sc-for></article>
+<aside style="position:sticky;top:0;display:flex;flex-direction:column;gap:8px"><div style="padding:18px;border-radius:28px;background:#1e1e24;color:#f9f7f4"><span style="font-size:12px;font-weight:600;color:rgba(249,247,244,.62)">Key dates</span><sc-for list="{{ exDates }}" as="d" hint-placeholder-count="4"><div style="display:grid;grid-template-columns:92px minmax(0,1fr);gap:10px;padding:12px 0;font-size:13.5px"><span style="font-family:'Geist Mono',monospace;color:{{ d.fg }}">{{ d.d }}</span><span style="color:rgba(249,247,244,.78)">{{ d.t }}</span></div></sc-for></div><div style="padding:16px 18px;border-radius:24px;background:#eef2fe;font-size:13.5px;line-height:1.55"><strong style="font-weight:600;color:#2748bd">For you:</strong> Atlas counts as a general-purpose assistant. The transparency rules apply from August 2026, and Atlas already tells people it’s an AI.</div></aside>
+</section>
+</sc-if>
+</main>
+</sc-if>
+
+<footer style="position:absolute;left:0;right:0;bottom:0;z-index:10;padding:16px 20px 18px;display:flex;flex-direction:column;align-items:center;gap:10px;background:linear-gradient(180deg,rgba(249,247,244,0),#f9f7f4 38%)">
+<div class="nosb" style="max-width:100%;display:flex;gap:6px;overflow-x:auto"><sc-for list="{{ asks }}" as="a" hint-placeholder-count="6"><button onClick="{{ ask }}" data-k="{{ a.k }}" style="border:none;flex:none;height:36px;padding:0 14px;border-radius:9999px;background:{{ a.bg }};color:{{ a.fg }};font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">{{ a.q }}</button></sc-for></div>
+<div style="width:min(760px,100%);display:flex;align-items:center;gap:8px;height:60px;padding:0 8px 0 22px;border-radius:9999px;background:#fffdfa;box-shadow:0 18px 40px -24px rgba(30,30,36,.35)">
+<input value="{{ draft }}" onInput="{{ onDraft }}" onKeyDown="{{ onKey }}" placeholder="Ask Atlas anything. The answer takes the shape it needs." aria-label="Ask Atlas" style="border:none;outline:none;flex:1;min-width:0;height:100%;font-size:16px">
+<a href="Atlas Dashboard Beta.dc.html" title="Home · Esc" style="height:44px;padding:0 14px;display:flex;align-items:center;border-radius:9999px;color:#6d6a67;font-size:13px;font-weight:600" style-hover="background:#f1eeea;color:#1e1e24">Home</a>
+<button onClick="{{ send }}" aria-label="Ask" style="border:none;width:44px;height:44px;border-radius:50%;background:#1e1e24;color:#f9f7f4;font-size:17px;cursor:pointer">→</button>
+</div>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const ASK = [['rain', 'Do I need an umbrella tomorrow?', 'Weather'], ['spend', 'How much did I spend on food this month?', 'Money'], ['train', 'When’s the next train to Lund?', 'Travel'], ['compare', 'Compare the two flats we’re looking at', 'Comparison'], ['person', 'What do I know about Priya Raman?', 'Person'], ['explain', 'Explain the EU AI Act in two minutes', 'Explainer']];
+const HEAD = { rain: 'Yes, take one. It rains from 15:00, right when you walk to the studio.', spend: 'You’ve spent €612 on food in October, €84 more than September.', train: 'The next train to Lund leaves at 14:22 from platform 2, six minutes late.', compare: 'The Nørrebro flat fits you better: shorter commute and the fourth room.', person: 'Priya runs Raman Studio, moved to Paris in July, and is waiting on your offsite reply.', explain: 'The EU AI Act sorts AI by risk, and most of it applies from August 2026.' };
+const SRC = { rain: ['DMI forecast', 'Your calendar'], spend: ['Danske Bank', 'Lunar'], train: ['Rejseplanen live'], compare: ['Boligportal', 'Your notes'], person: ['Mail', 'Calendar', 'Memory'], explain: ['eur-lex.europa.eu', 'EC guidance'] };
+const STEPS = { rain: ['Checking the forecast…', 'Matching it to your calendar…'], spend: ['Reading October’s transactions…', 'Grouping by category…'], train: ['Asking Rejseplanen…', 'Checking delays…'], compare: ['Reading both listings…', 'Weighing what you said matters…'], person: ['Searching mail and calendar…', 'Reading what Atlas remembers…'], explain: ['Reading the regulation…', 'Writing it in plain words…'] };
+class Component extends DCLogic {
+  state = { vw: window.innerWidth, vh: window.innerHeight, type: 'rain', q: ASK[0][1], phase: 'answer', step: 0, draft: '', acted: {}, forgot: {}, now: new Date() };
+  componentDidMount() {
+    this.onResize = () => this.setState({ vw: window.innerWidth, vh: window.innerHeight }); window.addEventListener('resize', this.onResize);
+    this.onEsc = (e) => { if (e.key === 'Escape') window.location.href = 'Atlas Dashboard Beta.dc.html'; }; window.addEventListener('keydown', this.onEsc);
+    this.iv = setInterval(() => this.setState({ now: new Date() }), 15000);
+    const h = (location.hash || '').slice(1); if (ASK.some((a) => a[0] === h)) this.run(h, ASK.find((a) => a[0] === h)[1]); else this.run('rain', ASK[0][1]);
+  }
+  componentDidUpdate() { const st = this.state.phase === 'think' ? 'thinking' : 'speaking'; if (this.sph && this._ls !== st && this._ls !== 'idle-after') { this._ls = st; this.sph.set({ state: st }); clearTimeout(this._idleT); if (st === 'speaking') this._idleT = setTimeout(() => { this._ls = 'idle-after'; if (this.sph) this.sph.set({ state: 'idle' }); }, 3200); } else if (this._ls === 'idle-after' && st === 'thinking') { this._ls = st; this.sph.set({ state: st }); } }
+  componentWillUnmount() { window.removeEventListener('resize', this.onResize); window.removeEventListener('keydown', this.onEsc); clearInterval(this.iv); (this.T || []).forEach(clearTimeout); if (this.sph) this.sph.destroy(); }
+  classify(q) { const t = q.toLowerCase(); if (/umbrella|rain|weather|jacket/.test(t)) return 'rain'; if (/spend|spent|cost|money|budget|€/.test(t)) return 'spend'; if (/train|bus|metro|leave|lund|depart/.test(t)) return 'train'; if (/compare|versus| vs |which is better|flats?/.test(t)) return 'compare'; if (/who is|what do i know|priya|about [A-Z]/i.test(q)) return 'person'; return 'explain'; }
+  run(type, q) { (this.T || []).forEach(clearTimeout); this.T = []; this.setState({ type, q, phase: 'think', step: 0, draft: '' }); this.T.push(setTimeout(() => this.setState({ step: 1 }), 900)); this.T.push(setTimeout(() => this.setState({ phase: 'answer' }), 1900)); }
+  renderVals() {
+    const s = this.state, T = s.type, think = s.phase === 'think', vw = s.vw, small = 'clamp(64px,7vw,92px)';
+    const S = Math.max(200, Math.round(Math.min((s.vh || 800) * 0.44, 460))), k = Math.min(92, Math.max(64, vw * 0.07)) / S;
+    const hh = s.now.getHours(), mm = s.now.getMinutes(), base = 14 * 60 + 6;
+    const trains = [['14:22', 'Øresundståg to Malmö → Lund', '6 min late · 14:28', '2', 16, true], ['14:42', 'Øresundståg to Kalmar via Lund', 'On time · fastest now', '2', 36], ['15:02', 'Øresundståg to Göteborg via Lund', 'On time', '2', 56], ['15:22', 'Øresundståg to Malmö → Lund', 'On time', '2', 76], ['15:42', 'Øresundståg to Kalmar via Lund', 'On time', '1', 96]];
+    const acted = !!s.acted[T];
+    const ACT = { rain: ['Remind me at 14:45 to take it', 'Reminder set for 14:45'], spend: ['Set a €550 food limit for November', 'Limit set · Atlas will nudge you at 80%'], person: ['Add a note about her', 'Note saved to memory'], compare: ['', ''], train: ['', ''], explain: ['', ''] }[T];
+    return {
+      sphereRef: (el) => { if (!el || el.__q) return; const go = () => { if (el.__q || !el.isConnected) return; if (!window.QuickSphere) return setTimeout(go, 60); el.__q = this.sph = window.QuickSphere.mount(el, { mode: 'veil', bg: 'transparent', dust: [122, 148, 246], strand: [52, 97, 242], blend: 'source-over', alpha: 0.62, seed: 11, count: 9000, scale: 0.42, state: 'thinking' }); this._ls = 'thinking'; }; go(); },
+      sphS: S + 'px', sphL: think ? '50%' : '24px', sphTop: think ? '36%' : '16px', sphT: think ? 'translate(-50%,-50%) scale(1)' : 'translate(0,0) scale(' + k.toFixed(3) + ')',
+      thinking: think, answered: !think, q: s.q, step: STEPS[T][s.step], type: T, typeName: ASK.find((a) => a[0] === T)[2],
+      headline: HEAD[T], srcs: SRC[T],
+      isRain: T === 'rain', isSpend: T === 'spend', isTrain: T === 'train', isCompare: T === 'compare', isPerson: T === 'person', isExplain: T === 'explain',
+      splitCols: vw >= 980 ? 'minmax(0,1fr) minmax(0,1fr)' : 'minmax(0,1fr)', readCols: vw >= 980 ? 'minmax(0,1fr) 320px' : 'minmax(0,1fr)',
+      rain: Array.from({ length: 24 }, (_, i) => { const p = i >= 15 && i <= 19 ? [70, 92, 85, 60, 35][i - 15] : i === 14 ? 30 : i === 20 ? 18 : 4 + (i % 3) * 3; return { h: Math.max(3, p) + '%', c: p >= 60 ? '#8fa9ff' : p >= 25 ? 'rgba(143,169,255,.5)' : 'rgba(249,247,244,.12)', l: i % 3 === 0 ? String(i).padStart(2, '0') : '', tip: String(i).padStart(2, '0') + ':00 · ' + p + '% rain' }; }),
+      rainEvents: [['09:30', 'Design review', 'Dry. You’re inside anyway.', 0], ['15:30', 'Walk to the studio', 'In the rain window. 14 minutes outside.', 1], ['19:30', 'Dinner at Bæst', 'Clearing by then. Light drizzle at most.', 0]].map(([t, n, d, hot]) => ({ t, n, d, bg: hot ? '#3461f2' : '#26262d', fg: hot ? '#f9f7f4' : 'rgba(249,247,244,.78)' })),
+      act: () => { if (ACT[0]) this.setState((x) => ({ acted: Object.assign({}, x.acted, { [T]: true }) })); }, actL: acted ? ACT[1] : ACT[0], actBg: acted ? '#e3f4ec' : T === 'rain' ? '#f9f7f4' : '#3461f2', actFg: acted ? '#0a7a53' : T === 'rain' ? '#1e1e24' : '#fff',
+      weeks: [['Wk 40', 128], ['Wk 41', 142], ['Wk 42', 176], ['Wk 43', 166]].map(([l, v], i) => ({ l, v: '€' + v, h: (v / 180 * 100) + '%', c: i >= 2 ? '#0fae76' : '#e3dbd0' })),
+      merchants: [['Irma', 'groceries', 214], ['Wolt', '9 deliveries', 168], ['Netto', 'groceries', 96], ['Lagkagehuset', 'bakery', 74], ['Bæst', 'dinner', 60]].map(([n, k, v]) => ({ n, k, v: '€' + v, w: (v / 214 * 100) + '%' })),
+      clock: String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0'),
+      trains: trains.map(([time, line, note, pf, mins, late], i) => ({ time, line, note, pf, cd: i === 0 ? 'in ' + (mins + 6) + ' min' : 'in ' + mins + ' min', cdFg: i === 1 ? '#50dca0' : '#f9f7f4', bg: i === 1 ? '#3461f2' : '#26262d', fg: '#f9f7f4', sub: i === 1 ? 'rgba(249,247,244,.82)' : 'rgba(249,247,244,.62)', deco: late ? 'line-through' : 'none' })),
+      leaveBy: '14:16',
+      flats: [['Nørrebro', 'Guldbergsgade 41', 86, true, [['Rent', '€2,050 /mo', false], ['Rooms', '4', true], ['Commute to studio', '12 min by bike', true], ['Light', 'South-west, 4th floor', true], ['Energy label', 'C', false], ['Move-in', '1 Dec', true]]], ['Vesterbro', 'Istedgade 78', 71, false, [['Rent', '€1,850 /mo', true], ['Rooms', '3', false], ['Commute to studio', '27 min', false], ['Light', 'North, 2nd floor', false], ['Energy label', 'B', true], ['Move-in', '15 Jan', false]]]].map(([area, n, score, win, rows]) => ({ area, n, score: String(score), win, bg: win ? '#1e1e24' : '#f1eeea', fg: win ? '#f9f7f4' : '#1e1e24', sub: win ? 'rgba(249,247,244,.62)' : '#6d6a67', best: win ? '#8fa9ff' : '#3461f2', rows: rows.map(([k, v, b]) => ({ k, v, best: b, bg: win ? '#26262d' : '#fffdfa' })) })),
+      pStats: [['Emails', '48'], ['Meetings', '6'], ['Last contact', 'Today']].map(([k, v]) => ({ k, v })),
+      memories: [['Moved to the Paris office in July', 'From an email, 14 Jul'], ['Prefers mornings for calls', 'Learned from 6 meetings'], ['Vegetarian', 'You told Atlas, 2 Jun'], ['Daughter, Maya, starts school in September', 'From a call note']].map(([t, src], i) => { const g = !!s.forgot[i]; return { i: String(i), t, src: g ? 'Forgotten' : src, op: g ? '.5' : '1', deco: g ? 'line-through' : 'none', btn: g ? 'Undo' : 'Forget', btnFg: g ? '#1e1e24' : '#a3352c' }; }),
+      forget: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.setState((x) => ({ forgot: Object.assign({}, x.forgot, { [k]: !x.forgot[k] }) })); },
+      pTimeline: [['Today', 'Asked about offsite dates: 12 or 19 Nov', '#3461f2'], ['14 Oct', 'Call · 30 min · design partnership', '#0fae76'], ['2 Oct', 'Lunch at Ark', '#e07a1f'], ['20 Sep', 'Sent you the Paris studio deck', '#b6b1aa']].map(([d, t, c]) => ({ d, t, c })),
+      exLead: 'The EU AI Act is the first broad law for artificial intelligence. Instead of banning AI, it sorts systems by how much harm they could do, and asks more of the riskier ones.',
+      exPoints: [['Some uses are banned', 'Social scoring, manipulative systems and most real-time face recognition in public are not allowed in the EU.'], ['High-risk systems need checks', 'AI used in hiring, credit, schools, health or policing must be tested, documented and overseen by people.'], ['Chatbots must say they’re AI', 'If you talk to an AI, or see AI-made images or audio, you have to be told.'], ['General-purpose models have duties', 'Makers of large models must publish summaries of training data and respect copyright opt-outs.']].map(([t, d], i) => ({ n: String(i + 1), t, d, bg: i === 0 ? '#fffdfa' : '#f1eeea' })),
+      exDates: [['Aug 2024', 'Law enters into force', 0], ['Feb 2025', 'Banned uses stop', 0], ['Aug 2025', 'Rules for general-purpose models', 0], ['Aug 2026', 'Most of the rest applies', 1]].map(([d, t, hot]) => ({ d, t, fg: hot ? '#8fa9ff' : 'rgba(249,247,244,.62)' })),
+      asks: ASK.map(([k, q]) => ({ k, q, bg: T === k ? '#1e1e24' : '#f1eeea', fg: T === k ? '#f9f7f4' : '#1e1e24' })),
+      ask: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.run(k, ASK.find((a) => a[0] === k)[1]); },
+      draft: s.draft, onDraft: (e) => this.setState({ draft: e.target.value }),
+      onKey: (e) => { if (e.key === 'Enter' && s.draft.trim()) this.run(this.classify(s.draft), s.draft.trim()); },
+      send: () => { if (s.draft.trim()) this.run(this.classify(s.draft), s.draft.trim()); }
+    };
+  }
+}
+</script>
+</body>
+</html>

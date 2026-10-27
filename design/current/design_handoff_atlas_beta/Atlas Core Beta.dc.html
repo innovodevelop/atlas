@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>(function(){window.addEventListener("unhandledrejection",function(e){var m=String(e.reason&&e.reason.message||e.reason);if(/Transition was aborted|ViewTransition/.test(m))e.preventDefault()});var top=false;try{top=window.self===window.top}catch(e){}var s=document.createElement("style");if(top){s.textContent="@view-transition{navigation:auto}";}else{s.textContent="html{animation:atlas-in .45s cubic-bezier(.22,1,.36,1) both}html.atlas-out{transition:opacity .22s ease,transform .22s ease;opacity:0;transform:scale(.988)}@keyframes atlas-in{from{opacity:0;transform:scale(1.012)}}";document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a||e.defaultPrevented||e.metaKey||e.ctrlKey||a.target)return;var h=a.getAttribute("href");if(!/\.dc\.html/.test(h)||/^https?:/.test(h))return;if(h.split("#")[0]===""||location.pathname.endsWith(encodeURI(h.split("#")[0]))&&h.indexOf("#")>0)return;e.preventDefault();document.documentElement.classList.add("atlas-out");setTimeout(function(){location.href=h},210)},true);}document.head.appendChild(s)})();</script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script>window.addEventListener("pagereveal",function(e){var t=e.viewTransition;if(t){["ready","finished","updateCallbackDone"].forEach(function(p){t[p]&&t[p].catch(function(){})})}});window.addEventListener("unhandledrejection",function(e){if(/Transition was aborted|ViewTransition/.test(String(e.reason&&e.reason.message||e.reason)))e.preventDefault()});</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+@keyframes spin{to{transform:rotate(360deg)}}
+::view-transition-group(*){animation-duration:.55s;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+::view-transition-old(root){animation:.4s cubic-bezier(.22,1,.36,1) both vt-out}
+::view-transition-new(root){animation:.55s cubic-bezier(.22,1,.36,1) both vt-in}
+@keyframes vt-out{to{opacity:0;transform:scale(.985)}}
+@keyframes vt-in{from{opacity:0;transform:scale(1.015)}}
+*{box-sizing:border-box}
+body{margin:0;background:#f9f7f4}
+button,input,textarea{border:none;font:inherit;background:none;color:inherit}
+a{color:#3461f2;text-decoration:none}a:hover{color:#2748bd}
+::selection{background:#e8d8c2}
+::placeholder{color:#b6b1aa}
+.nosb{scrollbar-width:none}.nosb::-webkit-scrollbar{display:none}
+@keyframes bpop{from{opacity:0;transform:translateY(14px) scale(.986)}to{opacity:1;transform:none}}
+@keyframes bdot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
+</style>
+<script src="atlas-quickstart-sphere.js"></script>
+<script src="atlas-orb.js"></script>
+<script src="atlas-topbar.js"></script>
+</helmet>
+
+<div data-screen-label="Atlas Core — Beta" style="height:100vh;display:flex;flex-direction:column;gap:12px;padding:26px 26px 88px;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden">
+
+<header data-screen-label="Core hero" style="flex:none;view-transition-name:hero;position:relative;border-radius:36px;background:#1e1e24;color:#f9f7f4;padding:clamp(22px,3vw,40px);display:flex;flex-wrap:wrap;align-items:center;gap:28px;overflow:hidden"><a href="Atlas Dashboard Beta.dc.html" title="Back · Esc" style="position:absolute;right:18px;top:18px;height:34px;padding:0 12px;display:flex;align-items:center;gap:6px;border-radius:9999px;background:rgba(249,247,244,.1);color:#f9f7f4;font-size:12.5px;font-weight:600;z-index:2">← Home</a>
+<div style="position:relative;width:220px;height:220px;flex:none"><svg viewBox="0 0 220 220" style="position:absolute;inset:0;width:100%;height:100%;animation:spin 60s linear infinite"><circle cx="110" cy="110" r="104" fill="none" stroke="rgba(249,247,244,.14)" stroke-width="1" stroke-dasharray="2 6"></circle><circle cx="110" cy="110" r="80" fill="none" stroke="rgba(143,169,255,.28)" stroke-width="1"></circle><circle cx="214" cy="110" r="4" fill="#8fa9ff"></circle><circle cx="30" cy="110" r="3" fill="#50dca0"></circle><circle cx="110" cy="6" r="3" fill="#ffb36b"></circle></svg><div style="position:absolute;inset:30px"><canvas ref="{{ sphereRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas></div></div>
+<div style="flex:1;min-width:260px;display:flex;flex-direction:column;gap:10px"><span style="font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:rgba(249,247,244,.62)">{{ eyebrow }}</span><h1 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(44px,5.6vw,84px);font-weight:500;letter-spacing:-.055em;line-height:.92">Core</h1><p style="margin:0;max-width:620px;font-size:15.5px;line-height:1.55;color:rgba(249,247,244,.78);text-wrap:pretty">{{ intro }}</p></div>
+</header>
+
+<nav aria-label="Core sections" class="nosb" style="flex-wrap:wrap;flex:none;display:flex;gap:2px;padding:5px;border-radius:9999px;background:#f1eeea;overflow-x:auto;align-self:flex-start;max-width:100%">
+<sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5">
+<button onClick="{{ act }}" data-a="tab" data-k="{{ t.k }}" aria-current="{{ t.cur }}" style="border:none;flex:none;display:flex;align-items:center;gap:8px;height:36px;padding:0 15px 0 12px;border-radius:9999px;background:{{ t.bg }};color:{{ t.fg }};font-family:inherit;font-size:13px;font-weight:{{ t.fw }};white-space:nowrap;cursor:pointer;box-shadow:{{ t.sh }};transition:background .2s" style-hover="background:{{ t.hov }}">
+<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{ t.ico }}"></path></svg>{{ t.l }}
+<sc-if value="{{ t.live }}" hint-placeholder-val="{{ false }}"><span style="width:6px;height:6px;border-radius:50%;background:#d0453a;animation:bdot 1.6s ease-in-out infinite"></span></sc-if>
+<sc-if value="{{ t.hasBadge }}" hint-placeholder-val="{{ false }}"><span style="height:18px;min-width:18px;padding:0 6px;display:flex;align-items:center;justify-content:center;border-radius:9999px;background:#3461f2;color:#fff;font-size:10.5px;font-weight:600">{{ t.badge }}</span></sc-if>
+<sc-if value="{{ t.admin }}" hint-placeholder-val="{{ false }}"><span style="font-size:10.5px;font-weight:600;color:#8b8681">Admin</span></sc-if>
+</button>
+</sc-for>
+</nav>
+
+<main ref="{{ mainRef }}" style="flex:1;min-height:0;overflow-y:auto;border-radius:28px;background:#f1eeea;padding:18px;display:grid;grid-template-columns:{{ cols }};grid-auto-rows:min-content;gap:12px;align-content:start">
+
+<sc-if value="{{ isOverview }}" hint-placeholder-val="{{ true }}">
+<div style="grid-column:1 / -1;display:grid;grid-template-columns:{{ heroCols }};gap:12px">
+<div style="border-radius:28px;background:#1e1e24;color:#f9f7f4;padding:24px;display:flex;flex-direction:column;gap:12px;animation:bpop .6s cubic-bezier(.22,1,.36,1) both">
+<span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:rgba(249,247,244,.62)">Knowledge</span>
+<div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap"><span style="font-family:'Hanken Grotesk',sans-serif;font-size:clamp(52px,6vw,84px);font-weight:600;letter-spacing:-.05em;line-height:.9;font-variant-numeric:tabular-nums">{{ kCount }}</span><span style="font-size:14px;font-weight:600;color:rgba(249,247,244,.78);padding-bottom:6px">entries indexed</span></div>
+<p style="margin:0;max-width:440px;font-size:13.5px;line-height:1.55;color:rgba(249,247,244,.78);text-wrap:pretty">{{ heroLine }}</p>
+<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:auto"><button onClick="{{ act }}" data-a="tab" data-k="search" style="border:none;flex:none;white-space:nowrap;height:36px;padding:0 16px;border-radius:9999px;background:#fffdfa;color:#1e1e24;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#f1eeea">Search the brain</button><button onClick="{{ act }}" data-a="tab" data-k="research" style="border:none;flex:none;white-space:nowrap;height:36px;padding:0 16px;border-radius:9999px;background:rgba(249,247,244,.12);color:#f9f7f4;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:rgba(249,247,244,.2)">Start research</button></div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+<sc-for list="{{ stats }}" as="s" hint-placeholder-count="4">
+<div style="border-radius:24px;background:#fffdfa;padding:18px 20px;display:flex;flex-direction:column;gap:6px;animation:bpop .6s cubic-bezier(.22,1,.36,1) both">
+<span style="display:flex;align-items:center;justify-content:space-between;font-size:12.5px;font-weight:600;color:#6d6a67">{{ s.k }}<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8b8681" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{ s.ico }}"></path></svg></span>
+<span style="font-family:'Hanken Grotesk',sans-serif;font-size:36px;font-weight:600;letter-spacing:-.045em;line-height:1;color:{{ s.fg }};font-variant-numeric:tabular-nums">{{ s.v }}</span>
+<span style="font-size:12px;color:#6d6a67">{{ s.d }}</span>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isSearch }}" hint-placeholder-val="{{ false }}">
+<div style="grid-column:1 / -1;border-radius:24px;background:#fffdfa;padding:20px;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;align-items:center;gap:10px;height:52px;padding:0 8px 0 16px;border-radius:16px;background:#f9f7f4">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b8681" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{ searchIco }}"></path></svg>
+<input ref="{{ qRef }}" value="{{ q }}" onInput="{{ onQ }}" placeholder="Search knowledge, research, findings…" aria-label="Search the brain" style="border:none;outline:none;flex:1;min-width:0;height:100%;background:transparent;color:#1e1e24;font-family:inherit;font-size:15px">
+<sc-if value="{{ hasQ }}" hint-placeholder-val="{{ false }}"><button onClick="{{ act }}" data-a="clearQ" style="border:none;height:34px;padding:0 12px;border-radius:9999px;background:#f1eeea;color:#6d6a67;font-family:inherit;font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:#edebe7">Clear</button></sc-if>
+</div>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px">
+<div style="display:flex;gap:2px;padding:3px;border-radius:9999px;background:#f1eeea"><sc-for list="{{ modes }}" as="m" hint-placeholder-count="3"><button onClick="{{ act }}" data-a="mode" data-k="{{ m.k }}" style="border:none;flex:none;white-space:nowrap;height:30px;padding:0 14px;border-radius:9999px;background:{{ m.bg }};color:{{ m.fg }};box-shadow:{{ m.sh }};font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer">{{ m.l }}</button></sc-for></div>
+<span style="font-size:12px;color:#6d6a67">{{ modeHint }}</span>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ suggest }}" as="sg" hint-placeholder-count="4"><button onClick="{{ act }}" data-a="suggest" data-k="{{ sg }}" style="border:none;flex:none;white-space:nowrap;height:32px;padding:0 13px;border-radius:9999px;background:#f9f7f4;color:#1e1e24;font-family:inherit;font-size:12.5px;cursor:pointer" style-hover="background:#edebe7">{{ sg }}</button></sc-for></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isResearch }}" hint-placeholder-val="{{ false }}">
+<div style="grid-column:1 / -1;border-radius:24px;background:#fffdfa;padding:20px;display:flex;flex-direction:column;gap:10px">
+<p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em">Ask Atlas to research something</p>
+<p style="margin:0;font-size:12.5px;line-height:1.5;color:#6d6a67">Atlas reads sources in the background and files a report with citations. You'll get a notification when it's done.</p>
+<div style="display:flex;gap:6px"><input value="{{ rq }}" onInput="{{ onRq }}" onKeyDown="{{ rqKey }}" placeholder="e.g. Best neighbourhoods in Lisbon for a 3-month stay" style="border:none;outline:none;flex:1;min-width:0;height:44px;padding:0 14px;border-radius:14px;background:#f9f7f4;color:#1e1e24;font-family:inherit;font-size:13.5px" style-focus="background:#eef2fe"><button onClick="{{ act }}" data-a="startR" style="border:none;flex:none;height:44px;padding:0 18px;border-radius:9999px;background:{{ rqBg }};color:{{ rqFg }};font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Start</button></div>
+</div>
+</sc-if>
+
+<sc-for list="{{ cards }}" as="c" hint-placeholder-count="4">
+<section style="grid-column:{{ c.gc }};min-width:0;border-radius:24px;background:{{ c.bg }};padding:20px;display:flex;flex-direction:column;gap:6px;animation:bpop .5s cubic-bezier(.22,1,.36,1) both">
+<div style="display:flex;align-items:flex-start;gap:12px;padding-bottom:8px">
+<sc-if value="{{ c.hasIcon }}" hint-placeholder-val="{{ true }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b8681" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><path d="{{ c.ico }}"></path></svg></sc-if>
+<div style="flex:1;min-width:0"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em;color:{{ c.titleFg }}">{{ c.title }}</p><sc-if value="{{ c.hasSub }}" hint-placeholder-val="{{ false }}"><p style="margin:3px 0 0;font-size:12.5px;line-height:1.5;color:#6d6a67;text-wrap:pretty">{{ c.sub }}</p></sc-if></div>
+<sc-for list="{{ c.headBtns }}" as="b" hint-placeholder-count="0"><button onClick="{{ act }}" data-a="{{ b.a }}" data-k="{{ b.k }}" style="border:none;flex:none;height:32px;padding:0 13px;border-radius:9999px;background:{{ b.bg }};color:{{ b.fg }};font-family:inherit;font-size:12.5px;font-weight:600;white-space:nowrap;cursor:pointer" style-hover="filter:brightness(.96)">{{ b.l }}</button></sc-for>
+</div>
+<sc-if value="{{ c.hasTiles }}" hint-placeholder-val="{{ false }}"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px"><sc-for list="{{ c.tiles }}" as="t" hint-placeholder-count="6"><button onClick="{{ act }}" data-a="{{ t.a }}" data-k="{{ t.k }}" style="border:none;display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:14px;border-radius:16px;background:{{ t.bg }};font-family:inherit;text-align:left;cursor:pointer;transition:background .2s" style-hover="background:#edebe7"><span style="font-family:'Hanken Grotesk',sans-serif;font-size:26px;font-weight:600;letter-spacing:-.04em;line-height:1;color:{{ t.fg }};font-variant-numeric:tabular-nums">{{ t.v }}</span><span style="font-size:12.5px;font-weight:600;color:#1e1e24">{{ t.l }}</span><span style="font-size:11.5px;color:#6d6a67">{{ t.d }}</span></button></sc-for></div></sc-if>
+<sc-for list="{{ c.rows }}" as="r" hint-placeholder-count="3">
+<div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:{{ r.bg }};transition:background .25s;animation:{{ r.anim }}">
+<sc-if value="{{ r.hasDot }}" hint-placeholder-val="{{ false }}"><span style="flex:none;width:8px;height:8px;border-radius:50%;background:{{ r.dot }}"></span></sc-if>
+<sc-if value="{{ r.hasIcon }}" hint-placeholder-val="{{ false }}"><span style="display:flex;flex:none;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:{{ r.chipBg }};color:{{ r.chipFg }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{ r.ico }}"></path></svg></span></sc-if>
+<div style="flex:1;min-width:0">
+<p style="margin:0;font-size:{{ r.tSize }};font-weight:{{ r.tW }};font-family:{{ r.tFont }};color:#1e1e24;overflow:hidden;text-overflow:ellipsis;white-space:{{ r.tWrap }}">{{ r.t }}</p>
+<sc-if value="{{ r.hasS }}" hint-placeholder-val="{{ true }}"><p style="margin:2px 0 0;font-size:12px;line-height:1.45;color:{{ r.sFg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.s }}</p></sc-if>
+<sc-if value="{{ r.hasMeter }}" hint-placeholder-val="{{ false }}"><div style="height:5px;margin-top:8px;border-radius:9999px;background:#edebe7;overflow:hidden"><div style="width:{{ r.mw }};height:100%;border-radius:9999px;background:{{ r.mfg }};transition:width .4s"></div></div></sc-if>
+</div>
+<sc-if value="{{ r.hasTag }}" hint-placeholder-val="{{ false }}"><span style="flex:none;height:22px;padding:0 9px;display:flex;align-items:center;border-radius:9999px;background:{{ r.tagBg }};color:{{ r.tagFg }};font-size:11px;font-weight:600;white-space:nowrap">{{ r.tag }}</span></sc-if>
+<sc-if value="{{ r.hasTrail }}" hint-placeholder-val="{{ false }}"><span style="flex:none;font-size:12px;font-weight:600;color:{{ r.trailFg }};font-variant-numeric:tabular-nums;white-space:nowrap">{{ r.trail }}</span></sc-if>
+<sc-for list="{{ r.btns }}" as="b" hint-placeholder-count="0"><button onClick="{{ act }}" data-a="{{ b.a }}" data-k="{{ b.k }}" style="border:none;flex:none;height:30px;padding:0 12px;border-radius:9999px;background:{{ b.bg }};color:{{ b.fg }};font-family:inherit;font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer" style-hover="filter:brightness(.95)">{{ b.l }}</button></sc-for>
+<sc-if value="{{ r.isToggle }}" hint-placeholder-val="{{ false }}"><button onClick="{{ act }}" data-a="{{ r.a }}" data-k="{{ r.k }}" role="switch" aria-label="{{ r.t }}" style="display:flex;flex:none;width:42px;height:25px;padding:3px;border:none;border-radius:9999px;background:{{ r.swBg }};justify-content:{{ r.swPos }};cursor:pointer;transition:background .25s"><span style="width:19px;height:19px;border-radius:50%;background:#fff;box-shadow:0 2px 5px rgba(30,30,36,.22)"></span></button></sc-if>
+</div>
+</sc-for>
+<sc-if value="{{ c.hasEmpty }}" hint-placeholder-val="{{ false }}"><div style="padding:22px 16px;border-radius:16px;background:#f9f7f4;text-align:center;font-size:12.5px;line-height:1.5;color:#6d6a67;text-wrap:pretty">{{ c.empty }}</div></sc-if>
+<sc-if value="{{ c.hasNote }}" hint-placeholder-val="{{ false }}"><p style="margin:6px 2px 0;font-size:12px;line-height:1.5;color:#6d6a67;text-wrap:pretty">{{ c.note }}</p></sc-if>
+<sc-if value="{{ c.hasLink }}" hint-placeholder-val="{{ false }}"><a href="{{ c.linkHref }}" style="align-self:flex-start;margin-top:8px;height:34px;padding:0 14px;display:flex;align-items:center;border-radius:9999px;background:#f1eeea;color:#1e1e24;font-size:12.5px;font-weight:600" style-hover="background:#edebe7;color:#1e1e24">{{ c.link }}</a></sc-if>
+</section>
+</sc-for>
+
+</main>
+
+<sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+<div role="status" style="position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:50;display:flex;align-items:center;gap:10px;height:42px;padding:0 18px;border-radius:9999px;background:#1e1e24;color:#f9f7f4;font-size:13px;font-weight:500;box-shadow:0 18px 40px -18px rgba(30,30,36,.5);animation:bpop .35s cubic-bezier(.22,1,.36,1) both"><span style="width:7px;height:7px;border-radius:50%;background:#0fae76"></span>{{ toast }}</div>
+</sc-if>
+
+<nav aria-label="Atlas" data-dock="beta" style="view-transition-name:atlas-dock;position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:4px;padding:6px;border-radius:9999px;background:rgba(255,253,250,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 18px 40px -20px rgba(30,30,36,.28)">
+<a href="Atlas Dashboard Beta.dc.html" title="Home" aria-label="Home" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M3.5 10.9 10.7 4.3a2 2 0 0 1 2.6 0l7.2 6.6v6.9a3 3 0 0 1-3 3h-3v-5.4a2.5 2.5 0 0 0-5 0v5.4h-3a3 3 0 0 1-3-3z"></path></svg></a>
+<span aria-current="page" style="flex:none;display:flex;align-items:center;gap:8px;height:42px;padding:0 16px 0 13px;border-radius:9999px;background:#1e1e24;color:#f9f7f4;font-size:13px;font-weight:600;white-space:nowrap"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.6a8.4 8.4 0 1 1 0 16.8 8.4 8.4 0 0 1 0-16.8M12 8.8a3.2 3.2 0 1 1 0 6.4 3.2 3.2 0 0 1 0-6.4M12 3.6v5.2M12 15.2v5.2M3.6 12h5.2M15.2 12h5.2"></path></svg>Core</span>
+<a href="Atlas Teach Beta.dc.html" title="Teach" aria-label="Teach" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 7.4a5.2 5.2 0 0 0-3.9-1.8H5a1.2 1.2 0 0 0-1.2 1.2v9.6A1.2 1.2 0 0 0 5 17.6h3.1A5.2 5.2 0 0 1 12 19.4a5.2 5.2 0 0 1 3.9-1.8H19a1.2 1.2 0 0 0 1.2-1.2V6.8A1.2 1.2 0 0 0 19 5.6h-3.1A5.2 5.2 0 0 0 12 7.4zM12 7.4v12"></path></svg></a>
+<a href="Atlas Mail Beta.dc.html" title="Mail" aria-label="Mail" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M6.6 5.6h10.8a3.2 3.2 0 0 1 3.2 3.2v6.4a3.2 3.2 0 0 1-3.2 3.2H6.6a3.2 3.2 0 0 1-3.2-3.2V8.8a3.2 3.2 0 0 1 3.2-3.2zM3.8 7.6l7 4.8a2.2 2.2 0 0 0 2.4 0l7-4.8"></path></svg></a>
+<a href="Atlas Architecture Beta.dc.html" title="Architecture" aria-label="Architecture" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.4 3.4 7.9 12 12.4l8.6-4.5zM3.4 12.1 12 16.6l8.6-4.5M3.4 16.3 12 20.8l8.6-4.5"></path></svg></a>
+<a href="Atlas Voice Beta.dc.html" title="Voice" aria-label="Voice" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.5a2.6 2.6 0 0 1 2.6 2.6v5.4a2.6 2.6 0 0 1-5.2 0V6.1A2.6 2.6 0 0 1 12 3.5zM18.1 11.5a6.1 6.1 0 0 1-12.2 0M12 17.6v3"></path></svg></a>
+<a href="Atlas Settings Beta.dc.html" title="Marcus · Settings" aria-label="Settings" style="flex:none;display:flex;align-items:center;justify-content:center;gap:8px;height:42px;width:42px;border-radius:9999px;background:transparent;color:#1e1e24;font-size:13px;font-weight:600;white-space:nowrap" style-hover="background:#f1eeea;color:#1e1e24"><span style="width:34px;height:34px;border-radius:50%;background:#1e1e24;color:#f9f7f4;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">M</span></a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;initialTab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;overview&quot;,&quot;options&quot;:[&quot;overview&quot;,&quot;search&quot;,&quot;knowledge&quot;,&quot;research&quot;,&quot;memory&quot;,&quot;live&quot;,&quot;agent&quot;,&quot;learning&quot;],&quot;tsType&quot;:&quot;string&quot;},&quot;edition&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;admin&quot;,&quot;options&quot;:[&quot;admin&quot;,&quot;consumer&quot;],&quot;tsType&quot;:&quot;'admin' | 'consumer'&quot;}}">
+class Component extends DCLogic {
+  state = {
+    tab: 'overview', vw: window.innerWidth, ico: {}, toast: '',
+    q: '', mode: 'hybrid', rq: '',
+    research: [
+      { id: 'r1', t: 'Lisbon neighbourhoods for a 3-month stay', st: 'researching', src: 14 },
+      { id: 'r2', t: 'Q4 hiring benchmarks for design teams', st: 'processing', src: 22 },
+      { id: 'r3', t: 'Heat pump vs. gas boiler running costs, UK', st: 'queued', src: 0 },
+      { id: 'r4', t: 'Paris restaurants without shellfish menus', st: 'paused', src: 6 }
+    ],
+    done: [
+      { id: 'd1', t: 'Best noise-cancelling headphones 2026', src: 31, when: 'Yesterday' },
+      { id: 'd2', t: 'Marais walking routes from Rue de Bretagne', src: 12, when: 'Thursday' },
+      { id: 'd3', t: 'Tax treatment of RSUs after relocation', src: 18, when: '18 Oct' }
+    ],
+    live: true, events: null, agents: { triage: true, digest: true, research: true, booking: false }, approvals: ['a1', 'a2']
+  };
+  componentDidMount() {
+    this.onResize = () => this.setState({ vw: window.innerWidth });
+    window.addEventListener('resize', this.onResize);
+    this.onKey = (e) => { if (e.key === 'Escape' && !/INPUT|TEXTAREA/.test(document.activeElement && document.activeElement.tagName)) window.location.href = 'Atlas Dashboard Beta.dc.html'; };
+    window.addEventListener('keydown', this.onKey);
+    const h = (window.location.hash || '').slice(1), want = h || this.props.initialTab;
+    if (want && this.tabs().some((t) => t.k === want)) this.setState({ tab: want });
+    fetch('atlas-icon-data.js').then((r) => r.text()).then((t) => {
+      const SET = new Function(t.replace(/export\s+const\s+SET\s*=/, 'return'))(), ico = {};
+      SET.forEach((g) => g[2].forEach(([n, d]) => { ico[n] = d; }));
+      this.setState({ ico });
+    }).catch(() => {});
+    this.evTimer = setInterval(() => { if (this.state.tab === 'live' && this.state.live) this.pushEvent(); }, 1800);
+  }
+  componentDidUpdate(p) { if (p.initialTab !== this.props.initialTab && this.props.initialTab) this.setState({ tab: this.props.initialTab }); }
+  componentWillUnmount() {
+    window.removeEventListener('resize', this.onResize); window.removeEventListener('keydown', this.onKey);
+    clearInterval(this.evTimer); (this.timers || []).forEach(clearTimeout); if (this.sph) this.sph.destroy();
+  }
+  later(fn, ms) { (this.timers = this.timers || []).push(setTimeout(fn, ms)); }
+  toast(t) { this.setState({ toast: t }); clearTimeout(this.tt); this.tt = setTimeout(() => this.setState({ toast: '' }), 2400); }
+  admin() { return (this.props.edition ?? 'admin') === 'admin'; }
+  tabs() {
+    const all = [
+      { k: 'overview', l: 'Overview', i: 'activity', intro: 'What Atlas knows, what it is researching, and how healthy the brain is right now.' },
+      { k: 'search', l: 'Search', i: 'search', intro: 'Search everything Atlas knows, by exact words, by meaning, or both.' },
+      { k: 'knowledge', l: 'Knowledge', i: 'document', intro: 'Every domain Atlas has learned about, and what it indexed most recently.' },
+      { k: 'research', l: 'Research', i: 'teach', intro: 'Background research Atlas is running for you, and the reports it has filed.' },
+      { k: 'memory', l: 'Memory', i: 'memory', intro: 'What Atlas remembers about you. Manage or erase it in Settings.' },
+      { k: 'live', l: 'Live', i: 'loading', intro: 'The raw event stream from the brain, as it happens.', admin: true },
+      { k: 'agent', l: 'Agent', i: 'control', intro: 'Agents, the approvals they are waiting on, and every tool call they made.', admin: true },
+      { k: 'learning', l: 'Learning', i: 'energy', intro: 'Validation rates and pipeline metrics for what Atlas learns.', admin: true }
+    ];
+    return this.admin() ? all : all.filter((t) => !t.admin);
+  }
+  pushEvent() {
+    const E = [['info', 'memory.write', 'Saved “Coffee order” · importance 0.42'], ['info', 'research.step', 'Lisbon neighbourhoods · read 3 sources'], ['info', 'mail.scan', 'marcus.hale@gmail.com · 4 new, 1 bill found'], ['warn', 'provider.latency', 'Bedrock eu-west-1 · 1.8 s p95'], ['info', 'voice.session', 'Wake word · session opened'], ['info', 'knowledge.index', 'Indexed 12 chunks from “Marais walking routes”'], ['info', 'agent.tool', 'triage → mail.label(“Bills”)']];
+    const e = E[Math.floor(Math.random() * E.length)], now = new Date();
+    const ts = now.toTimeString().slice(0, 8);
+    this.setState((s) => ({ events: [{ id: now.getTime(), sev: e[0], k: e[1], m: e[2], ts, fresh: true }].concat((s.events || this.seedEvents()).map((x) => Object.assign({}, x, { fresh: false }))).slice(0, 14) }));
+  }
+  seedEvents() {
+    return [['info', 'knowledge.index', 'Indexed 8 chunks from “Q4 hiring benchmarks”', '14:02:11'], ['info', 'memory.read', 'Recall “Paris trip” for conversation', '14:01:58'], ['warn', 'provider.latency', 'Bedrock eu-west-1 · 2.1 s p95', '14:01:40'], ['info', 'research.step', 'Q4 hiring benchmarks · summarising', '14:01:22'], ['error', 'mail.sync', 'marcus@fogware.com · token expired', '14:00:05'], ['info', 'voice.session', 'Session closed · 3 turns', '13:58:47']].map((e, i) => ({ id: i, sev: e[0], k: e[1], m: e[2], ts: e[3], fresh: false }));
+  }
+  act = (e) => {
+    const a = e.currentTarget.getAttribute('data-a'), k = e.currentTarget.getAttribute('data-k'), s = this.state;
+    const R = (id, o) => this.setState({ research: s.research.map((r) => (r.id === id ? Object.assign({}, r, o) : r)) });
+    switch (a) {
+      case 'tab': this.setState({ tab: k }); if (this.main) this.main.scrollTop = 0; try { history.replaceState(null, '', '#' + k); } catch (x) {} break;
+      case 'mode': this.setState({ mode: k }); break;
+      case 'suggest': this.setState({ q: k }); break;
+      case 'clearQ': this.setState({ q: '' }); if (this.qEl) this.qEl.focus(); break;
+      case 'startR': this.startR(); break;
+      case 'pause': R(k, { st: 'paused' }); break;
+      case 'resume': R(k, { st: 'queued' }); break;
+      case 'cancelR': this.setState({ research: s.research.filter((r) => r.id !== k) }); this.toast('Research cancelled'); break;
+      case 'open': this.toast('Opening report…'); break;
+      case 'domain': this.setState({ tab: 'search', q: k }); break;
+      case 'live': this.setState({ live: !s.live }); break;
+      case 'agentT': this.setState({ agents: Object.assign({}, s.agents, { [k]: !s.agents[k] }) }); break;
+      case 'approve': case 'deny': this.setState({ approvals: s.approvals.filter((x) => x !== k) }); this.toast(a === 'approve' ? 'Approved · agent continuing' : 'Denied · agent stopped that step'); break;
+    }
+  };
+  startR() {
+    const t = this.state.rq.trim(); if (!t) return;
+    const id = 'r' + Date.now();
+    this.setState((s) => ({ rq: '', research: [{ id, t, st: 'queued', src: 0 }].concat(s.research) }));
+    this.toast('Added to the research queue');
+    this.later(() => this.setState((s) => ({ research: s.research.map((r) => (r.id === id ? Object.assign({}, r, { st: 'researching', src: 2 }) : r)) })), 1600);
+  }
+  renderVals() {
+    const st = this.state, I = st.ico, ic = (n) => I[n] || '';
+    const narrow = st.vw < 980;
+    const TONE = { pri: ['#3461f2', '#fffdfa'], tint: ['#eef2fe', '#2748bd'], sec: ['#f1eeea', '#1e1e24'], card: ['#fffdfa', '#1e1e24'], ghost: ['transparent', '#6d6a67'], danger: ['#f1eeea', '#a3352c'], green: ['#e3f4ec', '#0a7a53'] };
+    const B = (l, a, k, t) => ({ l, a, k: k || '', bg: TONE[t || 'sec'][0], fg: TONE[t || 'sec'][1] });
+    const row = (o) => Object.assign({ bg: '#f9f7f4', chipBg: '#f1eeea', chipFg: '#6d6a67', sFg: '#6d6a67', trailFg: '#6d6a67', btns: [], isToggle: false, hasMeter: false, tSize: '13.5px', tW: 600, tFont: 'inherit', tWrap: 'nowrap', tagBg: '#f1eeea', tagFg: '#6d6a67', anim: 'none', a: '', k: '' }, o, {
+      hasIcon: !!o.ico, ico: o.ico ? ic(o.ico) : '', hasS: !!o.s, hasTrail: !!o.trail, hasDot: !!o.dot, hasTag: !!o.tag
+    }, o.isToggle ? { swBg: o.on ? '#3461f2' : '#d8d4cd', swPos: o.on ? 'flex-end' : 'flex-start' } : {});
+    const card = (o) => Object.assign({ bg: '#fffdfa', titleFg: '#1e1e24', rows: [], headBtns: [], tiles: [], gc: 'span 1' }, o, {
+      hasIcon: !!o.ico, ico: o.ico ? ic(o.ico) : '', hasSub: !!o.sub, hasNote: !!o.note, hasEmpty: !!o.empty, hasTiles: !!(o.tiles && o.tiles.length), hasLink: !!o.link
+    }, o.full ? { gc: '1 / -1' } : {});
+    const tabs = this.tabs(), tab = tabs.find((t) => t.k === st.tab) || tabs[0], T = tab.k;
+    const ST = { researching: ['Researching', '#eef2fe', '#2748bd'], processing: ['Writing report', '#eef2fe', '#2748bd'], queued: ['Queued', '#f1eeea', '#6d6a67'], paused: ['Paused', '#f1eeea', '#8b8681'] };
+    const active = st.research.filter((r) => r.st === 'researching' || r.st === 'processing').length;
+    const rRow = (r) => row({ ico: 'teach', t: r.t, s: r.src ? r.src + ' sources read' : 'Waiting to start', tag: ST[r.st][0], tagBg: ST[r.st][1], tagFg: ST[r.st][2], chipBg: r.st === 'paused' ? '#f1eeea' : '#1e1e24', chipFg: r.st === 'paused' ? '#8b8681' : '#f9f7f4',
+      btns: r.st === 'paused' ? [B('Resume', 'resume', r.id, 'tint'), B('Cancel', 'cancelR', r.id, 'ghost')] : [B('Pause', 'pause', r.id, 'sec')] });
+    const KN = [
+      ['Travel', 214, 'Paris, Lisbon, flights'], ['Work', 388, 'Fogware, hiring, Q4'], ['Money', 146, 'Portfolio, bills, tax'], ['Home', 97, 'Devices, energy, rooms'],
+      ['Health', 72, 'Sleep, training, diet'], ['People', 181, 'Contacts and context'], ['Reading', 133, 'Articles and reports'], ['Language', 53, 'Words Atlas picked up']
+    ];
+    const kCount = KN.reduce((n, x) => n + x[1], 0);
+    let cards = [], stats = [];
+    if (T === 'overview') {
+      stats = [
+        { k: 'Research', v: String(active), d: 'active topics', ico: ic('teach'), fg: '#1e1e24' },
+        { k: 'Memories', v: '412', d: 'stored on this Mac', ico: ic('memory'), fg: '#1e1e24' },
+        { k: 'Error rate', v: '0.4%', d: 'last 24 hours', ico: ic('warning'), fg: '#1e1e24' },
+        { k: 'Health', v: '98%', d: 'one provider degraded', ico: ic('activity'), fg: '#0a7a53' }
+      ];
+      cards = [
+        card({ ico: 'document', title: 'Recent knowledge', rows: [['Marais walking routes', 'Travel', 0.91, '12 min ago'], ['Q4 hiring benchmarks', 'Work', 0.88, '40 min ago'], ['RSU tax after relocation', 'Money', 0.84, 'Yesterday'], ['Maya Reyes · 1:1 notes', 'People', 0.79, 'Yesterday']].map(([t, c, r, w]) => row({ t, s: c + ' · ' + r.toFixed(2) + ' relevance', trail: w, trailFg: '#b6b1aa' })), headBtns: [B('All knowledge', 'tab', 'knowledge', 'ghost')] }),
+        card({ ico: 'teach', title: 'Research queue', rows: st.research.slice(0, 3).map(rRow), headBtns: [B('Open', 'tab', 'research', 'ghost')], empty: st.research.length ? '' : 'Queue is clear.' }),
+        card({ ico: 'download', title: 'Indexing', sub: 'The one figure Atlas actually measures. Throughput and pipeline counts aren’t tracked yet, so they aren’t shown.', rows: [row({ t: kCount.toLocaleString() + ' entries', s: 'Last indexed 12 minutes ago · 6.8 GB on disk', trail: 'Indexed', trailFg: '#0a7a53' })] }),
+        card({ ico: 'warning', title: 'Recent errors', rows: [['error', 'Mail sync failed', 'marcus@fogware.com · token expired · 14:00'], ['warn', 'Slow provider', 'Bedrock eu-west-1 · 2.1 s p95 · 14:01'], ['warn', 'Source unreachable', 'lisbon-guide.example · timed out · 13:12']].map(([sev, t, s]) => row({ dot: sev === 'error' ? '#d0453a' : '#e0a21f', t, s })), note: 'Errors clear themselves once resolved. Nothing older than 24 hours is shown.' })
+      ];
+    }
+    if (T === 'search') {
+      const q = st.q.trim().toLowerCase();
+      const ALL = [['Marais walking routes from Rue de Bretagne', 'Report', 'Travel', 0.93], ['Paris trip · flying 31 Oct, staying in Le Marais', 'Memory', 'Travel', 0.9], ['Restaurants near Le Marais without shellfish', 'Research', 'Travel', 0.86], ['Q4 hiring benchmarks for design teams', 'Report', 'Work', 0.88], ['Maya Reyes · direct report, weekly 1:1', 'Memory', 'People', 0.84], ['RSU tax treatment after relocation', 'Report', 'Money', 0.82], ['Heat pump running costs', 'Research', 'Home', 0.71], ['Lisbon neighbourhoods for a 3-month stay', 'Research', 'Travel', 0.78]];
+      const words = q.split(/\s+/).filter(Boolean);
+      const hits = !q ? [] : ALL.map(([t, ty, d, sc]) => {
+        const exact = words.every((w) => (t + ' ' + d).toLowerCase().includes(w));
+        const sem = words.some((w) => (t + ' ' + d).toLowerCase().includes(w.slice(0, 4)));
+        const ok = st.mode === 'keyword' ? exact : st.mode === 'semantic' ? sem : exact || sem;
+        return ok ? { t, ty, d, sc: exact && st.mode !== 'keyword' ? Math.min(0.99, sc + 0.05) : sc, both: exact && sem } : null;
+      }).filter(Boolean).sort((a, b) => b.sc - a.sc);
+      const TY = { Report: ['#eef2fe', '#2748bd', 'document'], Memory: ['#e3f4ec', '#0a7a53', 'memory'], Research: ['#f1eeea', '#6d6a67', 'teach'] };
+      cards = [card({ full: true, ico: 'search', title: q ? hits.length + ' result' + (hits.length === 1 ? '' : 's') : 'Top results', sub: q ? (st.mode === 'hybrid' ? 'Ranked by both. Things found twice rank highest.' : '') : '',
+        rows: hits.map((h) => row({ ico: TY[h.ty][2], chipBg: TY[h.ty][0], chipFg: TY[h.ty][1], t: h.t, s: h.ty + ' · ' + h.d + (h.both && st.mode === 'hybrid' ? ' · matched twice' : ''), trail: h.sc.toFixed(2), trailFg: '#6d6a67', btns: [B('Open', 'open', '', 'tint')] })),
+        empty: !q ? 'Type to search across everything Atlas knows.' : hits.length ? '' : 'No matches yet. Try “By meaning” for related ideas.' })];
+    }
+    if (T === 'knowledge') {
+      cards = [
+        card({ full: true, ico: 'folder', title: 'Domains', sub: kCount.toLocaleString() + ' entries across ' + KN.length + ' domains. Click a domain to search it.', tiles: KN.map(([l, v, d]) => ({ l, v: String(v), d, a: 'domain', k: l, bg: '#f9f7f4', fg: '#1e1e24' })) }),
+        card({ full: true, ico: 'document', title: 'Recently indexed', rows: [['Marais walking routes', 'Travel · report · 12 chunks', '12 min ago'], ['Q4 hiring benchmarks', 'Work · report · 8 chunks', '40 min ago'], ['Linden Studio portfolio site', 'People · web page · 5 chunks', '2 h ago'], ['Octopus Energy bill, October', 'Home · mail attachment · 3 chunks', 'Yesterday'], ['RSU tax after relocation', 'Money · report · 18 chunks', 'Yesterday']].map(([t, s, w]) => row({ ico: 'document', t, s, trail: w, trailFg: '#b6b1aa' })) })
+      ];
+    }
+    if (T === 'research') {
+      const q = st.research.filter((r) => r.st !== 'paused'), p = st.research.filter((r) => r.st === 'paused');
+      cards = [
+        card({ ico: 'teach', title: 'Research queue', sub: active + ' running · ' + st.research.filter((r) => r.st === 'queued').length + ' waiting', rows: q.map(rRow).concat(p.map(rRow)), empty: st.research.length ? '' : 'Queue is clear.' }),
+        card({ ico: 'success', title: 'Completed reports', rows: st.done.map((d) => row({ ico: 'document', chipBg: '#e3f4ec', chipFg: '#0a7a53', t: d.t, s: d.src + ' sources · ' + d.when, btns: [B('Read', 'open', d.id, 'tint')] })), empty: st.done.length ? '' : 'No completed reports yet.' })
+      ];
+    }
+    if (T === 'memory') {
+      cards = [
+        card({ ico: 'memory', title: 'What Atlas remembers', sub: '412 memories, stored locally on this Mac.', tiles: [['People', 96], ['Preferences', 74], ['Work', 88], ['Travel', 41], ['Health', 12], ['Language', 53], ['Places', 48]].map(([l, v]) => ({ l, v: String(v), d: 'memories', a: '', k: '', bg: '#f9f7f4', fg: '#1e1e24' })) }),
+        card({ ico: 'history', title: 'Most recent', rows: [['Coffee order', 'Flat white, oat milk', '2 h ago'], ['Paris trip', 'Flying 31 Oct, staying in Le Marais', 'Yesterday'], ['Allergy', 'Shellfish. Mention it when booking.', '3 days ago'], ['Standup', 'Means the 9:30 team sync', 'Last week']].map(([t, s, w]) => row({ t, s, trail: w, trailFg: '#b6b1aa' })), link: 'Manage in Settings → Memory & Privacy', linkHref: 'Atlas Settings Beta.dc.html#memory' })
+      ];
+    }
+    if (T === 'live') {
+      const ev = st.events || this.seedEvents();
+      cards = [card({ full: true, ico: 'loading', title: st.live ? 'Streaming' : 'Paused', sub: st.live ? 'New events appear at the top. Pause to read without the list moving.' : 'The stream is paused. Events are still recorded.', headBtns: [B(st.live ? 'Pause' : 'Resume', 'live', '', st.live ? 'sec' : 'pri')],
+        rows: ev.map((x) => row({ dot: x.sev === 'error' ? '#d0453a' : x.sev === 'warn' ? '#e0a21f' : '#0fae76', t: x.k + '  ' + x.m, tSize: '12.5px', tW: 500, tFont: "'Geist Mono',ui-monospace,monospace", s: '', trail: x.ts, trailFg: '#b6b1aa', bg: x.fresh ? '#eef2fe' : '#f9f7f4', anim: x.fresh ? 'bpop .4s cubic-bezier(.22,1,.36,1) both' : 'none' })) })];
+    }
+    if (T === 'agent') {
+      const AP = { a1: ['Booking agent wants to reserve a table', 'Le Petit Marché · Fri 1 Nov, 20:00, 2 people · no shellfish noted'], a2: ['Triage agent wants to archive 14 newsletters', 'Older than 30 days, never opened'] };
+      cards = [
+        card({ full: true, bg: st.approvals.length ? '#eef2fe' : '#fffdfa', ico: 'warning', title: st.approvals.length ? st.approvals.length + ' waiting for you' : 'No approvals waiting', sub: 'Agents stop and ask before anything that spends money, sends messages or deletes.',
+          rows: st.approvals.map((k) => row({ ico: 'control', chipBg: '#3461f2', chipFg: '#fff', bg: 'rgba(255,253,250,.78)', t: AP[k][0], s: AP[k][1], btns: [B('Approve', 'approve', k, 'pri'), B('Deny', 'deny', k, 'card')] })) }),
+        card({ ico: 'control', title: 'Agents', rows: [['triage', 'Mail triage', 'Labels and archives · every 15 min'], ['digest', 'Proactive digest', 'Prepares a summary while you are away'], ['research', 'Research', 'Reads sources for queued topics'], ['booking', 'Booking', 'Reservations, always asks first']].map(([k, t, s]) => row({ t, s, isToggle: true, on: !!st.agents[k], a: 'agentT', k })) }),
+        card({ ico: 'history', title: 'Tool calls', rows: [['triage → mail.label', '“Bills” on Octopus Energy', '14:02'], ['research → web.fetch', 'lisbon-guide.example · timed out', '13:12'], ['digest → calendar.read', 'Today, 4 events', '12:30'], ['booking → maps.search', '“restaurants Le Marais”', '11:48']].map(([t, s, w]) => row({ t, tSize: '12.5px', tW: 500, tFont: "'Geist Mono',ui-monospace,monospace", s, trail: w, trailFg: '#b6b1aa' })) })
+      ];
+    }
+    if (T === 'learning') {
+      cards = [
+        card({ ico: 'success', title: 'Validation success', sub: 'Share of new knowledge that passed checks before being saved. Last 7 days.', rows: [['Facts from conversation', 96], ['Research findings', 89], ['Mail extraction', 92], ['Personality updates', 78]].map(([t, v]) => row({ t, hasMeter: true, mw: v + '%', mfg: v >= 90 ? '#0fae76' : '#1e1e24', trail: v + '%', trailFg: '#1e1e24' })) }),
+        card({ ico: 'activity', title: 'Pipeline', tiles: [['Saved', '1,042', 'this week'], ['Rejected', '61', 'failed checks'], ['Merged', '38', 'duplicates'], ['Pruned', '17', 'stale']].map(([l, v, d]) => ({ l, v, d, a: '', k: '', bg: '#f9f7f4', fg: '#1e1e24' })) })
+      ];
+    }
+    return {
+      sphereRef: (el) => {
+        if (!el || el.__q) return;
+        const go = () => { if (el.__q || !el.isConnected) return; if (!window.QuickSphere) return setTimeout(go, 60);
+          el.__q = this.sph = window.QuickSphere.mount(el, { mode: 'veil', bg: 'transparent', tone: [30, 30, 36], dust: [92, 122, 248], strand: [176, 196, 255], blend: 'source-over', alpha: 0.75, seed: 11, count: 9000, scale: 0.42, state: this.sphState || 'idle' }); };
+        go();
+      },
+      _s: (() => { const ns = active > 0 ? 'working' : 'idle'; if (this.sphState !== ns) { this.sphState = ns; if (this.sph) this.sph.set({ state: ns }); } return ns; })(),
+      mainRef: (el) => { this.main = el; }, qRef: (el) => { this.qEl = el; },
+      eyebrow: 'Core · ' + (active ? active + ' research running' : 'idle'), intro: tab.intro,
+      tabs: tabs.map((t) => { const on = t.k === T; return { k: t.k, l: t.l, ico: ic(t.i), cur: on ? 'page' : 'false', bg: on ? '#fffdfa' : 'transparent', fg: on ? '#1e1e24' : '#6d6a67', fw: on ? 600 : 500, sh: on ? '0 2px 8px -3px rgba(30,30,36,.16)' : 'none', hov: on ? '#fffdfa' : '#edebe7', live: t.k === 'live' && st.live, hasBadge: t.k === 'agent' && st.approvals.length > 0, badge: String(st.approvals.length), admin: !!t.admin && !on }; }),
+      act: this.act, cards, stats,
+      cols: narrow ? 'minmax(0,1fr)' : 'repeat(2,minmax(0,1fr))', heroCols: narrow ? 'minmax(0,1fr)' : 'minmax(0,1.1fr) minmax(0,1fr)',
+      isOverview: T === 'overview', isSearch: T === 'search', isResearch: T === 'research',
+      kCount: kCount.toLocaleString(), heroLine: active ? 'Atlas is researching ' + active + ' topic' + (active > 1 ? 's' : '') + ' in the background. Everything it learns is checked before it is saved.' : 'Nothing running in the background right now.',
+      searchIco: ic('search'), q: st.q, hasQ: !!st.q, onQ: (e) => this.setState({ q: e.currentTarget.value }),
+      modes: [['keyword', 'Exact words'], ['semantic', 'By meaning'], ['hybrid', 'Both']].map(([k, l]) => { const on = st.mode === k; return { k, l, bg: on ? '#fffdfa' : 'transparent', fg: on ? '#1e1e24' : '#6d6a67', sh: on ? '0 2px 6px -2px rgba(30,30,36,.18)' : 'none' }; }),
+      modeHint: { keyword: 'Matches the words you typed, locally and instantly.', semantic: 'Asks the brain for things that mean the same, not just the same words.', hybrid: 'Runs both and merges them, ranking things found twice highest.' }[st.mode],
+      suggest: ['Paris', 'Maya', 'tax', 'Lisbon'],
+      rq: st.rq, onRq: (e) => this.setState({ rq: e.currentTarget.value }), rqKey: (e) => { if (e.key === 'Enter') this.startR(); },
+      rqBg: st.rq.trim() ? '#3461f2' : '#f1eeea', rqFg: st.rq.trim() ? '#fffdfa' : '#b6b1aa',
+      hasToast: !!st.toast, toast: st.toast
+    };
+  }
+}
+</script>
+</body>
+</html>

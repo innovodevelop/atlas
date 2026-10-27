@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f9f7f4}
+button,input{border:none;font:inherit;background:none;color:inherit}
+a{color:#3461f2;text-decoration:none}a:hover{color:#2748bd}
+::selection{background:#e8d8c2}
+@keyframes bpop{from{opacity:0;transform:translateY(14px) scale(.986)}to{opacity:1;transform:none}}
+</style>
+<script src="atlas-quickstart-sphere.js"></script>
+</helmet>
+
+<div data-screen-label="Beta Guidelines" style="min-height:100vh;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;padding:26px 26px 80px">
+<div style="max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:12px">
+
+<header style="height:clamp(200px,28vh,300px);border-radius:32px;background:#f1eeea;padding:18px 26px 18px 8px;display:flex;align-items:center;gap:22px">
+<div style="position:relative;height:100%;aspect-ratio:1;flex:none"><canvas ref="{{ heroRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas></div>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:9px">
+<span style="font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#8b8681">Atlas Beta · v1 · October 2026</span>
+<h1 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(28px,3.4vw,48px);font-weight:500;letter-spacing:-.045em;line-height:1.04;text-wrap:pretty">Beta design guidelines</h1>
+<p style="margin:0;max-width:640px;font-size:14px;line-height:1.55;color:#6d6a67;text-wrap:pretty">The rules every redesigned screen is built from, taken from the Beta dashboard. Flat and borderless: fill steps and space do the separating.</p>
+</div>
+</header>
+
+<nav style="display:flex;flex-wrap:wrap;gap:6px;padding:4px 0">
+<a href="#foundations" style="flex:none;white-space:nowrap;height:34px;padding:0 14px;display:flex;align-items:center;border-radius:9999px;background:#f1eeea;color:#1e1e24;font-size:12.5px;font-weight:500">Foundations</a>
+<a href="#shape" style="flex:none;white-space:nowrap;height:34px;padding:0 14px;display:flex;align-items:center;border-radius:9999px;background:#f1eeea;color:#1e1e24;font-size:12.5px;font-weight:500">Shape &amp; space</a>
+<a href="#band" style="flex:none;white-space:nowrap;height:34px;padding:0 14px;display:flex;align-items:center;border-radius:9999px;background:#f1eeea;color:#1e1e24;font-size:12.5px;font-weight:500">Stage band</a>
+<a href="#grid" style="flex:none;white-space:nowrap;height:34px;padding:0 14px;display:flex;align-items:center;border-radius:9999px;background:#f1eeea;color:#1e1e24;font-size:12.5px;font-weight:500">Widget grid</a>
+<a href="#full" style="flex:none;white-space:nowrap;height:34px;padding:0 14px;display:flex;align-items:center;border-radius:9999px;background:#f1eeea;color:#1e1e24;font-size:12.5px;font-weight:500">Full view</a>
+<a href="#controls" style="flex:none;white-space:nowrap;height:34px;padding:0 14px;display:flex;align-items:center;border-radius:9999px;background:#f1eeea;color:#1e1e24;font-size:12.5px;font-weight:500">Controls</a>
+<a href="#sphere" style="flex:none;white-space:nowrap;height:34px;padding:0 14px;display:flex;align-items:center;border-radius:9999px;background:#f1eeea;color:#1e1e24;font-size:12.5px;font-weight:500">Sphere</a>
+<a href="#motion" style="flex:none;white-space:nowrap;height:34px;padding:0 14px;display:flex;align-items:center;border-radius:9999px;background:#f1eeea;color:#1e1e24;font-size:12.5px;font-weight:500">Motion</a>
+<a href="#dock" style="flex:none;white-space:nowrap;height:34px;padding:0 14px;display:flex;align-items:center;border-radius:9999px;background:#f1eeea;color:#1e1e24;font-size:12.5px;font-weight:500">Dock</a>
+<a href="#rules" style="flex:none;white-space:nowrap;height:34px;padding:0 14px;display:flex;align-items:center;border-radius:9999px;background:#f1eeea;color:#1e1e24;font-size:12.5px;font-weight:500">Do &amp; don't</a>
+</nav>
+
+<section id="foundations" data-screen-label="01 Foundations" style="border-radius:28px;background:#f1eeea;padding:26px;display:flex;flex-direction:column;gap:18px">
+<div><span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8b8681">01</span><h2 style="margin:4px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:26px;font-weight:600;letter-spacing:-.035em">Foundations</h2></div>
+<p style="margin:0;font-size:13px;font-weight:600;color:#1e1e24">Paper scale: each layer steps lighter. Recessed areas step darker.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px">
+<div style="border-radius:20px;background:#f9f7f4;padding:16px;min-height:110px;display:flex;flex-direction:column;justify-content:flex-end"><p style="margin:0;font-size:13px;font-weight:600">Page</p><p style="margin:2px 0 0;font-size:12px;color:#6d6a67;font-variant-numeric:tabular-nums">#f9f7f4 · also recessed rows</p></div>
+<div style="border-radius:20px;background:#e8e4de;padding:16px;min-height:110px;display:flex;flex-direction:column;justify-content:flex-end"><div style="border-radius:14px;background:#f1eeea;padding:12px"><p style="margin:0;font-size:13px;font-weight:600">Panel / band</p><p style="margin:2px 0 0;font-size:12px;color:#6d6a67">#f1eeea</p></div></div>
+<div style="border-radius:20px;background:#e8e4de;padding:16px;min-height:110px;display:flex;flex-direction:column;justify-content:flex-end"><div style="border-radius:14px;background:#f1eeea;padding:8px"><div style="border-radius:14px;background:#fffdfa;padding:12px"><p style="margin:0;font-size:13px;font-weight:600">Card</p><p style="margin:2px 0 0;font-size:12px;color:#6d6a67">#fffdfa on panel</p></div></div></div>
+<div style="border-radius:20px;background:#edebe7;padding:16px;min-height:110px;display:flex;flex-direction:column;justify-content:flex-end"><p style="margin:0;font-size:13px;font-weight:600">Hover</p><p style="margin:2px 0 0;font-size:12px;color:#6d6a67">#edebe7 · background only</p></div>
+<div style="border-radius:20px;background:#eef2fe;padding:16px;min-height:110px;display:flex;flex-direction:column;justify-content:flex-end"><p style="margin:0;font-size:13px;font-weight:600;color:#2748bd">Emphasis</p><p style="margin:2px 0 0;font-size:12px;color:#2748bd">#eef2fe · replaces blue outlines</p></div>
+<div style="border-radius:20px;background:#f7e6e4;padding:16px;min-height:110px;display:flex;flex-direction:column;justify-content:flex-end"><p style="margin:0;font-size:13px;font-weight:600;color:#a3352c">Destructive hover</p><p style="margin:2px 0 0;font-size:12px;color:#a3352c">#f7e6e4</p></div>
+</div>
+<p style="margin:6px 0 0;font-size:13px;font-weight:600">Colour</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px">
+<sc-for list="{{ swatches }}" as="c" hint-placeholder-count="10">
+<div style="border-radius:18px;background:#fffdfa;padding:8px 8px 12px;display:flex;flex-direction:column;gap:8px"><span style="height:56px;border-radius:12px;background:{{ c.hex }}"></span><span style="padding:0 6px"><p style="margin:0;font-size:12.5px;font-weight:600">{{ c.n }}</p><p style="margin:1px 0 0;font-size:11.5px;color:#6d6a67;font-variant-numeric:tabular-nums">{{ c.hex }}</p><p style="margin:3px 0 0;font-size:11.5px;line-height:1.4;color:#6d6a67;text-wrap:pretty">{{ c.u }}</p></span></div>
+</sc-for>
+</div>
+<p style="margin:6px 0 0;font-size:13px;font-weight:600">Type: Hanken Grotesk for display, Geist for UI and body</p>
+<div style="border-radius:24px;background:#fffdfa;padding:8px 22px">
+<sc-for list="{{ typeScale }}" as="t" hint-placeholder-count="9">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:20px;align-items:baseline;padding:15px 0">
+<span style="font-family:{{ t.ff }};font-size:{{ t.fs }};font-weight:{{ t.fw }};letter-spacing:{{ t.ls }};line-height:1.25;text-transform:{{ t.tt }};color:{{ t.c }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ t.sample }}</span>
+<span style="font-size:11.5px;line-height:1.45;color:#6d6a67"><b style="color:#1e1e24;font-weight:600">{{ t.n }}</b><br>{{ t.spec }}</span>
+</div>
+</sc-for>
+</div>
+</section>
+
+<section id="shape" data-screen-label="02 Shape and space" style="border-radius:28px;background:#f1eeea;padding:26px;display:flex;flex-direction:column;gap:18px">
+<div><span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8b8681">02</span><h2 style="margin:4px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:26px;font-weight:600;letter-spacing:-.035em">Shape &amp; space</h2></div>
+<p style="margin:0;max-width:720px;font-size:13.5px;line-height:1.55;color:#6d6a67;text-wrap:pretty">Radius gets smaller as you nest deeper. The gap between surfaces is always 12px, and page padding is 26px. Rows take 9–12px vertical padding when they sit on their own fill, or 15–20px when they sit on the parent's fill.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
+<sc-for list="{{ radii }}" as="r" hint-placeholder-count="8">
+<div style="border-radius:20px;background:#fffdfa;padding:14px;display:flex;flex-direction:column;gap:12px"><span style="height:72px;border-radius:{{ r.r }};background:#f1eeea"></span><span><p style="margin:0;font-size:12.5px;font-weight:600">{{ r.r }}</p><p style="margin:1px 0 0;font-size:11.5px;color:#6d6a67;text-wrap:pretty">{{ r.u }}</p></span></div>
+</sc-for>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+<sc-for list="{{ spacing }}" as="s" hint-placeholder-count="4">
+<div style="border-radius:20px;background:#fffdfa;padding:16px;display:flex;align-items:center;gap:14px"><span style="flex:none;width:{{ s.v }};height:28px;border-radius:6px;background:#3461f2"></span><span><p style="margin:0;font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums">{{ s.v }}</p><p style="margin:1px 0 0;font-size:11.5px;color:#6d6a67">{{ s.u }}</p></span></div>
+</sc-for>
+</div>
+</section>
+
+<section id="band" data-screen-label="03 Stage band" style="border-radius:28px;background:#f1eeea;padding:26px;display:flex;flex-direction:column;gap:18px">
+<div><span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8b8681">03</span><h2 style="margin:4px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:26px;font-weight:600;letter-spacing:-.035em">Stage band</h2></div>
+<p style="margin:0;max-width:720px;font-size:13.5px;line-height:1.55;color:#6d6a67;text-wrap:pretty">Every primary screen opens with the band, so Atlas always sits top-left. Home uses the tall band (sphere, greeting, focus card). Every other screen uses the short band (sphere, eyebrow, title, intro, Back).</p>
+<div style="border-radius:24px;background:#f9f7f4;padding:14px">
+<div style="height:220px;border-radius:32px;background:#f1eeea;padding:18px 18px 18px 8px;display:grid;grid-template-columns:auto minmax(0,1fr) minmax(0,1.25fr);gap:22px">
+<div style="position:relative;height:100%;aspect-ratio:1"><canvas ref="{{ bandRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas></div>
+<div style="min-width:0;display:flex;flex-direction:column;justify-content:center;gap:9px"><span style="font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#8b8681">Sunday 25 October</span><span style="font-family:'Hanken Grotesk',sans-serif;font-size:28px;font-weight:500;letter-spacing:-.042em;line-height:1.12">Good afternoon, Marcus.</span><span style="font-size:13.5px;color:#6d6a67">One line of context, never more than two.</span><span style="display:flex;gap:6px"><span style="height:34px;padding:0 14px;display:flex;align-items:center;border-radius:9999px;background:#fffdfa;font-size:12.5px;font-weight:500">Suggested ask</span><span style="height:34px;padding:0 14px;display:flex;align-items:center;border-radius:9999px;background:#fffdfa;font-size:12.5px;font-weight:500">Suggested ask</span></span></div>
+<div style="min-width:0;border-radius:24px;background:#fffdfa;padding:20px 22px;display:flex;flex-direction:column;gap:6px"><span style="font-family:'Hanken Grotesk',sans-serif;font-size:15px;font-weight:600;letter-spacing:-.02em">Focus card</span><span style="font-size:12.5px;line-height:1.5;color:#6d6a67;text-wrap:pretty">The single most time-relevant thing, with one primary and one secondary action.</span><span style="margin-top:auto;display:flex;gap:6px"><span style="height:36px;padding:0 16px;display:flex;align-items:center;border-radius:9999px;background:#3461f2;color:#fffdfa;font-size:13px;font-weight:600">Primary</span><span style="height:36px;padding:0 16px;display:flex;align-items:center;border-radius:9999px;background:#f1eeea;font-size:13px;font-weight:500">Secondary</span></span></div>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px">
+<sc-for list="{{ bandSpecs }}" as="b" hint-placeholder-count="4">
+<div style="border-radius:20px;background:#fffdfa;padding:16px 18px"><p style="margin:0;font-size:13px;font-weight:600">{{ b.t }}</p><p style="margin:4px 0 0;font-size:12.5px;line-height:1.5;color:#6d6a67;text-wrap:pretty">{{ b.d }}</p></div>
+</sc-for>
+</div>
+</section>
+
+<section id="grid" data-screen-label="04 Widget grid" style="border-radius:28px;background:#f1eeea;padding:26px;display:flex;flex-direction:column;gap:18px">
+<div><span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8b8681">04</span><h2 style="margin:4px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:26px;font-weight:600;letter-spacing:-.035em">Widget grid</h2></div>
+<p style="margin:0;max-width:720px;font-size:13.5px;line-height:1.55;color:#6d6a67;text-wrap:pretty">Six columns with a 12px gap, packed dense under the band. Cards are #fffdfa, radius 24 and padding 20–22. A card that gets more space fills it with more content (a chart, stats or a side list), never with empty padding. Clicking a card opens its full view.</p>
+<div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-auto-rows:88px;gap:12px">
+<div style="grid-column:span 2;grid-row:span 2;border-radius:24px;background:#fffdfa;padding:18px;display:flex;flex-direction:column;justify-content:space-between"><span style="font-size:12.5px;font-weight:600">2 × 2 · standard</span><span style="font-family:'Hanken Grotesk',sans-serif;font-size:36px;font-weight:600;letter-spacing:-.045em;line-height:.9">72°</span></div>
+<div style="grid-column:span 4;grid-row:span 2;border-radius:24px;background:#fffdfa;padding:18px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px"><div style="display:flex;flex-direction:column;justify-content:space-between"><span style="font-size:12.5px;font-weight:600">4 × 2 · expanded</span><span style="font-family:'Hanken Grotesk',sans-serif;font-size:36px;font-weight:600;letter-spacing:-.045em;line-height:.9">$4,280</span></div><div style="display:flex;align-items:flex-end;gap:5px"><span style="flex:1;height:40%;border-radius:4px;background:#f1eeea"></span><span style="flex:1;height:62%;border-radius:4px;background:#f1eeea"></span><span style="flex:1;height:48%;border-radius:4px;background:#f1eeea"></span><span style="flex:1;height:80%;border-radius:4px;background:#f1eeea"></span><span style="flex:1;height:70%;border-radius:4px;background:#3461f2"></span></div></div>
+<div style="grid-column:span 2;grid-row:span 1;border-radius:24px;background:#1e1e24;color:#f9f7f4;padding:16px 18px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12.5px;font-weight:600">2 × 1 · ink</span><span style="font-size:12px;color:rgba(249,247,244,.78)">media, live</span></div>
+<div style="grid-column:span 2;grid-row:span 1;border-radius:24px;background:#eef2fe;padding:16px 18px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12.5px;font-weight:600;color:#2748bd">2 × 1 · emphasis</span><span style="font-size:12px;color:#2748bd">needs you</span></div>
+<div style="grid-column:span 2;grid-row:span 1;border-radius:24px;background:#fffdfa;padding:16px 18px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:12.5px;font-weight:600">2 × 1 · compact</span><span style="font-size:12px;color:#6d6a67">one fact</span></div>
+</div>
+<p style="margin:0;font-size:12.5px;color:#6d6a67">Allowed sizes: 2×1, 2×2, 3×2, 4×2, 6×2. Only two card fills are used besides #fffdfa: ink (#1e1e24) for media or live content, and emphasis (#eef2fe) for anything waiting on you.</p>
+</section>
+
+<section id="full" data-screen-label="05 Full view" style="border-radius:28px;background:#f1eeea;padding:26px;display:flex;flex-direction:column;gap:18px">
+<div><span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8b8681">05</span><h2 style="margin:4px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:26px;font-weight:600;letter-spacing:-.035em">Full-view template</h2></div>
+<p style="margin:0;max-width:720px;font-size:13.5px;line-height:1.55;color:#6d6a67;text-wrap:pretty">This is the template for every non-Home screen (Core, Teach, Mail, Banking, Settings…). A short band at the top, then a hero column next to a content column. Long lists scroll inside their own column, never the whole page.</p>
+<div style="border-radius:24px;background:#f9f7f4;padding:14px;display:flex;flex-direction:column;gap:12px">
+<div style="height:120px;border-radius:32px;background:#f1eeea;padding:12px 18px 12px 8px;display:flex;align-items:center;gap:16px">
+<div style="position:relative;height:100%;aspect-ratio:1;flex:none"><canvas ref="{{ fullRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas></div>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px"><span style="font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#8b8681">Eyebrow · context</span><span style="font-family:'Hanken Grotesk',sans-serif;font-size:32px;font-weight:500;letter-spacing:-.045em;line-height:1.02">Screen title</span><span style="font-size:13px;color:#6d6a67">Intro, two lines at most</span></div>
+<span style="flex:none;display:flex;align-items:center;gap:8px;height:40px;padding:0 16px 0 13px;border-radius:9999px;background:#fffdfa;font-size:13px;font-weight:600"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>Back<span style="font-size:11px;font-weight:500;color:#8b8681">Esc</span></span>
+</div>
+<div style="display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.6fr) minmax(0,.8fr);gap:12px;min-height:220px">
+<div style="border-radius:28px;background:#1e1e24;color:#f9f7f4;padding:22px;display:flex;flex-direction:column;gap:10px"><span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:rgba(249,247,244,.62)">Hero</span><span style="font-family:'Hanken Grotesk',sans-serif;font-size:52px;font-weight:600;letter-spacing:-.05em;line-height:.9">94%</span><span style="font-size:12.5px;line-height:1.5;color:rgba(249,247,244,.78)">One headline number or a featured item. Ink or card fill.</span></div>
+<div style="border-radius:28px;background:#fffdfa;padding:18px;display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600;padding:2px 4px 6px">Main content</span><span style="height:44px;border-radius:14px;background:#f9f7f4"></span><span style="height:44px;border-radius:14px;background:#f9f7f4"></span><span style="height:44px;border-radius:14px;background:#eef2fe"></span><span style="height:44px;border-radius:14px;background:#f9f7f4"></span></div>
+<div style="border-radius:28px;background:#fffdfa;padding:18px;display:flex;flex-direction:column;gap:8px"><span style="font-size:13px;font-weight:600;padding:2px 4px 4px">Side rail</span><span style="font-size:12px;line-height:1.5;color:#6d6a67">Stats, filters, related items. Drops below the main column when the window is under 1100px.</span></div>
+</div>
+</div>
+</section>
+
+<section id="controls" data-screen-label="06 Controls" style="border-radius:28px;background:#f1eeea;padding:26px;display:flex;flex-direction:column;gap:18px">
+<div><span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8b8681">06</span><h2 style="margin:4px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:26px;font-weight:600;letter-spacing:-.035em">Controls</h2></div>
+<p style="margin:0;max-width:720px;font-size:13.5px;line-height:1.55;color:#6d6a67;text-wrap:pretty">Every button, input and textarea sets <b style="color:#1e1e24;font-weight:600">border:none</b>. Buttons are always pills, and hovering only changes the fill. These are all live, so try them.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px">
+
+<div style="border-radius:24px;background:#fffdfa;padding:20px;display:flex;flex-direction:column;gap:14px">
+<p style="margin:0;font-size:13px;font-weight:600">Buttons</p>
+<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+<button style="border:none;height:36px;padding:0 16px;border-radius:9999px;background:#3461f2;color:#fffdfa;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s" style-hover="background:#2748bd">Primary</button>
+<button style="border:none;height:36px;padding:0 16px;border-radius:9999px;background:#f1eeea;color:#1e1e24;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;transition:background .2s" style-hover="background:#edebe7">Secondary</button>
+<button style="border:none;height:36px;padding:0 16px;border-radius:9999px;background:#eef2fe;color:#2748bd;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s" style-hover="background:#e2e9fd">Tinted</button>
+<button style="border:none;height:36px;padding:0 16px;border-radius:9999px;background:transparent;color:#6d6a67;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24">Ghost</button>
+<button style="border:none;height:36px;padding:0 16px;border-radius:9999px;background:#f1eeea;color:#a3352c;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s" style-hover="background:#f7e6e4">Delete</button>
+</div>
+<p style="margin:0;font-size:11.5px;line-height:1.5;color:#6d6a67">Heights are 36 for actions, 34 for chips and 28 for actions inside rows. Use one primary button per region.</p>
+</div>
+
+<div style="border-radius:24px;background:#fffdfa;padding:20px;display:flex;flex-direction:column;gap:14px">
+<p style="margin:0;font-size:13px;font-weight:600">Chips &amp; segmented</p>
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+<sc-for list="{{ chips }}" as="c" hint-placeholder-count="4"><button onClick="{{ pickChip }}" data-k="{{ c.k }}" style="border:none;height:34px;padding:0 14px;border-radius:9999px;background:{{ c.bg }};color:{{ c.fg }};font-family:inherit;font-size:12.5px;font-weight:500;cursor:pointer;transition:background .2s">{{ c.k }}</button></sc-for>
+</div>
+<div style="display:flex;gap:2px;padding:3px;border-radius:9999px;background:#f1eeea;align-self:flex-start">
+<sc-for list="{{ segs }}" as="s" hint-placeholder-count="3"><button onClick="{{ pickSeg }}" data-k="{{ s.k }}" style="border:none;height:30px;padding:0 14px;border-radius:9999px;background:{{ s.bg }};color:{{ s.fg }};font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;box-shadow:{{ s.sh }};transition:background .2s">{{ s.k }}</button></sc-for>
+</div>
+</div>
+
+<div style="border-radius:24px;background:#fffdfa;padding:20px;display:flex;flex-direction:column;gap:10px">
+<p style="margin:0 0 4px;font-size:13px;font-weight:600">Inputs</p>
+<input placeholder="Search mail, people, files" style="border:none;outline:none;height:42px;padding:0 14px;border-radius:14px;background:#f9f7f4;color:#1e1e24;font-family:inherit;font-size:13.5px" style-focus="background:#eef2fe">
+<textarea placeholder="Write a reply…" style="border:none;outline:none;resize:none;height:76px;padding:12px 14px;border-radius:14px;background:#f9f7f4;color:#1e1e24;font-family:inherit;font-size:13.5px;line-height:1.5" style-focus="background:#eef2fe"></textarea>
+<p style="margin:0;font-size:11.5px;color:#6d6a67">The field is recessed (#f9f7f4) and turns emphasis blue on focus. There's no focus ring, and placeholders use #b6b1aa.</p>
+</div>
+
+<div style="border-radius:24px;background:#fffdfa;padding:20px;display:flex;flex-direction:column;gap:6px">
+<p style="margin:0 0 8px;font-size:13px;font-weight:600">Switch rows</p>
+<sc-for list="{{ switches }}" as="w" hint-placeholder-count="2">
+<div style="display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:14px;background:#f9f7f4;font-size:13px"><div style="flex:1;min-width:0"><p style="margin:0;font-weight:600">{{ w.t }}</p><p style="margin:1px 0 0;font-size:11.5px;color:#6d6a67">{{ w.s }}</p></div><button onClick="{{ flip }}" data-k="{{ w.k }}" role="switch" aria-label="{{ w.t }}" style="display:flex;flex:none;width:42px;height:25px;padding:3px;border:none;border-radius:9999px;background:{{ w.bg }};justify-content:{{ w.pos }};cursor:pointer;transition:background .25s"><span style="width:19px;height:19px;border-radius:50%;background:#fff;box-shadow:0 2px 5px rgba(30,30,36,.22)"></span></button></div>
+</sc-for>
+</div>
+
+<div style="border-radius:24px;background:#fffdfa;padding:20px;display:flex;flex-direction:column;gap:6px">
+<p style="margin:0 0 8px;font-size:13px;font-weight:600">List rows</p>
+<sc-for list="{{ rows }}" as="r" hint-placeholder-count="3">
+<div style="display:flex;align-items:center;gap:11px;padding:9px 9px 9px 10px;border-radius:14px;background:{{ r.bg }};font-size:13px;cursor:pointer;transition:background .2s" style-hover="background:#edebe7"><span style="display:flex;flex:none;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:{{ r.chip }};color:{{ r.chipFg }};font-size:12px;font-weight:600">{{ r.i }}</span><div style="flex:1;min-width:0"><p style="margin:0;font-weight:600">{{ r.t }}</p><p style="margin:1px 0 0;font-size:11.5px;color:#6d6a67">{{ r.s }}</p></div><span style="font-size:11.5px;color:#b6b1aa;font-variant-numeric:tabular-nums">{{ r.time }}</span></div>
+</sc-for>
+<p style="margin:6px 0 0;font-size:11.5px;color:#6d6a67">Rows are recessed or emphasis-filled with a 6px gap between them and no dividers. Timestamps use the tertiary colour.</p>
+</div>
+
+<div style="border-radius:24px;background:#fffdfa;padding:20px;display:flex;flex-direction:column;gap:10px">
+<p style="margin:0;font-size:13px;font-weight:600">Empty &amp; status</p>
+<div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:22px 18px;border-radius:16px;background:#f9f7f4;text-align:center"><p style="margin:0;font-size:13.5px;font-weight:600">Nothing waiting</p><p style="margin:0;max-width:240px;font-size:12px;line-height:1.45;color:#6d6a67">Say what happened and what to do next, with one action.</p><span style="margin-top:6px;height:34px;padding:0 16px;display:flex;align-items:center;border-radius:9999px;background:#3461f2;color:#fff;font-size:12.5px;font-weight:600">Action</span></div>
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+<span style="display:flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:9999px;background:#e3f4ec;color:#0a7a53;font-size:11.5px;font-weight:600"><span style="width:6px;height:6px;border-radius:50%;background:#0fae76"></span>Ready</span>
+<span style="display:flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:9999px;background:#eef2fe;color:#2748bd;font-size:11.5px;font-weight:600"><span style="width:6px;height:6px;border-radius:50%;background:#3461f2"></span>Syncing</span>
+<span style="display:flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:9999px;background:#f7e6e4;color:#a3352c;font-size:11.5px;font-weight:600"><span style="width:6px;height:6px;border-radius:50%;background:#d0453a"></span>Failed</span>
+<span style="display:flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:9999px;background:#f1eeea;color:#6d6a67;font-size:11.5px;font-weight:600"><span style="width:6px;height:6px;border-radius:50%;background:#8b8681"></span>Paused</span>
+</div>
+</div>
+
+<div style="border-radius:24px;background:#f9f7f4;padding:20px;display:flex;flex-direction:column;gap:12px;grid-column:1 / -1">
+<p style="margin:0;font-size:13px;font-weight:600">Floating panel: status bar, menus, popovers</p>
+<div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start">
+<div style="width:300px;max-width:100%;padding:16px;border-radius:22px;background:rgba(255,255,255,.92);box-shadow:0 28px 64px -24px rgba(30,30,36,.3)"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em">Panel title</p><p style="margin:2px 0 0;font-size:12px;color:#6d6a67">State line in plain words</p><p style="margin:14px 2px 8px;font-size:11.5px;font-weight:600;color:#8b8681">Group label</p><div style="height:50px;border-radius:14px;background:#f9f7f4"></div><div style="height:50px;margin-top:6px;border-radius:14px;background:#f9f7f4"></div><div style="display:flex;justify-content:space-between;margin-top:12px;padding:11px 12px;border-radius:12px;font-size:12.5px;font-weight:500;color:#6d6a67">Settings link…<span>›</span></div></div>
+<div style="flex:1;min-width:240px;display:flex;flex-direction:column;gap:8px;font-size:12.5px;line-height:1.5;color:#6d6a67">
+<p style="margin:0"><b style="color:#1e1e24;font-weight:600">Shell:</b> 336px wide, radius 22, padding 16, white at 92% with a 24px backdrop blur, and one soft shadow. This is the only place a shadow is allowed, apart from the conversation drawer.</p>
+<p style="margin:0"><b style="color:#1e1e24;font-weight:600">Order:</b> title + switch, current-state card (emphasis fill), group label, rows, then the settings link.</p>
+<p style="margin:0"><b style="color:#1e1e24;font-weight:600">Off state:</b> replace the rows with an empty state that explains what keeps working and gives one action to turn it back on.</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<section id="sphere" data-screen-label="07 Sphere" style="border-radius:28px;background:#f1eeea;padding:26px;display:flex;flex-direction:column;gap:18px">
+<div><span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8b8681">07</span><h2 style="margin:4px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:26px;font-weight:600;letter-spacing:-.035em">Veil sphere</h2></div>
+<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:12px">
+<div style="border-radius:24px;background:#fffdfa;aspect-ratio:1;max-height:420px;position:relative"><canvas ref="{{ demoRef }}" style="position:absolute;inset:6%;width:88%;height:88%;display:block"></canvas><span style="position:absolute;left:18px;bottom:16px;font-size:12px;font-weight:600;color:#6d6a67">{{ sphereLabel }}</span></div>
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="border-radius:24px;background:#fffdfa;padding:18px;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px">
+<sc-for list="{{ states }}" as="s" hint-placeholder-count="10">
+<button onClick="{{ pickState }}" data-k="{{ s.k }}" style="border:none;display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:12px;background:{{ s.bg }};font-family:inherit;text-align:left;cursor:pointer;transition:background .2s" style-hover="background:#edebe7"><span style="flex:none;width:10px;height:10px;border-radius:50%;background:{{ s.c }}"></span><span style="min-width:0"><span style="display:block;font-size:12.5px;font-weight:600;color:#1e1e24">{{ s.n }}</span><span style="display:block;font-size:11px;color:#6d6a67">{{ s.u }}</span></span></button>
+</sc-for>
+</div>
+<div style="border-radius:24px;background:#fffdfa;padding:18px;display:flex;flex-direction:column;gap:8px;font-size:12.5px;line-height:1.55;color:#6d6a67">
+<p style="margin:0"><b style="color:#1e1e24;font-weight:600">Where it appears:</b> in the band (every screen), the Dock avatar, the conversation drawer and the editor veil. It's the same Veil motion on every surface. Tide and Spiral stay on the Quick Start page only.</p>
+<p style="margin:0"><b style="color:#1e1e24;font-weight:600">Density:</b> 20k particles in a band, 4k at mini size. Set the background to the fill the sphere sits on.</p>
+<p style="margin:0"><b style="color:#1e1e24;font-weight:600">Interaction:</b> the inner 72% of the sphere is the hit area and opens the conversation drawer.</p>
+<p style="margin:0"><b style="color:#1e1e24;font-weight:600">Transitions:</b> states ease over about 1 second (spring settle). Never jump-cut between states.</p>
+</div>
+</div>
+</div>
+</section>
+
+<section id="motion" data-screen-label="08 Motion" style="border-radius:28px;background:#f1eeea;padding:26px;display:flex;flex-direction:column;gap:18px">
+<div><span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8b8681">08</span><h2 style="margin:4px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:26px;font-weight:600;letter-spacing:-.035em">Motion</h2></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+<sc-for list="{{ motion }}" as="m" hint-placeholder-count="4">
+<div style="border-radius:20px;background:#fffdfa;padding:16px 18px"><p style="margin:0;font-size:13px;font-weight:600">{{ m.t }}</p><p style="margin:3px 0 0;font-size:11.5px;color:#3461f2;font-variant-numeric:tabular-nums">{{ m.v }}</p><p style="margin:6px 0 0;font-size:12.5px;line-height:1.5;color:#6d6a67;text-wrap:pretty">{{ m.d }}</p></div>
+</sc-for>
+</div>
+<button onClick="{{ replay }}" style="border:none;align-self:flex-start;height:36px;padding:0 16px;border-radius:9999px;background:#fffdfa;color:#1e1e24;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#edebe7">Replay entrance</button>
+<div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px">{{ popDemo }}</div>
+</section>
+
+<section id="dock" data-screen-label="09 Dock" style="border-radius:28px;background:#f1eeea;padding:26px;display:flex;flex-direction:column;gap:18px">
+<div><span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8b8681">09</span><h2 style="margin:4px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:26px;font-weight:600;letter-spacing:-.035em">Dock</h2></div>
+<div style="display:flex;justify-content:center;padding:18px;border-radius:24px;background:#f9f7f4">
+<div style="display:flex;align-items:center;gap:4px;padding:6px;border-radius:9999px;background:rgba(255,253,250,.94);box-shadow:0 18px 40px -20px rgba(30,30,36,.28)">
+<sc-for list="{{ dock }}" as="d" hint-placeholder-count="7">
+<button onClick="{{ pickDock }}" data-k="{{ d.k }}" title="{{ d.k }}" style="border:none;display:flex;align-items:center;gap:7px;height:42px;padding:{{ d.pad }};border-radius:9999px;background:{{ d.bg }};color:{{ d.fg }};font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s,padding .25s" style-hover="background:{{ d.hov }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="{{ d.p }}"></path></svg><sc-if value="{{ d.on }}" hint-placeholder-val="{{ false }}"><span>{{ d.k }}</span></sc-if></button>
+</sc-for>
+<span title="Marcus" style="width:42px;height:42px;border-radius:50%;background:#1e1e24;color:#f9f7f4;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">M</span>
+</div>
+</div>
+<p style="margin:0;font-size:12.5px;color:#6d6a67">Icon-only when idle, with title tooltips. Only the current screen shows its label. The Dock floats 16px from the bottom, centred, and is the only global navigation. Order: Home · Core · Teach · Mail · Architecture · Voice · avatar.</p>
+</section>
+
+<section id="rules" data-screen-label="10 Do and don't" style="border-radius:28px;background:#f1eeea;padding:26px;display:flex;flex-direction:column;gap:18px">
+<div><span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8b8681">10</span><h2 style="margin:4px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:26px;font-weight:600;letter-spacing:-.035em">Do &amp; don't</h2></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px">
+<div style="border-radius:24px;background:#fffdfa;padding:8px 20px"><sc-for list="{{ dos }}" as="x" hint-placeholder-count="5"><div style="display:flex;gap:10px;padding:13px 0;font-size:13px;line-height:1.5"><span style="flex:none;color:#0a7a53;font-weight:700">✓</span><span>{{ x }}</span></div></sc-for></div>
+<div style="border-radius:24px;background:#fffdfa;padding:8px 20px"><sc-for list="{{ donts }}" as="x" hint-placeholder-count="5"><div style="display:flex;gap:10px;padding:13px 0;font-size:13px;line-height:1.5"><span style="flex:none;color:#a3352c;font-weight:700">✕</span><span>{{ x }}</span></div></sc-for></div>
+</div>
+</section>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { chip: 'All', seg: 'Week', sw: { a: true, b: false }, sphere: 'idle', dock: 'Home', pop: 0 };
+  spheres = [];
+  componentWillUnmount() { this.spheres.forEach((s) => s.destroy && s.destroy()); }
+  mount(el, bg, count, scale, key) {
+    if (!el || el.__q) return;
+    const go = () => {
+      if (el.__q || !el.isConnected) return;
+      if (!window.QuickSphere) return setTimeout(go, 60);
+      el.__q = window.QuickSphere.mount(el, { mode: 'veil', bg, dust: [122, 148, 246], strand: [52, 97, 242], blend: 'source-over', alpha: 0.62, seed: 11, count, scale, state: 'idle' });
+      this.spheres.push(el.__q);
+      if (key) this[key] = el.__q;
+    };
+    go();
+  }
+  renderVals() {
+    const st = this.state;
+    const SW = (v) => ({ bg: v ? '#3461f2' : '#d8d4cd', pos: v ? 'flex-end' : 'flex-start' });
+    const T = window.QuickSphere ? window.QuickSphere.TINT : null;
+    const rgb = (k) => (T && T[k] ? 'rgb(' + T[k].join(',') + ')' : '#8b8681');
+    const STATES = [
+      ['idle', 'Idle', 'resting, waiting', null], ['listening', 'Listening', 'mic open', 'c'], ['thinking', 'Thinking', 'composing answer', 'v'],
+      ['speaking', 'Speaking', 'voice out', 'b'], ['working', 'Working', 'running a task', 'a'], ['success', 'Success', 'task done', 'g'],
+      ['alert', 'Alert', 'needs attention', 'r'], ['muted', 'Muted', 'mic off', 'n'], ['waking', 'Waking', 'wake word heard', 'd'], ['dissolving', 'Dissolving', 'ending session', 'm']
+    ];
+    const DOCK = [
+      ['Home', 'M3 11 12 4l9 7v9H3z'], ['Core', 'M12 3v18M3 12h18M6 6l12 12M18 6 6 18'], ['Teach', 'M3 8l9-4 9 4-9 4zM7 10v5c3 2 7 2 10 0v-5'],
+      ['Mail', 'M3 6h18v12H3zM3 7l9 6 9-6'], ['Architecture', 'M4 20V8l8-4 8 4v12M9 20v-6h6v6'], ['Voice', 'M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM5 11a7 7 0 0 0 14 0M12 18v3']
+    ];
+    return {
+      heroRef: (el) => this.mount(el, '#f1eeea', 14000, 0.4),
+      bandRef: (el) => this.mount(el, '#f1eeea', 9000, 0.4),
+      fullRef: (el) => this.mount(el, '#f1eeea', 5000, 0.42),
+      demoRef: (el) => this.mount(el, '#fffdfa', 20000, 0.42, 'demo'),
+      swatches: [
+        { n: 'Atlas Blue', hex: '#3461f2', u: 'Primary actions, active state, links' },
+        { n: 'Blue deep', hex: '#2748bd', u: 'Text on emphasis fill, primary hover' },
+        { n: 'Ink', hex: '#1e1e24', u: 'Text, ink cards, avatar' },
+        { n: 'Ink 2', hex: '#6d6a67', u: 'Secondary text, intros' },
+        { n: 'Neutral', hex: '#8b8681', u: 'Eyebrows, group labels, icons' },
+        { n: 'Tertiary', hex: '#b6b1aa', u: 'Placeholders and timestamps only' },
+        { n: 'Green', hex: '#0fae76', u: 'Dots and fills · text uses #0a7a53' },
+        { n: 'Green deep', hex: '#0a7a53', u: 'Success text' },
+        { n: 'Red', hex: '#d0453a', u: 'Dots and fills · text uses #a3352c' },
+        { n: 'Red deep', hex: '#a3352c', u: 'Destructive text' }
+      ],
+      typeScale: [
+        { n: 'Display', spec: 'Hanken 500 · clamp(26–44px) · −0.045em', sample: 'Screen title', ff: "'Hanken Grotesk',sans-serif", fs: '44px', fw: 500, ls: '-.045em', tt: 'none', c: '#1e1e24' },
+        { n: 'Hero number', spec: 'Hanken 600 · clamp(52–88px) · −0.05em · tabular', sample: '94%', ff: "'Hanken Grotesk',sans-serif", fs: '64px', fw: 600, ls: '-.05em', tt: 'none', c: '#1e1e24' },
+        { n: 'Greeting', spec: 'Hanken 500 · clamp(22–34px) · −0.042em', sample: 'Good afternoon, Marcus.', ff: "'Hanken Grotesk',sans-serif", fs: '32px', fw: 500, ls: '-.042em', tt: 'none', c: '#1e1e24' },
+        { n: 'Section', spec: 'Hanken 600 · 26px · −0.035em', sample: 'Section heading', ff: "'Hanken Grotesk',sans-serif", fs: '26px', fw: 600, ls: '-.035em', tt: 'none', c: '#1e1e24' },
+        { n: 'Card title', spec: 'Hanken 600 · 15–16px · −0.02em', sample: 'Now in focus', ff: "'Hanken Grotesk',sans-serif", fs: '16px', fw: 600, ls: '-.02em', tt: 'none', c: '#1e1e24' },
+        { n: 'Body', spec: 'Geist 400 · 13.5–14px · line 1.5', sample: 'Four meetings, two mails that need you.', ff: "'Geist',sans-serif", fs: '14px', fw: 400, ls: '0', tt: 'none', c: '#1e1e24' },
+        { n: 'UI label', spec: 'Geist 500–600 · 12.5–13px', sample: 'Push 15 min', ff: "'Geist',sans-serif", fs: '13px', fw: 600, ls: '0', tt: 'none', c: '#1e1e24' },
+        { n: 'Meta', spec: 'Geist 400 · 11.5–12px · ink 2', sample: 'Connected · WPA3 · 5 GHz', ff: "'Geist',sans-serif", fs: '12px', fw: 400, ls: '0', tt: 'none', c: '#6d6a67' },
+        { n: 'Eyebrow', spec: 'Geist 600 · 11px · +0.16–0.18em · caps', sample: 'Sunday 25 October', ff: "'Geist',sans-serif", fs: '11px', fw: 600, ls: '.18em', tt: 'uppercase', c: '#8b8681' }
+      ],
+      radii: [
+        { r: '32px', u: 'Stage band' }, { r: '28px', u: 'Full-view hero / section' }, { r: '24px', u: 'Widget card' },
+        { r: '22px', u: 'Floating panel' }, { r: '16px', u: 'Inset card, empty state' }, { r: '14px', u: 'Rows, inputs' },
+        { r: '12px', u: 'Small rows, links' }, { r: '9999px', u: 'Buttons, chips, switches' }
+      ],
+      spacing: [{ v: '6px', u: 'Between rows and chips' }, { v: '12px', u: 'Between surfaces' }, { v: '22px', u: 'Band columns, card padding' }, { v: '26px', u: 'Page padding' }],
+      bandSpecs: [
+        { t: 'Tall band (Home)', d: 'Height clamp(200px, 28vh, 300px). Columns: sphere (square, full height) · greeting · focus card at 1.25fr.' },
+        { t: 'Short band (every other screen)', d: 'Height clamp(132px, 19vh, 190px). Sphere · eyebrow + title + intro · Back pill with an Esc hint on the right.' },
+        { t: 'Content rules', d: 'The eyebrow carries context (date, account, count). The title is a noun, never a sentence. The intro is two lines at most, in plain words.' },
+        { t: 'Narrow windows', d: 'Under 900px the focus card drops below the band and the sphere shrinks to 120px. The band never scrolls.' }
+      ],
+      chips: ['All', 'Unread', 'Flagged', 'From people'].map((k) => ({ k, bg: st.chip === k ? '#1e1e24' : '#f1eeea', fg: st.chip === k ? '#f9f7f4' : '#1e1e24' })),
+      pickChip: (e) => this.setState({ chip: e.currentTarget.getAttribute('data-k') }),
+      segs: ['Day', 'Week', 'Month'].map((k) => ({ k, bg: st.seg === k ? '#fffdfa' : 'transparent', fg: st.seg === k ? '#1e1e24' : '#6d6a67', sh: st.seg === k ? '0 2px 6px -2px rgba(30,30,36,.18)' : 'none' })),
+      pickSeg: (e) => this.setState({ seg: e.currentTarget.getAttribute('data-k') }),
+      switches: [{ k: 'a', t: 'Optimised charging', s: 'Holds at 80% overnight' }, { k: 'b', t: 'Low Power Mode', s: 'Pauses background sync' }].map((w) => Object.assign(w, SW(st.sw[w.k]))),
+      flip: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.setState((s) => ({ sw: Object.assign({}, s.sw, { [k]: !s.sw[k] }) })); },
+      rows: [
+        { i: 'MR', t: 'Maya Reyes', s: 'Q4 plan, comments inline', time: '2:14 PM', bg: '#eef2fe', chip: '#3461f2', chipFg: '#fff' },
+        { i: 'JL', t: 'Jonah Lee', s: 'Paris itinerary', time: '11:02 AM', bg: '#f9f7f4', chip: '#1e1e24', chipFg: '#f9f7f4' },
+        { i: 'AT', t: 'Atlas', s: 'Weekly summary is ready', time: 'Yesterday', bg: '#f9f7f4', chip: '#f1eeea', chipFg: '#8b8681' }
+      ],
+      states: STATES.map(([k, n, u, t]) => ({ k, n, u, c: t ? rgb(t) : '#c8c3bb', bg: st.sphere === k ? '#f1eeea' : 'transparent' })),
+      sphereLabel: STATES.find((s) => s[0] === st.sphere)[1],
+      pickState: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.setState({ sphere: k }); if (this.demo) this.demo.set({ state: k }); },
+      motion: [
+        { t: 'Entrance', v: 'bpop · 0.6–0.72s · cubic-bezier(.22,1,.36,1)', d: 'Rise 14px and scale up from 0.986. Cards follow the band with a 40ms stagger.' },
+        { t: 'Fills', v: '0.2s background', d: 'Hover and selection change the fill only. Nothing moves except a 1px lift on the primary button.' },
+        { t: 'Overlays', v: '0.26–0.4s fade', d: 'Full views and drawers fade in over the page. The veil sits behind at rgba(30,30,36,.16).' },
+        { t: 'Sphere', v: 'spring settle · ~1s', d: 'States blend continuously. The sphere is never paused or swapped for a static image while on screen.' }
+      ],
+      replay: () => this.setState((s) => ({ pop: s.pop + 1 })),
+      popDemo: [0, 1, 2, 3, 4, 5].map((i) => React.createElement('span', { key: st.pop + '-' + i, style: { height: 64, borderRadius: 18, background: '#fffdfa', animation: 'bpop .6s cubic-bezier(.22,1,.36,1) both', animationDelay: i * 0.04 + 's' } })),
+      dock: DOCK.map(([k, p]) => { const on = st.dock === k; return { k, p, on, pad: on ? '0 16px 0 13px' : '0 12px', bg: on ? '#1e1e24' : 'transparent', fg: on ? '#f9f7f4' : '#6d6a67', hov: on ? '#1e1e24' : '#f1eeea' }; }),
+      pickDock: (e) => this.setState({ dock: e.currentTarget.getAttribute('data-k') }),
+      dos: [
+        'Separate surfaces with a fill step and a 12px gap',
+        'Start every primary screen with the band, with the sphere top-left',
+        'Fill extra card space with more content: a chart, stats or a side list',
+        'Use emphasis blue (#eef2fe) for anything waiting on the user',
+        'Keep small text on ink at 62% opacity or more, and body text at 78%'
+      ],
+      donts: [
+        'No 1px borders or divider rules, ever. Set border:none on every button, input and textarea',
+        'No hover that changes a border colour, and no focus rings',
+        'No tertiary grey (#b6b1aa) for body text',
+        'No gradients, emoji or left-accent stripes on cards',
+        'No second navigation alongside the Dock'
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

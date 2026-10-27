@@ -1,44 +1,39 @@
 {
   "source": "downloads-zip",
-  "bundle": "Atlas premium polish (5).zip",
-  "name": "Atlas premium polish (5) / design_handoff_atlas_suite_v2",
-  "sha256": "d03a0610e8ff1b603ba3d072fe47ab6b8b71147054d221941488db41d1d1ca75",
-  "syncedAt": "2026-08-03T20:06:00+02:00",
-  "status": "complete",
-  "completedAt": "2026-08-04T12:05:00+02:00",
-  "version": "v0.2.0",
-  "audit": "docs/design-sync/2026-08-03-audit-atlas-suite-v2.md",
+  "bundle": "Atlas App Beta Redesign.zip",
+  "name": "Atlas App Beta Redesign / design_handoff_atlas_beta",
+  "sha256": "712ce9909ffefe9f1a550c5ae419594d3927f2f4075c17c23309c5adbeb748c5",
+  "syncedAt": "2026-10-27T19:30:00+01:00",
+  "status": "in-progress",
+  "version": "v0.3.0",
+  "plan": "docs/design-sync/2026-10-27-beta-plan.md",
+  "mirrorPath": "design/current/design_handoff_atlas_beta",
+  "previousPath": "design/previous/design_handoff_atlas_suite_v2",
   "surfaces": [
-    "Onboarding",
-    "WidgetCatalog",
-    "WidgetSheet",
-    "AnswerViews",
-    "ModelLab",
-    "SmartHome",
-    "Health",
-    "Money",
-    "Browser",
-    "MusicPlayer"
+    "Guidelines", "Dashboard", "Widgets", "WidgetScreens", "Mail", "AnswerViews", "Core", "Teach", "Architecture",
+    "Voice", "Money", "Health", "SmartHome", "Music", "Clock", "School", "SchoolTools", "Browser", "ModelLab",
+    "Settings", "AgentView", "SystemStatus", "DevTools", "Entry", "DockExplorations"
   ],
-  "mirroredAt": "2026-08-04T12:05:00+02:00",
-  "mirrorPath": "design/current/design_handoff_atlas_suite_v2",
-  "note": "Suite v2: borderless system-wide (fill+space, #eef2fe wash), sphere v3 morph/field merged into src/lib/atlasSphere.ts (three.js RETIRED), 9 new surfaces (Onboarding/WidgetCatalog/WidgetSheet/AnswerViews/ModelLab + mock-labelled SmartHome/Health/Money/Browser), T4 admin absorb+delete, Music Player v2 (full/sleeve/compact on the shared renderer, MusicSphere.tsx deleted). Audit: docs/design-sync/2026-08-03-audit-atlas-suite-v2.md. Bundle fully implemented; Permission Lab dropped by user decision. NOT runtime-verified: the beat-driven morph needs `music:level`, which only fires under librespot in a packaged build.",
-  "mirrorNote": "The mirror was MISSING until 2026-08-04. This manifest recorded bundle (5) from 2026-08-03, but design/current/ still held atlas-premium-workshop (bundle 2, 2026-07-22) — the whole suite-v2 implementation was done straight from the zip and no reference was ever committed. Since design/current/ is the baseline the NEXT handoff is diffed against, that pointed the diff at the wrong tree. Rotated properly now: the old current went to previous/ (which held the July-15 workshop cut, discarded), and bundle (5) is unpacked here. Verified sha256 against the zip before unpacking.",
+  "note": "Beta redesign: flat/borderless paper scale (#f9f7f4 → #f1eeea → #fffdfa), Atlas Blue #3461f2, Hanken Grotesk / Geist / Geist Mono, icon set 1a Precision, a sphere on every screen driven by one state bus, a top bar on every screen, hero view transitions, Talk to Atlas (⌥Space). 25 .dc.html references + 9 runtime .js files. The README's rule: implement the features, not just the look. Shipped behind a beta_ui flag per phase; the handoff's 8 phases are tracked on the roadmap site (atlas-roadmap, phase 'Beta redesign').",
   "files": [
     "README.md",
-    "PROMPT.md",
-    "22 .dc.html references",
-    "atlas-sphere.js",
-    "atlas-cover.js",
-    "atlas-devices.js",
-    "atlas-filings.js",
-    "atlas-models.js",
-    "atlas-transition.js",
-    "image-slot.js",
-    "support.js",
-    "assets/covers/ (3 sleeve jpgs used by the music player reference)"
+    "Beta Redesign Plan.md",
+    "25 .dc.html references",
+    "atlas-quickstart-sphere.js", "atlas-sphere.js", "atlas-orb.js", "atlas-topbar.js", "atlas-transition.js",
+    "atlas-weather-sky.js", "atlas-devices-3d.js", "atlas-icon-data.js", "support.js"
   ],
   "history": [
+    {
+      "name": "Atlas premium polish (5) / design_handoff_atlas_suite_v2",
+      "bundle": "Atlas premium polish (5).zip",
+      "sha256": "d03a0610e8ff1b603ba3d072fe47ab6b8b71147054d221941488db41d1d1ca75",
+      "syncedAt": "2026-08-03T20:06:00+02:00",
+      "status": "complete",
+      "completedAt": "2026-08-04T12:05:00+02:00",
+      "version": "v0.2.0",
+      "audit": "docs/design-sync/2026-08-03-audit-atlas-suite-v2.md",
+      "note": "Suite v2: borderless system-wide (fill+space, #eef2fe wash), sphere v3 morph/field merged into src/lib/atlasSphere.ts (three.js RETIRED), 9 new surfaces, T4 admin absorb+delete, Music Player v2. Bundle fully implemented; Permission Lab dropped by user decision. Now in design/previous/ as the diff baseline for the Beta handoff."
+    },
     {
       "name": "Atlas premium polish (2) / design_handoff_workshop_polish",
       "bundle": "Atlas premium polish (2).zip",
@@ -46,7 +41,7 @@
       "syncedAt": "2026-07-22T02:00:00+02:00",
       "status": "complete",
       "version": "v0.2.0",
-      "note": "Design-sync v4.4: Atlas Blue palette, login orb + scrim, softer card shadows, borderless focus panels, music full-screen takeover, Atlas Intro landing (ported to atlas-site). Superseded by bundle (5). Recovered from this manifest at 5b9c985."
+      "note": "Design-sync v4.4: Atlas Blue palette, login orb + scrim, softer card shadows, borderless focus panels, music full-screen takeover, Atlas Intro landing (ported to atlas-site). Superseded by bundle (5)."
     },
     {
       "name": "Atlas premium polish / Atlas Premium D - Workshop.dc.html",
@@ -55,14 +50,14 @@
       "status": "complete",
       "version": "v0.2.0",
       "audit": "docs/design-sync/2026-07-15-workshop-plan.md",
-      "note": "Workshop reskin: warm paper base, frosted glass, Hanken Grotesk/Geist. Recovered from this manifest at 5b47f58."
+      "note": "Workshop reskin: warm paper base, frosted glass, Hanken Grotesk/Geist."
     },
     {
       "name": "Atlas premium polish-handoff.zip",
       "sha256": "116e3ea513bebe89dcb0aa0c5ae980fe8492702fb1c5d67b218e431d2e3bfef6",
       "syncedAt": "2026-07-06T20:02:00+02:00",
       "status": "complete",
-      "note": "Baseline: the Aurora reskin, implemented July 2026 (branch aurora-redesign). Recovered from this manifest at 8cf82bb."
+      "note": "Baseline: the Aurora reskin, implemented July 2026 (branch aurora-redesign)."
     }
   ]
 }

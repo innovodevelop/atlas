@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>(function(){window.addEventListener("unhandledrejection",function(e){var m=String(e.reason&&e.reason.message||e.reason);if(/Transition was aborted|ViewTransition/.test(m))e.preventDefault()});var top=false;try{top=window.self===window.top}catch(e){}var s=document.createElement("style");if(top){s.textContent="@view-transition{navigation:auto}";}else{s.textContent="html{animation:atlas-in .45s cubic-bezier(.22,1,.36,1) both}html.atlas-out{transition:opacity .22s ease,transform .22s ease;opacity:0;transform:scale(.988)}@keyframes atlas-in{from{opacity:0;transform:scale(1.012)}}";document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a||e.defaultPrevented||e.metaKey||e.ctrlKey||a.target)return;var h=a.getAttribute("href");if(!/\.dc\.html/.test(h)||/^https?:/.test(h))return;if(h.split("#")[0]===""||location.pathname.endsWith(encodeURI(h.split("#")[0]))&&h.indexOf("#")>0)return;e.preventDefault();document.documentElement.classList.add("atlas-out");setTimeout(function(){location.href=h},210)},true);}document.head.appendChild(s)})();</script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script>window.addEventListener("pagereveal",function(e){var t=e.viewTransition;if(t){["ready","finished","updateCallbackDone"].forEach(function(p){t[p]&&t[p].catch(function(){})})}});window.addEventListener("unhandledrejection",function(e){if(/Transition was aborted|ViewTransition/.test(String(e.reason&&e.reason.message||e.reason)))e.preventDefault()});</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Hanken+Grotesk:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet">
+<style>
+@keyframes spin{to{transform:rotate(360deg)}}
+::view-transition-group(*){animation-duration:.55s;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+::view-transition-old(root){animation:.4s cubic-bezier(.22,1,.36,1) both vt-out}
+::view-transition-new(root){animation:.55s cubic-bezier(.22,1,.36,1) both vt-in}
+@keyframes vt-out{to{opacity:0;transform:scale(.985)}}
+@keyframes vt-in{from{opacity:0;transform:scale(1.015)}}
+*{box-sizing:border-box}
+body{margin:0;background:#f9f7f4}
+button,input,textarea{border:none;font:inherit;background:none;color:inherit}
+a{color:#3461f2;text-decoration:none}a:hover{color:#2748bd}
+::selection{background:#e8d8c2}
+::placeholder{color:#b6b1aa}
+.nosb{scrollbar-width:none}.nosb::-webkit-scrollbar{display:none}
+@keyframes bpop{from{opacity:0;transform:translateY(14px) scale(.986)}to{opacity:1;transform:none}}
+</style>
+<script src="atlas-quickstart-sphere.js"></script>
+<script src="atlas-orb.js"></script>
+<script src="atlas-topbar.js"></script>
+</helmet>
+
+<div data-screen-label="Atlas Browser — Beta" style="height:100vh;display:flex;flex-direction:column;gap:12px;padding:26px 26px 88px;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden">
+
+<header data-screen-label="Browser hero" style="flex:none;view-transition-name:hero;display:flex;align-items:center;gap:10px">
+<div style="flex:1;min-width:0;height:72px;display:flex;align-items:center;gap:12px;padding:0 10px 0 4px;border-radius:9999px;background:#fffdfa;box-shadow:0 14px 34px -24px rgba(30,30,36,.35)"><div style="position:relative;width:64px;height:64px;flex:none"><canvas ref="{{ sphereRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas></div><span style="flex:1;min-width:0;font-size:16px;color:#6d6a67;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ subline }}</span><span style="flex:none;height:44px;padding:0 16px;display:flex;align-items:center;gap:8px;border-radius:9999px;background:#f1eeea;font-size:13px;font-weight:600"><span style="font-family:'Hanken Grotesk',sans-serif;font-size:18px">{{ tabCount }}</span>{{ tabCountLabel }}</span></div>
+<a href="Atlas Dashboard Beta.dc.html" title="Back · Esc" style="flex:none;height:44px;padding:0 14px;display:flex;align-items:center;border-radius:9999px;background:#f1eeea;color:#1e1e24;font-size:13px;font-weight:600" style-hover="background:#edebe7;color:#1e1e24">← Home</a>
+</header>
+
+<div role="note" style="flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:10px 12px 10px 16px;border-radius:18px;background:#eef2fe">
+<span style="flex:none;height:22px;padding:0 9px;display:flex;align-items:center;border-radius:9999px;background:#3461f2;color:#fff;font-size:10.5px;font-weight:600;letter-spacing:.06em">SAMPLE</span>
+<p style="flex:1;min-width:240px;margin:0;font-size:12.5px;line-height:1.5;color:#1e1e24;text-wrap:pretty">{{ noticeText }}</p>
+<button onClick="{{ toggleEmpty }}" style="border:none;flex:none;white-space:nowrap;height:30px;padding:0 12px;border-radius:9999px;background:#fffdfa;color:#2748bd;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer">{{ emptyBtn }}</button>
+</div>
+
+<div style="flex:1;min-height:0;position:relative;display:grid;grid-template-columns:{{ cols }};gap:12px">
+
+<aside class="nosb" aria-label="Tabs" style="min-height:0;overflow-y:auto;border-radius:28px;background:#f1eeea;padding:12px;display:{{ railDisp }};flex-direction:column;gap:4px">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 6px 8px"><span style="font-size:11.5px;font-weight:600;color:#8b8681">Open</span><button onClick="{{ newTab }}" title="New tab · ⌘L" style="border:none;flex:none;white-space:nowrap;height:26px;padding:0 10px;border-radius:9999px;background:#fffdfa;color:#1e1e24;font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer">New tab</button></div>
+<sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+<div style="display:flex;align-items:center;gap:6px;border-radius:14px;background:{{ t.bg }};transition:background .2s">
+<button onClick="{{ selTab }}" data-k="{{ t.id }}" style="border:none;flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:10px 4px 10px 10px;background:transparent;font-family:inherit;text-align:left;cursor:pointer"><span style="flex:none;width:26px;height:26px;border-radius:8px;background:{{ t.fav }};color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">{{ t.ini }}</span><span style="min-width:0"><span style="display:block;font-size:12.5px;font-weight:600;color:#1e1e24;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ t.title }}</span><span style="display:block;margin-top:1px;font-size:11px;color:#8b8681;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ t.host }}</span></span></button>
+<button onClick="{{ closeTab }}" data-k="{{ t.id }}" aria-label="Close tab" style="border:none;flex:none;width:26px;height:26px;margin-right:6px;border-radius:50%;background:transparent;color:#8b8681;font-size:15px;cursor:pointer" style-hover="background:#edebe7;color:#1e1e24">×</button>
+</div>
+</sc-for>
+<sc-if value="{{ noTabs }}" hint-placeholder-val="{{ false }}"><p style="margin:0;padding:14px 10px;border-radius:14px;background:#f9f7f4;font-size:12px;line-height:1.5;color:#6d6a67">No tabs. Press ⌘L and type an address. Atlas will tell you honestly that it can't open it yet.</p></sc-if>
+<span style="padding:14px 6px 6px;font-size:11.5px;font-weight:600;color:#8b8681">Kept</span>
+<sc-for list="{{ kept }}" as="k" hint-placeholder-count="3"><div style="padding:9px 10px;border-radius:12px;background:#f9f7f4"><p style="margin:0;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ k.t }}</p><p style="margin:1px 0 0;font-size:11px;color:#8b8681">{{ k.s }}</p></div></sc-for>
+<sc-if value="{{ noKept }}" hint-placeholder-val="{{ false }}"><p style="margin:0;padding:10px;font-size:12px;color:#8b8681">Nothing kept.</p></sc-if>
+</aside>
+
+<main ref="{{ pageRef }}" class="nosb" style="min-height:0;overflow-y:auto;border-radius:28px;background:#fffdfa;position:relative">
+<div style="position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;padding:12px 14px;background:#fffdfa">
+<span style="flex:1;min-width:0;display:flex;align-items:center;gap:8px;height:34px;padding:0 12px;border-radius:9999px;background:#f9f7f4;font-family:'Geist Mono',ui-monospace,monospace;font-size:12px;color:#6d6a67;overflow:hidden;white-space:nowrap;text-overflow:ellipsis"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3"></path></svg>{{ url }}</span>
+<button onClick="{{ toggleReader }}" aria-pressed="{{ readerOn }}" title="Reader view" style="border:none;flex:none;white-space:nowrap;height:34px;padding:0 13px;border-radius:9999px;background:{{ readerBg }};color:{{ readerFg }};font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer">Reader</button>
+<button onClick="{{ toggleSide }}" aria-pressed="{{ sideOnS }}" title="Show what Atlas noticed on this page" style="border:none;flex:none;white-space:nowrap;height:34px;padding:0 13px;border-radius:9999px;background:{{ sideBtnBg }};color:{{ sideBtnFg }};font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer">Atlas</button>
+</div>
+<sc-if value="{{ hasPage }}" hint-placeholder-val="{{ true }}">
+<article style="max-width:{{ readW }};margin:0 auto;padding:12px clamp(20px,4vw,48px) 140px;display:flex;flex-direction:column;gap:16px;transition:max-width .3s">
+<div style="display:flex;align-items:center;gap:8px"><span style="height:22px;padding:0 9px;display:flex;align-items:center;border-radius:9999px;background:#eef2fe;color:#2748bd;font-size:10.5px;font-weight:600;letter-spacing:.06em">SAMPLE PAGE</span><span style="font-size:12px;color:#8b8681">{{ byline }}</span></div>
+<h2 style="margin:0;font-family:{{ headFont }};font-size:clamp(28px,3vw,40px);font-weight:500;letter-spacing:-.03em;line-height:1.12;text-wrap:pretty">{{ pageTitle }}</h2>
+<sc-for list="{{ paras }}" as="p" hint-placeholder-count="5">
+<p style="margin:0;font-family:{{ bodyFont }};font-size:{{ bodySize }};line-height:1.7;color:#1e1e24;text-wrap:pretty"><sc-for list="{{ p.segs }}" as="s" hint-placeholder-count="1"><span data-hit="{{ s.hk }}" style="background:{{ s.bg }};color:{{ s.fg }};border-radius:3px;box-shadow:{{ s.sh }}">{{ s.t }}</span></sc-for></p>
+</sc-for>
+</article>
+</sc-if>
+<sc-if value="{{ noPage }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:80px 24px;text-align:center"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:20px;font-weight:600;letter-spacing:-.025em">Nothing open</p><p style="margin:0;max-width:380px;font-size:13px;line-height:1.55;color:#6d6a67">This is the browser on day one: an omnibox, and nothing invented behind it.</p></div></sc-if>
+</main>
+
+<sc-if value="{{ sideOn }}" hint-placeholder-val="{{ true }}">
+<aside class="nosb" aria-label="What Atlas noticed" style="min-height:0;overflow-y:auto;border-radius:28px;background:#f1eeea;padding:14px;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px;padding:2px 4px 4px"><span style="width:8px;height:8px;border-radius:50%;background:#3461f2"></span><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:15px;font-weight:600;letter-spacing:-.02em">On this page</p><span style="flex:1"></span><span style="font-size:11px;color:#8b8681;white-space:nowrap">{{ sideMeta }}</span></div>
+<sc-for list="{{ answers }}" as="a" hint-placeholder-count="0"><div style="padding:14px;border-radius:16px;background:#eef2fe;display:flex;flex-direction:column;gap:6px;animation:bpop .35s cubic-bezier(.22,1,.36,1) both"><div style="display:flex;gap:8px"><p style="flex:1;margin:0;font-size:12.5px;font-weight:600;color:#2748bd">{{ a.q }}</p><button onClick="{{ dismissAnswer }}" data-k="{{ a.id }}" aria-label="Dismiss this answer" style="border:none;flex:none;width:22px;height:22px;border-radius:50%;background:transparent;color:#2748bd;cursor:pointer">×</button></div><p style="margin:0;font-size:13px;line-height:1.55;color:#1e1e24;text-wrap:pretty">{{ a.body }}</p><p style="margin:0;font-size:11.5px;color:#6d6a67">{{ a.basis }}</p></div></sc-for>
+<sc-for list="{{ refusals }}" as="r" hint-placeholder-count="0"><div style="padding:14px;border-radius:16px;background:#fffdfa;display:flex;flex-direction:column;gap:6px;animation:bpop .35s cubic-bezier(.22,1,.36,1) both"><div style="display:flex;gap:8px"><p style="flex:1;margin:0;font-size:12.5px;font-weight:600;color:#a3352c">{{ r.t }}</p><button onClick="{{ clearRefusal }}" aria-label="Dismiss" style="border:none;flex:none;width:22px;height:22px;border-radius:50%;background:transparent;color:#6d6a67;cursor:pointer">×</button></div><p style="margin:0;font-size:12.5px;line-height:1.55;color:#1e1e24;text-wrap:pretty">{{ r.b }}</p></div></sc-for>
+<sc-for list="{{ points }}" as="p" hint-placeholder-count="4"><div style="display:flex;gap:10px;padding:11px 12px;border-radius:14px;background:#fffdfa"><span style="flex:none;height:20px;padding:0 8px;display:flex;align-items:center;border-radius:9999px;background:{{ p.tagBg }};color:{{ p.tagFg }};font-size:10.5px;font-weight:600">{{ p.kind }}</span><p style="margin:0;font-size:12.5px;line-height:1.5;color:#1e1e24;text-wrap:pretty">{{ p.t }}</p></div></sc-for>
+<sc-if value="{{ noPoints }}" hint-placeholder-val="{{ false }}"><div style="padding:18px 14px;border-radius:14px;background:#f9f7f4;font-size:12.5px;line-height:1.5;color:#6d6a67;text-align:center">Not read yet. Atlas notices things as a page is read.</div></sc-if>
+</aside>
+</sc-if>
+
+<div style="position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:5;width:min(640px,calc(100% - 40px));display:flex;flex-direction:column;gap:8px">
+<sc-if value="{{ showSuggest }}" hint-placeholder-val="{{ false }}"><div style="padding:8px;border-radius:22px;background:rgba(255,253,250,.96);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 24px 54px -24px rgba(30,30,36,.34);display:flex;flex-direction:column;gap:2px;animation:bpop .25s cubic-bezier(.22,1,.36,1) both"><sc-for list="{{ suggest }}" as="s" hint-placeholder-count="4"><button onMouseDown="{{ pickSuggest }}" data-q="{{ s.q }}" style="border:none;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:transparent;font-family:inherit;text-align:left;cursor:pointer" style-hover="background:#f1eeea"><span style="flex:1;min-width:0;font-size:13px;color:#1e1e24;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ s.t }}</span><span style="flex:none;font-size:11px;color:#8b8681">{{ s.hint }}</span></button></sc-for></div></sc-if>
+<div style="display:flex;align-items:center;gap:8px;padding:6px;border-radius:9999px;background:#1e1e24;box-shadow:0 24px 54px -22px rgba(30,30,36,.55)">
+<button onClick="{{ cycleMode }}" title="Switch between going somewhere, asking Atlas, and finding on the page" style="border:none;flex:none;white-space:nowrap;display:flex;align-items:center;gap:7px;height:38px;padding:0 14px 0 12px;border-radius:9999px;background:{{ modeBg }};color:#fffdfa;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:background .2s"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="{{ modeIco }}"></path></svg>{{ modeLabel }}<span style="font-size:10.5px;font-weight:500;color:rgba(249,247,244,.62)">{{ modeKey }}</span></button>
+<input ref="{{ omniRef }}" value="{{ typed }}" onInput="{{ onType }}" onKeyDown="{{ omniKey }}" onFocus="{{ omniFocus }}" onBlur="{{ omniBlur }}" placeholder="{{ placeholder }}" aria-label="{{ modeLabel }}" style="border:none;outline:none;flex:1;min-width:0;height:38px;background:transparent;color:#f9f7f4;font-family:inherit;font-size:14px">
+<sc-if value="{{ isFind }}" hint-placeholder-val="{{ false }}"><span style="flex:none;font-size:12px;font-weight:600;color:rgba(249,247,244,.78);font-variant-numeric:tabular-nums;white-space:nowrap">{{ findCount }}</span></sc-if>
+<button onClick="{{ submit }}" aria-label="Submit" style="border:none;flex:none;width:38px;height:38px;border-radius:50%;background:{{ subBg }};color:{{ subFg }};display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ subIco }}"></path></svg></button>
+</div>
+</div>
+</div>
+
+<nav aria-label="Atlas" data-dock="beta" style="view-transition-name:atlas-dock;position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:4px;padding:6px;border-radius:9999px;background:rgba(255,253,250,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 18px 40px -20px rgba(30,30,36,.28)">
+<a href="Atlas Dashboard Beta.dc.html" title="Home" aria-label="Home" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M3.5 10.9 10.7 4.3a2 2 0 0 1 2.6 0l7.2 6.6v6.9a3 3 0 0 1-3 3h-3v-5.4a2.5 2.5 0 0 0-5 0v5.4h-3a3 3 0 0 1-3-3z"></path></svg></a>
+<a href="Atlas Core Beta.dc.html" title="Core" aria-label="Core" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.6a8.4 8.4 0 1 1 0 16.8 8.4 8.4 0 0 1 0-16.8M12 8.8a3.2 3.2 0 1 1 0 6.4 3.2 3.2 0 0 1 0-6.4M12 3.6v5.2M12 15.2v5.2M3.6 12h5.2M15.2 12h5.2"></path></svg></a>
+<a href="Atlas Teach Beta.dc.html" title="Teach" aria-label="Teach" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 7.4a5.2 5.2 0 0 0-3.9-1.8H5a1.2 1.2 0 0 0-1.2 1.2v9.6A1.2 1.2 0 0 0 5 17.6h3.1A5.2 5.2 0 0 1 12 19.4a5.2 5.2 0 0 1 3.9-1.8H19a1.2 1.2 0 0 0 1.2-1.2V6.8A1.2 1.2 0 0 0 19 5.6h-3.1A5.2 5.2 0 0 0 12 7.4zM12 7.4v12"></path></svg></a>
+<a href="Atlas Mail Beta.dc.html" title="Mail" aria-label="Mail" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M6.6 5.6h10.8a3.2 3.2 0 0 1 3.2 3.2v6.4a3.2 3.2 0 0 1-3.2 3.2H6.6a3.2 3.2 0 0 1-3.2-3.2V8.8a3.2 3.2 0 0 1 3.2-3.2zM3.8 7.6l7 4.8a2.2 2.2 0 0 0 2.4 0l7-4.8"></path></svg></a>
+<a href="Atlas Architecture Beta.dc.html" title="Architecture" aria-label="Architecture" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.4 3.4 7.9 12 12.4l8.6-4.5zM3.4 12.1 12 16.6l8.6-4.5M3.4 16.3 12 20.8l8.6-4.5"></path></svg></a>
+<a href="Atlas Voice Beta.dc.html" title="Voice" aria-label="Voice" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.5a2.6 2.6 0 0 1 2.6 2.6v5.4a2.6 2.6 0 0 1-5.2 0V6.1A2.6 2.6 0 0 1 12 3.5zM18.1 11.5a6.1 6.1 0 0 1-12.2 0M12 17.6v3"></path></svg></a>
+<a href="Atlas Settings Beta.dc.html" title="Marcus · Settings" aria-label="Settings" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#1e1e24" style-hover="background:#f1eeea;color:#1e1e24"><span style="width:34px;height:34px;border-radius:50%;background:#1e1e24;color:#f9f7f4;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">M</span></a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { vw: window.innerWidth, tabs: null, sel: 'b1', reader: false, side: true, mode: 'ask', typed: '', focus: false, cursor: 0, answers: [], refusal: null };
+  componentDidMount() {
+    this.onResize = () => this.setState({ vw: window.innerWidth });
+    window.addEventListener('resize', this.onResize);
+    this.onKey = (e) => {
+      const meta = e.metaKey || e.ctrlKey;
+      if (meta && !e.altKey && !e.shiftKey) { const k = e.key.toLowerCase(); if (k === 'l' || k === 'k' || k === 'f') { e.preventDefault(); this.focusOmni(k === 'l' ? 'go' : k === 'k' ? 'ask' : 'find'); } return; }
+      if (e.key !== 'Escape') return;
+      if (document.activeElement === this.omni) { this.omni.blur(); return; }
+      window.location.href = 'Atlas Dashboard Beta.dc.html';
+    };
+    window.addEventListener('keydown', this.onKey);
+  }
+  componentDidUpdate() { const m = this.pageEl && this.pageEl.querySelector('[data-hit="cur"]'); if (m && this.lastScroll !== this.state.cursor + this.state.typed) { this.lastScroll = this.state.cursor + this.state.typed; this.pageEl.scrollTop = m.offsetTop - this.pageEl.clientHeight / 2; } }
+  componentWillUnmount() { window.removeEventListener('resize', this.onResize); window.removeEventListener('keydown', this.onKey); if (this.sph) this.sph.destroy(); }
+  focusOmni(m) { this.setState({ mode: m, typed: '', cursor: 0 }); if (this.omni) this.omni.focus(); }
+  TABS() {
+    return [
+      { id: 'b1', title: 'Heat pumps vs gas boilers: a 2026 buyer’s guide', host: 'heatwise.example', ini: 'H', fav: '#0a7a53', by: 'Heatwise · 9 min read',
+        paras: ['A well-sized air-source heat pump now costs between £8,000 and £14,000 installed in a three-bedroom house, before the £7,500 Boiler Upgrade Scheme grant. That puts the net cost close to a new gas boiler for the first time.', 'Running costs depend almost entirely on two numbers: your electricity tariff and the seasonal efficiency of the pump. At a typical efficiency of 3.2 and a heat-pump tariff, most homes in our survey paid 10–20% less to heat than they did on gas.', 'The catch is preparation. Homes with single glazing or uninsulated lofts often need larger radiators, which can add £2,000 or more. “The pump is the easy part,” said one installer we spoke to. “The house is the project.”', 'Noise is rarely the problem people expect. Modern outdoor units run at around 40 decibels at a metre, quieter than a fridge, though placement under a bedroom window is still worth avoiding.', 'If your boiler is less than eight years old, our advice is to insulate first and replace later. If it is failing, get two heat-pump quotes before you book a like-for-like swap.'],
+        points: [['claim', 'Net cost is now close to a new gas boiler, after the £7,500 grant.'], ['claim', 'Most surveyed homes paid 10–20% less to heat than on gas.'], ['quote', '“The pump is the easy part. The house is the project.”'], ['warn', 'Cost figures are UK-only and assume a three-bedroom house.'], ['link', 'You asked for heat-pump quotes on Thursday. Two are in Mail.']] },
+      { id: 'b2', title: 'Le Marais on foot: a slow afternoon route', host: 'walkparis.example', ini: 'W', fav: '#8a3b3b', by: 'Walk Paris · 6 min read',
+        paras: ['Start at the top of Rue de Bretagne, where the Marché des Enfants Rouges opens at half past eight and is quietest before ten.', 'Walk south through Rue Vieille du Temple, then cut east to the Place des Vosges. The arcades are the place to sit if it rains.', 'Finish at the Musée Carnavalet, which is free and open until six. The garden is the best quiet spot in the neighbourhood.'],
+        points: [['claim', 'Marché des Enfants Rouges is quietest before 10:00.'], ['claim', 'Musée Carnavalet is free and open until 18:00.'], ['link', 'Your Paris trip is 31 Oct. Saturday looks dry.']] },
+      { id: 'b3', title: 'Design hiring in Q4: what the numbers say', host: 'designcensus.example', ini: 'D', fav: '#2748bd', by: 'Design Census · 11 min read',
+        paras: ['Median time-to-hire for senior product designers fell to 38 days this quarter, down from 51 a year ago.', 'Contract rates held steady, while full-time offers rose about 4%. Teams that offered a written exercise instead of a take-home had a 20% higher acceptance rate.'],
+        points: [['claim', 'Senior designer time-to-hire is down to 38 days.'], ['warn', 'Survey sample is 412 companies, mostly US-based.'], ['link', 'Maya asked for hiring numbers before Friday.']] }
+    ];
+  }
+  tabs() { return this.state.tabs || this.TABS(); }
+  submit() {
+    const st = this.state, t = st.typed.trim(), tab = this.tabs().find((x) => x.id === st.sel);
+    if (st.mode === 'find') { this.setState((s) => ({ cursor: s.cursor + 1 })); return; }
+    if (!t) return;
+    if (st.mode === 'go') { this.setState({ typed: '', refusal: { t: 'Atlas can’t open “' + t + '”', b: 'There’s no browser engine in Atlas yet: no web view and no fetch of remote pages. Nothing was loaded, and nothing is shown pretending it was.' } }); return; }
+    const lc = t.toLowerCase();
+    const A = [[/cost|price|how much|grant/, 'Between £8,000 and £14,000 installed, minus the £7,500 grant. So roughly £500–£6,500 net, close to a new gas boiler.', 'From paragraphs 1 on this page'], [/noise|loud|quiet/, 'About 40 dB at a metre, quieter than a fridge. Avoid placing it under a bedroom window.', 'From paragraph 4 on this page'], [/should i|advice|replace|recommend/, 'The page says: if your boiler is under eight years old, insulate first and replace later. If it’s failing, get two heat-pump quotes first.', 'From paragraph 5 on this page'], [/summar|tl;?dr|key points/, (tab ? tab.points.filter((p) => p[0] === 'claim').map((p) => p[1]).join(' ') : ''), 'From what Atlas noticed on this page']];
+    const hit = tab && A.find(([re]) => re.test(lc));
+    if (hit && tab.id === 'b1' || (hit && /summar|tl;?dr|key points/.test(lc))) this.setState((s) => ({ typed: '', side: true, refusal: null, answers: [{ id: Date.now(), q: t, body: hit[1], basis: hit[2] }].concat(s.answers).slice(0, 3) }));
+    else this.setState({ typed: '', side: true, refusal: { t: 'Atlas can’t answer that from this page', b: 'Answers here come only from the text of the open sample page, and this one doesn’t cover “' + t + '”. Ask Atlas in Voice for a general answer.' } });
+  }
+  renderVals() {
+    const st = this.state, tabs = this.tabs(), tab = tabs.find((x) => x.id === st.sel) || tabs[0];
+    const narrow = st.vw < 1100, side = st.side && !!tab;
+    const q = st.mode === 'find' ? st.typed.trim().toLowerCase() : '';
+    let total = 0;
+    const segsFor = (txt) => { if (!q) return [{ t: txt }]; const out = []; let i = 0; const lc = txt.toLowerCase(); while (true) { const j = lc.indexOf(q, i); if (j < 0) { out.push({ t: txt.slice(i) }); break; } if (j > i) out.push({ t: txt.slice(i, j) }); out.push({ t: txt.slice(j, j + q.length), hit: total++ }); i = j + q.length; } return out; };
+    const parasRaw = tab ? tab.paras.map((p) => segsFor(p)) : [];
+    const cur = total ? st.cursor % total : -1;
+    const paras = parasRaw.map((segs) => ({ segs: segs.map((s) => ({ t: s.t, hk: s.hit === cur ? 'cur' : '', bg: s.hit == null ? 'transparent' : s.hit === cur ? '#f2c46b' : '#fbefd9', fg: '#1e1e24', sh: s.hit == null ? 'none' : '0 0 0 2px ' + (s.hit === cur ? '#f2c46b' : '#fbefd9') })) }));
+    const MODES = { go: ['Go', 'M12 3.6a8.4 8.4 0 1 1 0 16.8 8.4 8.4 0 0 1 0-16.8M15 9l-2 4-4 2 2-4z', '⌘L', 'Type an address', 'M5 12h14M13 6l6 6-6 6'], ask: ['Ask', 'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z', '⌘K', 'Ask Atlas about this page', 'M12 19V5M6 11l6-6 6 6'], find: ['Find', 'M10.5 3.5a7 7 0 1 1 0 14 7 7 0 0 1 0-14M20 20l-4.5-4.5', '⌘F', 'Find on this page', 'M6 9l6 6 6-6'] };
+    const M = MODES[st.mode];
+    const SUG = { ask: [['Summarise the key points', 'Summary'], ['How much would this cost me?', 'Cost'], ['Is it noisy?', 'Detail'], ['Should I replace my boiler now?', 'Advice']], go: [['heatwise.example/quotes', 'Address'], ['walkparis.example', 'Address'], ['news.example', 'Address']], find: [] };
+    const KC = { claim: ['#eef2fe', '#2748bd'], quote: ['#f1eeea', '#6d6a67'], link: ['#e3f4ec', '#0a7a53'], warn: ['#fbefd9', '#9a5a00'] };
+    return {
+      sphereRef: (el) => {
+        if (!el || el.__q) return;
+        const go = () => { if (el.__q || !el.isConnected) return; if (!window.QuickSphere) return setTimeout(go, 60);
+          el.__q = this.sph = window.QuickSphere.mount(el, { mode: 'veil', bg: 'transparent', dust: [122, 148, 246], strand: [52, 97, 242], blend: 'source-over', alpha: 0.7, seed: 11, count: 7000, scale: 0.42, state: 'idle' }); };
+        go();
+      },
+      pageRef: (el) => { this.pageEl = el; }, omniRef: (el) => { this.omni = el; },
+      subline: tabs.length ? tabs.length + ' sample ' + (tabs.length === 1 ? 'tab' : 'tabs') + ' kept open. Nothing here was loaded: Atlas has no browser engine yet.' : 'Every tab is closed. This is the browser on day one: an omnibox, and nothing invented behind it.',
+      tabCount: String(tabs.length), tabCountLabel: tabs.length === 1 ? 'open tab' : 'open tabs',
+      noticeText: tabs.length ? 'Atlas has no browser engine: no web view and no fetch of remote pages. Every tab and article is a fixed sample so the shell can be reviewed. Find-on-page is real; everything else refuses honestly.' : 'This is what a real adapter returns before an engine reports in: no tabs, no shelves, no article.',
+      emptyBtn: tabs.length ? 'Preview the empty state' : 'Restore the sample session',
+      toggleEmpty: () => this.setState((s) => (this.tabs().length ? { tabs: [], sel: null, answers: [], refusal: null } : { tabs: null, sel: 'b1' })),
+      cols: (narrow ? 'minmax(0,1fr)' : 'minmax(200px,240px) minmax(0,1fr)') + (side && !narrow ? ' minmax(260px,320px)' : ''), railDisp: narrow ? 'none' : 'flex',
+      tabs: tabs.map((t) => ({ id: t.id, title: t.title, host: t.host, ini: t.ini, fav: t.fav, bg: t.id === st.sel ? '#fffdfa' : 'transparent' })), noTabs: tabs.length === 0,
+      selTab: (e) => this.setState({ sel: e.currentTarget.getAttribute('data-k'), answers: [], refusal: null, cursor: 0 }),
+      closeTab: (e) => { const k = e.currentTarget.getAttribute('data-k'); const rest = this.tabs().filter((t) => t.id !== k); this.setState({ tabs: rest, sel: st.sel === k ? (rest[0] ? rest[0].id : null) : st.sel }); },
+      newTab: () => this.focusOmni('go'),
+      kept: tabs.length ? [['Octopus heat-pump tariff', 'Kept 22 Oct'], ['Lisbon short lets, Alfama', 'Kept 18 Oct'], ['RSU tax after relocation', 'Kept 12 Oct']].map(([t, s]) => ({ t, s })) : [], noKept: tabs.length === 0,
+      url: tab ? 'https://' + tab.host + '/' + tab.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40) : 'No page',
+      readerOn: st.reader ? 'true' : 'false', readerBg: st.reader ? '#1e1e24' : '#f1eeea', readerFg: st.reader ? '#f9f7f4' : '#1e1e24',
+      toggleReader: () => this.setState((s) => ({ reader: !s.reader })),
+      sideOn: side, sideOnS: side ? 'true' : 'false', sideBtnBg: side ? '#3461f2' : '#f1eeea', sideBtnFg: side ? '#fffdfa' : '#1e1e24',
+      toggleSide: () => this.setState((s) => ({ side: !s.side })),
+      hasPage: !!tab, noPage: !tab, byline: tab ? tab.by : '', pageTitle: tab ? tab.title : '', paras,
+      readW: st.reader ? '640px' : '860px', headFont: st.reader ? "'Newsreader',Georgia,serif" : "'Hanken Grotesk',sans-serif", bodyFont: st.reader ? "'Newsreader',Georgia,serif" : "'Geist',sans-serif", bodySize: st.reader ? '19px' : '15.5px',
+      sideMeta: tab ? 'read as you scrolled' : '',
+      points: tab ? tab.points.map(([kind, t]) => ({ kind, t, tagBg: KC[kind][0], tagFg: KC[kind][1] })) : [], noPoints: !tab,
+      answers: st.answers, dismissAnswer: (e) => { const k = +e.currentTarget.getAttribute('data-k'); this.setState((s) => ({ answers: s.answers.filter((a) => a.id !== k) })); },
+      refusals: st.refusal ? [st.refusal] : [], clearRefusal: () => this.setState({ refusal: null }),
+      modeLabel: M[0], modeIco: M[1], modeKey: M[2], placeholder: M[3], subIco: M[4], modeBg: st.mode === 'ask' ? '#3461f2' : 'rgba(249,247,244,.14)',
+      cycleMode: () => { const o = ['go', 'ask', 'find']; this.setState((s) => ({ mode: o[(o.indexOf(s.mode) + 1) % 3], typed: '', cursor: 0 })); },
+      typed: st.typed, onType: (e) => this.setState({ typed: e.currentTarget.value, cursor: 0 }),
+      omniKey: (e) => { if (e.key === 'Enter') { e.preventDefault(); this.submit(); } },
+      omniFocus: () => this.setState({ focus: true }), omniBlur: () => setTimeout(() => this.setState({ focus: false }), 120),
+      submit: () => this.submit(),
+      isFind: st.mode === 'find' && !!q, findCount: total ? (cur + 1) + ' of ' + total : 'No matches',
+      subBg: st.typed.trim() ? '#f9f7f4' : 'rgba(249,247,244,.14)', subFg: st.typed.trim() ? '#1e1e24' : 'rgba(249,247,244,.62)',
+      showSuggest: st.focus && !st.typed && SUG[st.mode].length > 0 && (st.mode !== 'ask' || !!tab), suggest: (SUG[st.mode] || []).map(([q, hint]) => ({ q, t: q, hint })),
+      pickSuggest: (e) => { e.preventDefault(); const q = e.currentTarget.getAttribute('data-q'); this.setState({ typed: q }, () => this.submit()); }
+    };
+  }
+}
+</script>
+</body>
+</html>

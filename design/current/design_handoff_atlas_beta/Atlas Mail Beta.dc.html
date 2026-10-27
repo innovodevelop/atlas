@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>(function(){window.addEventListener("unhandledrejection",function(e){var m=String(e.reason&&e.reason.message||e.reason);if(/Transition was aborted|ViewTransition/.test(m))e.preventDefault()});var top=false;try{top=window.self===window.top}catch(e){}var s=document.createElement("style");if(top){s.textContent="@view-transition{navigation:auto}";}else{s.textContent="html{animation:atlas-in .45s cubic-bezier(.22,1,.36,1) both}html.atlas-out{transition:opacity .22s ease,transform .22s ease;opacity:0;transform:scale(.988)}@keyframes atlas-in{from{opacity:0;transform:scale(1.012)}}";document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a||e.defaultPrevented||e.metaKey||e.ctrlKey||a.target)return;var h=a.getAttribute("href");if(!/\.dc\.html/.test(h)||/^https?:/.test(h))return;if(h.split("#")[0]===""||location.pathname.endsWith(encodeURI(h.split("#")[0]))&&h.indexOf("#")>0)return;e.preventDefault();document.documentElement.classList.add("atlas-out");setTimeout(function(){location.href=h},210)},true);}document.head.appendChild(s)})();</script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script>window.addEventListener("pagereveal",function(e){var t=e.viewTransition;if(t){["ready","finished","updateCallbackDone"].forEach(function(p){t[p]&&t[p].catch(function(){})})}});window.addEventListener("unhandledrejection",function(e){if(/Transition was aborted|ViewTransition/.test(String(e.reason&&e.reason.message||e.reason)))e.preventDefault()});</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+::view-transition-group(*){animation-duration:.55s;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+::view-transition-old(root){animation:.4s cubic-bezier(.22,1,.36,1) both vt-out}
+::view-transition-new(root){animation:.55s cubic-bezier(.22,1,.36,1) both vt-in}
+@keyframes vt-out{to{opacity:0;transform:scale(.985)}}
+@keyframes vt-in{from{opacity:0;transform:scale(1.015)}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#f9f7f4}
+button,input,textarea{border:none;font:inherit;background:none;color:inherit}
+a{color:#3461f2;text-decoration:none}a:hover{color:#2748bd}
+::selection{background:#e8d8c2}
+::placeholder{color:#b6b1aa}
+.nosb{scrollbar-width:none}.nosb::-webkit-scrollbar{display:none}
+@keyframes bpop{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes sheet{from{opacity:0;transform:translateY(24px) scale(.985)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;transition:none !important}}
+</style>
+<script src="atlas-quickstart-sphere.js"></script>
+<script src="atlas-orb.js"></script>
+<script src="atlas-topbar.js"></script>
+</helmet>
+<div data-screen-label="Atlas Mail — {{ boxTitle }}" style="height:100vh;display:flex;flex-direction:column;gap:12px;padding:20px 20px 84px;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden">
+
+<header style="view-transition-name:hero;flex:none;height:clamp(118px,15vh,160px);border-radius:32px;background:#f1eeea;padding:12px 18px 12px 8px;display:flex;align-items:center;gap:16px;animation:bpop .6s cubic-bezier(.22,1,.36,1) both">
+<div style="position:relative;height:100%;aspect-ratio:1;flex:none"><canvas ref="{{ sphereRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas></div>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px">
+<span style="font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#6d6a67;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Mail · {{ eyebrow }}</span>
+<a href="Atlas Dashboard Beta.dc.html" title="Back to Home · Esc" style="align-self:flex-start;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(24px,2.8vw,40px);font-weight:500;letter-spacing:-.045em;line-height:1.02;color:#1e1e24" style-hover="color:#1e1e24;opacity:.8">{{ greeting }}</a>
+<p style="margin:0;font-size:14px;line-height:1.5;color:#6d6a67;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ subline }}</p>
+</div>
+<div style="flex:none;display:flex;align-items:center;gap:8px">
+<div style="display:flex;align-items:center;gap:10px;width:{{ searchW }};height:44px;padding:0 8px 0 16px;border-radius:9999px;background:#fffdfa"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6d6a67" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{ icoSearch }}"></path></svg><input ref="{{ searchRef }}" value="{{ q }}" onInput="{{ onQ }}" placeholder="Search mail, people, rules" aria-label="Search mail" style="border:none;outline:none;flex:1;min-width:0;font-size:14px"><span style="height:28px;padding:0 9px;display:flex;align-items:center;border-radius:9999px;background:#f1eeea;font-family:'Geist Mono',monospace;font-size:11.5px;color:#6d6a67">/</span></div>
+<button onClick="{{ openCompose }}" title="Write · C" style="border:none;height:44px;padding:0 20px;display:flex;align-items:center;gap:8px;border-radius:9999px;background:#3461f2;color:#fff;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap" style-hover="background:#2748bd"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="{{ icoCompose }}"></path></svg>Write</button>
+</div>
+</header>
+
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:{{ cols }};gap:12px">
+
+<sc-if value="{{ showSide }}" hint-placeholder-val="{{ true }}">
+<aside class="nosb" style="min-height:0;overflow-y:auto;padding:10px;border-radius:28px;background:#f1eeea;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;flex-direction:column;gap:2px">
+<sc-for list="{{ boxes }}" as="b" hint-placeholder-count="7"><button onClick="{{ pickBox }}" data-k="{{ b.k }}" aria-current="{{ b.cur }}" style="border:none;width:100%;display:flex;align-items:center;gap:11px;height:42px;padding:0 12px;border-radius:14px;background:{{ b.bg }};color:#1e1e24;font-size:13.5px;font-weight:{{ b.fw }};cursor:pointer;text-align:left" style-hover="background:{{ b.hov }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="{{ b.ico }}"></path></svg><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ b.l }}</span><span style="flex:none;min-width:22px;height:22px;padding:0 7px;display:flex;align-items:center;justify-content:center;border-radius:9999px;background:{{ b.nBg }};color:{{ b.nFg }};font-size:11.5px;font-weight:600;font-variant-numeric:tabular-nums">{{ b.n }}</span></button></sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px"><span style="padding:0 12px 4px;font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#6d6a67">Accounts</span>
+<sc-for list="{{ accts }}" as="a" hint-placeholder-count="3"><button onClick="{{ pickAcct }}" data-k="{{ a.k }}" style="border:none;width:100%;text-align:left;display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:16px;background:{{ a.bg }};cursor:pointer" style-hover="background:{{ a.hov }}"><span style="flex:none;width:9px;height:9px;border-radius:50%;background:{{ a.dot }}"></span><span style="flex:1;min-width:0"><span style="display:block;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.addr }}</span><span style="display:block;margin-top:2px;font-size:11.5px;color:#6d6a67">{{ a.rule }}</span></span><span style="flex:none;font-size:11.5px;color:#6d6a67;font-variant-numeric:tabular-nums">{{ a.auto }}</span></button></sc-for>
+</div>
+<div style="margin-top:auto;padding:14px 16px;border-radius:20px;background:#fffdfa;display:flex;flex-direction:column;gap:8px"><span style="font-size:13px;font-weight:600">How Atlas handles mail</span><span style="font-size:12.5px;line-height:1.5;color:#6d6a67">Replies alone to people you’ve written to before. Holds anything about money, or to someone new.</span><a href="Atlas Settings Beta.dc.html#mail" style="align-self:flex-start;height:32px;padding:0 13px;display:flex;align-items:center;border-radius:9999px;background:#f1eeea;color:#1e1e24;font-size:12.5px;font-weight:600" style-hover="background:#edebe7;color:#1e1e24">Edit rules</a></div>
+</aside>
+</sc-if>
+
+<section aria-label="Messages" style="min-height:0;display:flex;flex-direction:column;gap:6px;padding:10px;border-radius:28px;background:#f1eeea">
+<div style="flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px 6px">
+<div style="min-width:0"><span style="display:block;font-family:'Hanken Grotesk',sans-serif;font-size:19px;font-weight:600;letter-spacing:-.025em;white-space:nowrap">{{ boxTitle }}</span><span style="display:block;margin-top:2px;font-size:12px;color:#6d6a67;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ boxMeta }}</span></div>
+<div style="flex:none;display:flex;gap:2px;padding:3px;border-radius:9999px;background:#f9f7f4"><sc-for list="{{ filters }}" as="f" hint-placeholder-count="2"><button onClick="{{ pickFilter }}" data-k="{{ f.k }}" style="border:none;height:28px;padding:0 11px;border-radius:9999px;background:{{ f.bg }};color:{{ f.fg }};font-size:12px;font-weight:600;cursor:pointer">{{ f.l }}</button></sc-for></div>
+</div>
+<div class="nosb" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px">
+<sc-for list="{{ rows }}" as="r" hint-placeholder-count="6"><button onClick="{{ pickRow }}" data-k="{{ r.id }}" style="border:none;width:100%;text-align:left;display:flex;flex-direction:column;gap:5px;padding:14px 16px;border-radius:18px;background:{{ r.bg }};cursor:pointer;transition:background .15s" style-hover="background:{{ r.hov }}">
+<span style="display:flex;align-items:center;gap:8px;width:100%"><sc-if value="{{ r.unread }}" hint-placeholder-val="{{ false }}"><span style="flex:none;width:7px;height:7px;border-radius:50%;background:#3461f2"></span></sc-if><span style="font-size:14px;font-weight:{{ r.fw }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.from }}</span><span style="flex:1;min-width:0;font-size:12px;color:#6d6a67;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.org }}</span><span style="flex:none;font-size:12px;color:#6d6a67;font-variant-numeric:tabular-nums">{{ r.time }}</span></span>
+<span style="font-size:13.5px;font-weight:{{ r.sfw }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%">{{ r.subject }}</span>
+<span style="font-size:12.5px;line-height:1.45;color:#6d6a67;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%">{{ r.snippet }}</span>
+<span style="display:flex;align-items:center;gap:8px;margin-top:3px;min-width:0;width:100%"><span style="flex:none;white-space:nowrap;height:22px;padding:0 9px;display:flex;align-items:center;gap:6px;border-radius:9999px;background:{{ r.chipBg }};color:{{ r.chipFg }};font-size:11px;font-weight:600"><span style="width:6px;height:6px;border-radius:50%;background:{{ r.chipDot }}"></span>{{ r.chip }}</span><span style="min-width:0;display:flex;align-items:center;gap:5px;font-size:11.5px;color:#6d6a67"><span style="flex:none;width:6px;height:6px;border-radius:50%;background:{{ r.acctDot }}"></span><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.acct }}</span></span></span>
+</button></sc-for>
+<sc-if value="{{ listEmpty }}" hint-placeholder-val="{{ false }}"><div style="margin:12px 4px;padding:28px 20px;border-radius:20px;background:#f9f7f4;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center"><span style="font-family:'Hanken Grotesk',sans-serif;font-size:17px;font-weight:600">{{ emptyTitle }}</span><span style="max-width:260px;font-size:12.5px;line-height:1.5;color:#6d6a67">{{ emptyBody }}</span></div></sc-if>
+</div>
+</section>
+
+<section aria-label="Reading" style="min-width:0;min-height:0;display:flex;flex-direction:column;border-radius:28px;background:#fffdfa;overflow:hidden">
+<sc-if value="{{ hasSel }}" hint-placeholder-val="{{ true }}">
+<div style="flex:none;display:flex;flex-wrap:wrap;align-items:flex-start;gap:12px;padding:{{ readPad }}">
+<div style="flex:1 1 280px;min-width:0"><span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="height:24px;padding:0 10px;display:flex;align-items:center;gap:6px;border-radius:9999px;background:{{ sel.chipBg }};color:{{ sel.chipFg }};font-size:11.5px;font-weight:600"><span style="width:6px;height:6px;border-radius:50%;background:{{ sel.chipDot }}"></span>{{ sel.chip }}</span><span style="display:flex;align-items:center;gap:6px;font-size:12px;color:#6d6a67"><span style="width:7px;height:7px;border-radius:50%;background:{{ sel.acctDot }}"></span>{{ sel.acctAddr }}</span></span>
+<h1 style="margin:10px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(22px,2.2vw,28px);font-weight:600;letter-spacing:-.03em;line-height:1.15;text-wrap:pretty">{{ sel.subject }}</h1>
+<p style="margin:6px 0 0;font-size:13px;color:#6d6a67">{{ sel.people }}</p></div>
+<div style="flex:none;display:flex;gap:4px">
+<button onClick="{{ startReply }}" title="Reply · R" aria-label="Reply" style="border:none;width:38px;height:38px;border-radius:50%;background:#f1eeea;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:#edebe7"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{ icoReply }}"></path></svg></button>
+<button onClick="{{ toggleSnooze }}" title="Snooze · H" aria-label="Snooze" style="border:none;width:38px;height:38px;border-radius:50%;background:{{ snzBg }};display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:#edebe7"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{ icoClock }}"></path></svg></button>
+<button onClick="{{ archive }}" title="Archive · E" aria-label="Archive" style="border:none;width:38px;height:38px;border-radius:50%;background:#f1eeea;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:#edebe7"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{ icoArchive }}"></path></svg></button>
+</div>
+</div>
+<sc-if value="{{ snoozeOpen }}" hint-placeholder-val="{{ false }}"><div style="flex:none;margin:0 24px 8px;display:flex;flex-wrap:wrap;gap:6px;animation:bpop .25s both"><sc-for list="{{ snoozeOpts }}" as="o" hint-placeholder-count="4"><button onClick="{{ snooze }}" data-k="{{ o.l }}" style="border:none;height:34px;padding:0 13px;border-radius:9999px;background:#f1eeea;font-size:12.5px;font-weight:600;cursor:pointer" style-hover="background:#edebe7">{{ o.l }}<span style="margin-left:6px;font-weight:500;color:#6d6a67">{{ o.t }}</span></button></sc-for></div></sc-if>
+<div ref="{{ readRef }}" class="nosb" style="flex:1;min-height:160px;overflow-y:auto;padding:4px 24px 24px;display:flex;flex-direction:column;gap:12px">
+<div key="{{ sel.id }}" style="padding:16px 18px;border-radius:20px;background:{{ sel.atlasBg }};display:flex;gap:14px;animation:bpop .4s cubic-bezier(.22,1,.36,1) both">
+<span style="flex:none;width:32px;height:32px;border-radius:10px;background:{{ sel.atlasIcoBg }};color:{{ sel.atlasIcoFg }};display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{ icoSparkle }}"></path></svg></span>
+<div style="flex:1;min-width:0"><p style="margin:0;font-size:14px;font-weight:600;color:{{ sel.atlasFg }}">{{ sel.atlasTitle }}</p><p style="margin:5px 0 0;font-size:13.5px;line-height:1.55;text-wrap:pretty">{{ sel.atlasBody }}</p>
+<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"><sc-for list="{{ sel.facts }}" as="f" hint-placeholder-count="3"><span style="height:24px;padding:0 10px;display:flex;align-items:center;border-radius:9999px;background:#fffdfa;font-size:11.5px">{{ f }}</span></sc-for></div>
+<sc-if value="{{ sel.hasDecision }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px"><button onClick="{{ approve }}" style="border:none;height:36px;padding:0 15px;border-radius:9999px;background:#3461f2;color:#fff;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#2748bd">{{ sel.approveL }}</button><button onClick="{{ decline }}" style="border:none;height:36px;padding:0 14px;border-radius:9999px;background:#fffdfa;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#f9f7f4">Don’t send</button></div></sc-if>
+<sc-if value="{{ sel.hasUndo }}" hint-placeholder-val="{{ false }}"><button onClick="{{ undo }}" style="border:none;margin-top:10px;height:32px;padding:0 13px;border-radius:9999px;background:#fffdfa;font-size:12.5px;font-weight:600;cursor:pointer" style-hover="background:#f9f7f4">{{ sel.undoL }}</button></sc-if>
+</div>
+</div>
+<sc-for list="{{ sel.msgs }}" as="m" hint-placeholder-count="2"><article style="padding:18px 20px;border-radius:20px;background:{{ m.bg }}">
+<header style="display:flex;align-items:center;gap:11px;margin-bottom:10px"><span style="flex:none;width:32px;height:32px;border-radius:50%;background:{{ m.avBg }};color:{{ m.avFg }};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">{{ m.init }}</span><span style="flex:1;min-width:0"><span style="display:block;font-size:13.5px;font-weight:600">{{ m.who }}</span><span style="display:block;margin-top:1px;font-size:12px;color:#6d6a67">{{ m.meta }}</span></span><span style="flex:none;font-size:12px;color:#6d6a67;font-variant-numeric:tabular-nums">{{ m.time }}</span></header>
+<p style="margin:0;font-size:14.5px;line-height:1.65;white-space:pre-line;text-wrap:pretty">{{ m.body }}</p>
+<sc-if value="{{ m.hasAtt }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px"><sc-for list="{{ m.att }}" as="t" hint-placeholder-count="1"><span style="height:36px;padding:0 12px;display:flex;align-items:center;gap:8px;border-radius:12px;background:#f1eeea;font-size:12.5px;font-weight:600"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{ icoAttach }}"></path></svg>{{ t }}</span></sc-for></div></sc-if>
+</article></sc-for>
+<sc-if value="{{ showReply }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:8px;padding-top:4px">
+<div style="padding:12px 14px;border-radius:20px;background:#eef2fe;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:#2748bd;min-width:0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="{{ icoSparkle }}"></path></svg><span style="white-space:nowrap">{{ draftLabel }}</span><span style="flex:1;min-width:0;text-align:right;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">In your tone · Tab to edit</span></div>
+<textarea value="{{ reply }}" onInput="{{ onReply }}" rows="{{ replyRows }}" aria-label="Reply" style="border:none;outline:none;resize:none;width:100%;font-family:inherit;font-size:14.5px;line-height:1.55;color:#1e1e24"></textarea>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px"><button onClick="{{ sendReply }}" style="border:none;height:34px;padding:0 15px;border-radius:9999px;background:#3461f2;color:#fff;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#2748bd">Send</button><sc-for list="{{ rewrites }}" as="w" hint-placeholder-count="3"><button onClick="{{ rewrite }}" data-k="{{ w.k }}" style="border:none;height:30px;padding:0 11px;border-radius:9999px;background:transparent;color:#2748bd;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap" style-hover="background:#e2e9fd">{{ w.l }}</button></sc-for><span style="flex:1"></span><button onClick="{{ discardReply }}" style="border:none;height:30px;padding:0 11px;border-radius:9999px;color:#6d6a67;font-size:12.5px;font-weight:600;cursor:pointer" style-hover="background:#e2e9fd">Discard</button></div>
+</div>
+</div>
+</sc-if>
+</div>
+
+</sc-if>
+<sc-if value="{{ noSel }}" hint-placeholder-val="{{ false }}"><div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:40px;text-align:center"><span style="font-family:'Hanken Grotesk',sans-serif;font-size:22px;font-weight:600;letter-spacing:-.02em">Nothing selected</span><span style="max-width:320px;font-size:13.5px;line-height:1.55;color:#6d6a67">Pick a message, or press C to write one. J and K move through the list.</span></div></sc-if>
+</section>
+</div>
+
+<sc-if value="{{ composing }}" hint-placeholder-val="{{ false }}">
+<div style="position:fixed;inset:0;z-index:70;background:rgba(30,30,36,.28);display:flex;align-items:flex-end;justify-content:center;padding:20px" onClick="{{ closeComposeBg }}">
+<div role="dialog" aria-label="New message" onClick="{{ stop }}" style="width:min(760px,100%);max-height:calc(100vh - 40px);display:flex;flex-direction:column;gap:10px;padding:14px;border-radius:32px;background:#f1eeea;box-shadow:0 40px 80px -30px rgba(30,30,36,.5);animation:sheet .4s cubic-bezier(.22,1,.36,1) both">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 8px"><span style="font-family:'Hanken Grotesk',sans-serif;font-size:20px;font-weight:600;letter-spacing:-.02em">New message</span><button onClick="{{ closeCompose }}" aria-label="Close" style="border:none;width:36px;height:36px;border-radius:50%;background:#fffdfa;font-size:15px;cursor:pointer">✕</button></div>
+<div style="padding:6px;border-radius:22px;background:#fffdfa;display:flex;flex-direction:column;gap:2px">
+<div style="display:flex;align-items:center;gap:10px;padding:8px 12px"><span style="width:56px;font-size:12.5px;color:#6d6a67">From</span><div style="display:flex;flex-wrap:wrap;gap:4px"><sc-for list="{{ fromOpts }}" as="o" hint-placeholder-count="3"><button onClick="{{ pickFrom }}" data-k="{{ o.k }}" style="border:none;height:30px;padding:0 11px;display:flex;align-items:center;gap:6px;border-radius:9999px;background:{{ o.bg }};color:{{ o.fg }};font-size:12.5px;font-weight:600;cursor:pointer"><span style="width:6px;height:6px;border-radius:50%;background:{{ o.dot }}"></span>{{ o.addr }}</button></sc-for></div></div>
+<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:14px;background:#f9f7f4"><span style="width:56px;font-size:12.5px;color:#6d6a67">To</span><input value="{{ cTo }}" onInput="{{ onCTo }}" placeholder="Name or email" aria-label="To" style="border:none;outline:none;flex:1;min-width:0;height:32px;font-size:14.5px"></div>
+<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:14px;background:#f9f7f4"><span style="width:56px;font-size:12.5px;color:#6d6a67">Subject</span><input value="{{ cSub }}" onInput="{{ onCSub }}" placeholder="What’s it about?" aria-label="Subject" style="border:none;outline:none;flex:1;min-width:0;height:32px;font-size:14.5px"></div>
+</div>
+<sc-if value="{{ newPerson }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:16px;background:#eef2fe;color:#2748bd;font-size:13px;font-weight:600"><span style="width:7px;height:7px;border-radius:50%;background:#3461f2"></span>{{ newPersonLine }}</div></sc-if>
+<div style="position:relative;padding:14px 16px;border-radius:22px;background:#fffdfa;min-height:200px;display:flex;flex-direction:column">
+<textarea value="{{ cBody }}" onInput="{{ onCBody }}" onKeyDown="{{ onCBodyKey }}" placeholder="Write, or describe what you want to say and press Ask Atlas" aria-label="Message" style="border:none;outline:none;resize:none;flex:1;min-height:170px;font-family:inherit;font-size:15px;line-height:1.6"></textarea>
+<sc-if value="{{ hasGhost }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:14px;background:#eef2fe;font-size:13.5px;line-height:1.5"><span style="flex:1;color:#2748bd">{{ ghost }}</span><span style="flex:none;height:22px;padding:0 8px;display:flex;align-items:center;border-radius:6px;background:#fffdfa;font-family:'Geist Mono',monospace;font-size:11px;color:#6d6a67">Tab</span></div></sc-if>
+</div>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:2px 4px">
+<button onClick="{{ sendCompose }}" style="border:none;height:44px;padding:0 22px;border-radius:9999px;background:{{ sendBg }};color:{{ sendFg }};font-size:14px;font-weight:600;cursor:pointer">{{ sendL }}</button>
+<button onClick="{{ askAtlas }}" style="border:none;height:44px;padding:0 16px;display:flex;align-items:center;gap:8px;border-radius:9999px;background:#fffdfa;color:#2748bd;font-size:13.5px;font-weight:600;cursor:pointer" style-hover="background:#eef2fe"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="{{ icoSparkle }}"></path></svg>{{ askL }}</button>
+<button onClick="{{ toggleSchedule }}" style="border:none;height:44px;padding:0 16px;border-radius:9999px;background:{{ schedBg }};color:{{ schedFg }};font-size:13.5px;font-weight:600;cursor:pointer;white-space:nowrap">{{ schedL }}</button>
+<span style="flex:1"></span><span style="font-size:12px;color:#6d6a67">⌘↵ to send</span>
+</div>
+</div>
+</div>
+</sc-if>
+
+<nav aria-label="Atlas" data-dock="beta" style="view-transition-name:atlas-dock;position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:4px;padding:6px;border-radius:9999px;background:rgba(255,253,250,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 18px 40px -20px rgba(30,30,36,.28)">
+<sc-for list="{{ dock }}" as="d" hint-placeholder-count="6"><a href="{{ d.h }}" title="{{ d.l }}" aria-label="{{ d.l }}" aria-current="{{ d.cur }}" style="flex:none;display:flex;align-items:center;justify-content:center;gap:8px;min-width:42px;height:42px;padding:0 {{ d.pad }};border-radius:9999px;background:{{ d.bg }};color:{{ d.fg }};font-size:13.5px;font-weight:600;transition:background .2s" style-hover="background:{{ d.hov }};color:{{ d.fg }}"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="{{ d.ico }}"></path></svg><sc-if value="{{ d.on }}" hint-placeholder-val="{{ false }}">{{ d.l }}</sc-if></a></sc-for>
+<a href="Atlas Settings Beta.dc.html" title="Marcus · Settings" aria-label="Settings" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px" style-hover="background:#f1eeea"><span style="width:34px;height:34px;border-radius:50%;background:#1e1e24;color:#f9f7f4;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">M</span></a>
+</nav>
+<sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}"><div role="status" style="position:fixed;left:50%;bottom:80px;transform:translateX(-50%);z-index:80;display:flex;align-items:center;gap:12px;height:44px;padding:0 8px 0 18px;border-radius:9999px;background:#1e1e24;color:#f9f7f4;font-size:13.5px;font-weight:600;box-shadow:0 18px 40px -20px rgba(30,30,36,.5);animation:bpop .3s both">{{ toast }}<sc-if value="{{ toastUndo }}" hint-placeholder-val="{{ false }}"><button onClick="{{ undoToast }}" style="border:none;height:30px;padding:0 12px;border-radius:9999px;background:rgba(249,247,244,.14);color:#f9f7f4;font-size:12.5px;font-weight:600;cursor:pointer">Undo</button></sc-if></div></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const ACCTS = { work: ['marcus@bell.studio', '#3461f2', 'Replies alone to known people'], home: ['marcus.bell@icloud.com', '#0fae76', 'Drafts only'], press: ['press@bell.studio', '#e07a1f', 'Holds everything new'] };
+const ST = { need: ['Needs you', '#f7e6e4', '#a3352c', '#d0453a'], held: ['Held for you', '#eef2fe', '#2748bd', '#3461f2'], draft: ['Draft ready', '#eef2fe', '#2748bd', '#3461f2'], answered: ['Atlas replied', '#e3f4ec', '#0a7a53', '#0fae76'], filed: ['Filed', '#f1eeea', '#6d6a67', '#b6b1aa'], read: ['Read', '#f1eeea', '#6d6a67', '#b6b1aa'] };
+const MAIL = [
+  { id: 'm1', from: 'Dana Whitfield', org: 'The Verge', acct: 'press', st: 'need', unread: true, time: '09:12', subject: 'Embargo for Thursday: can you confirm by noon?', snippet: 'We’d like to run the piece at 08:00 CET Thursday. Can you confirm the embargo holds?', people: 'Dana Whitfield to press@bell.studio', atlas: ['This needs your decision', 'Dana wants written confirmation of the Thursday embargo. Atlas checked: Ledgerline and Northwind confirmed the same time yesterday.', ['Deadline today 12:00', '2 outlets confirmed', 'Embargo 08:00 CET Thu']], msgs: [['DW', 'Dana Whitfield', 'dana@theverge.com', '09:12', 'Hi Marcus,\n\nWe’d like to run the piece at 08:00 CET on Thursday. Could you confirm in writing that the embargo holds for everyone?\n\nThanks,\nDana']], draft: 'Hi Dana, confirmed: the embargo holds until Thursday 08:00 CET for every outlet. I’ll send the final assets tomorrow morning. Best, Marcus', alt: ['Confirmed, Dana. Thursday 08:00 CET for everyone. Assets tomorrow.', 'Hi Dana, thanks for checking. Yes, the embargo holds for all outlets until Thursday at 08:00 CET. I’ll have the final images and quotes with you tomorrow morning, and I’m around if anything changes. Best, Marcus'] },
+  { id: 'm2', from: 'Ledgerline Finance', org: 'Accounts', acct: 'work', st: 'held', unread: true, time: '08:47', subject: 'Approval needed: €62,000 transfer', snippet: 'Please approve the Q4 retainer transfer before the 14:00 cut-off.', people: 'finance@ledgerline.com to marcus@bell.studio', atlas: ['Atlas held a reply', 'Atlas drafted the approval but stopped: it’s above your €50,000 payment limit. The amount matches the signed contract from 3 September.', ['Above €50,000 limit', 'Matches contract', 'Cut-off 14:00']], decision: 'Approve and send', msgs: [['LF', 'Ledgerline Finance', 'finance@ledgerline.com', '08:47', 'Hello,\n\nPlease approve the Q4 retainer transfer of €62,000 before today’s 14:00 cut-off.\n\nKind regards,\nLedgerline Accounts'], ['A', 'Atlas, drafted for you', 'Not sent · waiting for your approval', '08:48', 'Approved. Please proceed with the €62,000 Q4 retainer transfer today. Marcus']], draft: '', alt: [] },
+  { id: 'm3', from: 'Priya Raman', org: 'Raman Studio', acct: 'work', st: 'draft', unread: true, time: '08:05', subject: 'Paris offsite: 12 or 19 November?', snippet: 'Both work for us, which suits your team better?', people: 'Priya Raman to marcus@bell.studio, Ana Bell', atlas: ['Draft ready in your tone', 'Your calendar is clear on the 19th and you have a board meeting on the 12th. Atlas suggested the 19th.', ['12 Nov: board meeting', '19 Nov: clear', 'Paris, 2 days']], msgs: [['PR', 'Priya Raman', 'priya@raman.studio', '08:05', 'Hi both,\n\nBoth 12 and 19 November work for us for the Paris offsite. Which suits your team better?\n\nPriya']], draft: 'Hi Priya, the 19th works much better for us, since the 12th clashes with our board meeting. Shall I book the same place as last year?', alt: ['19th please, Priya. The 12th clashes with our board. Same place as last year?', 'Hi Priya, thanks for offering both. The 19th suits us better, as the 12th falls on our board meeting. If it helps, I can book the venue we used last year and send round a short agenda next week.'] },
+  { id: 'm4', from: 'Marcus Lee', org: 'Northwind', acct: 'work', st: 'answered', unread: false, time: '06:02', subject: 'Invoice #2207', snippet: 'Atlas replied: “Thanks Marcus, received. Paying it on Friday as usual.”', people: 'Marcus Lee to marcus@bell.studio', atlas: ['Atlas replied for you', 'Known contact, routine invoice, under every limit. Sent at 06:02 under the rule “Reply to known people”.', ['Rule: known people', 'Under all limits', 'Sent 06:02']], undo: 'Unsend and reopen', msgs: [['ML', 'Marcus Lee', 'marcus@northwind.io', '05:40', 'Hi Marcus, attached is invoice #2207 for October. Same terms as usual.', ['Invoice-2207.pdf']], ['A', 'Atlas, as Marcus', 'Sent from marcus@bell.studio', '06:02', 'Thanks Marcus, received. Paying it on Friday as usual. Best, Marcus']], draft: '', alt: [] },
+  { id: 'm5', from: 'Ana Bell', org: '', acct: 'home', st: 'draft', unread: false, time: 'Yesterday', subject: 'Sam’s pickup on Thursday', snippet: 'Can you get Sam at 15:55? I have a call.', people: 'Ana Bell to marcus.bell@icloud.com', atlas: ['Draft ready', 'You have a 15:30 call on Thursday that ends at 16:00. Atlas suggests asking to swap.', ['Thu 15:30 call', 'Pickup 15:55']], msgs: [['AB', 'Ana Bell', 'ana@bell.studio', 'Yesterday', 'Can you get Sam at 15:55 on Thursday? I have a call.']], draft: 'I’ve got a call until 16:00 on Thursday, could you swap with me for Friday instead? Otherwise I’ll move my call.', alt: ['Call till 16:00 Thu. Swap for Friday? Or I’ll move it.', 'Thursday’s tricky, I’m on a call until 16:00. Could we swap and I’ll do Friday? If not, I’ll move my call and get him.'] },
+  { id: 'm6', from: 'Studio Kern', org: 'Orders', acct: 'home', st: 'filed', unread: false, time: 'Yesterday', subject: 'Your order has shipped', snippet: 'Track your parcel: arriving Wednesday.', people: 'orders@studiokern.dk to marcus.bell@icloud.com', atlas: ['Filed by Atlas', 'Delivery noted on your calendar for Wednesday. Nothing for you to do.', ['Arrives Wed', 'Added to calendar']], undo: 'Move back to Inbox', msgs: [['SK', 'Studio Kern', 'orders@studiokern.dk', 'Yesterday', 'Your order #8812 has shipped and will arrive on Wednesday.']], draft: '', alt: [] },
+  { id: 'm7', from: 'Field Notes Press', org: 'Newsletter', acct: 'press', st: 'filed', unread: false, time: 'Mon', subject: 'Three stories on assistive UI', snippet: 'This week: why quiet software wins…', people: 'news@fieldnotes.press', atlas: ['Filed by Atlas', 'Newsletter. Atlas added the top story to your Briefing.', ['In Briefing']], undo: 'Move back to Inbox', msgs: [['FN', 'Field Notes Press', 'news@fieldnotes.press', 'Mon', 'This week: why quiet software wins, a look at assistant presence, and an interview on trust.']], draft: '', alt: [] }
+];
+const BOXES = [['need', 'Needs you', 'warning'], ['atlas', 'Atlas handled', 'sparkle'], ['inbox', 'Inbox', 'inbox'], ['snoozed', 'Snoozed', 'clock'], ['sent', 'Sent', 'send'], ['archive', 'Archive', 'folder']];
+class Component extends DCLogic {
+  state = { ico: {}, vw: window.innerWidth, vh: window.innerHeight, box: 'need', acct: null, filter: 'all', q: '', sel: 'm1', mail: MAIL.map((m) => Object.assign({}, m, { box: m.st === 'answered' || m.st === 'filed' ? 'atlas' : 'inbox', dI: -1 })), reply: null, snz: false, composing: false, cFrom: 'work', cTo: '', cSub: '', cBody: '', ghost: '', sched: false, toast: '', undoFn: null, busy: false };
+  componentDidMount() {
+    fetch('atlas-icon-data.js').then((r) => r.text()).then((t) => { const SET = new Function(t.replace(/export\s+const\s+SET\s*=/, 'return'))(), ico = {}; SET.forEach((g) => g[2].forEach(([n, d]) => { ico[n] = d; })); this.setState({ ico }); }).catch(() => {});
+    this.onResize = () => this.setState({ vw: window.innerWidth, vh: window.innerHeight }); window.addEventListener('resize', this.onResize);
+    this.onKey = (e) => {
+      const tag = document.activeElement && document.activeElement.tagName; if (/INPUT|TEXTAREA/.test(tag)) { if (e.key === 'Escape') document.activeElement.blur(); return; }
+      if (this.state.composing) { if (e.key === 'Escape') this.setState({ composing: false }); return; }
+      const list = this.list(), i = list.findIndex((m) => m.id === this.state.sel);
+      if (e.key === 'j' && list[i + 1]) this.setState({ sel: list[i + 1].id, reply: null, snz: false });
+      else if (e.key === 'k' && i > 0) this.setState({ sel: list[i - 1].id, reply: null, snz: false });
+      else if (e.key === 'e') this.archive();
+      else if (e.key === 'c') { e.preventDefault(); this.setState({ composing: true }); }
+      else if (e.key === 'r') this.startReply();
+      else if (e.key === 'h') this.setState((x) => ({ snz: !x.snz }));
+      else if (e.key === '/') { e.preventDefault(); if (this.search) this.search.focus(); }
+      else if (e.key === 'Escape') window.location.href = 'Atlas Dashboard Beta.dc.html';
+    };
+    window.addEventListener('keydown', this.onKey);
+  }
+  componentWillUnmount() { window.removeEventListener('resize', this.onResize); window.removeEventListener('keydown', this.onKey); clearTimeout(this.tt); clearTimeout(this.gt); if (this.sph) this.sph.destroy(); }
+  componentDidUpdate() { const st = this.state.busy ? 'thinking' : this.list().some((m) => m.st === 'need') ? 'listening' : 'idle'; if (this.sph && this.ls !== st) { this.ls = st; this.sph.set({ state: st }); } }
+  list() { const s = this.state, q = s.q.trim().toLowerCase(); return s.mail.filter((m) => { if (s.acct && m.acct !== s.acct) return false; if (q) return (m.from + m.subject + m.snippet + m.org).toLowerCase().includes(q); if (s.filter === 'unread' && !m.unread) return false; if (s.box === 'need') return m.box === 'inbox' && (m.st === 'need' || m.st === 'held' || m.st === 'draft'); if (s.box === 'inbox') return m.box === 'inbox'; return m.box === s.box; }); }
+  upd(id, o) { this.setState((s) => ({ mail: s.mail.map((m) => (m.id === id ? Object.assign({}, m, typeof o === 'function' ? o(m) : o) : m)) })); }
+  toastMsg(t, undoFn) { clearTimeout(this.tt); this.setState({ toast: t, undoFn: undoFn || null }); this.tt = setTimeout(() => this.setState({ toast: '', undoFn: null }), 3800); }
+  nextAfter(id) { const l = this.list(), i = l.findIndex((m) => m.id === id); const n = l[i + 1] || l[i - 1]; return n ? n.id : null; }
+  archive() { const id = this.state.sel; if (!id) return; const m = this.state.mail.find((x) => x.id === id), prevBox = m.box; const nx = this.nextAfter(id); this.upd(id, { box: 'archive', unread: false }); this.setState({ sel: nx, reply: null, snz: false }); this.toastMsg('Archived', () => { this.upd(id, { box: prevBox }); this.setState({ sel: id }); }); }
+  startReply() { const m = this.state.mail.find((x) => x.id === this.state.sel); if (!m) return; this.setState({ reply: m.draft || '' }); }
+  renderVals() {
+    const s = this.state, ic = (n) => s.ico[n] || '', wide = s.vw >= 1280, mid = s.vw >= 1000;
+    const list = this.list(), sel = s.mail.find((m) => m.id === s.sel);
+    const cnt = (k) => s.mail.filter((m) => (k === 'need' ? m.box === 'inbox' && ['need', 'held', 'draft'].includes(m.st) : m.box === k)).length;
+    const needN = cnt('need'), autoN = s.mail.filter((m) => m.st === 'answered' || m.st === 'filed').length;
+    const BT = { need: ['Needs you', 'Decisions, held replies and drafts. Everything else is handled.'], atlas: ['Atlas handled', 'Replied or filed for you, each with the rule it used.'], inbox: ['Inbox', 'Every account, newest first.'], snoozed: ['Snoozed', 'Back when you said.'], sent: ['Sent', 'By you and by Atlas.'], archive: ['Archive', 'Out of the way, never deleted.'] };
+    const draftFor = (m) => (m.dI < 0 ? m.draft : m.alt[m.dI] || m.draft);
+    const known = ['dana@theverge.com', 'priya@raman.studio', 'ana@bell.studio', 'marcus@northwind.io', 'dana', 'priya', 'ana', 'marcus lee'];
+    const toNew = s.cTo.trim() && !known.some((k) => s.cTo.toLowerCase().includes(k));
+    const canSend = s.cTo.trim() && (s.cBody.trim() || s.cSub.trim());
+    return {
+      sphereRef: (el) => { if (!el || el.__q) return; const go = () => { if (el.__q || !el.isConnected) return; if (!window.QuickSphere) return setTimeout(go, 60); el.__q = this.sph = window.QuickSphere.mount(el, { mode: 'veil', bg: 'transparent', dust: [122, 148, 246], strand: [52, 97, 242], blend: 'source-over', alpha: 0.62, seed: 11, count: 9000, scale: 0.42, state: 'idle' }); }; go(); },
+      searchRef: (el) => { this.search = el; },
+      icoSearch: ic('search'), icoCompose: ic('compose'), icoReply: ic('reply'), icoClock: ic('clock'), icoArchive: ic('folder'), icoSparkle: ic('sparkle'), icoAttach: ic('attach'),
+      eyebrow: '3 accounts · ' + autoN + ' handled since 06:00',
+      greeting: needN ? needN + (needN === 1 ? ' thing needs you' : ' things need you') : 'Nothing needs you',
+      subline: needN ? 'Atlas answered ' + autoN + ' and held the rest. The embargo reply is due at noon.' : 'Atlas is handling the rest quietly.',
+      wide, showSide: mid, showSearch: s.vw >= 760, searchW: wide ? '320px' : s.vw >= 760 ? '220px' : '150px', readPad: s.vh < 700 ? '14px 20px 8px' : '22px 24px 14px', cols: wide ? '260px 380px minmax(0,1fr)' : mid ? '230px 320px minmax(0,1fr)' : '300px minmax(0,1fr)',
+      boxes: BOXES.map(([k, l, i]) => { const on = s.box === k && !s.acct && !s.q; const n = k === 'atlas' ? autoN : cnt(k); return { k, l, ico: ic(i), cur: on ? 'page' : 'false', bg: on ? '#fffdfa' : 'transparent', hov: on ? '#fffdfa' : '#edebe7', fw: on ? 600 : 500, n: n ? String(n) : '', nBg: k === 'need' && n ? '#d0453a' : 'transparent', nFg: k === 'need' && n ? '#fff' : '#6d6a67' }; }),
+      pickBox: (e) => { const k = e.currentTarget.getAttribute('data-k'); const l = s.mail.filter((m) => (k === 'need' ? m.box === 'inbox' && ['need', 'held', 'draft'].includes(m.st) : m.box === k)); this.setState({ box: k, acct: null, q: '', sel: l[0] ? l[0].id : null, reply: null, snz: false }); },
+      accts: Object.keys(ACCTS).map((k) => { const [addr, dot, rule] = ACCTS[k], on = s.acct === k; return { k, addr, dot, rule, auto: s.mail.filter((m) => m.acct === k && (m.st === 'answered' || m.st === 'filed')).length + ' auto', bg: on ? '#fffdfa' : '#f9f7f4', hov: on ? '#fffdfa' : '#fdfbf7' }; }),
+      pickAcct: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.setState((x) => ({ acct: x.acct === k ? null : k })); },
+      q: s.q, onQ: (e) => this.setState({ q: e.target.value }),
+      boxTitle: s.q.trim() ? 'Search' : s.acct ? ACCTS[s.acct][0] : BT[s.box][0], boxMeta: s.q.trim() ? list.length + ' results for “' + s.q.trim() + '”' : s.acct ? 'Everything in this account' : BT[s.box][1],
+      filters: [['all', 'All'], ['unread', 'Unread']].map(([k, l]) => ({ k, l, bg: s.filter === k ? '#1e1e24' : 'transparent', fg: s.filter === k ? '#f9f7f4' : '#1e1e24' })),
+      pickFilter: (e) => this.setState({ filter: e.currentTarget.getAttribute('data-k') }),
+      rows: list.map((m) => { const on = m.id === s.sel, S = ST[m.st]; return { id: m.id, from: m.from, org: m.org, time: m.time, subject: m.subject, snippet: m.snippet, unread: m.unread, fw: m.unread ? 700 : 600, sfw: m.unread ? 600 : 400, chip: S[0], chipBg: on ? S[1] : S[1], chipFg: S[2], chipDot: S[3], acct: ACCTS[m.acct][0].split('@')[0], acctDot: ACCTS[m.acct][1], bg: on ? '#fffdfa' : '#f9f7f4', hov: on ? '#fffdfa' : '#fdfbf7' }; }),
+      listEmpty: list.length === 0, emptyTitle: s.box === 'need' ? 'Nothing needs you' : 'Nothing here', emptyBody: s.box === 'need' ? 'Atlas is answering what it can and will bring anything new here.' : 'Messages land here as they arrive.',
+      pickRow: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.upd(k, { unread: false }); this.setState({ sel: k, reply: null, snz: false }); if (this.read) this.read.scrollTop = 0; },
+      hasSel: !!sel, noSel: !sel,
+      sel: sel ? (() => { const S = ST[sel.st], A = sel.atlas, need = sel.st === 'need', held = sel.st === 'held'; return { id: sel.id, subject: sel.subject, people: sel.people, chip: S[0], chipBg: S[1], chipFg: S[2], chipDot: S[3], acctAddr: ACCTS[sel.acct][0], acctDot: ACCTS[sel.acct][1], atlasTitle: A[0], atlasBody: A[1], facts: A[2], atlasBg: need ? '#f7e6e4' : held || sel.st === 'draft' ? '#eef2fe' : '#f1eeea', atlasFg: need ? '#a3352c' : held || sel.st === 'draft' ? '#2748bd' : '#1e1e24', atlasIcoBg: need ? '#d0453a' : '#3461f2', atlasIcoFg: '#fff', hasDecision: held, approveL: sel.decision || 'Approve', hasUndo: !!sel.undo, undoL: sel.undo || '', msgs: sel.msgs.map(([init, who, meta, time, body, att]) => { const a = init === 'A'; return { init: a ? '' : init, who, meta, time, body, hasAtt: !!att, att: att || [], bg: a ? '#eef2fe' : '#f9f7f4', avBg: a ? '#3461f2' : '#1e1e24', avFg: '#fff' }; }) }; })() : {},
+      readRef: (el) => { this.read = el; },
+      showReply: !!sel && (s.reply != null || ((sel.st === 'need' || sel.st === 'draft') && !!sel.draft)),
+      draftLabel: s.reply != null && sel && s.reply !== draftFor(sel) ? 'Your reply' : 'Atlas drafted a reply',
+      reply: s.reply != null ? s.reply : sel ? draftFor(sel) : '', onReply: (e) => this.setState({ reply: e.target.value }), replyRows: s.vw < 1200 ? '2' : '3',
+      rewrites: [['short', 'Shorter'], ['warm', 'Warmer'], ['orig', 'Original']].map(([k, l]) => ({ k, l })),
+      rewrite: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.setState({ busy: true }); clearTimeout(this.gt); this.gt = setTimeout(() => { this.upd(sel.id, { dI: k === 'short' ? 0 : k === 'warm' ? 1 : -1 }); this.setState({ reply: null, busy: false }); }, 600); },
+      sendReply: () => { const text = s.reply != null ? s.reply : draftFor(sel); if (!text.trim()) return; const id = sel.id, nx = this.nextAfter(id); this.upd(id, (m) => ({ st: 'read', box: 'sent', msgs: m.msgs.concat([['MB', 'Marcus Bell', 'You · ' + ACCTS[m.acct][0], 'Now', text]]), snippet: 'You: ' + text })); this.setState({ reply: null, sel: nx }); this.toastMsg('Sent to ' + sel.from.split(' ')[0], () => { this.upd(id, { st: sel.st, box: 'inbox', msgs: sel.msgs, snippet: sel.snippet }); this.setState({ sel: id }); }); },
+      discardReply: () => this.setState({ reply: null }), startReply: () => this.startReply(),
+      approve: () => { const id = sel.id; this.upd(id, (m) => ({ st: 'answered', box: 'atlas', atlas: ['Sent after your approval', 'You approved the €62,000 transfer at ' + new Date().toTimeString().slice(0, 5) + '. Logged in the audit trail.', ['Approved by you', 'Logged']], msgs: m.msgs.map((x) => (x[0] === 'A' ? ['A', 'Atlas, as Marcus', 'Sent after your approval', 'Now', x[4]] : x)), undo: '' })); this.toastMsg('Approved and sent'); },
+      decline: () => { this.upd(sel.id, { st: 'read', atlas: ['Not sent', 'Atlas discarded the draft. Reply yourself whenever you’re ready.', ['Declined by you']] }); this.toastMsg('Atlas won’t send it'); },
+      undo: () => { this.upd(sel.id, { st: 'read', box: 'inbox', undo: '', atlas: ['Moved back for you', 'Atlas undid what it did and noted it in the audit trail.', ['Undone']] }); this.toastMsg('Undone'); },
+      snzBg: s.snz ? '#eef2fe' : '#f1eeea', toggleSnooze: () => this.setState((x) => ({ snz: !x.snz })), snoozeOpen: s.snz && !!sel,
+      snoozeOpts: [['Later today', '18:00'], ['Tomorrow', '08:00'], ['After the Paris trip', 'Mon 4 Nov'], ['When Dana replies', 'Atlas watches']].map(([l, t]) => ({ l, t })),
+      snooze: (e) => { const l = e.currentTarget.getAttribute('data-k'), id = sel.id, b = sel.box, nx = this.nextAfter(id); this.upd(id, { box: 'snoozed' }); this.setState({ snz: false, sel: nx }); this.toastMsg('Snoozed · ' + l, () => { this.upd(id, { box: b }); this.setState({ sel: id }); }); },
+      archive: () => this.archive(),
+      openCompose: () => this.setState({ composing: true }), closeCompose: () => this.setState({ composing: false }), closeComposeBg: () => this.setState({ composing: false }), stop: (e) => e.stopPropagation(),
+      composing: s.composing,
+      fromOpts: Object.keys(ACCTS).map((k) => ({ k, addr: ACCTS[k][0], dot: ACCTS[k][1], bg: s.cFrom === k ? '#1e1e24' : '#f1eeea', fg: s.cFrom === k ? '#f9f7f4' : '#1e1e24' })),
+      pickFrom: (e) => this.setState({ cFrom: e.currentTarget.getAttribute('data-k') }),
+      cTo: s.cTo, cSub: s.cSub, cBody: s.cBody,
+      onCTo: (e) => this.setState({ cTo: e.target.value }), onCSub: (e) => this.setState({ cSub: e.target.value }),
+      onCBody: (e) => { const v = e.target.value; this.setState({ cBody: v, ghost: '' }); clearTimeout(this.gt); if (v.trim().length > 12 && !/[.!?]\s*$/.test(v)) this.gt = setTimeout(() => this.setState({ ghost: v.trim().split(/\s+/).length < 8 ? '…and let me know what works for you this week.' : '…I’ll follow up on Friday if I haven’t heard back.' }), 700); },
+      onCBodyKey: (e) => { if (e.key === 'Tab' && s.ghost) { e.preventDefault(); this.setState({ cBody: s.cBody.replace(/\s*$/, ' ') + s.ghost.replace(/^…/, ''), ghost: '' }); } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) this.sendC(); },
+      hasGhost: !!s.ghost, ghost: s.ghost,
+      newPerson: !!toNew, newPersonLine: 'First time writing to ' + s.cTo.trim() + '. Atlas will never reply to them alone unless you allow it.',
+      askL: s.busy ? 'Writing…' : 'Ask Atlas to write it',
+      askAtlas: () => { this.setState({ busy: true }); clearTimeout(this.gt); this.gt = setTimeout(() => this.setState((x) => ({ busy: false, cSub: x.cSub || 'Quick question', cBody: 'Hi' + (x.cTo.trim() ? ' ' + x.cTo.trim().split(/[ @]/)[0].replace(/^\w/, (c) => c.toUpperCase()) : '') + ',\n\n' + (x.cBody.trim() ? 'About ' + x.cBody.trim().replace(/\.$/, '') + ': ' : '') + 'could we find 20 minutes this week to go through it? Thursday afternoon is open on my side.\n\nBest,\nMarcus' })), 900); },
+      schedL: s.sched ? 'Sends tomorrow 08:00' : 'Send later', schedBg: s.sched ? '#eef2fe' : '#fffdfa', schedFg: s.sched ? '#2748bd' : '#1e1e24', toggleSchedule: () => this.setState((x) => ({ sched: !x.sched })),
+      sendL: s.sched ? 'Schedule' : 'Send', sendBg: canSend ? '#3461f2' : '#e3dfd9', sendFg: canSend ? '#fff' : '#6d6a67',
+      sendCompose: () => this.sendC(),
+      dock: [['home', 'Home', 'Atlas Dashboard Beta.dc.html'], ['core', 'Core', 'Atlas Core Beta.dc.html'], ['teach', 'Teach', 'Atlas Teach Beta.dc.html'], ['mail', 'Mail', 'Atlas Mail Beta.dc.html'], ['architecture', 'Architecture', 'Atlas Architecture Beta.dc.html'], ['voice', 'Voice', 'Atlas Voice Beta.dc.html']].map(([k, l, h]) => { const on = k === 'mail'; return { l, h, ico: ic(k), on, cur: on ? 'page' : 'false', pad: on ? '16px 0 12px' : '0', bg: on ? '#1e1e24' : 'transparent', fg: on ? '#f9f7f4' : '#6d6a67', hov: on ? '#1e1e24' : '#f1eeea' }; }),
+      hasToast: !!s.toast, toast: s.toast, toastUndo: !!s.undoFn, undoToast: () => { if (s.undoFn) s.undoFn(); this.setState({ toast: '', undoFn: null }); }
+    };
+  }
+  sendC() { const s = this.state; if (!(s.cTo.trim() && (s.cBody.trim() || s.cSub.trim()))) return; const id = 'n' + Date.now(); this.setState((x) => ({ composing: false, mail: [{ id, from: 'To ' + x.cTo.trim(), org: '', acct: x.cFrom, st: 'read', box: 'sent', unread: false, time: x.sched ? 'Tomorrow 08:00' : 'Now', subject: x.cSub || '(no subject)', snippet: x.cBody.slice(0, 80), people: 'You to ' + x.cTo.trim(), atlas: [x.sched ? 'Scheduled' : 'Sent by you', x.sched ? 'Atlas will send this tomorrow at 08:00.' : 'Sent from ' + ACCTS[x.cFrom][0] + '.', [ACCTS[x.cFrom][0]]], msgs: [['MB', 'Marcus Bell', 'You', 'Now', x.cBody]], draft: '', alt: [], dI: -1 }].concat(x.mail), cTo: '', cSub: '', cBody: '', ghost: '', sched: false })); this.toastMsg(s.sched ? 'Scheduled for tomorrow 08:00' : 'Sent'); }
+}
+</script>
+</body>
+</html>

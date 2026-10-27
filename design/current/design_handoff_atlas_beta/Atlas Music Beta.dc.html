@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>(function(){window.addEventListener("unhandledrejection",function(e){var m=String(e.reason&&e.reason.message||e.reason);if(/Transition was aborted|ViewTransition/.test(m))e.preventDefault()});var top=false;try{top=window.self===window.top}catch(e){}var s=document.createElement("style");if(top){s.textContent="@view-transition{navigation:auto}";}else{s.textContent="html{animation:atlas-in .45s cubic-bezier(.22,1,.36,1) both}html.atlas-out{transition:opacity .22s ease,transform .22s ease;opacity:0;transform:scale(.988)}@keyframes atlas-in{from{opacity:0;transform:scale(1.012)}}";document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a||e.defaultPrevented||e.metaKey||e.ctrlKey||a.target)return;var h=a.getAttribute("href");if(!/\.dc\.html/.test(h)||/^https?:/.test(h))return;if(h.split("#")[0]===""||location.pathname.endsWith(encodeURI(h.split("#")[0]))&&h.indexOf("#")>0)return;e.preventDefault();document.documentElement.classList.add("atlas-out");setTimeout(function(){location.href=h},210)},true);}document.head.appendChild(s)})();</script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script>window.addEventListener("pagereveal",function(e){var t=e.viewTransition;if(t){["ready","finished","updateCallbackDone"].forEach(function(p){t[p]&&t[p].catch(function(){})})}});window.addEventListener("unhandledrejection",function(e){if(/Transition was aborted|ViewTransition/.test(String(e.reason&&e.reason.message||e.reason)))e.preventDefault()});</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+::view-transition-group(*){animation-duration:.55s;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+::view-transition-old(root){animation:.4s cubic-bezier(.22,1,.36,1) both vt-out}
+::view-transition-new(root){animation:.55s cubic-bezier(.22,1,.36,1) both vt-in}
+@keyframes vt-out{to{opacity:0;transform:scale(.985)}}
+@keyframes vt-in{from{opacity:0;transform:scale(1.015)}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#1e1e24}
+button,input{border:none;font:inherit;background:none;color:inherit}
+a{color:#8fa9ff;text-decoration:none}a:hover{color:#f9f7f4}
+.nosb{scrollbar-width:none}.nosb::-webkit-scrollbar{display:none}
+input[type=range]{-webkit-appearance:none;appearance:none;height:6px;border-radius:9999px;background:rgba(249,247,244,.14);outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#f9f7f4;cursor:pointer}
+@keyframes bpop{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;transition:none !important}}
+</style>
+<script src="atlas-quickstart-sphere.js"></script>
+<script src="atlas-orb.js"></script>
+<script src="atlas-topbar.js"></script>
+</helmet>
+<div data-screen-label="Atlas Music · {{ t.title }}" style="height:100vh;display:grid;grid-template-rows:minmax(0,1fr) auto;gap:12px;padding:20px 20px 84px;background:#1e1e24;color:#f9f7f4;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden">
+
+<div style="min-height:0;display:grid;grid-template-columns:{{ cols }};gap:12px">
+<section style="view-transition-name:hero;min-height:0;min-width:0;display:flex;flex-direction:column;gap:22px;padding:clamp(20px,3vw,36px);border-radius:36px;background:#26262d;overflow:hidden">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+<a href="Atlas Dashboard Beta.dc.html" title="Back to Home · Esc" style="display:flex;align-items:center;gap:12px;font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:rgba(249,247,244,.62)" style-hover="color:#f9f7f4"><span style="position:relative;width:56px;height:56px;flex:none;margin:-10px 0 -10px -10px"><canvas ref="{{ sphereRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas></span><span><span style="display:block">Music · {{ roomLine }}</span><span style="display:block;margin-top:3px;font-size:12px;font-weight:500;letter-spacing:0;text-transform:none;color:rgba(249,247,244,.78)">{{ sphereLine }}</span></span></a>
+<span style="display:flex;align-items:center;gap:8px;height:30px;padding:0 12px;border-radius:9999px;background:rgba(249,247,244,.08);font-size:12px;font-weight:600"><span style="width:7px;height:7px;border-radius:50%;background:#1ed760"></span>Spotify</span>
+</div>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:{{ stageCols }};gap:clamp(20px,3vw,44px);align-items:center">
+<div style="position:relative;width:100%;max-width:min(52vh,460px);aspect-ratio:1;justify-self:center">
+<div style="position:absolute;inset:4% -6% 4% 6%;border-radius:50%;background:#16161b;animation:spin 6s linear infinite;animation-play-state:{{ spinState }}"><span style="position:absolute;inset:34%;border-radius:50%;background:{{ t.c2 }}"></span><span style="position:absolute;inset:47%;border-radius:50%;background:#1e1e24"></span></div>
+<div key="{{ t.id }}" style="position:absolute;inset:0;border-radius:28px;background:{{ t.c1 }};overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;padding:clamp(16px,2.4vw,28px);box-shadow:0 40px 80px -40px rgba(0,0,0,.6);transform:translateX({{ coverX }});transition:transform .6s cubic-bezier(.22,1,.36,1);animation:bpop .5s both">
+<span style="position:absolute;right:-18%;bottom:-18%;width:78%;aspect-ratio:1;border-radius:50%;background:{{ t.c2 }}"></span>
+<span style="position:relative;font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:{{ t.ink }}">{{ t.artist }}</span>
+<span style="position:relative;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(32px,4.4vw,64px);font-weight:600;letter-spacing:-.05em;line-height:.9;color:{{ t.ink }}">{{ t.title }}</span>
+</div>
+</div>
+<div style="min-width:0;display:flex;flex-direction:column;gap:18px">
+<div><span style="display:block;font-size:13px;font-weight:600;color:rgba(249,247,244,.62)">{{ t.album }} · {{ t.year }}</span><h1 key="{{ t.id }}" style="margin:8px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(40px,5vw,84px);font-weight:500;letter-spacing:-.055em;line-height:.95;text-wrap:balance;animation:bpop .45s both">{{ t.title }}</h1><span style="display:block;margin-top:10px;font-size:18px;font-weight:500;color:rgba(249,247,244,.78)">{{ t.artist }}</span></div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<button onClick="{{ seek }}" aria-label="Seek" style="border:none;position:relative;height:56px;display:flex;align-items:center;gap:3px;cursor:pointer;padding:0"><sc-for list="{{ wave }}" as="w" hint-placeholder-count="60"><span style="flex:1;height:{{ w.h }};border-radius:3px;background:{{ w.c }};transition:background .2s"></span></sc-for></button>
+<div style="display:flex;justify-content:space-between;font-family:'Geist Mono',monospace;font-size:12px;color:rgba(249,247,244,.62)"><span>{{ at }}</span><span>{{ t.len }}</span></div>
+</div>
+<div style="display:flex;align-items:center;gap:10px">
+<button onClick="{{ toggleShuffle }}" title="Shuffle" aria-pressed="{{ shOn }}" style="border:none;width:44px;height:44px;border-radius:50%;background:{{ shBg }};color:#f9f7f4;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{ icoShuffle }}"></path></svg></button>
+<button onClick="{{ prev }}" aria-label="Previous" style="border:none;width:56px;height:56px;border-radius:50%;background:rgba(249,247,244,.08);color:#f9f7f4;display:flex;align-items:center;justify-content:center;cursor:pointer;transform:scaleX(-1)" style-hover="background:rgba(249,247,244,.14)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{ icoSkip }}"></path></svg></button>
+<button onClick="{{ togglePlay }}" aria-label="{{ playL }}" style="border:none;width:80px;height:80px;border-radius:50%;background:#f9f7f4;color:#1e1e24;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .2s" style-hover="transform:scale(1.05)"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="{{ playIco }}"></path></svg></button>
+<button onClick="{{ next }}" aria-label="Next" style="border:none;width:56px;height:56px;border-radius:50%;background:rgba(249,247,244,.08);color:#f9f7f4;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:rgba(249,247,244,.14)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{ icoSkip }}"></path></svg></button>
+<button onClick="{{ toggleRepeat }}" title="Repeat" aria-pressed="{{ rpOn }}" style="border:none;width:44px;height:44px;border-radius:50%;background:{{ rpBg }};color:#f9f7f4;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{ icoRepeat }}"></path></svg></button>
+<span style="flex:1"></span>
+<button onClick="{{ toggleLike }}" aria-label="Like" style="border:none;width:44px;height:44px;border-radius:50%;background:{{ likeBg }};color:{{ likeFg }};display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="{{ likeFill }}" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{ icoStar }}"></path></svg></button>
+</div>
+<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:18px;background:rgba(249,247,244,.06)"><span style="flex:none;width:8px;height:8px;border-radius:50%;background:{{ duckDot }}"></span><span style="flex:1;min-width:0;font-size:13px;line-height:1.45;color:rgba(249,247,244,.78)">{{ duckLine }}</span><button onClick="{{ toggleDuck }}" role="switch" aria-checked="{{ duckOn }}" aria-label="Lower music when someone speaks" style="border:none;display:flex;flex:none;width:42px;height:25px;padding:3px;border-radius:9999px;background:{{ duckBg }};justify-content:{{ duckPos }};cursor:pointer"><span style="width:19px;height:19px;border-radius:50%;background:#fff"></span></button></div>
+</div>
+</div>
+</section>
+
+<aside style="min-height:0;display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:36px;background:#26262d">
+<div role="tablist" style="flex:none;display:flex;gap:2px;padding:4px;border-radius:9999px;background:rgba(249,247,244,.06)"><sc-for list="{{ tabs }}" as="b" hint-placeholder-count="3"><button role="tab" onClick="{{ pickTab }}" data-k="{{ b.k }}" style="border:none;flex:1;height:38px;border-radius:9999px;background:{{ b.bg }};color:{{ b.fg }};font-size:13px;font-weight:600;cursor:pointer">{{ b.l }}</button></sc-for></div>
+<div class="nosb" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px">
+<sc-if value="{{ isQueue }}" hint-placeholder-val="{{ true }}"><sc-for list="{{ queue }}" as="q" hint-placeholder-count="6"><button onClick="{{ playIdx }}" data-k="{{ q.i }}" style="border:none;width:100%;text-align:left;display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:18px;background:{{ q.bg }};color:#f9f7f4;cursor:pointer" style-hover="background:rgba(249,247,244,.08)"><span style="flex:none;position:relative;width:48px;height:48px;border-radius:12px;background:{{ q.c1 }};overflow:hidden"><span style="position:absolute;right:-30%;bottom:-30%;width:80%;height:80%;border-radius:50%;background:{{ q.c2 }}"></span></span><span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ q.title }}</span><span style="display:block;margin-top:2px;font-size:12.5px;color:rgba(249,247,244,.62)">{{ q.artist }}</span></span><span style="flex:none;font-family:'Geist Mono',monospace;font-size:12px;color:{{ q.tFg }}">{{ q.right }}</span></button></sc-for></sc-if>
+<sc-if value="{{ isLyrics }}" hint-placeholder-val="{{ false }}"><div style="padding:14px 16px;display:flex;flex-direction:column;gap:14px"><sc-for list="{{ lyrics }}" as="l" hint-placeholder-count="8"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ l.size }};font-weight:600;letter-spacing:-.02em;line-height:1.25;color:{{ l.fg }};transition:color .4s,font-size .4s">{{ l.t }}</p></sc-for><sc-if value="{{ noLyrics }}" hint-placeholder-val="{{ false }}"><p style="margin:0;font-size:14px;color:rgba(249,247,244,.62)">{{ noLyricsLine }}</p></sc-if></div></sc-if>
+<sc-if value="{{ isRooms }}" hint-placeholder-val="{{ false }}"><sc-for list="{{ rooms }}" as="r" hint-placeholder-count="4"><div style="padding:14px 16px;border-radius:20px;background:{{ r.bg }};display:flex;flex-direction:column;gap:10px"><div style="display:flex;align-items:center;gap:12px"><button onClick="{{ toggleRoom }}" data-k="{{ r.k }}" aria-pressed="{{ r.on }}" style="border:none;flex:none;width:40px;height:40px;border-radius:12px;background:{{ r.icoBg }};color:{{ r.icoFg }};display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{ icoSpeaker }}"></path></svg></button><span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:600">{{ r.n }}</span><span style="display:block;margin-top:2px;font-size:12px;color:rgba(249,247,244,.62)">{{ r.d }}</span></span><span style="font-family:'Geist Mono',monospace;font-size:12px;color:rgba(249,247,244,.62)">{{ r.vol }}%</span></div><sc-if value="{{ r.isOn }}" hint-placeholder-val="{{ true }}"><input type="range" min="0" max="100" value="{{ r.vol }}" onInput="{{ setVol }}" data-k="{{ r.k }}" aria-label="{{ r.n }} volume"></sc-if></div></sc-for></sc-if>
+</div>
+</aside>
+</div>
+
+<section style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr));gap:8px">
+<sc-for list="{{ moods }}" as="m" hint-placeholder-count="4"><button onClick="{{ pickMood }}" data-k="{{ m.k }}" style="border:none;text-align:left;display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:24px;background:{{ m.bg }};color:{{ m.fg }};cursor:pointer;transition:background .2s"><span style="flex:none;width:44px;height:44px;border-radius:14px;background:{{ m.sw }}"></span><span style="min-width:0"><span style="display:block;font-size:14.5px;font-weight:600">{{ m.t }}</span><span style="display:block;margin-top:2px;font-size:12px;color:{{ m.sub }}">{{ m.d }}</span></span></button></sc-for>
+</section>
+
+<nav aria-label="Atlas" data-dock="beta" style="view-transition-name:atlas-dock;position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:4px;padding:6px;border-radius:9999px;background:rgba(255,253,250,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 18px 40px -20px rgba(0,0,0,.5)">
+<sc-for list="{{ dock }}" as="d" hint-placeholder-count="6"><a href="{{ d.h }}" title="{{ d.l }}" aria-label="{{ d.l }}" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{ d.ico }}"></path></svg></a></sc-for>
+<a href="Atlas Settings Beta.dc.html" title="Marcus · Settings" aria-label="Settings" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px" style-hover="background:#f1eeea"><span style="width:34px;height:34px;border-radius:50%;background:#1e1e24;color:#f9f7f4;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">M</span></a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const TRACKS = [
+  { id: 't1', title: 'Golden Hour', artist: 'Vela Sunn', album: 'Low Sun', year: '2026', sec: 221, c1: '#e9b44c', c2: '#d0453a', ink: '#1e1e24', lyr: ['The kettle clicks, the street is quiet', 'Light comes in sideways through the blind', 'I said I’d leave by eight, I didn’t', 'There’s nothing here I need to find', 'Hold the morning, hold it longer', 'Golden hour, slow it down', 'Every minute getting warmer', 'Golden hour, stay around'] },
+  { id: 't2', title: 'Tidligt Op', artist: 'Gilli', album: 'Single', year: '2025', sec: 214, c1: '#3461f2', c2: '#8fa9ff', ink: '#f9f7f4', lyr: null },
+  { id: 't3', title: 'Morning Light', artist: 'Ólafur Arnalds', album: 'Instrumental', year: '2024', sec: 286, c1: '#f1eeea', c2: '#b6c6ff', ink: '#1e1e24', lyr: [] },
+  { id: 't4', title: 'Haze', artist: 'Fred again..', album: 'Actual Life', year: '2023', sec: 198, c1: '#0fae76', c2: '#1e1e24', ink: '#f9f7f4', lyr: null },
+  { id: 't5', title: 'Xtal', artist: 'Aphex Twin', album: 'Selected Ambient Works', year: '1992', sec: 291, c1: '#7854ff', c2: '#e3dbd0', ink: '#f9f7f4', lyr: [] },
+  { id: 't6', title: 'Paper Planes', artist: 'Vela Sunn', album: 'Low Sun', year: '2026', sec: 204, c1: '#d0453a', c2: '#f9f7f4', ink: '#f9f7f4', lyr: ['Folded every letter that I never sent', 'Threw them off the roof to see where they went'] }
+];
+class Component extends DCLogic {
+  state = { ico: {}, vw: window.innerWidth, i: 0, pos: 72, playing: true, shuffle: false, repeat: false, liked: {}, tab: 'queue', duck: true, rooms: { office: [true, 46], kitchen: [true, 30], living: [false, 50], bedroom: [false, 20] }, mood: null, slide: 0 };
+  componentDidMount() {
+    fetch('atlas-icon-data.js').then((r) => r.text()).then((t) => { const SET = new Function(t.replace(/export\s+const\s+SET\s*=/, 'return'))(), ico = {}; SET.forEach((g) => g[2].forEach(([n, d]) => { ico[n] = d; })); this.setState({ ico }); }).catch(() => {});
+    this.onResize = () => this.setState({ vw: window.innerWidth }); window.addEventListener('resize', this.onResize);
+    this.iv = setInterval(() => { const s = this.state; if (!s.playing) return; const T = TRACKS[s.i]; if (s.pos + 1 >= T.sec) this.go(s.repeat ? 0 : 1); else this.setState({ pos: s.pos + 1 }); }, 1000);
+    this.onKey = (e) => { if (/INPUT/.test((document.activeElement || {}).tagName)) return; if (e.key === ' ') { e.preventDefault(); this.setState((x) => ({ playing: !x.playing })); } else if (e.key === 'ArrowRight') this.go(1); else if (e.key === 'ArrowLeft') this.go(-1); else if (e.key === 'Escape') window.location.href = 'Atlas Dashboard Beta.dc.html'; };
+    window.addEventListener('keydown', this.onKey);
+  }
+  componentWillUnmount() { clearInterval(this.iv); clearTimeout(this.st); window.removeEventListener('resize', this.onResize); window.removeEventListener('keydown', this.onKey); }
+  go(d) { const s = this.state; if (d === 0) return this.setState({ pos: 0 }); if (d < 0 && s.pos > 4) return this.setState({ pos: 0 }); const n = s.shuffle ? (s.i + 1 + Math.floor(Math.random() * (TRACKS.length - 1))) % TRACKS.length : (s.i + d + TRACKS.length) % TRACKS.length; this.setState({ slide: d > 0 ? -8 : 8 }); clearTimeout(this.st); this.st = setTimeout(() => this.setState({ i: n, pos: 0, slide: 0 }), 160); }
+  renderVals() {
+    const s = this.state, ic = (n) => s.ico[n] || '', T = TRACKS[s.i], fmt = (x) => Math.floor(x / 60) + ':' + String(x % 60).padStart(2, '0');
+    const frac = s.pos / T.sec, N = 60, seed = s.i * 7 + 3;
+    const activeRooms = Object.keys(s.rooms).filter((k) => s.rooms[k][0]);
+    const RN = { office: ['Office', 'Sonos Era 300'], kitchen: ['Kitchen', 'HomePod mini'], living: ['Living room', 'TV and soundbar'], bedroom: ['Bedroom', 'Sonos One'] };
+    const lyr = T.lyr, li = lyr && lyr.length ? Math.min(lyr.length - 1, Math.floor(frac * lyr.length * 1.4)) : -1;
+    const liked = !!s.liked[T.id];
+    return {
+      sphereRef: (el) => { if (!el || el.__q) return; const go = () => { if (el.__q || !el.isConnected) return; if (!window.QuickSphere) return setTimeout(go, 60); el.__q = this._sph = window.QuickSphere.mount(el, { mode: 'veil', bg: '#26262d', dust: [92, 122, 248], strand: [176, 196, 255], blend: 'lighter', alpha: 0.5, seed: 11, count: 3500, scale: 0.42, state: 'idle' }); this._sphSt = 'idle'; }; go(); },
+      _sphSync: (() => { const ns = s.playing ? (s.duck ? 'speaking' : 'working') : 'idle'; if (this._sph && this._sphSt !== ns) { this._sphSt = ns; this._sph.set({ state: ns }); } return ''; })(),
+      sphereLine: s.playing ? (s.mood ? 'Atlas is picking for ' + s.mood : 'Atlas is listening along') : 'Paused',
+      cols: s.vw >= 1100 ? 'minmax(0,1fr) 380px' : 'minmax(0,1fr)', stageCols: s.vw >= 900 ? 'minmax(0,1fr) minmax(0,1.1fr)' : 'minmax(0,1fr)',
+      t: { id: T.id, title: T.title, artist: T.artist, album: T.album, year: T.year, c1: T.c1, c2: T.c2, ink: T.ink, len: fmt(T.sec) },
+      coverX: s.slide + '%', spinState: s.playing ? 'running' : 'paused',
+      roomLine: activeRooms.length ? activeRooms.map((k) => RN[k][0]).join(' + ') : 'This Mac',
+      wave: Array.from({ length: N }, (_, j) => { const h = 22 + Math.round(70 * Math.abs(Math.sin((j + seed) * 0.62) * Math.cos((j + seed) * 0.21))); return { h: h + '%', c: j / N < frac ? T.c1 : 'rgba(249,247,244,.16)' }; }),
+      seek: (e) => { const r = e.currentTarget.getBoundingClientRect(); this.setState({ pos: Math.round(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * T.sec) }); },
+      at: fmt(s.pos),
+      icoShuffle: ic('shuffle'), icoSkip: ic('skip'), icoRepeat: ic('repeat'), icoStar: ic('star'), icoSpeaker: ic('speaker'),
+      playIco: ic(s.playing ? 'pause' : 'play'), playL: s.playing ? 'Pause' : 'Play',
+      togglePlay: () => this.setState((x) => ({ playing: !x.playing })), next: () => this.go(1), prev: () => this.go(-1),
+      shOn: s.shuffle ? 'true' : 'false', shBg: s.shuffle ? '#3461f2' : 'transparent', toggleShuffle: () => this.setState((x) => ({ shuffle: !x.shuffle })),
+      rpOn: s.repeat ? 'true' : 'false', rpBg: s.repeat ? '#3461f2' : 'transparent', toggleRepeat: () => this.setState((x) => ({ repeat: !x.repeat })),
+      likeBg: liked ? '#f9f7f4' : 'rgba(249,247,244,.08)', likeFg: liked ? '#d0453a' : '#f9f7f4', likeFill: liked ? 'currentColor' : 'none', toggleLike: () => this.setState((x) => ({ liked: Object.assign({}, x.liked, { [T.id]: !x.liked[T.id] }) })),
+      duckOn: s.duck ? 'true' : 'false', duckBg: s.duck ? '#3461f2' : 'rgba(249,247,244,.22)', duckPos: s.duck ? 'flex-end' : 'flex-start', duckDot: s.duck ? '#50dca0' : '#b6b1aa',
+      duckLine: s.duck ? 'Atlas lowers the music when someone talks, and when it speaks to you.' : 'Music stays at full volume, even when Atlas speaks.', toggleDuck: () => this.setState((x) => ({ duck: !x.duck })),
+      tabs: [['queue', 'Up next'], ['lyrics', 'Lyrics'], ['rooms', 'Rooms']].map(([k, l]) => ({ k, l, bg: s.tab === k ? '#f9f7f4' : 'transparent', fg: s.tab === k ? '#1e1e24' : '#f9f7f4' })),
+      pickTab: (e) => this.setState({ tab: e.currentTarget.getAttribute('data-k') }),
+      isQueue: s.tab === 'queue', isLyrics: s.tab === 'lyrics', isRooms: s.tab === 'rooms',
+      queue: TRACKS.map((q, j) => ({ i: String(j), title: q.title, artist: q.artist, c1: q.c1, c2: q.c2, right: j === s.i ? (s.playing ? 'Playing' : 'Paused') : fmt(q.sec), tFg: j === s.i ? '#8fa9ff' : 'rgba(249,247,244,.62)', bg: j === s.i ? 'rgba(249,247,244,.1)' : 'transparent' })),
+      playIdx: (e) => this.setState({ i: +e.currentTarget.getAttribute('data-k'), pos: 0, playing: true }),
+      lyrics: (lyr || []).map((t, j) => ({ t, fg: j === li ? '#f9f7f4' : j < li ? 'rgba(249,247,244,.38)' : 'rgba(249,247,244,.62)', size: j === li ? '26px' : '20px' })),
+      noLyrics: !lyr || !lyr.length, noLyricsLine: lyr ? 'Instrumental. Nothing to sing along to.' : 'Lyrics aren’t available for this track.',
+      rooms: Object.keys(RN).map((k) => { const [on, vol] = s.rooms[k]; return { k, n: RN[k][0], d: RN[k][1] + (on ? ' · playing' : ' · off'), vol: String(vol), on: on ? 'true' : 'false', isOn: on, bg: on ? 'rgba(249,247,244,.08)' : 'transparent', icoBg: on ? '#f9f7f4' : 'rgba(249,247,244,.08)', icoFg: on ? '#1e1e24' : '#f9f7f4' }; }),
+      toggleRoom: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.setState((x) => ({ rooms: Object.assign({}, x.rooms, { [k]: [!x.rooms[k][0], x.rooms[k][1]] }) })); },
+      setVol: (e) => { const k = e.currentTarget.getAttribute('data-k'), v = +e.currentTarget.value; this.setState((x) => ({ rooms: Object.assign({}, x.rooms, { [k]: [x.rooms[k][0], v] }) })); },
+      moods: [['focus', 'Focus', 'No vocals, steady tempo', '#3461f2'], ['wind', 'Wind down', 'Softer every 10 minutes', '#7854ff'], ['cook', 'Cooking', 'Kitchen speaker, upbeat', '#e07a1f'], ['run', 'Run', 'Matches your 5:12 pace', '#0fae76']].map(([k, t, d, sw]) => { const on = s.mood === k; return { k, t, d, sw, bg: on ? '#f9f7f4' : '#26262d', fg: on ? '#1e1e24' : '#f9f7f4', sub: on ? '#6d6a67' : 'rgba(249,247,244,.62)' }; }),
+      pickMood: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.setState((x) => ({ mood: x.mood === k ? null : k, i: k === 'focus' ? 4 : k === 'wind' ? 2 : k === 'run' ? 3 : x.i, pos: 0, playing: true })); },
+      dock: [['home', 'Home', 'Atlas Dashboard Beta.dc.html'], ['core', 'Core', 'Atlas Core Beta.dc.html'], ['teach', 'Teach', 'Atlas Teach Beta.dc.html'], ['mail', 'Mail', 'Atlas Mail Beta.dc.html'], ['architecture', 'Architecture', 'Atlas Architecture Beta.dc.html'], ['voice', 'Voice', 'Atlas Voice Beta.dc.html']].map(([k, l, h]) => ({ l, h, ico: ic(k) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

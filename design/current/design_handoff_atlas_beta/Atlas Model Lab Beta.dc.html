@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>(function(){window.addEventListener("unhandledrejection",function(e){var m=String(e.reason&&e.reason.message||e.reason);if(/Transition was aborted|ViewTransition/.test(m))e.preventDefault()});var top=false;try{top=window.self===window.top}catch(e){}var s=document.createElement("style");if(top){s.textContent="@view-transition{navigation:auto}";}else{s.textContent="html{animation:atlas-in .45s cubic-bezier(.22,1,.36,1) both}html.atlas-out{transition:opacity .22s ease,transform .22s ease;opacity:0;transform:scale(.988)}@keyframes atlas-in{from{opacity:0;transform:scale(1.012)}}";document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a||e.defaultPrevented||e.metaKey||e.ctrlKey||a.target)return;var h=a.getAttribute("href");if(!/\.dc\.html/.test(h)||/^https?:/.test(h))return;if(h.split("#")[0]===""||location.pathname.endsWith(encodeURI(h.split("#")[0]))&&h.indexOf("#")>0)return;e.preventDefault();document.documentElement.classList.add("atlas-out");setTimeout(function(){location.href=h},210)},true);}document.head.appendChild(s)})();</script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script>window.addEventListener("pagereveal",function(e){var t=e.viewTransition;if(t){["ready","finished","updateCallbackDone"].forEach(function(p){t[p]&&t[p].catch(function(){})})}});window.addEventListener("unhandledrejection",function(e){if(/Transition was aborted|ViewTransition/.test(String(e.reason&&e.reason.message||e.reason)))e.preventDefault()});</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+@keyframes spin{to{transform:rotate(360deg)}}
+::view-transition-group(*){animation-duration:.55s;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+::view-transition-old(root){animation:.4s cubic-bezier(.22,1,.36,1) both vt-out}
+::view-transition-new(root){animation:.55s cubic-bezier(.22,1,.36,1) both vt-in}
+@keyframes vt-out{to{opacity:0;transform:scale(.985)}}
+@keyframes vt-in{from{opacity:0;transform:scale(1.015)}}
+*{box-sizing:border-box}
+body{margin:0;background:#f9f7f4}
+button,input{border:none;font:inherit;background:none;color:inherit}
+a{color:#3461f2;text-decoration:none}a:hover{color:#2748bd}
+::selection{background:#e8d8c2}
+.nosb{scrollbar-width:none}.nosb::-webkit-scrollbar{display:none}
+@keyframes bpop{from{opacity:0;transform:translateY(14px) scale(.986)}to{opacity:1;transform:none}}
+@keyframes bdot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
+</style>
+<script src="atlas-quickstart-sphere.js"></script>
+<script src="atlas-orb.js"></script>
+<script src="atlas-topbar.js"></script>
+</helmet>
+
+<div data-screen-label="Atlas Model Lab — {{ viewName }}" class="nosb" style="height:100vh;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding:26px 26px 88px;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased">
+
+<header data-screen-label="Model Lab hero" style="flex:none;view-transition-name:hero;position:relative;border-radius:36px;background:#1e1e24;color:#f9f7f4;padding:clamp(20px,3vw,34px);display:flex;flex-wrap:wrap;align-items:center;gap:26px;overflow:hidden"><svg width="100%" height="100%" style="position:absolute;inset:0;pointer-events:none"><defs><pattern id="labgrid" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M28 0H0V28" fill="none" stroke="rgba(249,247,244,.06)" stroke-width="1"></path></pattern></defs><rect width="100%" height="100%" fill="url(#labgrid)"></rect></svg>
+<div style="position:relative;width:170px;height:170px;flex:none"><svg viewBox="0 0 170 170" style="position:absolute;inset:0"><circle cx="85" cy="85" r="82" fill="none" stroke="rgba(249,247,244,.16)" stroke-width="1"></circle><path d="M85 0V14M85 156V170M0 85H14M156 85H170" stroke="rgba(249,247,244,.38)" stroke-width="1.4"></path></svg><div style="position:absolute;inset:18px"><canvas ref="{{ sphereRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas></div></div>
+<div style="position:relative;flex:1;min-width:240px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Geist Mono',monospace;font-size:12px;color:rgba(249,247,244,.62)">model-lab · admin · lane {{ laneName }}</span><button onClick="{{ back }}" title="Back · Esc" style="border:none;align-self:flex-start;padding:0;background:transparent;text-align:left;cursor:pointer;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(34px,4.2vw,62px);font-weight:500;letter-spacing:-.05em;line-height:1;color:#f9f7f4">{{ title }}</button><p style="margin:0;max-width:620px;font-size:14.5px;line-height:1.55;color:{{ subFg }}">{{ subline }}</p></div>
+<div style="position:relative;flex:none;padding:16px 20px;border-radius:22px;background:#26262d;text-align:right"><span style="display:block;font-family:'Hanken Grotesk',sans-serif;font-size:40px;font-weight:500;letter-spacing:-.04em;line-height:1">{{ subCount }}</span><span style="display:block;margin-top:4px;font-size:12px;color:rgba(249,247,244,.62)">{{ subCountLabel }}</span></div>
+</header>
+
+<div style="flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:8px">
+<div role="tablist" aria-label="Model lab" style="display:flex;gap:2px;padding:4px;border-radius:22px;background:#f1eeea"><sc-for list="{{ views }}" as="v" hint-placeholder-count="3"><button role="tab" aria-selected="{{ v.on }}" onClick="{{ pickView }}" data-k="{{ v.k }}" style="border:none;flex:none;white-space:nowrap;height:36px;padding:0 15px;border-radius:9999px;background:{{ v.bg }};color:{{ v.fg }};font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">{{ v.l }}</button></sc-for></div>
+<span style="flex:1"></span>
+<span style="font-size:12px;color:#6d6a67">Lane</span>
+<div role="radiogroup" aria-label="Lane" style="display:flex;gap:2px;padding:4px;border-radius:9999px;background:#f1eeea"><sc-for list="{{ lanes }}" as="l" hint-placeholder-count="2"><button role="radio" aria-checked="{{ l.on }}" onClick="{{ pickLane }}" data-k="{{ l.k }}" title="{{ l.host }}" style="border:none;flex:none;white-space:nowrap;display:flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:9999px;background:{{ l.bg }};color:{{ l.fg }};font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer">{{ l.l }}<sc-if value="{{ l.active }}" hint-placeholder-val="{{ false }}"><span style="height:16px;padding:0 6px;display:flex;align-items:center;border-radius:9999px;background:#e3f4ec;color:#0a7a53;font-size:9.5px">LIVE</span></sc-if></button></sc-for></div>
+</div>
+
+<sc-if value="{{ isWall }}" hint-placeholder-val="{{ true }}">
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
+<sc-for list="{{ wall }}" as="t" hint-placeholder-count="5">
+<button onClick="{{ openTier }}" data-k="{{ t.id }}" style="border:none;display:flex;flex-direction:column;gap:12px;padding:20px;border-radius:24px;background:{{ t.bg }};color:{{ t.fg }};font-family:inherit;text-align:left;cursor:pointer;transition:background .2s;animation:bpop .5s cubic-bezier(.22,1,.36,1) both" style-hover="background:{{ t.hov }}">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%"><span style="font-size:11.5px;font-weight:600;color:{{ t.sub }};text-transform:capitalize">{{ t.band }}{{ t.def }}</span><span style="flex:none;white-space:nowrap;height:22px;padding:0 9px;display:flex;align-items:center;border-radius:9999px;background:{{ t.tagBg }};color:{{ t.tagFg }};font-size:11px;font-weight:600">{{ t.tag }}</span></div>
+<span style="font-family:'Hanken Grotesk',sans-serif;font-size:28px;font-weight:600;letter-spacing:-.04em;line-height:1">{{ t.label }}</span>
+<div style="display:flex;flex-direction:column;gap:4px;width:100%">
+<span style="font-size:11px;font-weight:600;color:{{ t.sub }}">Named</span><span style="font-family:'Geist Mono',ui-monospace,monospace;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:{{ t.reqDeco }};color:{{ t.reqFg }}">{{ t.requested }}</span>
+<span style="margin-top:4px;font-size:11px;font-weight:600;color:{{ t.sub }}">Actually invoked</span><span style="font-family:'Geist Mono',ui-monospace,monospace;font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ t.invoked }}</span>
+</div>
+<p style="margin:0;font-size:12.5px;line-height:1.5;color:{{ t.sub }};text-wrap:pretty">{{ t.blurb }}</p>
+</button>
+</sc-for>
+</div>
+<section style="border-radius:24px;background:#f1eeea;padding:16px 18px;display:flex;flex-wrap:wrap;gap:16px;font-size:12.5px;line-height:1.5;color:#6d6a67"><span><b style="color:#1e1e24;font-weight:600">Unknown ids</b> land on {{ fallback }} silently. A typo in a model id is invisible.</span><span><b style="color:#1e1e24;font-weight:600">Verified</b> by signed InvokeModel on 28 Jul 2026; Opus 5 re-checked as root on 30 Jul.</span></section>
+</sc-if>
+
+<sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
+<div style="display:grid;grid-template-columns:{{ detCols }};gap:12px;align-items:start">
+<section style="border-radius:28px;background:{{ d.heroBg }};color:{{ d.heroFg }};padding:24px;display:flex;flex-direction:column;gap:14px">
+<span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:{{ d.heroSub }}">{{ d.kicker }}</span>
+<p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(22px,2.4vw,30px);font-weight:500;letter-spacing:-.03em;line-height:1.25;text-wrap:pretty">{{ d.headline }}</p>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px"><div style="padding:12px 14px;border-radius:14px;background:{{ d.tileBg }}"><p style="margin:0;font-size:11px;color:{{ d.heroSub }}">Named</p><p style="margin:4px 0 0;font-family:'Geist Mono',ui-monospace,monospace;font-size:12.5px;word-break:break-all;text-decoration:{{ d.reqDeco }}">{{ d.requested }}</p></div><div style="padding:12px 14px;border-radius:14px;background:{{ d.tileBg }}"><p style="margin:0;font-size:11px;color:{{ d.heroSub }}">Invoked</p><p style="margin:4px 0 0;font-family:'Geist Mono',ui-monospace,monospace;font-size:12.5px;word-break:break-all">{{ d.invoked }}</p></div></div>
+<p style="margin:0;font-size:13.5px;line-height:1.6;color:{{ d.heroSub2 }};text-wrap:pretty">{{ d.note }}</p>
+</section>
+<div style="display:flex;flex-direction:column;gap:12px">
+<section style="border-radius:28px;background:#fffdfa;padding:18px;display:flex;flex-direction:column;gap:6px">
+<p style="margin:0;padding:2px 4px 8px;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em">Facts</p>
+<sc-for list="{{ d.facts }}" as="f" hint-placeholder-count="6"><div style="display:flex;gap:12px;padding:10px 12px;border-radius:12px;background:#f9f7f4;font-size:12.5px"><span style="flex:none;width:150px;color:#6d6a67">{{ f.k }}</span><span style="flex:1;min-width:0;font-family:{{ f.font }};word-break:break-word;color:{{ f.fg }}">{{ f.v }}</span></div></sc-for>
+</section>
+<section style="border-radius:28px;background:#eef2fe;padding:18px;display:flex;flex-direction:column;gap:6px"><span style="font-size:12.5px;font-weight:600;color:#2748bd">Capabilities</span><p style="margin:0;font-size:13px;line-height:1.55;color:#1e1e24;text-wrap:pretty">{{ d.capNote }}</p></section>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isCompare }}" hint-placeholder-val="{{ false }}">
+<section class="nosb" style="overflow-x:auto;border-radius:28px;background:#f1eeea;padding:12px">
+<div style="display:grid;grid-template-columns:170px repeat(5,minmax(170px,1fr));gap:4px;min-width:1040px">
+<span></span><sc-for list="{{ cmpHead }}" as="h" hint-placeholder-count="5"><button onClick="{{ openTier }}" data-k="{{ h.id }}" style="border:none;padding:12px;border-radius:14px;background:#fffdfa;font-family:inherit;text-align:left;cursor:pointer"><span style="display:block;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em">{{ h.label }}</span><span style="display:block;margin-top:2px;font-size:11px;color:#6d6a67;text-transform:capitalize">{{ h.band }}</span></button></sc-for>
+<sc-for list="{{ cmpRows }}" as="r" hint-placeholder-count="10"><span style="padding:10px 12px;font-size:12px;font-weight:600;color:#6d6a67">{{ r.k }}</span><sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="5"><span style="padding:10px 12px;border-radius:10px;background:{{ c.bg }};font-family:{{ c.font }};font-size:11.5px;line-height:1.45;color:{{ c.fg }};word-break:break-word">{{ c.v }}</span></sc-for></sc-for>
+</div>
+</section>
+</sc-if>
+
+<sc-if value="{{ isProviders }}" hint-placeholder-val="{{ false }}">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;align-items:start">
+<sc-for list="{{ laneCards }}" as="l" hint-placeholder-count="2"><section style="border-radius:28px;background:{{ l.bg }};color:{{ l.fg }};padding:22px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><span style="font-family:'Hanken Grotesk',sans-serif;font-size:20px;font-weight:600;letter-spacing:-.025em">{{ l.l }}</span><span style="flex:none;display:flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:9999px;background:{{ l.stBg }};color:{{ l.stFg }};font-size:11.5px;font-weight:600"><span style="width:6px;height:6px;border-radius:50%;background:{{ l.stDot }}"></span>{{ l.status }}</span></div>
+<p style="margin:0;font-size:13px;line-height:1.55;color:{{ l.sub }};text-wrap:pretty">{{ l.detail }}</p>
+<sc-for list="{{ l.facts }}" as="f" hint-placeholder-count="4"><div style="display:flex;gap:10px;padding:9px 12px;border-radius:12px;background:{{ l.tileBg }};font-size:12px"><span style="flex:none;width:96px;color:{{ l.sub }}">{{ f.k }}</span><span style="flex:1;min-width:0;font-family:'Geist Mono',ui-monospace,monospace;word-break:break-all">{{ f.v }}</span></div></sc-for>
+</section></sc-for>
+</div>
+<section style="border-radius:28px;background:#fffdfa;padding:18px;display:flex;flex-direction:column;gap:6px">
+<p style="margin:0;padding:2px 4px 8px;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em">Gateway rules</p>
+<sc-for list="{{ rules }}" as="r" hint-placeholder-count="4"><div style="display:flex;flex-direction:column;gap:3px;padding:12px 14px;border-radius:14px;background:#f9f7f4"><span style="font-size:13px;font-weight:600">{{ r.t }}</span><span style="font-size:12.5px;line-height:1.55;color:#6d6a67;text-wrap:pretty">{{ r.b }}</span></div></sc-for>
+</section>
+<section style="border-radius:28px;background:#f1eeea;padding:18px;display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;justify-content:space-between;gap:10px;padding:2px 4px 8px"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em">Usage, last 30 days</p><span style="font-size:12px;color:#6d6a67">live</span></div>
+<sc-for list="{{ usage }}" as="u" hint-placeholder-count="4"><div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;background:#fffdfa"><span style="flex:none;width:110px;font-size:12.5px;font-weight:600">{{ u.t }}</span><div style="flex:1;height:6px;border-radius:9999px;background:#edebe7;overflow:hidden"><div style="width:{{ u.w }};height:100%;border-radius:9999px;background:{{ u.c }}"></div></div><span style="flex:none;width:120px;text-align:right;font-size:12px;font-variant-numeric:tabular-nums;color:#6d6a67">{{ u.v }}</span></div></sc-for>
+</section>
+</sc-if>
+
+<p style="margin:0;padding:0 6px;font-size:11.5px;line-height:1.55;color:#6d6a67;text-wrap:pretty">Routing and Compare are transcribed from the gateway source at build time; the webview can’t import it. Providers and usage are live from the brain. Nothing here is a guess.</p>
+
+<nav aria-label="Atlas" data-dock="beta" style="view-transition-name:atlas-dock;position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:4px;padding:6px;border-radius:9999px;background:rgba(255,253,250,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 18px 40px -20px rgba(30,30,36,.28)">
+<a href="Atlas Dashboard Beta.dc.html" title="Home" aria-label="Home" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M3.5 10.9 10.7 4.3a2 2 0 0 1 2.6 0l7.2 6.6v6.9a3 3 0 0 1-3 3h-3v-5.4a2.5 2.5 0 0 0-5 0v5.4h-3a3 3 0 0 1-3-3z"></path></svg></a>
+<a href="Atlas Core Beta.dc.html" title="Core" aria-label="Core" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.6a8.4 8.4 0 1 1 0 16.8 8.4 8.4 0 0 1 0-16.8M12 8.8a3.2 3.2 0 1 1 0 6.4 3.2 3.2 0 0 1 0-6.4M12 3.6v5.2M12 15.2v5.2M3.6 12h5.2M15.2 12h5.2"></path></svg></a>
+<a href="Atlas Teach Beta.dc.html" title="Teach" aria-label="Teach" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 7.4a5.2 5.2 0 0 0-3.9-1.8H5a1.2 1.2 0 0 0-1.2 1.2v9.6A1.2 1.2 0 0 0 5 17.6h3.1A5.2 5.2 0 0 1 12 19.4a5.2 5.2 0 0 1 3.9-1.8H19a1.2 1.2 0 0 0 1.2-1.2V6.8A1.2 1.2 0 0 0 19 5.6h-3.1A5.2 5.2 0 0 0 12 7.4zM12 7.4v12"></path></svg></a>
+<a href="Atlas Mail Beta.dc.html" title="Mail" aria-label="Mail" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M6.6 5.6h10.8a3.2 3.2 0 0 1 3.2 3.2v6.4a3.2 3.2 0 0 1-3.2 3.2H6.6a3.2 3.2 0 0 1-3.2-3.2V8.8a3.2 3.2 0 0 1 3.2-3.2zM3.8 7.6l7 4.8a2.2 2.2 0 0 0 2.4 0l7-4.8"></path></svg></a>
+<a href="Atlas Architecture Beta.dc.html" title="Architecture" aria-label="Architecture" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.4 3.4 7.9 12 12.4l8.6-4.5zM3.4 12.1 12 16.6l8.6-4.5M3.4 16.3 12 20.8l8.6-4.5"></path></svg></a>
+<a href="Atlas Voice Beta.dc.html" title="Voice" aria-label="Voice" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.5a2.6 2.6 0 0 1 2.6 2.6v5.4a2.6 2.6 0 0 1-5.2 0V6.1A2.6 2.6 0 0 1 12 3.5zM18.1 11.5a6.1 6.1 0 0 1-12.2 0M12 17.6v3"></path></svg></a>
+<a href="Atlas Settings Beta.dc.html" title="Marcus · Settings" aria-label="Settings" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#1e1e24" style-hover="background:#f1eeea;color:#1e1e24"><span style="width:34px;height:34px;border-radius:50%;background:#1e1e24;color:#f9f7f4;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">M</span></a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { view: 'routing', lane: 'bedrock', open: null, vw: window.innerWidth };
+  componentDidMount() {
+    this.onResize = () => this.setState({ vw: window.innerWidth });
+    window.addEventListener('resize', this.onResize);
+    this.onKey = (e) => { if (e.key === 'Escape') this.back(); };
+    window.addEventListener('keydown', this.onKey);
+  }
+  componentWillUnmount() { window.removeEventListener('resize', this.onResize); window.removeEventListener('keydown', this.onKey); if (this.sph) this.sph.destroy(); }
+  back() { if (this.state.open) this.setState({ open: null }); else if (this.state.view !== 'routing') this.setState({ view: 'routing' }); else window.location.href = 'Atlas Dashboard Beta.dc.html'; }
+  T() {
+    return [
+      { id: 'claude-haiku-4-5', label: 'Haiku 4.5', band: 'fast', blurb: 'Summarisation, classification, titles: the constant background traffic.', aliases: ['google/gemini-2.5-flash-lite', 'openai/gpt-5-nano'], req: 'eu.anthropic.claude-haiku-4-5-20251001-v1:0', prof: 'eu.anthropic.claude-haiku-4-5-20251001-v1:0', st: 'invocable', sub: false, geo: 'eea', env: 'BEDROCK_MODEL_HAIKU', think: 'omitted', adaptive: false, note: 'The one tier whose Bedrock profile is the model the tier is named for.', cap: 'Haiku 4.5 predates adaptive thinking and output_config.effort and rejects both, so the adapter sends neither. Otherwise every call on the cheap tier would fail.', fp: 'Passed through unchanged.' },
+      { id: 'claude-sonnet-5', label: 'Sonnet 5', band: 'balanced', def: true, blurb: 'The default tier. Every unrecognised model id lands here.', aliases: ['google/gemini-2.5-flash', 'openai/gpt-5-mini'], req: 'eu.anthropic.claude-sonnet-5', prof: 'eu.anthropic.claude-sonnet-4-6', st: 'denied', sub: true, geo: 'eea', env: 'BEDROCK_MODEL_SONNET', think: 'omitted', adaptive: true, note: 'The profile is listed by list-inference-profiles, but invoking it returns AccessDeniedException. So the default is the newest Sonnet that actually answers.', cap: 'Adaptive thinking is on for tool-free turns and off whenever tool blocks are in play: the OpenAI seam can’t replay thinking-block signatures.', fp: 'Passed through unchanged. The frontier problem is Bedrock-only.' },
+      { id: 'claude-opus-4-8', label: 'Opus 4.8', band: 'frontier', blurb: 'The strong tier the logical “pro” ids map to.', aliases: ['google/gemini-2.5-pro', 'openai/gpt-5'], req: 'eu.anthropic.claude-opus-4-8', prof: 'eu.anthropic.claude-opus-4-6-v1', st: 'denied', sub: true, geo: 'eea', env: 'BEDROCK_MODEL_OPUS', think: 'omitted', adaptive: true, note: 'Opus 4.8 and 4.7 are both unentitled on this account; 4.6 is the newest Opus that answers.', cap: 'Same adaptive-thinking rule as Sonnet.', fp: 'Passed through unchanged.' },
+      { id: 'claude-opus-5', label: 'Opus 5', band: 'frontier', blurb: 'Reachable only by naming it. No logical alias maps here.', aliases: [], req: 'eu.anthropic.claude-opus-5', prof: 'eu.anthropic.claude-opus-4-6-v1', st: 'denied', sub: true, geo: 'eea', env: 'BEDROCK_MODEL_OPUS_5', think: 'explicitly-disabled', adaptive: true, note: 'Denied to the root account as well as to atlas-brain, which rules IAM out: the newest tier needs a separate model-access request on the AWS side. Pointing the default at it would put AccessDeniedException straight into the transcript.', cap: 'Opus 5 thinks when `thinking` is omitted, so the adapter sends {type:"disabled"} explicitly. That override keys on the resolved profile id, so while this tier resolves to Opus 4.6 it never fires.', fp: 'Passed through unchanged. On this lane Opus 5 is Opus 5.' },
+      { id: 'claude-fable-5', label: 'Fable 5', band: 'frontier', blurb: 'No EU profile exists. Two deliberate acts stand between it and a call.', aliases: [], req: 'global.anthropic.claude-fable-5', prof: null, st: 'denied', sub: false, unmapped: true, geo: 'worldwide', env: 'BEDROCK_MODEL_FABLE_5', think: 'unconditional', adaptive: true, note: 'No default entry, so mapping a bare claude-fable-5 throws at map time instead of failing per request. The only reachable profile is global., which routes to whichever region has capacity, worldwide.', cap: 'Fable thinks unconditionally and rejects {type:"disabled"} at any effort, so thinking is left omitted. It’s also unavailable under zero data retention: 30-day retention is mandatory.', fp: 'Passed through unchanged.' }
+    ];
+  }
+  renderVals() {
+    const st = this.state, T = this.T(), bed = st.lane === 'bedrock', narrow = st.vw < 1000;
+    const subN = bed ? T.filter((t) => t.sub || t.unmapped).length : 0;
+    const t = st.open ? T.find((x) => x.id === st.open) : null;
+    const tag = (x) => !bed ? ['Unchanged', '#e3f4ec', '#0a7a53'] : x.unmapped ? ['Unmapped', '#1e1e24', '#f9f7f4'] : x.sub ? ['Substituted', '#fbefd9', '#9a5a00'] : ['Entitled', '#e3f4ec', '#0a7a53'];
+    const inv = (x) => !bed ? x.id : x.prof || 'none (mapping throws)';
+    const facts = (x) => [
+      ['Band', x.band + (x.def ? ' · default tier' : ''), 'inherit'], ['Reached by', x.aliases.length ? x.aliases.join(', ') : 'its own id only', "'Geist Mono',monospace"],
+      ['First-party', x.id + ' · ' + x.fp, "'Geist Mono',monospace"], ['Bedrock named', x.req, "'Geist Mono',monospace"], ['Bedrock invoked', x.prof || 'none (mapping throws)', "'Geist Mono',monospace"],
+      ['Entitlement', x.st === 'invocable' ? 'entitled' : x.unmapped ? 'unmapped' : 'not entitled · substituted', 'inherit'], ['Geography', x.geo === 'eea' ? 'EEA (eu. profile)' : 'worldwide (global. profile)', 'inherit'],
+      ['Override env var', x.env, "'Geist Mono',monospace"], ['Thinking on Bedrock', x.think === 'omitted' ? 'omitted (no thinking)' : x.think === 'explicitly-disabled' ? 'explicitly disabled' : 'unconditional', 'inherit'], ['Server tools', 'first-party lane only', 'inherit']
+    ].map(([k, v, font]) => ({ k, v, font, fg: k === 'Entitlement' && v !== 'entitled' ? '#9a5a00' : '#1e1e24' }));
+    const CMP = [['Band', (x) => x.band], ['Default tier', (x) => (x.def ? 'yes · unknown ids land here' : 'no')], ['Reached by', (x) => (x.aliases.length ? x.aliases.join(', ') : 'its own id only'), 1], ['Invoked on this lane', (x) => inv(x), 1], ['Entitlement', (x) => (!bed ? 'n/a' : x.st === 'invocable' ? 'entitled' : x.unmapped ? 'unmapped' : 'substituted')], ['Geography', (x) => (!bed ? 'n/a' : x.geo === 'eea' ? 'EEA' : 'worldwide')], ['Override env var', (x) => x.env, 1], ['Adaptive / effort', (x) => (x.adaptive ? 'supported' : 'not sent')], ['Thinking on Bedrock', (x) => x.think], ['Server tools', () => 'first-party only']];
+    return {
+      sphereRef: (el) => {
+        if (!el || el.__q) return;
+        const go = () => { if (el.__q || !el.isConnected) return; if (!window.QuickSphere) return setTimeout(go, 60);
+          el.__q = this.sph = window.QuickSphere.mount(el, { mode: 'veil', bg: 'transparent', tone: [30, 30, 36], dust: [92, 122, 248], strand: [176, 196, 255], blend: 'source-over', alpha: 0.75, seed: 11, count: 9000, scale: 0.42, state: 'idle' }); };
+        go();
+      },
+      back: () => this.back(),
+      viewName: t ? t.label : { routing: 'Routing', compare: 'Compare', providers: 'Providers' }[st.view],
+      title: t ? t.label : { routing: 'Model routing', compare: 'Compare tiers', providers: 'Providers' }[st.view],
+      laneName: bed ? 'Bedrock (eu-central-1)' : 'First-party',
+      subline: t ? t.blurb : bed ? 'On Bedrock this account can’t invoke the frontier tier. Every substitution is shown as the headline fact, not a footnote.' : 'On the first-party lane every tier passes through unchanged. Switch to Bedrock to see the substitutions.',
+      subCount: String(subN), subFg: subN ? '#9a5a00' : '#0a7a53', subCountLabel: subN ? 'of 5 tiers not what they say' : 'tiers substituted',
+      views: [['routing', 'Routing'], ['compare', 'Compare'], ['providers', 'Providers']].map(([k, l]) => { const on = st.view === k && !t; return { k, l, on: on ? 'true' : 'false', bg: on ? '#1e1e24' : 'transparent', fg: on ? '#f9f7f4' : '#1e1e24' }; }),
+      pickView: (e) => this.setState({ view: e.currentTarget.getAttribute('data-k'), open: null }),
+      lanes: [['anthropic', 'First-party', 'api.anthropic.com'], ['bedrock', 'Bedrock', 'bedrock-runtime.eu-central-1.amazonaws.com']].map(([k, l, host]) => { const on = st.lane === k; return { k, l, host, on: on ? 'true' : 'false', bg: on ? '#fffdfa' : 'transparent', fg: on ? '#1e1e24' : '#6d6a67', active: k === 'bedrock' }; }),
+      pickLane: (e) => this.setState({ lane: e.currentTarget.getAttribute('data-k') }),
+      isWall: !t && st.view === 'routing', isDetail: !!t, isCompare: !t && st.view === 'compare', isProviders: !t && st.view === 'providers',
+      wall: T.map((x) => { const [tg, tb, tf] = tag(x); const bad = bed && (x.sub || x.unmapped); return { id: x.id, label: x.label, band: x.band, def: x.def ? ' · default' : '', blurb: x.blurb, tag: tg, tagBg: tb, tagFg: tf, requested: bed ? x.req : x.id, invoked: inv(x), reqDeco: bad ? 'line-through' : 'none', reqFg: bad ? '#8b8681' : 'inherit', bg: x.unmapped && bed ? '#1e1e24' : '#fffdfa', hov: x.unmapped && bed ? '#2a2a31' : '#fdfbf7', fg: x.unmapped && bed ? '#f9f7f4' : '#1e1e24', sub: x.unmapped && bed ? 'rgba(249,247,244,.62)' : '#6d6a67' }; }),
+      openTier: (e) => this.setState({ open: e.currentTarget.getAttribute('data-k') }),
+      fallback: 'Sonnet 5',
+      detCols: narrow ? 'minmax(0,1fr)' : 'minmax(0,1fr) minmax(0,1.1fr)',
+      d: t ? (() => { const bad = bed && (t.sub || t.unmapped); return { kicker: !bed ? 'First-party lane' : t.unmapped ? 'Unmapped on Bedrock' : t.sub ? 'Substituted on Bedrock' : 'Entitled on Bedrock', headline: !bed ? 'Passed through unchanged. ' + t.label + ' is ' + t.label + '.' : t.unmapped ? t.label + ' has no Bedrock profile Atlas will call.' : t.sub ? 'Asking for ' + t.label + ' runs ' + (t.prof.includes('sonnet-4-6') ? 'Sonnet 4.6' : 'Opus 4.6') + '.' : t.label + ' is what runs.', requested: bed ? t.req : t.id, invoked: inv(t), reqDeco: bad ? 'line-through' : 'none', note: bed ? t.note : t.fp, heroBg: bad ? '#1e1e24' : '#fffdfa', heroFg: bad ? '#f9f7f4' : '#1e1e24', heroSub: bad ? 'rgba(249,247,244,.62)' : '#6d6a67', heroSub2: bad ? 'rgba(249,247,244,.78)' : '#1e1e24', tileBg: bad ? 'rgba(249,247,244,.08)' : '#f9f7f4', facts: facts(t), capNote: t.cap }; })() : { facts: [] },
+      cmpHead: T.map((x) => ({ id: x.id, label: x.label, band: x.band })),
+      cmpRows: CMP.map(([k, fn, mono]) => ({ k, cells: T.map((x) => { const v = fn(x); const warn = v === 'substituted' || v === 'unmapped' || v === 'worldwide'; return { v, font: mono ? "'Geist Mono',ui-monospace,monospace" : 'inherit', bg: warn ? '#fbefd9' : '#fffdfa', fg: warn ? '#9a5a00' : '#1e1e24' }; }) })),
+      laneCards: [
+        { l: 'First-party', status: 'Key present', stBg: '#e3f4ec', stFg: '#0a7a53', stDot: '#0fae76', detail: 'Claude tiers pass through unchanged. This is the only lane that can run the native web_search and web_fetch server tools.', facts: [['Host', 'api.anthropic.com'], ['Auth', 'x-api-key'], ['Streaming', 'text/event-stream'], ['Max tokens', '4096 blocking · 16000 streaming']], bg: '#fffdfa', fg: '#1e1e24', sub: '#6d6a67', tileBg: '#f9f7f4' },
+        { l: 'Bedrock · selected', status: 'Live · 1.8 s p95', stBg: 'rgba(255,179,107,.16)', stFg: '#ffb36b', stDot: '#ffb36b', detail: 'The credit-funded background tier. Same Messages API, but the model id lives in the URL path and must be an inference profile this account is entitled to.', facts: [['Host', 'bedrock-runtime.eu-central-1.amazonaws.com'], ['Auth', 'AWS SigV4'], ['Streaming', 'application/vnd.amazon.eventstream'], ['Switch', 'atlas_ai_provider (service atlas-core)']], bg: '#1e1e24', fg: '#f9f7f4', sub: 'rgba(249,247,244,.62)', tileBg: 'rgba(249,247,244,.08)' }
+      ].map((l) => Object.assign(l, { facts: l.facts.map(([k, v]) => ({ k, v })) })),
+      rules: [['Server-tool bridge', 'A turn carrying web_search or web_fetch is re-routed to api.anthropic.com, because Bedrock has no server-tool runtime. With no first-party key it runs on Bedrock without those tools: degraded, not refused.'], ['Fail closed', 'With no key for the selected provider the gateway returns null and callers surface “no AI key configured”. It never falls through to another provider.'], ['EEA containment', 'Non-EEA profiles have been permitted since 2 Aug 2026; ATLAS_BEDROCK_EEA_ONLY=1 restores containment. Every default is still an eu. profile.'], ['Embeddings', 'Not part of this table. Anthropic has no embeddings endpoint, so recall vectors come from a separate local path.']].map(([t2, b]) => ({ t: t2, b })),
+      usage: [['Haiku 4.5', 62, '11.4M tok · $4.10', '#1e1e24'], ['Sonnet 4.6', 31, '5.7M tok · $24.30', '#3461f2'], ['Opus 4.6', 7, '1.3M tok · $12.80', '#7854ff'], ['Fable 5', 0, 'not called', '#d8d4cd']].map(([t2, w, v, c]) => ({ t: t2, w: w + '%', v, c }))
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>(function(){window.addEventListener("unhandledrejection",function(e){var m=String(e.reason&&e.reason.message||e.reason);if(/Transition was aborted|ViewTransition/.test(m))e.preventDefault()});var top=false;try{top=window.self===window.top}catch(e){}var s=document.createElement("style");if(top){s.textContent="@view-transition{navigation:auto}";}else{s.textContent="html{animation:atlas-in .45s cubic-bezier(.22,1,.36,1) both}html.atlas-out{transition:opacity .22s ease,transform .22s ease;opacity:0;transform:scale(.988)}@keyframes atlas-in{from{opacity:0;transform:scale(1.012)}}";document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a||e.defaultPrevented||e.metaKey||e.ctrlKey||a.target)return;var h=a.getAttribute("href");if(!/\.dc\.html/.test(h)||/^https?:/.test(h))return;if(h.split("#")[0]===""||location.pathname.endsWith(encodeURI(h.split("#")[0]))&&h.indexOf("#")>0)return;e.preventDefault();document.documentElement.classList.add("atlas-out");setTimeout(function(){location.href=h},210)},true);}document.head.appendChild(s)})();</script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script>window.addEventListener("pagereveal",function(e){var t=e.viewTransition;if(t){["ready","finished","updateCallbackDone"].forEach(function(p){t[p]&&t[p].catch(function(){})})}});window.addEventListener("unhandledrejection",function(e){if(/Transition was aborted|ViewTransition/.test(String(e.reason&&e.reason.message||e.reason)))e.preventDefault()});</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+::view-transition-group(*){animation-duration:.55s;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+::view-transition-old(root){animation:.4s cubic-bezier(.22,1,.36,1) both vt-out}
+::view-transition-new(root){animation:.55s cubic-bezier(.22,1,.36,1) both vt-in}
+@keyframes vt-out{to{opacity:0;transform:scale(.985)}}
+@keyframes vt-in{from{opacity:0;transform:scale(1.015)}}
+*{box-sizing:border-box}
+body{margin:0;background:#f9f7f4}
+button,input,textarea,select{border:none;font:inherit;background:none;color:inherit}
+a{color:#3461f2;text-decoration:none}a:hover{color:#2748bd}
+.nosb{scrollbar-width:none}.nosb::-webkit-scrollbar{display:none}
+@keyframes bpop{from{opacity:0;transform:translateY(14px) scale(.986)}to{opacity:1;transform:none}}
+@keyframes shm{from{background-position:200% 0}to{background-position:-200% 0}}
+@keyframes ibreathe{0%,100%{transform:scale(1)}50%{transform:scale(1.045)}}
+@keyframes wc-ecg{0%{stroke-dashoffset:380}70%{stroke-dashoffset:0}100%{stroke-dashoffset:0}}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;transition:none !important}}
+</style>
+<script src="atlas-quickstart-sphere.js"></script>
+<script src="atlas-orb.js"></script>
+<script src="atlas-topbar.js"></script>
+</helmet>
+<div ref="{{ rootRef }}" data-screen-label="Widgets Beta" class="nosb" style="height:100vh;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding:26px 26px 88px;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased">
+<header style="flex:none;height:clamp(132px,19vh,190px);border-radius:32px;background:#f1eeea;padding:14px 22px 14px 8px;display:flex;align-items:center;gap:18px;animation:bpop .6s cubic-bezier(.22,1,.36,1) both">
+<div style="position:relative;height:100%;aspect-ratio:1;flex:none"><canvas ref="{{ sphereRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas></div>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
+<span style="font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#8b8681">Home · Widgets</span>
+<a href="Atlas Dashboard Beta.dc.html" title="Back to Home · Esc" style="align-self:flex-start;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(26px,3vw,44px);font-weight:500;letter-spacing:-.045em;line-height:1.02;color:#1e1e24" style-hover="color:#1e1e24;opacity:.8">Widgets</a>
+<p style="margin:0;max-width:720px;font-size:14px;line-height:1.5;color:#6d6a67;text-wrap:pretty">{{ subline }}</p>
+</div>
+<sc-if value="{{ isCatalog }}" hint-placeholder-val="{{ true }}"><div style="flex:none;text-align:right;padding-right:4px"><div style="font-family:'Hanken Grotesk',sans-serif;font-size:44px;font-weight:500;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums">{{ shownCount }}</div><div style="margin-top:6px;font-size:12.5px;color:#6d6a67;white-space:nowrap">shown · {{ sizeLabel }} · {{ designLabel }}</div></div></sc-if>
+</header>
+<div style="flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:8px">
+<div role="tablist" aria-label="Widgets view" style="flex:none;display:flex;gap:2px;padding:4px;border-radius:22px;background:#f1eeea">
+<sc-for list="{{ tabs }}" as="t" hint-placeholder-count="2"><button role="tab" onClick="{{ pickTab }}" data-k="{{ t.k }}" style="border:none;flex:none;white-space:nowrap;display:flex;align-items:center;gap:8px;height:40px;padding:0 16px;border-radius:9999px;background:{{ t.bg }};color:{{ t.fg }};font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;transition:background .2s"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{ t.ico }}"></path></svg>{{ t.l }}</button></sc-for>
+</div>
+<sc-if value="{{ isCatalog }}" hint-placeholder-val="{{ true }}">
+<span style="flex:1"></span>
+<div style="flex:none;display:flex;gap:2px;padding:4px;border-radius:9999px;background:#f1eeea"><sc-for list="{{ sizes }}" as="z" hint-placeholder-count="3"><button data-id="{{ z.id }}" onClick="{{ pickSize }}" style="border:none;flex:none;white-space:nowrap;display:flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:9999px;background:{{ z.bg }};color:{{ z.fg }};font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:background .2s">{{ z.label }}<span style="font-size:11px;opacity:.6;font-variant-numeric:tabular-nums">{{ z.dim }}</span></button></sc-for></div>
+<div style="flex:none;display:flex;gap:2px;padding:4px;border-radius:9999px;background:#f1eeea"><sc-for list="{{ modes }}" as="m" hint-placeholder-count="2"><button data-id="{{ m.id }}" onClick="{{ pickMode }}" style="border:none;flex:none;white-space:nowrap;display:flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:9999px;background:{{ m.bg }};color:{{ m.fg }};font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:background .2s">{{ m.label }}</button></sc-for></div>
+<div style="flex:none;display:flex;gap:2px;padding:4px;border-radius:9999px;background:#f1eeea"><sc-for list="{{ designs }}" as="d" hint-placeholder-count="3"><button data-id="{{ d.id }}" onClick="{{ pickDesign }}" style="border:none;flex:none;white-space:nowrap;display:flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:9999px;background:{{ d.bg }};color:{{ d.fg }};font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:background .2s"><span style="width:11px;height:11px;border-radius:4px;background:{{ d.chip }}"></span>{{ d.label }}</button></sc-for></div>
+</sc-if>
+</div>
+<sc-if value="{{ isCatalog }}" hint-placeholder-val="{{ true }}">
+<div style="flex:none;display:flex;flex-wrap:wrap;gap:4px">
+<sc-for list="{{ cats }}" as="c" hint-placeholder-count="11"><button data-id="{{ c.id }}" onClick="{{ pickCat }}" style="border:none;flex:none;white-space:nowrap;display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:9999px;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:500;background:{{ c.bg }};color:{{ c.fg }}" style-hover="background:#edebe7">{{ c.label }}<span style="font-size:11px;opacity:.6;font-variant-numeric:tabular-nums">{{ c.n }}</span></button></sc-for>
+</div>
+<main style="display:grid;grid-template-columns:repeat({{ gridCols }},minmax(0,1fr));grid-auto-flow:row dense;grid-auto-rows:132px;gap:12px;padding:12px;border-radius:28px;background:#f1eeea">
+<sc-for list="{{ cards }}" as="w" hint-placeholder-count="16">
+<article data-screen-label="{{ w.name }} {{ w.designTag }}" style="position:relative;display:flex;flex-direction:column;overflow:hidden;grid-column:span {{ w.cols }};grid-row:span {{ w.rows }};padding:{{ w.pad }};border-radius:24px;background:{{ w.bg }}">
+<header style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-shrink:0">
+<p style="margin:0;flex:0 0 auto;font-family:'Hanken Grotesk',sans-serif;font-size:{{ w.nameSize }};font-weight:600;letter-spacing:-.02em;color:{{ w.label }};white-space:nowrap">{{ w.name }}</p>
+<span style="flex:0 1 auto;min-width:0;font-size:12px;color:{{ w.mut }};text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.kicker }}</span>
+</header>
+
+<sc-if value="{{ w.isBig }}" hint-placeholder-val="{{ true }}">
+<div style="margin-top:auto;display:flex;align-items:flex-end;gap:10px;min-width:0;overflow:hidden">
+<span style="font-family:'Hanken Grotesk',sans-serif;font-weight:500;letter-spacing:-.035em;line-height:1.08;font-size:{{ w.bigSize }};color:{{ w.fg }};font-variant-numeric:tabular-nums;white-space:nowrap">{{ w.value }}</span>
+<span style="padding-bottom:5px;font-size:12.5px;font-weight:500;color:{{ w.accent }};white-space:nowrap">{{ w.delta }}</span>
+</div>
+<p style="margin:7px 0 0;font-size:12.5px;line-height:1.4;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p>
+</sc-if>
+
+<sc-if value="{{ w.hasRoute }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:12px;display:flex;align-items:center;gap:9px">
+<span style="flex-shrink:0;font-size:11px;font-weight:600;color:{{ w.fg }}">{{ w.routeA }}</span>
+<span style="position:relative;flex:1;height:4px;border-radius:9999px;background:{{ w.trackBg }}">
+<span style="position:absolute;left:0;top:0;bottom:0;width:{{ w.routeP }};border-radius:9999px;background:{{ w.accent }}"></span>
+<span style="position:absolute;left:{{ w.routeP }};top:50%;transform:translate(-50%,-50%);width:10px;height:10px;border-radius:50%;background:{{ w.accent }};box-shadow:0 0 0 3px {{ w.bg }}"></span>
+</span>
+<span style="flex-shrink:0;font-size:11px;font-weight:600;color:{{ w.fg }}">{{ w.routeB }}</span>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.hasDayDots }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:12px;display:flex;gap:5px;flex-wrap:wrap">
+<sc-for list="{{ w.dayDots }}" as="dd" hint-placeholder-count="14">
+<span style="width:8px;height:8px;border-radius:50%;background:{{ dd.bg }}"></span>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.hasGrid }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:12px;display:grid;grid-template-columns:repeat(15,1fr);gap:4px;justify-items:start">
+<sc-for list="{{ w.gridDots }}" as="gd" hint-placeholder-count="30">
+<span style="width:7px;height:7px;border-radius:50%;background:#0fae76;opacity:{{ gd.op }}"></span>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.hasEcg }}" hint-placeholder-val="{{ false }}">
+<svg viewBox="0 0 300 40" preserveAspectRatio="none" style="margin-top:12px;width:100%;height:36px;display:block;overflow:visible">
+<polyline points="0,24 44,24 58,24 68,10 78,34 88,19 98,24 148,24 168,24 178,10 188,34 198,19 208,24 300,24" fill="none" stroke="{{ w.trackBg }}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"></polyline>
+<polyline points="0,24 44,24 58,24 68,10 78,34 88,19 98,24 148,24 168,24 178,10 188,34 198,19 208,24 300,24" fill="none" stroke="#d0453a" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" stroke-dasharray="380" stroke-dashoffset="380" style="animation:wc-ecg {{ w.ecgDur }} linear infinite"></polyline>
+</svg>
+</sc-if>
+
+<sc-if value="{{ w.hasStrip }}" hint-placeholder-val="{{ false }}">
+<div style="position:relative;flex-shrink:0;margin-top:auto;height:14px;border-radius:5px;background:{{ w.trackBg }}">
+<sc-for list="{{ w.strip }}" as="sb" hint-placeholder-count="4">
+<span style="position:absolute;top:2px;bottom:2px;left:{{ sb.l }};width:{{ sb.w }};border-radius:4px;background:{{ w.accent }};opacity:.8"></span>
+</sc-for>
+<span style="position:absolute;top:-3px;bottom:-3px;left:{{ w.nowL }};width:2px;border-radius:1px;background:#d0453a"></span>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.arcArea }}" hint-placeholder-val="{{ false }}">
+<svg viewBox="0 0 300 46" preserveAspectRatio="none" style="margin-top:12px;width:100%;height:40px;display:block">
+<path d="M0,34 L40,30 80,36 120,26 160,30 200,20 240,24 280,16 300,18 L300,46 L0,46 Z" fill="{{ w.trackBg }}"></path>
+<polyline points="0,34 40,30 80,36 120,26 160,30 200,20 240,24 280,16 300,18" fill="none" stroke="#0fae76" stroke-width="2" vector-effect="non-scaling-stroke"></polyline>
+</svg>
+</sc-if>
+
+<sc-if value="{{ w.hasBeam }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:13px;display:flex;flex-direction:column;gap:7px">
+<span style="display:flex;align-items:center;gap:9px"><span style="flex-shrink:0;width:34px;font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:{{ w.mut }}">In</span><span style="flex:1;height:7px;border-radius:9999px;background:{{ w.trackBg }};overflow:hidden"><span style="display:block;height:100%;width:100%;border-radius:9999px;background:{{ w.accent }}"></span></span></span>
+<span style="display:flex;align-items:center;gap:9px"><span style="flex-shrink:0;width:34px;font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:{{ w.mut }}">Out</span><span style="flex:1;height:7px;border-radius:9999px;background:{{ w.trackBg }};overflow:hidden"><span style="display:block;height:100%;width:{{ w.beamOut }};border-radius:9999px;background:#0fae76"></span></span></span>
+<span style="font-size:11.5px;color:{{ w.mut }};font-variant-numeric:tabular-nums">{{ w.beamNet }}</span>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.hasBigRows }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:10px;display:flex;flex-direction:column;min-height:0;overflow:hidden">
+<sc-for list="{{ w.bigRows }}" as="br" hint-placeholder-count="3">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:7px 0">
+<span style="font-size:12.5px;color:{{ w.fg }};text-decoration:{{ br.deco }};opacity:{{ br.op }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ br.label }}</span>
+<span style="font-size:11.5px;color:{{ w.mut }};font-variant-numeric:tabular-nums">{{ br.value }}</span>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.isRows }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:13px;display:flex;flex-direction:column;gap:0;min-height:0;overflow:hidden">
+<sc-for list="{{ w.rowsData }}" as="r" hint-placeholder-count="3">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 0">
+<span style="display:flex;align-items:center;gap:8px;min-width:0"><sc-if value="{{ r.hasTone }}" hint-placeholder-val="{{ false }}"><span style="flex-shrink:0;width:7px;height:7px;border-radius:50%;background:{{ r.tone }}"></span></sc-if><span style="font-size:13px;color:{{ w.fg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.label }}</span></span>
+<span style="display:flex;align-items:center;gap:6px"><span style="font-size:12px;font-variant-numeric:tabular-nums;color:{{ w.mut }}">{{ r.value }}</span><sc-if value="{{ w.mailActs }}" hint-placeholder-val="{{ false }}"><span style="display:flex;gap:4px"><span title="Reply" style="width:24px;height:24px;border-radius:50%;background:{{ w.trackBg }};color:{{ w.fg }};display:flex;align-items:center;justify-content:center"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17 4 12l5-5"></path><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg></span><span title="Forward" style="width:24px;height:24px;border-radius:50%;background:{{ w.trackBg }};color:{{ w.fg }};display:flex;align-items:center;justify-content:center"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 17 5-5-5-5"></path><path d="M4 18v-2a4 4 0 0 1 4-4h12"></path></svg></span></span></sc-if></span>
+</div>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.isBars }}" hint-placeholder-val="{{ false }}">
+<div style="position:relative;margin-top:auto;display:flex;align-items:flex-end;gap:{{ w.barGap }};height:{{ w.barH }}">
+<sc-if value="{{ w.hasGoal2 }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;left:0;right:0;bottom:{{ w.goalB }};border-top:2px dashed #b6b1aa;opacity:.7;pointer-events:none"></span></sc-if>
+<sc-for list="{{ w.bars }}" as="b" hint-placeholder-count="7">
+<span style="flex:1;border-radius:5px;height:{{ b.h }};background:{{ b.bg }}"></span>
+</sc-for>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:9px">
+<span style="font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</span>
+<span style="font-size:13px;font-weight:600;color:{{ w.fg }};font-variant-numeric:tabular-nums;flex-shrink:0">{{ w.value }}</span>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.isProgress }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto">
+<div style="display:flex;align-items:baseline;gap:9px;margin-bottom:11px">
+<span style="font-family:'Hanken Grotesk',sans-serif;font-weight:500;letter-spacing:-.03em;font-size:{{ w.midSize }};line-height:1;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</span>
+<span style="font-size:12.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</span>
+</div>
+<div style="height:5px;border-radius:9999px;background:{{ w.trackBg }};overflow:hidden"><span style="display:block;height:100%;width:{{ w.pct }};border-radius:9999px;background:{{ w.accent }}"></span></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.isDials }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;min-height:0;margin-top:6px;display:grid;grid-template-columns:repeat({{ w.dialCols }},1fr);gap:6px;align-content:space-evenly;justify-items:center">
+<sc-for list="{{ w.dials }}" as="d" hint-placeholder-count="3">
+<span style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0">
+<svg viewBox="0 0 100 100" style="width:{{ d.size }};height:{{ d.size }};display:block">
+<circle cx="50" cy="50" r="48" fill="{{ d.face }}" style="transition:fill .5s"></circle>
+<circle cx="50" cy="14" r="2.2" fill="{{ d.tick }}"></circle><circle cx="86" cy="50" r="2.2" fill="{{ d.tick }}"></circle><circle cx="50" cy="86" r="2.2" fill="{{ d.tick }}"></circle><circle cx="14" cy="50" r="2.2" fill="{{ d.tick }}"></circle>
+<line x1="50" y1="50" x2="50" y2="28" stroke="{{ d.hand }}" stroke-width="5.5" stroke-linecap="round" transform="{{ d.ha }}" style="transition:transform .6s cubic-bezier(.22,1,.36,1)"></line>
+<line x1="50" y1="50" x2="50" y2="18" stroke="{{ d.hand }}" stroke-width="3.2" stroke-linecap="round" transform="{{ d.ma }}" style="transition:transform .6s cubic-bezier(.22,1,.36,1)"></line>
+<circle cx="50" cy="50" r="3.4" fill="{{ d.hand }}"></circle>
+</svg>
+<span style="display:flex;flex-direction:column;align-items:center;min-width:0;max-width:100%"><span style="max-width:100%;font-size:10.5px;font-weight:600;color:{{ w.fg }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ d.name }}</span><span style="font-size:10px;color:{{ w.mut }};font-variant-numeric:tabular-nums;white-space:nowrap">{{ d.time }} {{ d.ap }}</span></span>
+</span>
+</sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.isArc }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;align-items:center;gap:16px">
+<span style="position:relative;flex-shrink:0;width:{{ w.arcW }}">
+<svg viewBox="0 0 100 56" style="width:100%;display:block">
+<path d="M10 50 A40 40 0 0 1 90 50" fill="none" stroke="{{ w.trackBg }}" stroke-width="9" stroke-linecap="round"></path>
+<path d="M10 50 A40 40 0 0 1 90 50" fill="none" stroke="#0fae76" stroke-width="9" stroke-linecap="round" stroke-dasharray="126" stroke-dashoffset="{{ w.arcOff }}"></path>
+</svg>
+<span style="position:absolute;left:0;right:0;bottom:2px;text-align:center;font-family:'Hanken Grotesk',sans-serif;font-size:20px;font-weight:600;letter-spacing:-.03em;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</span>
+</span>
+<sc-if value="{{ w.showArcStats }}" hint-placeholder-val="{{ false }}">
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+<sc-for list="{{ w.arcStats }}" as="q2" hint-placeholder-count="3">
+<span style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><span style="font-size:11.5px;color:{{ w.mut }}">{{ q2.s }}</span><span style="font-size:12.5px;font-weight:600;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ q2.t }}</span></span>
+</sc-for>
+</span>
+</sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.isHypno }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto">
+<div style="display:flex;align-items:baseline;gap:9px;margin-bottom:10px">
+<span style="font-family:'Hanken Grotesk',sans-serif;font-weight:500;letter-spacing:-.03em;font-size:{{ w.midSize }};line-height:1;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</span>
+<span style="font-size:12px;font-weight:600;color:#0a7a53">{{ w.delta }}</span>
+</div>
+<div style="display:flex;gap:2px;height:14px;border-radius:5px;overflow:hidden">
+<sc-for list="{{ w.hypno }}" as="hy" hint-placeholder-count="6">
+<span style="width:{{ hy.w }};height:100%;background:{{ hy.bg }}"></span>
+</sc-for>
+</div>
+<div style="margin-top:5px;display:flex;justify-content:space-between;font-size:10px;color:{{ w.mut }};font-variant-numeric:tabular-nums"><span>23:40</span><span>06:52</span></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.isPod }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;align-items:center;gap:12px">
+<span style="flex-shrink:0;width:{{ w.podArt }};height:{{ w.podArt }};border-radius:10px;background:radial-gradient(circle at 30% 26%,#cdd8ff,#5b74d6 46%,#1c2a66 100%)"></span>
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+<span style="font-size:13px;font-weight:600;color:{{ w.fg }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ w.caption }}</span>
+<span style="font-size:11.5px;color:{{ w.mut }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ w.caption2 }}</span>
+</span>
+<span style="position:relative;flex-shrink:0;width:42px;height:42px">
+<svg viewBox="0 0 48 48" style="position:absolute;inset:0;width:100%;height:100%"><circle cx="24" cy="24" r="22" fill="none" stroke="{{ w.trackBg }}" stroke-width="3"></circle><circle cx="24" cy="24" r="22" fill="none" stroke="{{ w.accent }}" stroke-width="3" stroke-linecap="round" stroke-dasharray="138" stroke-dashoffset="{{ w.podRing }}" transform="rotate(-90 24 24)"></circle></svg>
+<span style="position:absolute;inset:6px;border-radius:50%;background:{{ w.accent }};color:#fffdfa;display:flex;align-items:center;justify-content:center"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg></span>
+</span>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.isGlyph }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto">
+<div style="display:flex;align-items:center;gap:12px">
+<svg viewBox="0 0 48 48" style="flex-shrink:0;width:{{ w.glyphS }};height:{{ w.glyphS }};animation:ibreathe 4s ease-in-out infinite">
+<circle cx="24" cy="24" r="20" fill="none" stroke="#0fae76" stroke-width="2" opacity=".3"></circle>
+<circle cx="24" cy="24" r="13" fill="none" stroke="#0fae76" stroke-width="2" opacity=".55"></circle>
+<circle cx="24" cy="24" r="6" fill="#0fae76"></circle>
+</svg>
+<span style="display:flex;align-items:baseline;gap:8px;min-width:0"><span style="font-family:'Hanken Grotesk',sans-serif;font-weight:500;letter-spacing:-.03em;font-size:{{ w.midSize }};line-height:1;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</span><span style="font-size:12px;color:{{ w.mut }}">{{ w.delta }}</span></span>
+</div>
+<div style="position:relative;margin-top:12px;height:9px;border-radius:9999px;background:{{ w.trackBg }}">
+<sc-for list="{{ w.tl }}" as="b2" hint-placeholder-count="3">
+<span style="position:absolute;top:0;bottom:0;left:{{ b2.l }};width:{{ b2.w }};border-radius:9999px;background:#0fae76;opacity:.85"></span>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.isSegs }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto">
+<div style="display:flex;align-items:baseline;gap:9px;margin-bottom:11px">
+<span style="font-family:'Hanken Grotesk',sans-serif;font-weight:500;letter-spacing:-.03em;font-size:{{ w.midSize }};line-height:1;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</span>
+<span style="font-size:12.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</span>
+</div>
+<div style="display:flex;gap:3px">
+<sc-for list="{{ w.segs }}" as="sg" hint-placeholder-count="8">
+<span style="flex:1;height:6px;border-radius:9999px;background:{{ sg.bg }}"></span>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.isRingsW }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;align-items:center;gap:16px">
+<svg viewBox="0 0 100 100" style="flex-shrink:0;width:{{ w.ringSize }};height:{{ w.ringSize }};display:block">
+<circle cx="50" cy="50" r="42" fill="none" stroke="{{ w.ringTrack }}" stroke-width="9"></circle>
+<circle cx="50" cy="50" r="42" fill="none" stroke="{{ w.accent }}" stroke-width="9" stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="52" transform="rotate(-90 50 50)"></circle>
+<circle cx="50" cy="50" r="29" fill="none" stroke="{{ w.ringTrack }}" stroke-width="9"></circle>
+<circle cx="50" cy="50" r="29" fill="none" stroke="#0fae76" stroke-width="9" stroke-linecap="round" stroke-dasharray="182" stroke-dashoffset="98" transform="rotate(-90 50 50)"></circle>
+<circle cx="50" cy="50" r="16" fill="none" stroke="{{ w.ringTrack }}" stroke-width="9"></circle>
+<circle cx="50" cy="50" r="16" fill="none" stroke="#e07a1f" stroke-width="9" stroke-linecap="round" stroke-dasharray="100" stroke-dashoffset="25" transform="rotate(-90 50 50)"></circle>
+</svg>
+<sc-if value="{{ w.showRingList }}" hint-placeholder-val="{{ false }}">
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
+<sc-for list="{{ w.ringList }}" as="g" hint-placeholder-count="3">
+<span style="display:flex;align-items:baseline;justify-content:space-between;gap:10px"><span style="font-size:12px;color:{{ w.mut }}">{{ g.t }}</span><span style="font-size:12.5px;font-weight:600;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ g.v }}</span></span>
+</sc-for>
+</span>
+</sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.isSplit }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:grid;grid-template-columns:minmax(0,1fr) 1px minmax(0,1fr);gap:14px;align-items:center">
+<div style="min-width:0"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ w.midSize }};font-weight:500;letter-spacing:-.03em;line-height:1;color:{{ w.fg }};font-variant-numeric:tabular-nums">{{ w.value }}</p><p style="margin:6px 0 0;font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p></div>
+<span></span>
+<div style="min-width:0"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:{{ w.midSize }};font-weight:500;letter-spacing:-.03em;line-height:1;color:{{ w.accent }};font-variant-numeric:tabular-nums">{{ w.value2 }}</p><p style="margin:6px 0 0;font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption2 }}</p></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.isPeople }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;align-items:center">
+<sc-for list="{{ w.people }}" as="p" hint-placeholder-count="4">
+<span style="width:32px;height:32px;margin-right:-9px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:600;background:{{ w.avBg }};color:{{ w.fg }};box-shadow:0 0 0 2px {{ w.avRing }}">{{ p.i }}</span>
+</sc-for>
+<span style="margin-left:22px;font-size:12.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</span>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.isText }}" hint-placeholder-val="{{ false }}">
+<p style="margin:13px 0 0;font-size:{{ w.textSize }};line-height:1.5;letter-spacing:-.012em;color:{{ w.fg }};text-wrap:pretty;overflow:hidden">{{ w.value }}</p>
+<p style="margin:auto 0 0;padding-top:10px;font-size:11.5px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.caption }}</p>
+</sc-if>
+
+<sc-if value="{{ w.isEmpty }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:auto;display:flex;flex-direction:{{ w.eDir }};align-items:{{ w.eAlign }};gap:10px;min-height:0;overflow:hidden">
+<sc-if value="{{ w.eGhost }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;align-items:flex-end;gap:4px;height:{{ w.eGhostH }};width:56%;opacity:.55">
+<sc-for list="{{ w.ghostBars }}" as="g" hint-placeholder-count="5">
+<span style="flex:1;border-radius:5px;height:{{ g.h }};background:{{ w.trackBg }}"></span>
+</sc-for>
+</div>
+</sc-if>
+<div style="min-width:0;flex:1">
+<p style="margin:0;font-size:13px;font-weight:550;letter-spacing:-.01em;color:{{ w.fg }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.eTitle }}</p>
+<sc-if value="{{ w.showHint }}" hint-placeholder-val="{{ false }}">
+<p style="margin:4px 0 0;font-size:11.5px;line-height:1.45;color:{{ w.mut }};text-wrap:pretty">{{ w.eHint }}</p>
+</sc-if>
+</div>
+<span style="display:inline-flex;align-items:center;flex-shrink:0;height:27px;padding:0 12px;border-radius:9999px;cursor:pointer;font-size:11.5px;font-weight:550;color:{{ w.accent }};background:{{ w.trackBg }}">{{ w.eAction }}</span>
+</div>
+</sc-if>
+
+<sc-if value="{{ w.hasFoot }}" hint-placeholder-val="{{ false }}">
+<div style="flex-shrink:0;display:flex;justify-content:space-between;gap:10px;margin-top:11px;padding-top:9px">
+<span style="font-size:11px;color:{{ w.mut }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.footA }}</span>
+<span style="font-size:11px;color:{{ w.mut }};font-variant-numeric:tabular-nums;flex-shrink:0">{{ w.footB }}</span>
+</div>
+</sc-if>
+
+</article>
+</sc-for>
+</main>
+</sc-if>
+<sc-if value="{{ isStates }}" hint-placeholder-val="{{ false }}">
+<section style="display:grid;grid-template-columns:{{ rulesCols }};gap:6px;padding:12px;border-radius:24px;background:#f1eeea">
+<div style="padding:12px 14px;border-radius:16px;background:#fffdfa"><p style="margin:0;font-size:13px;font-weight:600">Loading shimmers</p><p style="margin:4px 0 0;font-size:12.5px;line-height:1.5;color:#6d6a67">Skeletons in the panel tone. Never a spinner.</p></div>
+<div style="padding:12px 14px;border-radius:16px;background:#fffdfa"><p style="margin:0;font-size:13px;font-weight:600">Attention adds one row</p><p style="margin:4px 0 0;font-size:12.5px;line-height:1.5;color:#6d6a67">A blue-tinted alert and a filled icon. The rest of the card stays put.</p></div>
+<div style="padding:12px 14px;border-radius:16px;background:#fffdfa"><p style="margin:0;font-size:13px;font-weight:600">Empty says what’s next</p><p style="margin:4px 0 0;font-size:12.5px;line-height:1.5;color:#6d6a67">What Atlas will do once it has data, plus one action.</p></div>
+<div style="padding:12px 14px;border-radius:16px;background:#fffdfa"><p style="margin:0;font-size:13px;font-weight:600">Offline shows its age</p><p style="margin:4px 0 0;font-size:12.5px;line-height:1.5;color:#6d6a67">Cached content dims to half and always says how old it is.</p></div>
+</section>
+<sc-for list="{{ sheet }}" as="w" hint-placeholder-count="6">
+<section data-screen-label="{{ w.name }} states" style="display:grid;grid-template-columns:{{ sheetRowCols }};gap:12px;padding:12px;border-radius:28px;background:#f1eeea">
+<div style="padding:10px 10px 4px"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:18px;font-weight:600;letter-spacing:-.02em">{{ w.name }}</p><p style="margin:6px 0 0;font-size:12.5px;line-height:1.5;color:#6d6a67;text-wrap:pretty">{{ w.desc }}</p></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(220px,100%),1fr));gap:8px">
+<sc-for list="{{ w.cards }}" as="c" hint-placeholder-count="5">
+<article style="min-height:212px;padding:16px 18px;border-radius:22px;background:#fffdfa;display:flex;flex-direction:column;gap:10px">
+<span style="display:flex;align-items:center;gap:7px;font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:{{ c.tagFg }}"><span style="width:6px;height:6px;border-radius:50%;background:{{ c.tagDot }}"></span>{{ c.tag }}</span>
+<sc-if value="{{ c.isLoad }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:9px;padding-top:4px"><sc-for list="{{ c.sk }}" as="b" hint-placeholder-count="5"><span style="display:block;width:{{ b.w }};height:{{ b.h }};border-radius:6px;background:linear-gradient(90deg,#f1eeea 25%,#f9f7f4 50%,#f1eeea 75%);background-size:200% 100%;animation:shm 1.6s linear infinite"></span></sc-for></div>
+</sc-if>
+<sc-if value="{{ c.isBody }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:15px;font-weight:600;letter-spacing:-.02em">{{ c.name }}</p><span style="flex:none;width:28px;height:28px;border-radius:9px;background:{{ c.icoBg }};color:{{ c.icoFg }};display:flex;align-items:center;justify-content:center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{ c.ico }}"></path></svg></span></div>
+<sc-if value="{{ c.hasAlert }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:12px;background:{{ c.aBg }};color:{{ c.aFg }};font-size:12px;font-weight:600;line-height:1.4"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><path d="{{ c.aIco }}"></path></svg>{{ c.alert }}</div></sc-if>
+<div style="display:flex;flex-direction:column;gap:8px;opacity:{{ c.op }}">
+<sc-if value="{{ c.hasBig }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:flex-end;justify-content:space-between;gap:10px"><span style="font-family:'Hanken Grotesk',sans-serif;font-size:34px;font-weight:500;letter-spacing:-.035em;line-height:1;font-variant-numeric:tabular-nums">{{ c.big }}</span><span style="font-size:12px;font-weight:500;color:{{ c.sideFg }};font-variant-numeric:tabular-nums;white-space:nowrap">{{ c.side }}</span></div></sc-if>
+<sc-if value="{{ c.hasProg }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:10px"><span style="flex:1;height:5px;border-radius:9999px;background:#f1eeea;overflow:hidden"><span style="display:block;height:100%;width:{{ c.prog }};border-radius:9999px;background:#3461f2"></span></span><span style="font-size:11.5px;color:#6d6a67;font-variant-numeric:tabular-nums;white-space:nowrap">{{ c.progL }}</span></div></sc-if>
+<div style="display:flex;flex-direction:column"><sc-for list="{{ c.rows }}" as="r" hint-placeholder-count="2"><div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12.5px;opacity:{{ r.rop }}"><sc-if value="{{ r.unread }}" hint-placeholder-val="{{ false }}"><span style="flex:none;width:6px;height:6px;border-radius:50%;background:#3461f2"></span></sc-if><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:{{ r.aFg }};font-weight:{{ r.aW }};text-decoration:{{ r.deco }}">{{ r.a }}</span><span style="flex:none;font-size:11.5px;font-weight:500;color:{{ r.bFg }};font-variant-numeric:tabular-nums">{{ r.b }}</span></div></sc-for></div>
+</div>
+<div style="margin-top:auto;display:flex;align-items:center;gap:10px">
+<sc-if value="{{ c.hasNote }}" hint-placeholder-val="{{ false }}"><span style="flex:1;min-width:0;font-size:11.5px;line-height:1.45;color:#6d6a67">{{ c.note }}</span></sc-if>
+<sc-if value="{{ c.hasAct }}" hint-placeholder-val="{{ false }}"><button style="border:none;margin-left:auto;flex:none;height:30px;padding:0 14px;border-radius:9999px;background:#3461f2;color:#fff;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer" style-hover="background:#2748bd">{{ c.act }}</button></sc-if>
+</div>
+</sc-if>
+<sc-if value="{{ c.isEmpty }}" hint-placeholder-val="{{ false }}">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;text-align:center;padding:4px 6px">
+<span style="width:40px;height:40px;border-radius:50%;background:#f1eeea;color:#6d6a67;display:flex;align-items:center;justify-content:center"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{ c.eIco }}"></path></svg></span>
+<p style="margin:4px 0 0;font-size:13.5px;font-weight:600">{{ c.eT }}</p>
+<p style="margin:0;max-width:210px;font-size:12px;line-height:1.5;color:#6d6a67;text-wrap:pretty">{{ c.eH }}</p>
+<sc-if value="{{ c.hasEA }}" hint-placeholder-val="{{ false }}"><button style="border:none;margin-top:4px;height:30px;padding:0 14px;border-radius:9999px;background:#eef2fe;color:#2748bd;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer" style-hover="background:#e2e9fd">{{ c.eA }}</button></sc-if>
+</div>
+</sc-if>
+</article>
+</sc-for>
+</div>
+</section>
+</sc-for>
+</sc-if>
+<nav aria-label="Atlas" data-dock="beta" style="view-transition-name:atlas-dock;position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:4px;padding:6px;border-radius:9999px;background:rgba(255,253,250,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 18px 40px -20px rgba(30,30,36,.28)">
+<a href="Atlas Dashboard Beta.dc.html" title="Home" aria-label="Home" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M3.5 10.9 10.7 4.3a2 2 0 0 1 2.6 0l7.2 6.6v6.9a3 3 0 0 1-3 3h-3v-5.4a2.5 2.5 0 0 0-5 0v5.4h-3a3 3 0 0 1-3-3z"></path></svg></a>
+<a href="Atlas Core Beta.dc.html" title="Core" aria-label="Core" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.6a8.4 8.4 0 1 1 0 16.8 8.4 8.4 0 0 1 0-16.8M12 8.8a3.2 3.2 0 1 1 0 6.4 3.2 3.2 0 0 1 0-6.4M12 3.6v5.2M12 15.2v5.2M3.6 12h5.2M15.2 12h5.2"></path></svg></a>
+<a href="Atlas Teach Beta.dc.html" title="Teach" aria-label="Teach" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 7.4a5.2 5.2 0 0 0-3.9-1.8H5a1.2 1.2 0 0 0-1.2 1.2v9.6A1.2 1.2 0 0 0 5 17.6h3.1A5.2 5.2 0 0 1 12 19.4a5.2 5.2 0 0 1 3.9-1.8H19a1.2 1.2 0 0 0 1.2-1.2V6.8A1.2 1.2 0 0 0 19 5.6h-3.1A5.2 5.2 0 0 0 12 7.4zM12 7.4v12"></path></svg></a>
+<a href="Atlas Mail Beta.dc.html" title="Mail" aria-label="Mail" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M6.6 5.6h10.8a3.2 3.2 0 0 1 3.2 3.2v6.4a3.2 3.2 0 0 1-3.2 3.2H6.6a3.2 3.2 0 0 1-3.2-3.2V8.8a3.2 3.2 0 0 1 3.2-3.2zM3.8 7.6l7 4.8a2.2 2.2 0 0 0 2.4 0l7-4.8"></path></svg></a>
+<a href="Atlas Architecture Beta.dc.html" title="Architecture" aria-label="Architecture" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.4 3.4 7.9 12 12.4l8.6-4.5zM3.4 12.1 12 16.6l8.6-4.5M3.4 16.3 12 20.8l8.6-4.5"></path></svg></a>
+<a href="Atlas Voice Beta.dc.html" title="Voice" aria-label="Voice" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.5a2.6 2.6 0 0 1 2.6 2.6v5.4a2.6 2.6 0 0 1-5.2 0V6.1A2.6 2.6 0 0 1 12 3.5zM18.1 11.5a6.1 6.1 0 0 1-12.2 0M12 17.6v3"></path></svg></a>
+<a href="Atlas Settings Beta.dc.html" title="Marcus · Settings" aria-label="Settings" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#1e1e24" style-hover="background:#f1eeea;color:#1e1e24"><span style="width:34px;height:34px;border-radius:50%;background:#1e1e24;color:#f9f7f4;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">M</span></a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1000},&quot;startTab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;catalog&quot;,&quot;options&quot;:[&quot;catalog&quot;,&quot;states&quot;],&quot;tsType&quot;:&quot;'catalog' | 'states'&quot;},&quot;design&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;both&quot;,&quot;options&quot;:[&quot;both&quot;,&quot;glass&quot;,&quot;ink&quot;],&quot;tsType&quot;:&quot;string&quot;},&quot;size&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;l&quot;,&quot;options&quot;:[&quot;s&quot;,&quot;m&quot;,&quot;l&quot;],&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  CATS = { time:'Time', weather:'Weather', travel:'Travel', money:'Money', work:'Work', comms:'Comms', health:'Health', home:'Home', media:'Media', know:'Knowledge' };
+  ACC = { time:'#3461f2', weather:'#c2661a', travel:'#0a8f60', money:'#2f7d5e', work:'#5b3ce0', comms:'#2f4bbd', health:'#c2483d', home:'#8b6f3f', media:'#a33f66', know:'#55524f' };
+  W = [
+    ['Clock','time','dials',{v:'14:32',c:'Tuesday, 26 July',k:'Local time'}],
+    ['Up next','time','big',{v:'1:1 Maya',d:'18 min',c:'Room 4 · with Maya Ortiz',k:'Next event',r:[['Press briefing','14:00'],['Ledgerline call','16:30']]}],
+    ['Agenda','time','rows',{r:[['Design review','09:30'],['1:1 with Maya','11:00'],['Press briefing','14:00'],['Ledgerline call','16:30']],v:'4 events',c:'3h 15m booked',k:'Today',strip:1}],
+    ['Countdown','time','big',{v:'6d',d:'Lisbon',c:'Departs 1 Aug, 07:40',k:'Until departure',dots:{t:14,d:8},r:[['Flights','booked'],['Casa Amarela','confirmed'],['Transfer','pending']]}],
+    ['Time zones','time','dials',{v:'4 cities',c:'Team spread',k:'Right now'}],
+    ['Weather','weather','big',{v:'68°',d:'Cloudy',c:'Feels 66° · H 70 L 58',k:'San Francisco'}],
+    ['Forecast','weather','bars',{b:[38,52,64,70,66,58,44,40,48,60,56,42],v:'H 70°',c:'Next seven days',k:'Daily highs'}],
+    ['Precipitation','weather','big',{v:'40 min',d:'light',c:'Rain arrives, clears by 19:00',k:'Radar'}],
+    ['Air quality','weather','arc',{v:'32',c:'AQI · good',k:'Outdoor air'}],
+    ['Daylight','weather','split',{v:'06:14',c:'Sunrise',v2:'21:02',c2:'Sunset',k:'14h 48m'}],
+    ['Flight','travel','big',{v:'TP1338',d:'on time',c:'Gate B12 · boards 06:55',k:'SFO → LIS',route:{a:'SFO',b:'LIS',p:'38%'},r:[['Gate B12','boards 06:55'],['Seat 4A','window'],['Bags','2 checked']]}],
+    ['Trip','travel','rows',{r:[['Flights','confirmed'],['Casa Amarela','1–5 Aug'],['Dinner, Thu','20:00'],['Airport transfer','pending']],v:'4 nights',c:'Lisbon · everything booked but one',k:'1–5 August'}],
+    ['Commute','travel','big',{v:'24 min',d:'+6',c:'Bridge traffic · leave by 08:10',k:'Home → studio',route:{a:'Home',b:'Studio',p:'62%'},r:[['Via bridge','24 min'],['Via tunnel','31 min'],['Transit','38 min']]}],
+    ['Transit','travel','rows',{r:[['N Judah · Embarcadero','3 min'],['38R · Geary & Powell','9 min'],['N Judah · Embarcadero','14 min']],v:'3 min',c:'Next departure',k:'Nearby'}],
+    ['Packing','travel','segs',{v:'8/14',c:'items packed',k:'Lisbon list',r:[['Chargers','done'],['Camera','done'],['Linen jacket','open']]}],
+    ['Currency','money','split',{v:'€1',c:'Euro',v2:'$1.09',c2:'US dollar',k:'Rate today'}],
+    ['Spend','money','bars',{b:[24,40,32,58,44,70,52],v:'€1,284',c:'This month by week',k:'Cards',r:[['Groceries','€412'],['Travel','€356'],['Studio','€298']]}],
+    ['Budget','money','progress',{v:'68%',c:'of July used',p:'68%',k:'Monthly'}],
+    ['Watchlist','money','rows',{r:[['NVDA','+2.4%'],['ASML','−0.8%'],['ETH','+5.1%'],['S&P 500','+0.3%']],v:'+1.8%',c:'Four holdings',k:'Markets open'}],
+    ['Portfolio','money','big',{v:'€48.2k',d:'+1.8%',c:'Since 1 July',k:'Total value'}],
+    ['Invoices','money','rows',{r:[['Northwind','€12,400','#0a7a53'],['Ledgerline','€86,000','#e07a1f'],['Studio Kern','€3,200','#d0453a']],v:'€101.6k',c:'Three outstanding',k:'Receivable'}],
+    ['Subscriptions','money','big',{v:'€184',d:'/mo',c:'11 active · 2 unused',k:'Recurring'}],
+    ['Tasks','work','segs',{v:'3/8',c:'done today',k:'Your list',r:[['Send Q4 budget notes','done'],['Review guidelines','open'],['Book transfer','open']]}],
+    ['Focus','work','glyph',{v:'2h 40m',d:'deep',c:'Longest run: 74 minutes',k:'Today'}],
+    ['Meeting notes','work','rows',{r:[['Design review','6 actions'],['1:1 Maya','2 actions'],['Standup','no actions']],v:'8 actions',c:'From three meetings',k:'Captured'}],
+    ['Documents','work','rows',{r:[['Launch brief','2h'],['Pricing v4','1d'],['Handoff README','3d']],v:'3 files',c:'Recently edited',k:'Drive'}],
+    ['Pull requests','work','rows',{r:[['Sphere renderer','review','#e07a1f'],['Mail audit trail','approved','#0a7a53'],['Dock nav','draft','#8b8681']],v:'1 waiting',c:'On you to review',k:'atlas/app'}],
+    ['Deploys','work','big',{v:'v2.4.1',d:'live',c:'Shipped 41 minutes ago',k:'Production'}],
+    ['Incidents','work','big',{v:'All clear',d:'34d',c:'No open incidents',k:'Status',grid:1}],
+    ['Support queue','work','big',{v:'12',d:'−4',c:'Median first reply: 6 min',k:'Open tickets'}],
+    ['Inbox','comms','rows',{r:[['Dana Whitfield · The Verge','9:12'],['Marcus Lee · Northwind','8:47'],['Priya Raman','8:05']],v:'3 unread',c:'Across three mailboxes',k:'Priority',mail:1}],
+    ['Messages','comms','people',{ppl:['MK','RN','JP','SA'],v:'4',c:'threads need you',k:'Team'}],
+    ['Atlas drafts','comms','progress',{v:'5',c:'awaiting approval',p:'42%',k:'Written for you'}],
+    ['Call','comms','big',{v:'16:30',d:'today',c:'Ledgerline sync · 4 invited',k:'Scheduled'}],
+    ['Steps','health','bars',{b:[30,48,62,40,72,55,66],v:'8,240',c:'Last seven days',k:'Daily',goal:'62%'}],
+    ['Sleep','health','hypno',{v:'7h 12m',d:'+22m',c:'Deep 1h 40m · woke twice',k:'Last night'}],
+    ['Heart','health','big',{v:'58',d:'bpm',c:'Resting · five-day low',k:'Today',ecg:58,r:[['Resting','58 bpm'],['Walking avg','92 bpm'],['HRV','64 ms']]}],
+    ['Workout','health','progress',{v:'3/4',c:'sessions this week',p:'75%',k:'Plan'}],
+    ['Nutrition','health','split',{v:'1,840',c:'kcal in',v2:'620',c2:'burned',k:'Today',beam:1,r:[['Breakfast','420 kcal'],['Lunch','780 kcal'],['Run 5k','−380 kcal']]}],
+    ['Climate','home','big',{v:'21.5°',d:'auto',c:'Living room · quiet mode',k:'Indoors'}],
+    ['Energy','home','bars',{b:[20,26,34,52,66,48,30,24,22,28,40,58],v:'8.2 kWh',c:'Today by hour',k:'Usage'}],
+    ['Security','home','big',{v:'Armed',d:'away',c:'Doors locked · 2 cameras',k:'House'}],
+    ['Groceries','home','rows',{r:[['Coffee','2 bags'],['Olive oil','1'],['Bread','sourdough']],v:'3 items',c:'On the list',k:'Shopping'}],
+    ['Lights','home','progress',{v:'40%',c:'warm · 6 rooms on',p:'40%',k:'Brightness'}],
+    ['Now playing','media','big',{v:'Xtal',d:'3:12',c:'Aphex Twin · Ambient Works',k:'Spotify'}],
+    ['Podcast','media','pod',{v:'34 min',c:'The quiet interface',c2:'Ezra Klein · 34 min left',k:'Resume'}],
+    ['Reading','media','rows',{r:[['The quiet interface','9 min'],['Pricing psychology','14 min'],['Lisbon, slowly','6 min']],v:'29 min',c:'Three saved pieces',k:'Saved'}],
+    ['Briefing','know','rows',{r:[['Three stories on assistive UI','07:00'],['Ledgerline raises a Series B','09:20'],['EU AI act guidance lands','11:45']],v:'3 stories',c:'Followed topics',k:'This morning'}],
+    ['Answer','know','text',{v:'Yes — the embargo holds until Thursday 08:00 CET, and all three outlets have confirmed in writing.',c:'3 sources · high confidence',k:'Atlas'}],
+    ['Sources','know','rows',{r:[['fieldnotes.press','primary'],['ec.europa.eu','official'],['ledgerline.com','release']],v:'3 cited',c:'Behind this answer',k:'Provenance'}],
+    ['Atlas said','know','text',{v:'I handled eleven threads and escalated one. Nothing else needs you before the briefing.',c:'Spoken aloud · 08:12',k:'Voice'}],
+    ['Activity','health','rings',{v:'520',c:'/ 650 cal · on track',k:'Move'}],
+    ['Elsewhere','time','dials',{v:'3 cities',c:'You watch',k:'World clock'}],
+    ['Bulb','home','progress',{v:'On',c:'warm white · office',p:'62%',k:'Light'}],
+    ['Floor lamp','home','progress',{v:'On',c:'dusk violet · living room',p:'45%',k:'Ambient'}],
+    ['Front door','home','big',{v:'Live',d:'now',c:'Person at the door · 10:42',k:'Camera'}],
+    ['Music','media','big',{v:'Golden Hour',d:'playing',c:'Vela Sunn · 1:12 of 3:41',k:'Now playing'}]
+  ];
+  SIZES = [
+    { id:'s', label:'S', dim:'2×1', cols:2, rows:1 },
+    { id:'m', label:'M', dim:'3×1', cols:3, rows:1 },
+    { id:'l', label:'L', dim:'3×2', cols:3, rows:2 }
+  ];
+  DESIGNS = [
+    { id:'both', label:'Both', chip:'linear-gradient(135deg,#fffdfa 50%,#1e1e24 50%)', chipRing:'none' },
+    { id:'glass', label:'Paper', chip:'#fffdfa', chipRing:'none' },
+    { id:'ink', label:'Ink', chip:'#1e1e24', chipRing:'none' }
+  ];
+  MODES = [ { id:'live', label:'With data' }, { id:'empty', label:'Empty' } ];
+  state = { size:'l', design:'both', cat:'all', mode:'live', now: new Date(), tab:'catalog', vw: window.innerWidth, ico:{} };
+  CITIES = [{ n:'San Francisco', s:'San Fran', off:-420 }, { n:'London', off:60 }, { n:'Tokyo', off:540 }, { n:'New York', off:-240 }, { n:'Lisbon', off:60 }, { n:'Sydney', off:600 }];
+  RINGDATA = [{ t:'Move', v:'520 / 650 cal' }, { t:'Exercise', v:'38 / 60 min' }, { t:'Stand', v:'9 / 12 hr' }];
+  componentDidMount() {
+    this._t = setInterval(() => this.setState({ now: new Date() }), 30000);
+    this.onResize = () => this.setState({ vw: window.innerWidth }); window.addEventListener('resize', this.onResize);
+    this.onKey = (e) => { if (e.key === 'Escape' && !/INPUT|TEXTAREA/.test(document.activeElement && document.activeElement.tagName)) window.location.href = 'Atlas Dashboard Beta.dc.html'; }; window.addEventListener('keydown', this.onKey);
+    const h = (window.location.hash || '').slice(1), p = this.props;
+    this.setState({ tab: h === 'states' ? 'states' : (p.startTab || 'catalog'), design: p.design || 'both', size: p.size || 'l' });
+    fetch('atlas-icon-data.js').then((r) => r.text()).then((t) => { const SET = new Function(t.replace(/export\s+const\s+SET\s*=/, 'return'))(), ico = {}; SET.forEach((g) => g[2].forEach(([n, d]) => { ico[n] = d; })); this.setState({ ico }); }).catch(() => {});
+  }
+  componentWillUnmount() { clearInterval(this._t); if (this.ro) this.ro.disconnect(); window.removeEventListener('resize', this.onResize); window.removeEventListener('keydown', this.onKey); if (this.sph) this.sph.destroy(); }
+  SHEET = [
+    { name:'Weather', ico:'partly cloudy', desc:'Attention when rain or a severe alert lands within six hours.', sk:[[46,10],[28,0],[56,26],[40,10],[88,10],[72,10]],
+      def:{ big:'68°', side:'H 70 · L 58', rows:[['Partly cloudy','San Francisco'],['Humidity 62%','Wind 8 mph']] },
+      att:{ alert:'Rain from 15:10, before your 15:30 walk', aIco:'rain', big:'64°', side:'88% rain', rows:[['Clouds building','San Francisco']] },
+      empty:{ ico:'location', t:'No location set', h:'Atlas can follow your calendar’s city or a fixed home base.', a:'Set location' },
+      off:{ alert:'Station unreachable, retrying', big:'68°', side:'cached 12 min ago', note:'Showing the last good reading' } },
+    { name:'Today', ico:'calendar', desc:'Attention ten minutes before an event, with a Join action.', sk:[[40,10],[28,0],[90,10],[82,10],[86,10],[60,10]],
+      def:{ rows:[['Design review','09:30'],['1:1 with Maya','11:00'],['Press briefing','14:00']] },
+      att:{ alert:'1:1 with Maya starts in 5 min', aIco:'calendar', rows:[['1:1 with Maya','11:00']], act:'Join', note:'Then: Press briefing · 14:00' },
+      empty:{ ico:'calendar', t:'Nothing scheduled', h:'A clear day. Ask Atlas to block focus time and it will guard it.', a:'Block focus time' },
+      off:{ alert:'Calendar sync failed', rows:[['1:1 with Maya','11:00']], note:'cached 4 min ago · reconnecting' } },
+    { name:'Tasks', ico:'tasks', desc:'Attention when something is overdue. It moves to the top in red.', sk:[[44,10],[28,0],[100,5],[88,10],[76,10],[82,10]],
+      def:{ prog:20, progL:'1 of 5', rows:[['Send Q4 budget notes','High','r'],['Book Lisbon transfer','Done','m',1]] },
+      att:{ alert:'1 task overdue', aIco:'warning', red:1, rows:[['Renew passport · due yesterday','','R'],['Send Q4 budget notes','High','r']] },
+      empty:{ ico:'success', t:'All clear', h:'Atlas files new tasks from chat and mail as they arrive.' },
+      off:{ alert:'Changes saved on this Mac', rows:[['Send Q4 budget notes','High','r']], note:'2 edits sync when you’re back online' } },
+    { name:'Watchlist', ico:'markets', desc:'Attention when a holding moves past your ±3% threshold.', sk:[[52,10],[28,0],[92,10],[88,10],[90,10]],
+      def:{ rows:[['NVDA','+2.3%','g'],['ASML','−0.8%','r'],['ETH','+5.1%','g']] },
+      att:{ alert:'NVDA +5.2%, past your threshold', aIco:'markets', big:'1,238', side:'+5.2%', sideG:1, note:'Atlas summarised 3 sources on chip capacity' },
+      empty:{ ico:'markets', t:'No tickers yet', h:'Tell Atlas what you hold or watch and it tracks moves and news.', a:'Add tickers' },
+      off:{ alert:'Feed disconnected', rows:[['NVDA','+2.3%','g']], note:'last tick 38 s ago · reconnecting' } },
+    { name:'Inbox', ico:'inbox', desc:'Attention when Atlas judges a message urgent and has a reply drafted.', sk:[[46,10],[28,0],[90,10],[84,10],[88,10]],
+      def:{ rows:[['Dana Whitfield','9:12','u'],['Marcus Lee','8:47','u'],['Priya Raman','8:05']] },
+      att:{ alert:'Dana needs the embargo confirmed by Thursday', aIco:'sparkle', rows:[['Dana Whitfield · reply drafted','9:12','u']], act:'Review' },
+      empty:{ ico:'inbox', t:'Inbox zero', h:'Nothing needs you. Atlas keeps triaging in the background.' },
+      off:{ alert:'Mail sync paused', rows:[['Dana Whitfield','9:12']], note:'cached 2 min ago' } },
+    { name:'Briefing', ico:'news', desc:'Attention for breaking news on a topic you follow.', sk:[[44,10],[28,0],[40,8],[94,10],[52,8],[88,10]],
+      def:{ rows:[['Three stories on assistive UI','07:00'],['Ledgerline raises a Series B','09:20']] },
+      att:{ alert:'Breaking: EU AI Act dates confirmed', aIco:'news', rows:[['Affects your compliance task','6 min']], note:'Linked to 2 items in memory' },
+      empty:{ ico:'news', t:'No topics followed', h:'Pick a few topics and Atlas builds a brief twice a day.', a:'Choose topics' },
+      off:{ alert:'Feeds unreachable', rows:[['Three stories on assistive UI','07:00']], note:'cached 41 min ago' } }
+  ];
+  sheet(ic) {
+    const TAGS = [['load','Loading'],['def','Default'],['att','Attention'],['empty','Empty'],['off','Offline']];
+    const tone = { g:'#0a7a53', r:'#a3352c', R:'#a3352c', m:'#8b8681' };
+    return this.SHEET.map((w) => ({ name: w.name, desc: w.desc, cards: TAGS.map(([k, tag]) => {
+      const s = w[k] || {}, att = k === 'att', off = k === 'off';
+      return { tag, tagFg: att ? '#2748bd' : off ? '#a3352c' : '#8b8681', tagDot: att ? '#3461f2' : off ? '#d0453a' : k === 'def' ? '#0fae76' : '#b6b1aa',
+        isLoad: k === 'load', isEmpty: k === 'empty', isBody: k === 'def' || att || off,
+        sk: (w.sk || []).map(([wd, h]) => ({ w: wd + '%', h: (h || 0) + 'px', mt: h ? '0px' : '4px', show: !!h })).filter((b) => b.show),
+        name: w.name, ico: ic(w.ico), icoBg: att ? '#3461f2' : '#f1eeea', icoFg: att ? '#fff' : off ? '#8b8681' : '#1e1e24',
+        hasAlert: !!s.alert, alert: s.alert || '', aIco: ic(off ? 'offline' : (s.aIco || 'info')), aBg: (off || s.red) ? '#f7e6e4' : '#eef2fe', aFg: (off || s.red) ? '#a3352c' : '#2748bd',
+        op: off ? '.5' : '1',
+        hasBig: !!s.big, big: s.big || '', side: s.side || '', sideFg: s.sideG ? '#0a7a53' : '#6d6a67',
+        hasProg: s.prog != null, prog: (s.prog || 0) + '%', progL: s.progL || '',
+        rows: (s.rows || []).map(([a, b, t, done]) => ({ a, b, aFg: t === 'R' ? '#a3352c' : '#1e1e24', aW: t === 'R' ? '600' : '400', bFg: (t && t !== 'u' && t !== 'R') ? tone[t] : '#6d6a67', deco: done ? 'line-through' : 'none', rop: done ? '.5' : '1', unread: t === 'u' })),
+        hasNote: !!s.note, note: s.note || '', hasAct: !!s.act, act: s.act || '',
+        eIco: ic((s.ico) || 'empty'), eT: s.t || '', eH: s.h || '', hasEA: !!s.a, eA: s.a || '' };
+    }) }));
+  }
+  rgb(h) { h = h.replace('#',''); return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)]; }
+  lighten(h, f) { const c = this.rgb(h).map(v => Math.round(v + (255 - v)*f)); return 'rgb(' + c.join(',') + ')'; }
+  /* One language with the dashboard: paper and ink surfaces, no rings, no blur,
+     one Atlas blue rather than ten category accents. */
+  skin(design) {
+    if (design === 'ink') return { bg:'#1e1e24', blur:'none', ring:'none', fg:'#f9f7f4', mut:'rgba(249,247,244,.72)', label:'#f9f7f4', accent:'#8fa9ff', rule:'rgba(249,247,244,.18)', trackBg:'rgba(249,247,244,.18)', avBg:'rgba(249,247,244,.14)', avRing:'transparent', barBase:'rgba(249,247,244,.24)', stamp:'rgba(249,247,244,.62)', designTag:'Ink' };
+    return { bg:'#fffdfa', blur:'none', ring:'none', fg:'#1e1e24', mut:'#6d6a67', label:'#1e1e24', accent:'#3461f2', rule:'#f1eeea', trackBg:'#f1eeea', avBg:'#f1eeea', avRing:'transparent', barBase:'#e3dbd0', stamp:'#8b8681', designTag:'Paper' };
+  }
+  renderVals() {
+    const S = this.state;
+    const size = this.SIZES.find(z => z.id === S.size) || this.SIZES[2];
+    const list = this.W.filter(w => S.cat === 'all' || w[1] === S.cat);
+    const designs = S.design === 'both' ? ['glass', 'ink'] : [S.design];
+    const chipOn = (on) => ({ bg: on ? '#1e1e24' : 'transparent', fg: on ? '#f9f7f4' : '#1e1e24' });
+    const ic = (n) => (S.ico || {})[n] || '';
+    const cards = [];
+    list.forEach((w) => {
+      const [name, cat, kind, o] = w;
+      const accent = this.ACC[cat];
+      const cols = size.cols, rows = size.rows;
+      const tall = rows >= 2, huge = rows >= 3, wide = cols >= 6;
+      designs.forEach(d => {
+        const sk = this.skin(d);
+        const empty = S.mode === 'empty';
+        const rowCap = huge ? 5 : (tall ? 3 : 0);
+        const canRows = kind === 'rows' && rowCap > 0;
+        const asBig = kind === 'big' || (kind === 'rows' && !canRows) || (kind === 'people' && !tall);
+        const E = {
+          big:      ['No data yet', 'Connect a source and this number fills in live.', 'Connect source'],
+          rows:     ['Nothing to list', 'Items appear the moment Atlas sees them.', 'Add first item'],
+          bars:     ['No activity yet', 'Activity draws itself in as it happens.', 'Connect source'],
+          progress: ['No goal set', 'Set a target and Atlas tracks it for you.', 'Set a goal'],
+          split:    ['Nothing to compare', 'Both sides show up once connected.', 'Connect source'],
+          people:   ['No one here yet', 'People sync in from the accounts you grant.', 'Sync contacts'],
+          text:     ['Nothing said yet', 'Ask Atlas anything — the answer lands here.', 'Ask Atlas']
+        }[kind] || ['No data yet', 'Connect a source to begin.', 'Connect source'];
+        cards.push(Object.assign({}, sk, {
+          name, cols, rows, kicker: o.k || '',
+          pad: huge ? '22px 24px' : (tall ? '22px 24px' : (cols >= 3 ? '18px 20px' : '16px 18px')),
+          nameSize: huge ? '17px' : (tall ? '17px' : (cols >= 3 ? '16px' : '15px')),
+          bigSize: (huge ? 62 : (tall ? (wide ? 52 : 40) : (cols >= 3 ? 30 : 26))) + 'px',
+          midSize: (huge ? 34 : (tall ? 24 : 19)) + 'px',
+          headGap: '4px',
+          textSize: (huge ? 21 : (tall ? 15.5 : 13)) + 'px',
+          barH: (huge ? 132 : (tall ? 68 : 34)) + 'px',
+          barGap: wide ? '5px' : '3px',
+          value: o.v || '', value2: o.v2 || '', caption: o.c || '', caption2: o.c2 || '', delta: o.d || '', pct: o.p || '50%',
+          isBig: !empty && asBig, isRows: !empty && canRows, isBars: !empty && kind === 'bars', isProgress: !empty && kind === 'progress',
+          isSplit: !empty && kind === 'split', isPeople: !empty && kind === 'people' && tall, isText: !empty && kind === 'text',
+          rowsData: (o.r || []).slice(0, rowCap).map(r => ({ label: r[0], value: r[1], tone: r[2] || '', hasTone: !!r[2] })),
+          mailActs: !empty && !!o.mail,
+          hasRoute: !empty && !!o.route, routeA: (o.route || {}).a || '', routeB: (o.route || {}).b || '', routeP: (o.route || {}).p || '0%',
+          hasDayDots: !empty && !!o.dots,
+          dayDots: o.dots ? Array.apply(null, Array(o.dots.t)).map((x, i) => ({ bg: i < o.dots.d ? sk.accent : sk.trackBg })) : [],
+          hasGrid: !empty && !!o.grid,
+          gridDots: o.grid ? Array.apply(null, Array(30)).map((x, i) => ({ op: i === 29 ? '1' : '.5' })) : [],
+          hasEcg: !empty && !!o.ecg && cols >= 3, ecgDur: o.ecg ? (120 / o.ecg).toFixed(2) + 's' : '2s',
+          hasGoal2: !empty && kind === 'bars' && !!o.goal, goalB: o.goal || '0%',
+          hasBeam: !empty && !!o.beam && cols >= 3,
+          hasStrip: !empty && !!o.strip,
+          strip: o.strip ? [{ l: '6%', w: '9%' }, { l: '22%', w: '12%' }, { l: '55%', w: '8%' }, { l: '83%', w: '10%' }] : [],
+          nowL: (function (nw) { return Math.max(2, Math.min(97, ((nw.getHours() * 60 + nw.getMinutes() - 540) / 540) * 100)).toFixed(1) + '%'; })(this.state.now || new Date()),
+          arcArea: !empty && kind === 'arc' && tall,
+          hasBigRows: !empty && tall && !!o.r && (kind === 'big' || kind === 'bars' || kind === 'segs' || kind === 'split'),
+          beamOut: o.beam ? Math.round(parseInt(String(o.v2).replace(/\D/g, ''), 10) / parseInt(String(o.v).replace(/\D/g, ''), 10) * 100) + '%' : '0%',
+          beamNet: o.beam ? '+' + String(parseInt(String(o.v).replace(/\D/g, ''), 10) - parseInt(String(o.v2).replace(/\D/g, ''), 10)).replace(/\B(?=(\d{3})+$)/g, ',') + ' kcal net' : '',
+          /* two rows when a flourish (route lane, dot track, bar chart) already
+             took a lane — three don't measurably fit the L box */
+          bigRows: (tall && o.r ? o.r : []).slice(0, (o.ecg || o.beam) && cols >= 3 ? 1 : (o.route || o.dots || kind === 'bars') ? 2 : 3).map(r => ({ label: r[0], value: r[1], deco: r[1] === 'done' ? 'line-through' : 'none', op: r[1] === 'done' ? '.5' : '1' })),
+          bars: (o.b || []).slice(0, wide ? 12 : 7).map((h, i, arr) => ({ h: Math.round(h) + '%', bg: i === arr.length - 1 ? sk.accent : sk.barBase })),
+          people: (o.ppl || []).map(i => ({ i })),
+          isEmpty: empty,
+          eTitle: E[0], eHint: E[1], eAction: E[2],
+          eDir: tall ? 'column' : 'row', eAlign: tall ? 'flex-start' : 'center',
+          eGhost: empty && tall, eGhostH: (huge ? 46 : 34) + 'px',
+          showHint: empty && tall,
+          ghostBars: [34, 58, 22, 72, 44, 62, 28].slice(0, wide ? 7 : 5).map(g => ({ h: g + '%' })),
+          isDials: !empty && kind === 'dials',
+          dialCols: tall || cols >= 3 ? 3 : 1,
+          dials: kind === 'dials' ? this.CITIES.slice(0, tall ? 6 : (cols >= 3 ? 3 : 1)).map((ct) => {
+            const nw = this.state.now || new Date();
+            const t = new Date(nw.getTime() + (ct.off + nw.getTimezoneOffset()) * 60000);
+            const hh = t.getHours(), mm = t.getMinutes(), night = hh < 6 || hh >= 20;
+            return { name: ct.s || ct.n, time: ((hh % 12) || 12) + ':' + ('0' + mm).slice(-2), ap: hh < 12 ? 'AM' : 'PM',
+              ha: 'rotate(' + ((hh % 12) * 30 + mm * 0.5).toFixed(1) + ' 50 50)', ma: 'rotate(' + (mm * 6) + ' 50 50)',
+              face: night ? '#101013' : sk.trackBg, hand: night ? '#f9f7f4' : sk.fg,
+              tick: night ? 'rgba(249,247,244,.35)' : sk.mut,
+              size: tall ? '54px' : (cols >= 3 ? '52px' : '48px') };
+          }) : [],
+          isArc: !empty && kind === 'arc', arcOff: Math.round(126 * (1 - 32 / 150)),
+          arcW: cols >= 3 ? '96px' : '82px', showArcStats: cols >= 3,
+          arcStats: [{ t:'12', s:'PM2.5' }, { t:'18', s:'PM10' }, { t:'41', s:'O₃' }],
+          isHypno: !empty && kind === 'hypno',
+          hypno: [{ w:'14%', bg:'#7854ff' }, { w:'9%', bg:'#b1a2f5' }, { w:'22%', bg:sk.trackBg }, { w:'11%', bg:'#7854ff' }, { w:'17%', bg:'#b1a2f5' }, { w:'27%', bg:sk.trackBg }],
+          isPod: !empty && kind === 'pod', podArt: tall ? '62px' : '44px',
+          podRing: Math.round(138 * (1 - 0.46)),
+          isGlyph: !empty && kind === 'glyph', glyphS: tall ? '44px' : '32px',
+          tl: [{ l:'6%', w:'28%' }, { l:'42%', w:'18%' }, { l:'68%', w:'14%' }],
+          isSegs: !empty && kind === 'segs',
+          segs: kind === 'segs' ? (function (v) {
+            const p = String(v).split('/'), d = +p[0] || 0, n = +p[1] || 1;
+            const arr = []; for (let i = 0; i < n; i++) arr.push({ bg: i < d ? sk.accent : sk.trackBg });
+            return arr;
+          })(o.v) : [],
+          isRingsW: !empty && kind === 'rings', ringSize: tall ? '96px' : '62px',
+          showRingList: cols >= 3, ringList: this.RINGDATA, ringTrack: sk.trackBg,
+          hasFoot: !empty && tall,
+          footA: o.c2 && kind !== 'split' ? o.c2 : 'Updated 2m ago',
+          footB: (o.r ? o.r.length + ' items' : (o.d && kind !== 'big' ? o.d : 'Live'))
+        }));
+      });
+    });
+    return {
+      rootRef: (el) => { if (!el || this.ro) return; this.ro = new ResizeObserver((en) => { const w = Math.round(en[0].contentRect.width) + 52; if (w !== this.state.vw) this.setState({ vw: w }); }); this.ro.observe(el); },
+      sphereRef: (el) => {
+        if (!el || el.__q) return;
+        const go = () => { if (el.__q || !el.isConnected) return; if (!window.QuickSphere) return setTimeout(go, 60);
+          el.__q = this.sph = window.QuickSphere.mount(el, { mode: 'veil', bg: 'transparent', dust: [122, 148, 246], strand: [52, 97, 242], blend: 'source-over', alpha: 0.62, seed: 11, count: 9000, scale: 0.42, state: 'idle' }); };
+        go();
+      },
+      isCatalog: S.tab === 'catalog', isStates: S.tab === 'states',
+      tabs: [['catalog','Catalog','grid view'],['states','States','loading']].map(([k, l, i]) => { const on = S.tab === k; return { k, l, ico: ic(i), bg: on ? '#1e1e24' : 'transparent', fg: on ? '#f9f7f4' : '#1e1e24' }; }),
+      pickTab: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.setState({ tab: k }); try { history.replaceState(null, '', '#' + k); } catch (x) {} },
+      subline: S.tab === 'states' ? 'Six dashboard widgets across their five states. Attention adds one row; nothing else on the card moves.' : this.W.length + ' widgets in ' + Object.keys(this.CATS).length + ' categories. Each comes in S, M and L, on paper or ink, and drops into any slot on Home.',
+      gridCols: String(S.vw >= 1280 ? 12 : S.vw >= 760 ? 6 : 3),
+      rulesCols: S.vw >= 1100 ? 'repeat(4,minmax(0,1fr))' : S.vw >= 560 ? 'repeat(2,minmax(0,1fr))' : 'minmax(0,1fr)',
+      sheetRowCols: S.vw >= 1100 ? '200px minmax(0,1fr)' : 'minmax(0,1fr)',
+      sheet: this.sheet(ic),
+      shownCount: String(list.length),
+      sizeLabel: size.label + ' · ' + size.dim,
+      designLabel: S.design === 'both' ? 'paper and ink' : (S.design === 'glass' ? 'paper' : S.design),
+      sizes: this.SIZES.map(z => Object.assign({}, z, chipOn(z.id === S.size))),
+      designs: this.DESIGNS.map(d => Object.assign({}, d, chipOn(d.id === S.design))),
+      modes: this.MODES.map(m => Object.assign({}, m, chipOn(m.id === S.mode))),
+      cats: [{ id:'all', label:'All', n:this.W.length }].concat(Object.keys(this.CATS).map(k => ({ id:k, label:this.CATS[k], n:this.W.filter(w => w[1] === k).length }))).map(c => Object.assign(c, chipOn(c.id === S.cat))),
+      cards,
+      pickSize: (e) => this.setState({ size: e.currentTarget.dataset.id }),
+      pickDesign: (e) => this.setState({ design: e.currentTarget.dataset.id }),
+      pickCat: (e) => this.setState({ cat: e.currentTarget.dataset.id }),
+      pickMode: (e) => this.setState({ mode: e.currentTarget.dataset.id })
+    };
+  }
+}
+</script>
+</body>
+</html>
