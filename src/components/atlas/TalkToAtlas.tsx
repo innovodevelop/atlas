@@ -25,6 +25,8 @@ import { screenLabel } from './TopBar';
 import { STATE_COLOUR, hasVoiceOwner, publishAtlasState, requestVoice, useAtlasState, type AtlasBusState } from '@/lib/atlasStateBus';
 import { takeTalkRequest, useTalkAnchor, useTalkRequestTick } from '@/lib/talkBus';
 import { askAtlas } from '@/lib/askAtlas';
+import type { BrainCitation } from '@/lib/brainSse';
+import { setLastAnswer } from '@/lib/answerStore';
 import { useBetaNavigate } from '@/lib/viewTransitions';
 import { isRoutable } from '@/surfaces';
 
@@ -59,9 +61,11 @@ export function TalkToAtlas() {
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
   const abort = useRef<AbortController | null>(null);
+  /** The last complete answer, for the Answer screen. */
+  const lastAnswer = useRef<{ question: string; text: string; citations: BrainCitation[] } | null>(null);
   const restTimer = useRef<number | null>(null);
   const screen = screenLabel(pathname);
-  const canOpenAnswer = isRoutable('/answer-views');
+  const canOpenAnswer = isRoutable('/answer');
 
   const clearRest = () => { if (restTimer.current) { window.clearTimeout(restTimer.current); restTimer.current = null; } };
 
@@ -108,6 +112,7 @@ export function TalkToAtlas() {
       });
       if (ctrl.signal.aborted) return;
       if (!result.text) setSay('I didn’t find anything to say about that.');
+      else lastAnswer.current = { question, text: result.text, citations: result.citations };
       setAnswered(!!result.text);
       restTimer.current = window.setTimeout(() => publishAtlasState('idle', SOURCE), SPEAK_HOLD_MS);
     } catch (e) {
@@ -196,7 +201,7 @@ export function TalkToAtlas() {
           </div>
           <p className={`b-talk-say${error ? ' err' : ''}`}>{error ?? say}</p>
           {answered && canOpenAnswer ? (
-            <button type="button" className="b-talk-link" onClick={() => { hide(); navigate('/answer-views'); }}>Open the full answer →</button>
+            <button type="button" className="b-talk-link" onClick={() => { if (lastAnswer.current) setLastAnswer(lastAnswer.current); hide(); navigate('/answer'); }}>Open the full answer →</button>
           ) : null}
           {!busy && !answered ? (
             <div className="b-talk-chips">

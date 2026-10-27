@@ -35,6 +35,7 @@ export const BETA_SCREEN_LABEL: Record<string, string> = {
   '/model-lab': 'Model Lab',
   '/agent-view': 'Agent View',
   '/answer-views': 'Answers',
+  '/answer': 'Answer',
   '/onboarding': 'Welcome',
   '/permissions': 'Permissions',
   '/auth': 'Sign in',

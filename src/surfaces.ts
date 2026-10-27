@@ -164,6 +164,9 @@ export const SURFACES: readonly SurfaceMeta[] = [
   },
   { path: '/mail', label: 'Mail', icon: 'Mail', entry: 'dock', mock: false, edition: 'consumer' },
   { path: '/home', label: 'Voice home', icon: 'Mic', entry: 'menu', mock: false, edition: 'consumer' },
+  // Beta phase 3: where the Talk panel's "Open the full answer" lands. Reached
+  // by navigation only; the page sends the Workshop UI back to the admin view.
+  { path: '/answer', label: 'Answer', icon: 'Sparkles', entry: 'none', mock: false, edition: 'consumer' },
   {
     path: '/atlas-teach',
     label: 'Teach Atlas',
@@ -309,6 +312,7 @@ const CONSUMER_LOADERS: Record<string, Loader> = {
   '/atlas-core': () => import('./pages/atlas/AtlasCoreScreen'),
   '/mail': () => import('./pages/atlas/AtlasMail'),
   '/home': () => import('./pages/atlas/AtlasHome'),
+  '/answer': () => import('./pages/atlas/BetaAnswer'),
   '/atlas-teach': () => import('./pages/AtlasTeach'),
   '/smart-home': () => import('./pages/atlas/AtlasSmartHome'),
   '/health': () => import('./pages/atlas/AtlasHealth'),
