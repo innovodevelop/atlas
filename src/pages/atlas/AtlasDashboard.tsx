@@ -12,6 +12,7 @@ import { useAtlasSettings } from '@/hooks/useAtlasSettings';
 import { toVoiceSettings } from '@/lib/voiceTuning';
 import { useAgentRuns } from '@/hooks/useAgentRuns';
 import { useAtlasPresence } from '@/hooks/useAtlasPresence';
+import { onVoiceRequest, publishAtlasState } from '@/lib/atlasStateBus';
 import { presenceLabel, isVoiceActive } from '@/lib/presenceBridge';
 import { getActiveWakePhrases } from '@/lib/wakeWord';
 import { AtlasSphereCanvas } from '@/components/atlas-ui/AtlasSphereCanvas';
@@ -360,6 +361,13 @@ const AtlasDashboard = () => {
 
   // The one thing in the app allowed to be orange.
   const voiceOn = isVoiceActive(presence);
+
+  // The state bus: every sphere, the Beta top bar and the Talk panel read
+  // Atlas's state from it, and this is where the real signals (voice gateway,
+  // agent runs, mute) enter. The Talk panel's mic button asks this screen to
+  // start a turn through the same bus.
+  useEffect(() => { publishAtlasState(presence, 'presence'); }, [presence]);
+  useEffect(() => onVoiceRequest(handleManualActivate), [handleManualActivate]);
 
   // Shared with /mail. Here it opens Settings as an OVERLAY — a modal over your
   // own desk is the right feel on the dashboard, and it is what keeps the

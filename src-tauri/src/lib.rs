@@ -36,6 +36,7 @@ mod home;
 mod health;
 mod watchdog;
 mod brain;
+mod system_vitals;
 
 /// Outcome of a sidecar spawn attempt. `integrity_error` is set when the
 /// binary failed integrity verification (and was therefore NOT spawned) — it
@@ -556,6 +557,8 @@ pub fn run() {
       datafetch::fetch_weather,
       datafetch::fetch_stocks,
       datafetch::fetch_news,
+      // Battery / Wi-Fi / Bluetooth for the Beta top bar. Read-only, no secrets.
+      system_vitals::system_vitals,
       mail::mail_sync,
       mail::mail_thread_fetch,
       mail::mail_mark_read,
