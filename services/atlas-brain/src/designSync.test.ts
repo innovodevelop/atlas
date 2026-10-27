@@ -30,7 +30,7 @@ describe("parseDesignManifest", () => {
     // The current bundle (2026-10-27 Beta redesign) is in progress, and says
     // so in the parser's own vocabulary — never "complete" by default.
     expect(entries[0].status).toBe("implementing");
-    expect(entries[0].version_id).toBe("v0-3-0");
+    expect(entries[0].version_id).toBe("v0-4-0");
     expect(entries[0].surfaces.length).toBeGreaterThan(0);
     // The suite v2 port it is diffed against stays on record as shipped.
     expect(entries[1].status).toBe("complete");

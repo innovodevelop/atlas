@@ -5,7 +5,7 @@
   "sha256": "712ce9909ffefe9f1a550c5ae419594d3927f2f4075c17c23309c5adbeb748c5",
   "syncedAt": "2026-10-27T19:30:00+01:00",
   "status": "implementing",
-  "version": "v0.3.0",
+  "version": "v0.4.0",
   "plan": "docs/design-sync/2026-10-27-beta-plan.md",
   "mirrorPath": "design/current/design_handoff_atlas_beta",
   "previousPath": "design/previous/design_handoff_atlas_suite_v2",
