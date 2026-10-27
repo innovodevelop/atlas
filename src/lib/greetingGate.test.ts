@@ -83,8 +83,18 @@ describe('timeOfDay — the brain\'s boundaries, implemented on the frontend', (
     // And it is given the user's zone, not left on the device clock.
     expect(/greetingPhrase\(.*profile\?\.timezone/.test(home)).toBe(true);
 
-    const dash = await Bun.file(new URL('../pages/atlas/AtlasDashboard.tsx', import.meta.url)).text();
-    expect(dash.includes('greetingPhrase(')).toBe(true);
+    // The dashboard's greeting moved into the Home session hook when the Beta
+    // Home arrived (both Homes share it), so the authority is checked there
+    // and both pages are checked to delegate rather than greet on their own.
+    const session = await Bun.file(new URL('../hooks/useHomeSession.ts', import.meta.url)).text();
+    expect(session.includes('greetingPhrase(')).toBe(true);
+    expect(/greetingPhrase\(.*profile\?\.timezone/.test(session)).toBe(true);
+    for (const page of ['AtlasDashboard', 'BetaHome']) {
+      const src = await Bun.file(new URL(`../pages/atlas/${page}.tsx`, import.meta.url)).text();
+      expect(src.includes('useHomeSession(')).toBe(true);
+      expect(src.includes('timeOfDayGreeting')).toBe(false);
+      expect(src.includes('greetingPhrase(')).toBe(false);
+    }
   });
 
   test('the zone, not the machine, decides', () => {

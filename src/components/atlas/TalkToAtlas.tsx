@@ -12,15 +12,18 @@
  * dashboard today); the mic button asks it to start a turn through the bus
  * and is disabled when nobody is listening for that.
  *
- * Phase 2 adds the header-sphere mode: a screen that renders a band sphere
- * marks it as the talk entry point and this orb hides.
+ * Header-sphere mode (handoff `atlas-orb.js`: "uses the page's header sphere
+ * when there is one"): a screen that renders a band sphere registers it on the
+ * talk bus, this orb hides, and the panel opens beside that sphere instead.
+ * The same bus carries `openTalk(question)` from a screen's suggested asks.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { VeilSphere } from './VeilSphere';
 import { AtlasIcon } from './AtlasIcon';
 import { screenLabel } from './TopBar';
 import { STATE_COLOUR, hasVoiceOwner, publishAtlasState, requestVoice, useAtlasState, type AtlasBusState } from '@/lib/atlasStateBus';
+import { takeTalkRequest, useTalkAnchor, useTalkRequestTick } from '@/lib/talkBus';
 import { askAtlas } from '@/lib/askAtlas';
 import { useBetaNavigate } from '@/lib/viewTransitions';
 import { isRoutable } from '@/surfaces';
@@ -136,23 +139,56 @@ export function TalkToAtlas() {
 
   useEffect(() => () => { clearRest(); abort.current?.abort(); }, []);
 
+  // A screen asked for the panel (a suggested ask, the band's Join). The
+  // request is taken once, so re-renders never repeat the question.
+  const tick = useTalkRequestTick();
+  useEffect(() => {
+    if (!tick) return;
+    const req = takeTalkRequest();
+    if (!req) return;
+    show();
+    if (req.question) void ask(req.question);
+  }, [tick, show, ask]);
+
+  // Header-sphere mode: with an anchor on screen the orb hides and the panel
+  // sits beside the anchor, clamped to the window.
+  const anchor = useTalkAnchor();
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  useLayoutEffect(() => {
+    if (!open || !anchor) { setPos(null); return; }
+    const place = () => {
+      const r = anchor.getBoundingClientRect();
+      const width = 336;
+      const left = Math.max(16, Math.min(r.right + 14, window.innerWidth - width - 16));
+      const top = Math.max(76, Math.min(r.top, window.innerHeight - 420));
+      setPos({ left, top });
+    };
+    place();
+    window.addEventListener('resize', place);
+    return () => window.removeEventListener('resize', place);
+  }, [open, anchor]);
+
   const colour = STATE_COLOUR[state];
   const tipOn = state !== 'idle' && !open;
   const micOwner = hasVoiceOwner();
 
   return (
     <>
-      <button type="button" className="b-orb" aria-label="Talk to Atlas" aria-expanded={open} onClick={() => (open ? hide() : show())}>
-        <VeilSphere size="orb" bg="transparent" tone={[249, 247, 244]} alpha={0.75} scale={0.44} />
-      </button>
-      <div className={`b-orb-tip${tipOn ? ' on' : ''}`} aria-hidden="true">
-        <span className="b-orb-dot" style={{ background: colour }} />
-        <span>{state === 'idle' ? 'Talk to Atlas' : STATE_TEXT[state] ?? state}</span>
-        <kbd>⌥ Space</kbd>
-      </div>
+      {!anchor ? (
+        <>
+          <button type="button" className="b-orb" aria-label="Talk to Atlas" aria-expanded={open} onClick={() => (open ? hide() : show())}>
+            <VeilSphere size="orb" bg="transparent" tone={[249, 247, 244]} alpha={0.75} scale={0.44} />
+          </button>
+          <div className={`b-orb-tip${tipOn ? ' on' : ''}`} aria-hidden="true">
+            <span className="b-orb-dot" style={{ background: colour }} />
+            <span>{state === 'idle' ? 'Talk to Atlas' : STATE_TEXT[state] ?? state}</span>
+            <kbd>⌥ Space</kbd>
+          </div>
+        </>
+      ) : null}
 
       {open ? (
-        <div className="b-talk" role="dialog" aria-label="Talk to Atlas">
+        <div className={`b-talk${pos ? ' b-talk--anchored' : ''}`} style={pos ?? undefined} role="dialog" aria-label="Talk to Atlas">
           <div className="b-talk-stage"><VeilSphere size="panel" ink bg="#1e1e24" /></div>
           <div className="b-talk-state">
             <span className="b-orb-dot" style={{ background: colour }} />

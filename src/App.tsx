@@ -17,6 +17,8 @@ import { OnboardingGate } from "./components/OnboardingGate";
 // the desk you land on, and the consent screen a new user is sent to — so
 // neither may depend on a runtime chunk fetch that can fail in the webview.
 import AtlasDashboard from "./pages/atlas/AtlasDashboard";
+import BetaHome from "./pages/atlas/BetaHome";
+import { isBetaUi } from "./lib/betaFlag";
 import AtlasPermissions from "./pages/AtlasPermissions";
 
 // The twenty-odd `const X = lazy(() => import("./pages/…"))` lines that used to
@@ -63,7 +65,10 @@ const PageLoader = () => (
 // use instead of the lazy one, and the dashboard's first-run gate.
 const ROUTE_OVERRIDES: Readonly<Record<string, RouteOverride>> = {
   "/": {
-    Component: AtlasDashboard,
+    // The Beta Home takes the route while the beta_ui flag is on (phase 2 of
+    // the Beta redesign). Resolved once per load, like the flag itself: turning
+    // it on or off reloads the window.
+    Component: isBetaUi() ? BetaHome : AtlasDashboard,
     // Applies to `/dashboard` too — they are one entry with an alias now, so
     // the two routes cannot drift into different wrappers the way hand-written
     // duplicates could.
