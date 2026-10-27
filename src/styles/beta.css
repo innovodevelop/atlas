@@ -715,3 +715,96 @@ html[data-ui="beta"] .beta-page:has(> .b-mail) { padding-bottom: 0; }
 .b-mail-toast button { height: 30px; padding: 0 12px; border-radius: var(--b-r-pill); background: rgba(249, 247, 244, .14); color: var(--b-on-ink); font-size: 12.5px; font-weight: 600; cursor: pointer; }
 .b-mail-toast button:hover { background: rgba(249, 247, 244, .22); }
 @media (prefers-reduced-motion: reduce) { .b-mail-hero, .b-mail-card, .b-mail-sheet, .b-mail-veil, .b-mail-drawer, .b-mail-toast { animation: none; } }
+
+/* ── Phase 3: Voice, and the Core / Teach / Architecture heroes ───────────────
+   Source: Atlas Voice Beta.dc.html; the <header> of Atlas Core Beta,
+   Atlas Teach Beta and Atlas Architecture Beta. */
+
+.b-voice { display: flex; flex-direction: column; gap: var(--b-gap); padding: 14px var(--b-pad-page) 0; min-height: calc(100vh - var(--b-topbar) - 160px); }
+.b-voice-band { height: clamp(240px, 36vh, 360px); display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 22px; padding: 18px 26px 18px 8px; animation: b-pop .6s var(--b-spring) both; }
+.b-voice-text { min-width: 0; display: flex; flex-direction: column; gap: 12px; padding: 10px 0; }
+.b-voice-top { display: flex; align-items: center; gap: 10px; }
+.b-voice-sp { flex: 1; }
+.b-voice-top .b-btn kbd { font-family: inherit; font-size: 11px; font-weight: 500; color: var(--b-neutral); }
+.b-voice-chip { flex: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 11px; border-radius: var(--b-r-pill); background: var(--b-card); font-size: 12px; font-weight: 600; transition: background .3s; }
+.b-voice-chip.live { background: var(--b-emphasis); color: var(--b-blue-deep); }
+.b-voice-chip i { width: 7px; height: 7px; border-radius: 50%; }
+.b-voice-chip.live i { animation: b-pulse 1.2s ease-in-out infinite; }
+@keyframes b-pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.5); opacity: .55; } }
+.b-voice-lines { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 12px; overflow: hidden; }
+.b-voice-you { margin: 0; min-height: 21px; font-size: 14px; font-weight: 500; line-height: 1.5; color: var(--b-ink2); text-wrap: pretty; }
+.b-voice-you.empty { color: var(--b-tertiary); }
+.b-voice-reply { margin: 0; font-family: var(--b-font-display); font-size: clamp(22px, 2.4vw, 36px); font-weight: 500; letter-spacing: -.035em; line-height: 1.2; text-wrap: pretty; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.b-voice-reply.speaking { color: var(--b-blue-deep); }
+.b-voice-hint { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--b-ink2); }
+.b-voice-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.b-voice-controls .b-btn { height: 40px; padding: 0 16px 0 13px; font-weight: 600; }
+.b-btn--ink { background: var(--b-ink); color: var(--b-on-ink); }
+.b-btn--ink:hover { background: var(--b-ink-raised); }
+.b-btn--danger-fill { background: var(--b-destructive-hover); color: var(--b-red-deep); }
+.b-voice-asks { display: flex; flex-wrap: wrap; gap: 6px; }
+.b-voice-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: var(--b-gap); }
+.b-voice-session { min-height: 260px; display: flex; flex-direction: column; border-radius: var(--b-r-hero); background: var(--b-panel); padding: 16px; gap: 10px; }
+.b-voice-session-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 2px 6px; }
+.b-voice-session-head p { margin: 0; }
+.b-voice-session-head span { flex: none; white-space: nowrap; font-size: 12px; color: var(--b-ink2); }
+.b-voice-turns { flex: 1; min-height: 0; max-height: 44vh; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.b-voice-turn { display: flex; gap: 12px; padding: 12px 14px; border-radius: var(--b-r-inset); background: var(--b-page); animation: b-pop .4s var(--b-spring) both; }
+.b-voice-turn.atlas { background: var(--b-card); }
+.b-voice-turn-who { flex: none; width: 44px; font-size: 11.5px; font-weight: 600; color: var(--b-ink2); padding-top: 2px; }
+.b-voice-turn.atlas .b-voice-turn-who { color: var(--b-blue-deep); }
+.b-voice-turn p { flex: 1; min-width: 0; margin: 0; font-size: 13.5px; line-height: 1.55; text-wrap: pretty; }
+.b-voice-turn-ts { flex: none; font-size: 11px; color: var(--b-tertiary); padding-top: 3px; }
+.b-voice-none { padding: 28px 16px; border-radius: var(--b-r-inset); background: var(--b-page); text-align: center; font-size: 12.5px; line-height: 1.5; color: var(--b-ink2); }
+.b-voice-typed { display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: var(--b-r-pill); background: var(--b-card); }
+.b-voice-typed input { flex: 1; min-width: 0; height: 36px; padding: 0 12px; background: transparent; color: var(--b-ink); font-size: 13.5px; }
+.b-voice-typed .b-btn { height: 36px; }
+.b-voice-typed .b-btn:disabled { background: var(--b-panel); color: var(--b-ink2); cursor: default; }
+.b-voice-aside { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--b-gap); }
+.b-voice-card { border-radius: var(--b-r-hero); background: var(--b-card); padding: 18px; display: flex; flex-direction: column; gap: 6px; }
+.b-voice-card-head { padding: 2px 4px 8px; }
+.b-voice-card-head p { margin: 0; }
+.b-voice-card-head p + p { margin-top: 3px; font-size: 12.5px; line-height: 1.5; color: var(--b-ink2); }
+.b-voice-ctx { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--b-r-row); background: var(--b-page); font-size: 13px; line-height: 1.4; }
+.b-voice-ctx > span:last-child { flex: 1; min-width: 0; }
+.b-voice-tag { flex: none; height: 22px; padding: 0 8px; display: inline-flex; align-items: center; border-radius: var(--b-r-pill); background: var(--b-emphasis); color: var(--b-blue-deep); font-size: 10.5px; font-weight: 600; }
+.b-voice-route { margin: 6px 4px 0; font-size: 12px; line-height: 1.5; color: var(--b-ink2); }
+.b-link { padding: 0; background: none; color: var(--b-blue); font: inherit; font-weight: 600; cursor: pointer; }
+.b-link:hover { color: var(--b-blue-deep); }
+@media (max-width: 1000px) { .b-voice-body { grid-template-columns: minmax(0, 1fr); } .b-voice-band { height: auto; min-height: 240px; } }
+
+/* Screen heroes */
+.b-hero { position: relative; flex: none; border-radius: 36px; background: var(--b-panel); color: var(--b-ink); padding: clamp(22px, 3vw, 40px); display: flex; flex-wrap: wrap; align-items: center; gap: 28px; overflow: hidden; margin: 14px var(--b-pad-page) 0; box-sizing: border-box; animation: b-pop .6s var(--b-spring) both; }
+.b-hero--core { background: var(--b-ink); color: var(--b-on-ink); }
+.b-hero--teach { gap: 32px; }
+.b-hero--arch { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); }
+.b-hero-back { position: absolute; right: 18px; top: 18px; z-index: 2; height: 34px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; border-radius: var(--b-r-pill); background: var(--b-card); color: var(--b-ink); font-size: 12.5px; font-weight: 600; cursor: pointer; transition: background .2s; }
+.b-hero-back:hover { background: var(--b-hover); }
+.b-hero-back--ink { background: rgba(249, 247, 244, .1); color: var(--b-on-ink); }
+.b-hero-back--ink:hover { background: rgba(249, 247, 244, .18); }
+.b-hero-text { flex: 1; min-width: 260px; display: flex; flex-direction: column; gap: 10px; }
+.b-hero-h1 { margin: 0; font-family: var(--b-font-display); font-size: clamp(40px, 5vw, 76px); font-weight: 500; letter-spacing: -.055em; line-height: .95; }
+.b-hero--core .b-hero-h1 { font-size: clamp(44px, 5.6vw, 84px); line-height: .92; }
+.b-hero-h1--balance { text-wrap: balance; }
+.b-hero-intro { margin: 0; max-width: 620px; font-size: 15.5px; line-height: 1.55; color: var(--b-ink2); text-wrap: pretty; }
+.b-hero--core .b-hero-intro { color: var(--b-on-ink-body); }
+.b-orbit { position: relative; width: 220px; height: 220px; flex: none; }
+.b-orbit-rings { position: absolute; inset: 0; width: 100%; height: 100%; animation: b-spin 60s linear infinite; }
+@keyframes b-spin { to { transform: rotate(360deg); } }
+.b-orbit-sphere { position: absolute; inset: 30px; }
+.b-hero-mic { position: relative; width: 200px; height: 200px; flex: none; border-radius: 50%; background: transparent; cursor: pointer; padding: 0; }
+.b-hero-mic > :first-child { position: absolute; inset: 0; }
+.b-hero-mic-label { position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%); height: 30px; padding: 0 12px; display: flex; align-items: center; border-radius: var(--b-r-pill); background: var(--b-ink); color: var(--b-on-ink); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.b-hero-live { display: flex; align-items: center; gap: 8px; }
+.b-hero-live i { width: 7px; height: 7px; border-radius: 50%; background: var(--b-green); }
+.b-stack { position: relative; height: 250px; perspective: 900px; }
+.b-stack-sphere { position: absolute; left: 50%; top: 0; width: 110px; height: 110px; transform: translateX(-50%); z-index: 3; }
+.b-stack-layers { position: absolute; left: 8%; right: 8%; top: 92px; bottom: 0; transform: rotateX(52deg); transform-origin: 50% 0; display: flex; flex-direction: column; gap: 6px; }
+.b-stack-layer { flex: 1; border-radius: var(--b-r-small); display: flex; align-items: center; padding: 0 14px; font-size: 11px; font-weight: 600; background: var(--b-card); color: var(--b-ink); }
+.b-stack-layer--blue { background: var(--b-blue); color: #fff; }
+.b-stack-layer--blue-soft { background: #7f9bf7; color: var(--b-ink); }
+.b-stack-layer--sand { background: #e3dbd0; }
+.b-stack-layer--ink { background: var(--b-ink); color: var(--b-on-ink); }
+/* The Workshop headers the heroes replace, and the Core orb the hero's lab already shows. */
+html[data-ui="beta"] .corehead, html[data-ui="beta"] .coreorb { display: none; }
+@media (prefers-reduced-motion: reduce) { .b-orbit-rings, .b-voice-chip.live i, .b-hero, .b-voice-band, .b-voice-turn { animation: none; } }

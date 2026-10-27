@@ -9,6 +9,8 @@ import { getToken } from '@/lib/authClient';
 import { getBrainEndpoint } from '@/lib/brainClient';
 import { useToast } from '@/hooks/use-toast';
 import { AtlasSphereCanvas } from '@/components/atlas-ui/AtlasSphereCanvas';
+import { isBetaUi } from '@/lib/betaFlag';
+import { TeachHero } from '@/components/atlas/BetaScreenHero';
 
 /**
  * Registration data. Mirrored in `src/surfaces.ts`, which is what the router,
@@ -507,6 +509,18 @@ const AtlasTeach = () => {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
+      {/* Beta phase 3: the sphere-as-microphone hero above the same body. The
+          sphere is the mic button this page already has (handleMicClick). */}
+      {isBetaUi() ? (
+        <TeachHero
+          eyebrow={`Teach · ${memories.length} ${memories.length === 1 ? 'thing' : 'things'} kept${isConnected ? ' · listening' : ''}`}
+          title="Tell Atlas who you are."
+          intro="It listens for the durable things, like values, people and plans, and shows you everything it keeps. Tap the sphere and start talking."
+          micLabel={!isConnected ? 'Tap to talk' : isProcessing ? 'Thinking…' : listeningMode === 'active' ? 'Listening · tap to stop' : 'Waiting for “Hey Atlas”'}
+          state={atlasState === 'dormant' ? 'idle' : atlasState}
+          onTapSphere={handleMicClick}
+        />
+      ) : null}
       {/* Voice Status Header */}
       <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
         <motion.div

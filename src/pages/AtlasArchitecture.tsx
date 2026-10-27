@@ -9,6 +9,8 @@
  import MemoryArchitectureSection from '@/components/architecture/MemoryArchitectureSection';
  import LearningPipelineSection from '@/components/architecture/LearningPipelineSection';
  import SphereDocumentation from '@/components/architecture/SphereDocumentation';
+ import { isBetaUi } from '@/lib/betaFlag';
+ import { ArchitectureHero } from '@/components/atlas/BetaScreenHero';
 
 /**
  * Registration data. Mirrored in `src/surfaces.ts`, which is what the router,
@@ -48,7 +50,23 @@ export const surface = {
        {/* Background gradient */}
        <div className="fixed inset-0 bg-gradient-to-br from-background via-background to-primary/5 pointer-events-none" />
        
-       {/* Header */}
+       {/* Header — or, while the beta_ui flag is on, the Beta's isometric
+           layer-stack hero (phase 3) above the same body. */}
+       {isBetaUi() ? (
+         <ArchitectureHero
+           eyebrow="Running on this Mac · local first"
+           title="How Atlas works"
+           intro="A plain account of where your words go, what stays on this Mac, and what doesn’t."
+           layers={[
+             { label: 'You · voice and screen', tone: 'blue' },
+             { label: 'Wake word · on device', tone: 'blue-soft' },
+             { label: 'Agent and limits', tone: 'paper' },
+             { label: 'Memory · on this Mac', tone: 'paper' },
+             { label: 'Connections', tone: 'sand' },
+             { label: 'Reasoning model · remote', tone: 'ink' },
+           ]}
+         />
+       ) : (
        <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border/30">
          <div className="max-w-7xl mx-auto px-4 py-4">
            <div className="flex items-center justify-between">
@@ -63,7 +81,7 @@ export const surface = {
                <div className="h-4 w-px bg-border/50" />
                <h1 className="text-lg font-semibold">Atlas Architecture</h1>
              </div>
-             <Link 
+             <Link
                to="/atlas-core"
                className="text-sm text-muted-foreground hover:text-primary transition-colors"
              >
@@ -72,7 +90,8 @@ export const surface = {
            </div>
          </div>
        </header>
- 
+       )}
+
        <main className="relative max-w-7xl mx-auto px-4 py-8">
          {/* Hero Section */}
          <motion.div 

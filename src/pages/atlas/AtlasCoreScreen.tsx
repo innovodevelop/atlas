@@ -12,6 +12,8 @@ import { useAtlasKnowledge } from '@/hooks/useAtlasKnowledge';
 import { useAtlasResearch } from '@/hooks/useAtlasResearch';
 import { errorSeverityGlyph, useAtlasErrorLog } from '@/hooks/useAtlasErrorLog';
 import { EDITION, surfaceByPath } from '@/surfaces';
+import { isBetaUi } from '@/lib/betaFlag';
+import { CoreHero } from '@/components/atlas/BetaScreenHero';
 
 /**
  * Registration data. Mirrored in `src/surfaces.ts`, which is what the router,
@@ -84,6 +86,16 @@ const AtlasCoreScreen = () => {
   return (
     <div className="overlay" data-screen-label="Atlas — Atlas Core">
       <div className="ovwash" />
+      {/* Beta phase 3: the ink orbit-lab hero replaces the header and the orb
+          below (both hidden by beta.css while the flag is on); the body stays. */}
+      {isBetaUi() ? (
+        <CoreHero
+          eyebrow={`Atlas Core · ${(stats?.knowledgeCount ?? 0).toLocaleString()} known · ${stats?.activeResearch ?? 0} researching`}
+          title="Core"
+          intro="What Atlas knows, what it is researching, and how well it is running. All of it on this Mac; none of it leaves without you."
+          state={(stats?.activeResearch ?? 0) > 0 ? 'working' : 'idle'}
+        />
+      ) : null}
       <header className="corehead">
         <Button variant="text" icon={<ArrowLeft className="i16" />} onClick={() => navigate('/')}>Back to Dashboard</Button>
         <div className="fx ac gap12">
