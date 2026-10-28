@@ -5,8 +5,9 @@
  * Stage band first: the sphere, the greeting, the day's context, three asks,
  * and the next event with its two actions. Under it the user's widgets on
  * the six-column grid, packed to the rows this window has. Edit Home swaps
- * the page for the editor; a widget's full view takes the grid's place with
- * the band still above it.
+ * the page for the editor; a widget's full view takes the whole page, as the
+ * widget screens in the design do. The band stays mounted but hidden there,
+ * so its sphere sleeps instead of starting over on the way back.
  *
  * Shares the voice loop, greeting gate and presence with the Workshop
  * dashboard through `useHomeSession`, and the layout table through
@@ -48,6 +49,8 @@ const BetaHome = () => {
   const bandRef = useRef<HTMLDivElement | null>(null);
   const [rows, setRows] = useState(3);
   useLayoutEffect(() => {
+    // The band is hidden under a full view, so there is nothing to measure.
+    if (expanded) return;
     const measure = () => {
       const band = bandRef.current?.getBoundingClientRect().height ?? 260;
       setRows(Math.max(1, stageRowCount(window.innerHeight, band)));
@@ -55,7 +58,7 @@ const BetaHome = () => {
     measure();
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
-  }, [layout]);
+  }, [layout, expanded]);
 
   // Esc leaves the full view (the Talk panel captures its own Esc first).
   useEffect(() => {
@@ -101,7 +104,7 @@ const BetaHome = () => {
 
   return (
     <div className={`b-home b-home--${layout}${settings.labels === 'On hover' ? ' b-home--hoverlabels' : ''}`} data-screen-label="Beta — Home">
-      <div ref={bandRef}>
+      <div ref={bandRef} hidden={expanded !== null}>
         <StageBand
           session={session}
           needsYou={needsYou}
