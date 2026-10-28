@@ -58,6 +58,14 @@ export interface NowPlaying {
    */
   positionMs: number;
   deviceName: string | null;
+  /**
+   * True once Atlas's own engine has played this track to its end and has
+   * nothing after it (`EndOfTrack` with the one-element Rust queue exhausted).
+   * It is what lets a surface with its own queue hand the engine the next
+   * track; cleared by the next load or the next position the engine reports.
+   * Always false for a snapshot of another device, whose end Atlas never sees.
+   */
+  ended: boolean;
 }
 
 export interface SearchResults {
@@ -246,6 +254,15 @@ const clearAnchor = (): void => { anchorState = { ms: 0, at: 0, playing: false, 
 const REMOTE_LEAD_MS = 12000;
 
 /**
+ * How close to its duration the engine clock must stand for a null-position
+ * `is_playing:false` push to count as EndOfTrack rather than a TrackChanged.
+ * The engine re-anchors every 500 ms while playing, so the clock is never
+ * more than that behind when the track runs out; a freshly loaded track sits
+ * at zero. Four times the push interval leaves room for a slow frame.
+ */
+const END_WINDOW_MS = 2000;
+
+/**
  * Live position in ms. Safe to call every animation frame — it reads a module
  * value and does arithmetic; it never touches state, so it cannot cause a
  * render.
@@ -321,6 +338,7 @@ async function refreshNowPlaying(): Promise<void> {
         isPlaying: !!raw.is_playing,
         positionMs: raw.progress_ms ?? 0,
         deviceName: raw.device?.name ?? null,
+        ended: false,
       },
     });
     // Restart the chain from this sync, at the cadence the answer implies: the
@@ -521,19 +539,34 @@ async function seek(positionMs: number): Promise<void> {
  * still-pending call; that listener's `refreshNowPlaying()` must already see
  * that Atlas owns the audio, or it pulls `/me/player` and nulls the track that
  * is about to start.
+ *
+ * `track` is the record being loaded, when it is not the one already showing.
+ * The engine's TrackChanged carries no metadata and the listener deliberately
+ * does not pull any while Atlas is decoding (`/me/player` cannot see Atlas),
+ * so a caller queuing a DIFFERENT track must say which one, or the title and
+ * artwork on every surface would stay on the previous record for the whole
+ * play. The one existing caller — pressing play on the track already showing
+ * — leaves it out.
  */
-async function load(uri: string): Promise<void> {
+async function load(uri: string, track?: Track): Promise<void> {
   const wasUri = engineUri;
   const wasPlaying = enginePlaying;
+  const wasNowPlaying = snapshot.nowPlaying;
   engineUri = uri;
   enginePlaying = true;
   // `player.load(uri, start_playing = true, 0)` — loading starts playback.
   anchor(0, true, true);
+  if (track) {
+    patch({ nowPlaying: { track, isPlaying: true, positionMs: 0, deviceName: null, ended: false } });
+  } else if (wasNowPlaying?.ended) {
+    patch({ nowPlaying: { ...wasNowPlaying, isPlaying: true, positionMs: 0, ended: false } });
+  }
   try {
     await cmd('music_load', { uri });
   } catch (e) {
     engineUri = wasUri;
     enginePlaying = wasPlaying;
+    if (track || wasNowPlaying?.ended) patch({ nowPlaying: wasNowPlaying });
     throw e;
   }
 }
@@ -618,6 +651,21 @@ function startBridge(): void {
         enginePlaying = playing;
         const pos = p && typeof p.position_ms === 'number' ? p.position_ms : null;
         if (pos == null) {
+          // A null position is either TrackChanged or EndOfTrack; the engine
+          // emits `(false, None)` for both — TrackChanged right after a load,
+          // before its Playing event, and EndOfTrack once the one-element
+          // queue is spent. The clock tells them apart: `load()` has just
+          // anchored a fresh track at zero, while a track that ran out is
+          // within a push interval of its duration. Without this the record
+          // kept saying "playing" after the audio stopped, and nothing could
+          // queue what comes next.
+          const cur = snapshot.nowPlaying;
+          const dur = cur?.track?.durationMs ?? 0;
+          if (!playing && cur && dur > 0 && readPosition() >= dur - END_WINDOW_MS) {
+            anchor(dur, false, true);
+            patch({ nowPlaying: { ...cur, isPlaying: false, positionMs: dur, ended: true } });
+            return;
+          }
           // TrackChanged. `refreshNowPlaying` no-ops while the engine is
           // decoding, which is right: the only thing librespot can have loaded
           // is the URI Atlas handed it, and Atlas already has that metadata.
@@ -628,7 +676,7 @@ function startBridge(): void {
         }
         anchor(pos, playing, true);
         const cur = snapshot.nowPlaying;
-        if (cur) patch({ nowPlaying: { ...cur, isPlaying: playing, positionMs: pos } });
+        if (cur) patch({ nowPlaying: { ...cur, isPlaying: playing, positionMs: pos, ended: false } });
       }),
       // Per-frame audio energy for the Sphere — write the ref, no re-render.
       listen<AudioLevel>('music:level', (e) => {
