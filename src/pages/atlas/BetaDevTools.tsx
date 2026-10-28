@@ -185,7 +185,7 @@ function TestsView({ open, onOpen, now }: ViewProps) {
           <b>{busyAny ? '…' : totals ? totals.fail.toLocaleString('en-US') : kpis.failing}{!busyAny && totals && kpis.failing ? <small>· {kpis.failing} {kpis.failing === 1 ? 'job' : 'jobs'} failed</small> : null}</b>
         </div>
         <div className="b-dt-kpi" title={coverage?.detail ?? 'Measured by bun test --coverage when the frontend or atlas-brain job runs'}>
-          <span>Coverage</span>
+          <span>{coverage ? coverage.label : 'Coverage'}</span>
           <b>{coverage ? coverage.value : '—'}{coverage ? <small>{coverage.of}</small> : null}</b>
         </div>
         <div className="b-dt-kpi"><span>Last run</span><b className="b-dt-kpi-time">{busyAny ? 'now' : lastRun}</b></div>

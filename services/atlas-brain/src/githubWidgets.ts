@@ -15,7 +15,14 @@
 
 import { PLAN_REPO, ghBinary } from "./planSync.ts";
 
-const COMMAND_TIMEOUT_MS = 20_000;
+/**
+ * How long one gh call may take. The webview gives up on an admin request
+ * after 8 s (useAdminApi.ts, BRAIN_TIMEOUT_MS), and each route runs its gh
+ * calls side by side, so the brain always answers first: a slow or stalled
+ * GitHub reads as "GitHub could not be reached", the honest offline row,
+ * rather than the webview's own "brain not answering".
+ */
+export const COMMAND_TIMEOUT_MS = 6_000;
 const CACHE_MS = 60_000;
 const PULLS_LIMIT = 20;
 const RUNS_LIMIT = 20;
@@ -32,20 +39,42 @@ export interface GhResult {
 }
 export type GhRunner = (argv: string[]) => Promise<GhResult>;
 
-export const bunGhRunner: GhRunner = async (argv) => {
-  try {
-    const proc = Bun.spawn(argv, { stdout: "pipe", stderr: "pipe", timeout: COMMAND_TIMEOUT_MS });
-    const [stdout, stderr, code] = await Promise.all([
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-      proc.exited,
-    ]);
-    return { code, stdout, stderr };
-  } catch (err) {
-    // Spawning itself failed: the binary is not there.
-    return { code: -1, stdout: "", stderr: String(err) };
-  }
-};
+/** The runner's code for a gh that did not finish within the deadline and was stopped. */
+export const TIMED_OUT = -2;
+
+/**
+ * Runs gh with a hard deadline. The deadline is a timer raced against gh's
+ * output rather than Bun.spawn's own `timeout`, so it holds even if something
+ * gh started keeps its pipes open after gh itself is killed.
+ */
+export function makeGhRunner(timeoutMs = COMMAND_TIMEOUT_MS): GhRunner {
+  return async (argv) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const proc = Bun.spawn(argv, { stdin: "ignore", stdout: "pipe", stderr: "pipe" });
+      const finished = Promise.all([
+        new Response(proc.stdout).text(),
+        new Response(proc.stderr).text(),
+        proc.exited,
+      ]).then(([stdout, stderr, code]): GhResult => ({ code, stdout, stderr }));
+      const deadline = new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), timeoutMs);
+      });
+      const result = await Promise.race([finished, deadline]);
+      if (result) return result;
+      proc.kill();
+      const s = timeoutMs / 1000;
+      return { code: TIMED_OUT, stdout: "", stderr: `gh did not answer within ${s} ${s === 1 ? "second" : "seconds"}` };
+    } catch (err) {
+      // Spawning itself failed: the binary is not there.
+      return { code: -1, stdout: "", stderr: String(err) };
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+}
+
+export const bunGhRunner: GhRunner = makeGhRunner();
 
 // ---------------------------------------------------------------------------
 // What went wrong, in words
@@ -274,11 +303,15 @@ export function createGithubWidgets({ run = bunGhRunner, gh = ghBinary(), repo =
 
   const fail = (r: GhResult): Failure => ({ ok: false, repo, checkedAt: now().toISOString(), ...ghProblem(r) });
 
+  // The list and the viewer are asked side by side, so the route takes one
+  // gh call's time at most (COMMAND_TIMEOUT_MS), never two in a row.
   const pulls = cached<PullsReport>(cacheMs, now, async () => {
-    const r = await run([gh, "pr", "list", "--repo", repo, "--state", "open", "--limit", String(PULLS_LIMIT),
-      "--json", "number,title,url,isDraft,reviewDecision,author,headRefName,baseRefName,createdAt,updatedAt,reviewRequests"]);
+    const [r, who] = await Promise.all([
+      run([gh, "pr", "list", "--repo", repo, "--state", "open", "--limit", String(PULLS_LIMIT),
+        "--json", "number,title,url,isDraft,reviewDecision,author,headRefName,baseRefName,createdAt,updatedAt,reviewRequests"]),
+      whoAmI(),
+    ]);
     if (r.code !== 0) return fail(r);
-    const who = await whoAmI();
     return { ok: true, repo, checkedAt: now().toISOString(), viewer: who, pulls: parsePulls(parseJson(r.stdout), who) };
   });
 

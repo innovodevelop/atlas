@@ -155,9 +155,20 @@ describe('test reports (rows 81 and 82)', () => {
   });
 
   test('coverage: the app’s own job first, its newest run, named', () => {
-    expect(coverageTile(groups())).toEqual({ value: '56%', of: 'lines', job: 'frontend', detail: 'frontend, last run: 56.08% of lines · 45.67% of functions · 138 source files' });
+    expect(coverageTile(groups())).toEqual({ value: '56%', of: 'lines', job: 'frontend', label: 'Coverage', detail: 'frontend, last run: 56.08% of lines · 45.67% of functions · 138 source files' });
+    // Only atlas-brain has a report: its figure, and its name where it shows, not only on hover.
     const brainOnly = groups().filter((g) => g.job !== 'frontend');
-    expect(coverageTile(brainOnly)).toMatchObject({ value: '72%', job: 'atlas-brain' });
+    expect(coverageTile(brainOnly)).toMatchObject({ value: '72%', job: 'atlas-brain', label: 'Coverage · atlas-brain' });
+    // The frontend job is there but its newest run printed no report: the
+    // brain's figure is shown, and the heading says so.
+    const frontNoReport = groupSuites([
+      suite({ id: 'f', ci_job: 'frontend', last_status: 'failed', last_run_at: minsAgo(2) }),
+      suite({ id: 'b', ci_job: 'atlas-brain', last_status: 'passed', last_run_at: minsAgo(9) }),
+    ], [
+      run({ id: 'r1', suite_id: 'f', run_at: minsAgo(2), status: 'failed', report: null }),
+      run({ id: 'r2', suite_id: 'b', run_at: minsAgo(9), report: brainReport }),
+    ], NOW);
+    expect(coverageTile(frontNoReport)).toMatchObject({ value: '72%', job: 'atlas-brain', label: 'Coverage · atlas-brain' });
     expect(coverageTile(groupSuites([suite({ id: 'x' })], [], NOW))).toBeNull();
     expect(coverageLine({ lines: null, funcs: 50, files: 1 })).toBe('50% of functions · 1 source file');
   });

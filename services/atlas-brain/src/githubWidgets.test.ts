@@ -1,7 +1,13 @@
 // The developer widgets' GitHub reads, against what gh 2.86 really returned
 // for innovodevelop/atlas on 2026-10-28 (abridged), with gh itself faked.
 import { describe, expect, test } from "bun:test";
-import { createGithubWidgets, ghProblem, parsePulls, parseReleases, parseRuns, runState, type GhResult, type GhRunner } from "./githubWidgets.ts";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+  COMMAND_TIMEOUT_MS, TIMED_OUT, createGithubWidgets, ghProblem, makeGhRunner, parsePulls, parseReleases, parseRuns, runState,
+  type GhResult, type GhRunner,
+} from "./githubWidgets.ts";
 
 const PR_LIST = JSON.stringify([
   { author: { id: "U_kgDOBrGpLg", is_bot: false, login: "innovodevelop", name: "Magnus Pilegaard" }, baseRefName: "atlas-redesign", createdAt: "2026-10-27T19:45:07Z", headRefName: "ws-beta-redesign", isDraft: false, number: 6, reviewDecision: "", reviewRequests: [], title: "Beta redesign, phase 1: the shell (tokens, veil sphere, icons, top bar, dock, Talk to Atlas, transitions)", updatedAt: "2026-10-28T15:42:50Z", url: "https://github.com/innovodevelop/atlas/pull/6" },
@@ -64,6 +70,40 @@ describe("what went wrong, in words", () => {
     expect(ghProblem({ code: 4, stdout: "", stderr: "To get started with GitHub CLI, please run:  gh auth login" }).problem).toBe("signed-out");
     const off = ghProblem({ code: 1, stdout: "", stderr: "error connecting to api.github.com\ncheck your internet connection" });
     expect(off).toEqual({ problem: "unreachable", message: "GitHub could not be reached: error connecting to api.github.com" });
+    // A gh stopped at the deadline is GitHub not answering, not a dormant widget.
+    expect(ghProblem({ code: TIMED_OUT, stdout: "", stderr: "gh did not answer within 6 seconds" })).toEqual({
+      problem: "unreachable",
+      message: "GitHub could not be reached: gh did not answer within 6 seconds",
+    });
+  });
+});
+
+describe("the deadline", () => {
+  test("the brain answers before the webview gives up on it", () => {
+    // useAdminApi.ts aborts every admin request after BRAIN_TIMEOUT_MS. The
+    // routes run their gh calls side by side, so one call's deadline is the
+    // route's; it must leave room under the webview's, or the widget says
+    // "brain not answering" when GitHub is what is slow. Read as text: the
+    // two numbers live in two packages with nothing else holding them together.
+    const hook = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../../../src/hooks/useAdminApi.ts"), "utf8");
+    const m = hook.match(/const BRAIN_TIMEOUT_MS = ([\d_]+);/);
+    expect(m).not.toBeNull();
+    const webview = Number(m![1].replaceAll("_", ""));
+    expect(COMMAND_TIMEOUT_MS + 1_000).toBeLessThanOrEqual(webview);
+  });
+
+  test("a gh that does not finish is stopped at the deadline and reads as unreachable", async () => {
+    const started = Date.now();
+    const r = await makeGhRunner(150)(["sleep", "5"]);
+    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(r.code).toBe(TIMED_OUT);
+    expect(ghProblem(r).problem).toBe("unreachable");
+  });
+
+  test("a gh that finishes in time answers as it is; a missing one is missing", async () => {
+    expect(await makeGhRunner(5_000)(["echo", "innovodevelop"])).toEqual({ code: 0, stdout: "innovodevelop\n", stderr: "" });
+    const none = await makeGhRunner(5_000)(["/nonexistent/gh", "pr", "list"]);
+    expect(ghProblem(none).problem).toBe("missing");
   });
 });
 
@@ -98,6 +138,30 @@ describe("createGithubWidgets", () => {
     await w.pulls();
     expect(calls.filter((c) => c.includes("pr")).length).toBe(2);
     expect(calls.filter((c) => c.includes("user")).length).toBe(1);
+  });
+
+  test("pulls: the list and the viewer are asked side by side, and a viewer that times out leaves the list standing", async () => {
+    const started: string[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((r) => { release = r; });
+    const run: GhRunner = async (argv) => {
+      started.push(argv.slice(1, 3).join(" "));
+      await gate;
+      return argv.includes("user") ? { code: TIMED_OUT, stdout: "", stderr: "gh did not answer within 6 seconds" } : ok(PR_LIST);
+    };
+    const pending = createGithubWidgets({ run, gh: "gh" }).pulls();
+    await Promise.resolve();
+    // Both are under way before either answers: the route waits for one deadline, not two.
+    expect(started).toEqual(["pr list", "api user"]);
+    release();
+    const r = await pending;
+    expect(r).toMatchObject({ ok: true, viewer: null });
+    expect(r.ok && r.pulls).toHaveLength(4);
+  });
+
+  test("pulls: a list that times out is the unreachable answer", async () => {
+    const run: GhRunner = async () => ({ code: TIMED_OUT, stdout: "", stderr: "gh did not answer within 6 seconds" });
+    expect(await createGithubWidgets({ run, gh: "gh", repo: "innovodevelop/atlas" }).pulls()).toMatchObject({ ok: false, problem: "unreachable", repo: "innovodevelop/atlas" });
   });
 
   test("callers at the same moment share one fetch", async () => {

@@ -350,13 +350,20 @@ export interface CoverageTile {
   /** What the figure is a share of: lines, or functions when Bun printed no line figure. */
   of: 'lines' | 'functions';
   job: string;
+  /**
+   * The tile's visible heading: "Coverage" for the default job's figure, and
+   * "Coverage · atlas-brain" when it is another job's, so a figure for a
+   * different source tree never sits under the same bare word.
+   */
+  label: string;
   detail: string;
 }
 
 /**
  * The Coverage tile. Each job measures its own tree, and percentages of two
  * trees do not add up, so the tile shows one job's figure and names it: the
- * default job's (the app's own gate) when it has one, else the first that does.
+ * default job's (the app's own gate) when it has one, else the first that
+ * does, with that job's name in the heading.
  */
 export function coverageTile(groups: readonly JobGroup[]): CoverageTile | null {
   const ordered = [...groups].sort((a, b) => (a.job === DEFAULT_JOB ? -1 : b.job === DEFAULT_JOB ? 1 : 0));
@@ -365,7 +372,13 @@ export function coverageTile(groups: readonly JobGroup[]): CoverageTile | null {
     if (!c) continue;
     const figure = c.lines ?? c.funcs;
     if (figure == null) continue;
-    return { value: `${Math.round(figure)}%`, of: c.lines != null ? 'lines' : 'functions', job: g.job, detail: `${g.job}, last run: ${coverageLine(c)}` };
+    return {
+      value: `${Math.round(figure)}%`,
+      of: c.lines != null ? 'lines' : 'functions',
+      job: g.job,
+      label: g.job === DEFAULT_JOB ? 'Coverage' : `Coverage · ${g.job}`,
+      detail: `${g.job}, last run: ${coverageLine(c)}`,
+    };
   }
   return null;
 }

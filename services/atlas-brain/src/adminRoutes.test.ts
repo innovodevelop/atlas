@@ -69,6 +69,18 @@ describe("the admin route table", () => {
     expect(unrouted).toEqual([]);
   });
 
+  test("every async handler is awaited inside the dispatch's try", () => {
+    // `return admin.x(req)` of a promise leaves the try before the promise
+    // settles, so a rejected requireUser skips the catch that answers 401/403
+    // with CORS headers; Bun serves its own 500 page instead and the webview
+    // reports the brain as not answering. Awaiting keeps the rejection inside.
+    const handlers = new Set(exportedHandlers());
+    const asyncHandlers = [...adminSource.matchAll(/async function ([a-zA-Z0-9]+)\(/g)].map((m) => m[1]).filter((h) => handlers.has(h));
+    expect(asyncHandlers).toContain("getGithubPulls");
+    const bare = asyncHandlers.filter((h) => !indexSource.includes(`return await admin.${h}(`));
+    expect(bare).toEqual([]);
+  });
+
   test("every admin path index.ts dispatches is under /admin/", () => {
     // A stray admin handler mounted on an unprefixed path would sit outside
     // whatever coarse gating the prefix earns it later.
