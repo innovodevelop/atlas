@@ -12,15 +12,30 @@
  * the overdue task, the meeting about to start, the last mail sync — and the
  * caller's `previewCopy` fills the rest. With `preview` undefined nothing
  * here runs and Home draws exactly what it drew before.
+ *
+ * `autoState` (Home only) lets a widget switch faces on its own: each live
+ * adapter hands Card a `live` reading — its loading, offline and attention
+ * detectors from betaWidgetCatalog.ts, the same ones the sheet previews — and
+ * Card draws the face that reading calls for (`liveFaceState`). The catalog,
+ * the sheet and Edit Home do not pass it, so they draw what they always drew.
  */
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { WidgetFace, type FacePreview, type FacePreviewCopy, type FaceProps, type FaceRow, type FaceTone } from './WidgetFace';
 import { AtlasIcon } from '../AtlasIcon';
 import { WIDGET_BY_ID, type WidgetSize } from '@/lib/betaHome';
 import {
-  briefingAttention, inboxAttention, mailOffline, tasksAttention, todayAttention, watchAttention, weatherAttention,
-  type AttentionCopy,
+  briefingAttention, inboxAttention, inboxOffline, liveFaceState, mailOffline, networkOffline, tasksAttention, todayAttention,
+  watchAttention, weatherAttention,
+  type AttentionCopy, type LiveReading,
 } from '@/lib/betaWidgetCatalog';
+import { seenAt } from '@/lib/dataAge';
+import { useWatchlist } from '@/hooks/useWatchlist';
+import { feelsLine, upNextEvents, upNextWhen, withLine } from '@/lib/betaViews';
+import { shortTitle } from '@/lib/stageFocus';
+import { useCurrency } from '@/hooks/useCurrency';
+import { currencyName, fmtMoney, monthMove, rateDateLabel } from '@/lib/betaCurrency';
+import { startFocus, useFocus } from '@/lib/focusGate';
+import { dayStats, fmtClock, fmtFocusMinutes, heldLabel, isRunning, leftMs, progress } from '@/lib/betaFocus';
 import { openExternal } from '@/components/atlas-ui/answerViews/openExternal';
 import { useWeather } from '@/hooks/useWeather';
 import { useCalendarEvents } from '@/hooks/useCalendarEvents';
@@ -38,7 +53,7 @@ import { useClockPrefs } from '@/lib/betaClockStore';
 // loads this file is lazy, so Home must not count on it having arrived.
 import '@/styles/beta/clock.css';
 import { citiesMeta, countdownFace, countdownTickMs, dialCount, dials, elsewhere } from '@/lib/betaClockWidgets';
-import { WATCHLIST, fmtPct } from '@/pages/atlas/atlasHelpers';
+import { fmtPct } from '@/pages/atlas/atlasHelpers';
 import { eventTime, focusEvent, focusIn, thenEvents, todaysEvents } from '@/lib/stageFocus';
 
 export interface WidgetProps {
@@ -52,20 +67,39 @@ export interface WidgetProps {
   preview?: FacePreview;
   /** The copy for that state the widget cannot read for itself (empty copy and its action, idle attention, offline). */
   previewCopy?: FacePreviewCopy;
+  /** Home: switch into the loading, offline and attention faces when the widget's own reading calls for them. */
+  autoState?: boolean;
 }
 
-/** `previewCopy` here is the adapter's live part; the caller's copy fills what it leaves out. */
-type Face = Omit<FaceProps, 'size' | 'delay' | 'onOpen' | 'preview'>;
+/**
+ * `previewCopy` here is the adapter's live part; the caller's copy fills what
+ * it leaves out. `live` is the adapter's own reading, for `autoState`.
+ */
+type Face = Omit<FaceProps, 'size' | 'delay' | 'onOpen' | 'preview'> & { live?: LiveReading };
 
-function Card({ p, face, tone }: { p: WidgetProps; face: Face; tone?: FaceTone }) {
+function Card({ p, face: withLive, tone }: { p: WidgetProps; face: Face; tone?: FaceTone }) {
+  const { live, ...face } = withLive;
+  const auto = !p.preview && p.autoState && live ? liveFaceState(live) : undefined;
   const copy = p.preview
     ? {
         attention: face.previewCopy?.attention ?? p.previewCopy?.attention,
         empty: face.previewCopy?.empty ?? p.previewCopy?.empty,
         offline: face.previewCopy?.offline ?? p.previewCopy?.offline,
       }
-    : undefined;
-  return <WidgetFace {...face} tone={p.forceTone ?? tone ?? face.tone} size={p.size} delay={p.delay} onOpen={p.open} preview={p.preview} previewCopy={copy} />;
+    : auto && live
+      ? { attention: attentionRow(live.attention), offline: offlineRow(live.offline) }
+      : undefined;
+  return <WidgetFace {...face} tone={p.forceTone ?? tone ?? face.tone} size={p.size} delay={p.delay} onOpen={p.open} preview={p.preview ?? auto} previewCopy={copy} />;
+}
+
+const onOnline = (cb: () => void) => {
+  window.addEventListener('online', cb);
+  window.addEventListener('offline', cb);
+  return () => { window.removeEventListener('online', cb); window.removeEventListener('offline', cb); };
+};
+/** Whether this Mac has a network at all — the one offline signal no fetch has to fail for. */
+function useOnline(): boolean {
+  return useSyncExternalStore(onOnline, () => navigator.onLine, () => true);
 }
 
 /** A live attention reading as the face's row; a meeting link becomes Join. */
@@ -102,9 +136,12 @@ function useTick(ms: number, on = true): number {
 // --- Day ---------------------------------------------------------------------------
 
 export function WeatherWidget(p: WidgetProps) {
-  const { weather, isFallback } = useWeather();
+  const { weather, isFallback, isLoading, error } = useWeather();
+  const online = useOnline();
   const sunny = /sun|clear/i.test(weather.condition);
   const hourly = weather.hourly.slice(0, 4);
+  const feels = feelsLine(weather.temp, weather.feelsLike);
+  const now = Date.now();
   const face: Face = {
     label: 'Weather',
     meta: weather.location,
@@ -112,7 +149,12 @@ export function WeatherWidget(p: WidgetProps) {
     value: `${Math.round(weather.temp)}°`,
     delta: weather.high != null && weather.low != null ? `H ${Math.round(weather.high)}° L ${Math.round(weather.low)}°` : undefined,
     deltaTone: 'muted',
-    sub: weather.condition,
+    sub: feels ? `${weather.condition} · ${feels}` : weather.condition,
+    live: p.autoState ? {
+      loading: isFallback && isLoading,
+      offline: networkOffline('weather', { hasData: !isFallback, error, online, arrivedAt: isFallback ? null : seenAt(weather, now) }, now),
+      attention: isFallback ? null : weatherAttention(hourly),
+    } : undefined,
     stats: hourly.map((h) => ({ t: h.time, s: `${Math.round(h.temp)}°` })),
     rows: (weather.daily ?? []).slice(0, 3).map<FaceRow>((d) => ({ key: d.day, lead: d.day, title: d.icon.replace(/-/g, ' '), value: `${Math.round(d.high)}° / ${Math.round(d.low)}°`, valueTone: 'ink' })),
     foot: [{ t: weather.sunrise, s: 'Sunrise' }, { t: weather.sunset, s: 'Sunset' }, { t: `${weather.humidity}%`, s: 'Humidity' }, { t: `${Math.round(weather.windSpeed)}`, s: 'Wind' }],
@@ -123,12 +165,14 @@ export function WeatherWidget(p: WidgetProps) {
 }
 
 export function TodayWidget(p: WidgetProps) {
-  const { events } = useCalendarEvents();
+  const { events, isLoading } = useCalendarEvents();
   const now = useTick(30000);
   const todays = todaysEvents(events, now);
   const focus = focusEvent(todays, now);
   const then = thenEvents(todays, focus);
   const face: Face = {
+    // The calendar lives on this Mac: it loads, it never goes offline.
+    live: p.autoState ? { loading: isLoading && !events.length, offline: null, attention: todayAttention(focus, now) } : undefined,
     label: 'Today',
     meta: `${todays.length} ${todays.length === 1 ? 'event' : 'events'}`,
     value: focus ? eventTime(focus) : 'Free',
@@ -142,8 +186,11 @@ export function TodayWidget(p: WidgetProps) {
 }
 
 export function TasksWidget(p: WidgetProps) {
-  const { tasks, completedCount, toggleTask, addTask } = useTasks();
+  const { tasks, completedCount, toggleTask, addTask, isLoading } = useTasks();
   const [draft, setDraft] = useState('');
+  // Re-read the clock with the card's other minute-scale readers, so a task
+  // falls overdue on Home without anything else having to change.
+  const now = useTick(60000, !!p.autoState);
   const open = tasks.filter((t) => !t.completed);
   const pill = (priority: string): FaceRow['pill'] => {
     const k = priority.toLowerCase();
@@ -179,6 +226,7 @@ export function TasksWidget(p: WidgetProps) {
       />
     ),
     previewCopy: p.preview ? { attention: attentionRow(tasksAttention(tasks, Date.now())) } : undefined,
+    live: p.autoState ? { loading: isLoading && !tasks.length, offline: null, attention: tasksAttention(tasks, now) } : undefined,
   };
   return <Card p={p} face={face} />;
 }
@@ -191,7 +239,8 @@ const initials = (addr: string | null): string => {
 };
 
 export function InboxWidget(p: WidgetProps) {
-  const { messages, alerts, accounts, isConnected } = useMailIntelligence();
+  const { messages, alerts, accounts, isConnected, isLoading } = useMailIntelligence();
+  const online = useOnline();
   const needs = alerts.filter((a) => !a.acknowledged);
   const top = useMemo(() => [...messages].sort((a, b) => b.importance - a.importance).slice(0, 3), [messages]);
   const face: Face = {
@@ -205,13 +254,20 @@ export function InboxWidget(p: WidgetProps) {
     })),
     note: needs[0] ? needs[0].title : undefined,
     previewCopy: p.preview ? { attention: attentionRow(inboxAttention(alerts)), offline: offlineRow(mailOffline(accounts, Date.now())) } : undefined,
+    live: p.autoState ? {
+      loading: isLoading && !messages.length && !accounts.length,
+      offline: inboxOffline(accounts, online, Date.now()),
+      attention: inboxAttention(alerts),
+    } : undefined,
   };
   return <Card p={p} face={face} />;
 }
 
 export function BriefingWidget(p: WidgetProps) {
-  const { news, isFallback } = useNews();
+  const { news, isFallback, isLoading, error } = useNews();
+  const online = useOnline();
   const lead = news[0];
+  const now = Date.now();
   const face: Face = {
     label: 'Briefing',
     meta: lead ? `${news.length} headlines` : 'Fetching…',
@@ -221,6 +277,14 @@ export function BriefingWidget(p: WidgetProps) {
     ) : <span className="bw-lede"><span className="bw-lede-s">No headlines yet.</span></span>,
     rows: news.slice(1, 4).map<FaceRow>((n) => ({ key: n.id, leadKind: 'dot', dotOn: n.trending, title: n.title, sub: n.source })),
     previewCopy: p.preview ? { attention: attentionRow(briefingAttention(news)) } : undefined,
+    // No attention on Home: NewsAPI has no trending signal, and the fetch
+    // marks its first stories `trending` by position, so the rule would hold
+    // on every refresh and the row would stop meaning anything.
+    live: p.autoState ? {
+      loading: isLoading && !news.length,
+      offline: networkOffline('briefing', { hasData: !isFallback && news.length > 0, error, online, arrivedAt: !isFallback && news.length ? seenAt(news, now) : null }, now),
+      attention: null,
+    } : undefined,
   };
   return <Card p={p} face={face} tone="linen" />;
 }
@@ -228,11 +292,18 @@ export function BriefingWidget(p: WidgetProps) {
 // --- Money -------------------------------------------------------------------------
 
 export function WatchWidget(p: WidgetProps) {
-  const { stocks, indices, isFallback } = useStocks(WATCHLIST);
+  // The tickers the user keeps (Watchlist screen, or the brain's watchlist op),
+  // asked for only once the table has been read, so a saved list does not
+  // first fetch the starting four.
+  const watch = useWatchlist();
+  const { stocks, indices, isFallback, isLoading, error } = useStocks(watch.loaded ? watch.symbols : []);
+  const online = useOnline();
   const portfolio = usePortfolio();
   const summary = portfolio.connected ? portfolio.summary : null;
   const first = stocks[0];
   const toneOf = (v: number): FaceRow['valueTone'] => (v > 0 ? 'up' : v < 0 ? 'down' : 'muted');
+  const now = Date.now();
+  const hasQuotes = !isFallback && stocks.length > 0;
   const face: Face = {
     label: 'Watchlist',
     meta: summary ? 'Portfolio' : indices[0] ? `${indices[0].label} ${fmtPct(indices[0].changePercent)}` : 'Markets',
@@ -240,14 +311,20 @@ export function WatchWidget(p: WidgetProps) {
     value: summary ? money(summary.total_value, summary.currency) : first ? first.price.toFixed(2) : '—',
     delta: summary ? fmtPct(summary.unrealized_pct) : first ? fmtPct(first.changePercent) : undefined,
     deltaTone: summary ? (summary.unrealized_pct >= 0 ? 'up' : 'down') : first ? (first.changePercent >= 0 ? 'up' : 'down') : 'muted',
-    sub: summary ? `${summary.holdings_count} holdings` : first ? first.name : 'No tickers yet',
+    sub: summary ? `${summary.holdings_count} holdings` : first ? first.name : watch.loaded && !watch.symbols.length ? 'No tickers yet · add them in Watchlist' : 'No tickers yet',
     spark: first?.sparkline?.length ? first.sparkline : undefined,
     sparkColour: first && first.changePercent < 0 ? 'var(--b-red)' : 'var(--b-green-deep)',
     rows: stocks.slice(0, p.size === 'XL' ? 4 : 3).map<FaceRow>((s) => ({
       key: s.symbol, lead: s.symbol, title: s.name, value: s.price.toFixed(2), valueTone: toneOf(s.changePercent), sub: fmtPct(s.changePercent),
     })),
     kv: indices.slice(0, 4).map((i) => ({ t: fmtPct(i.changePercent), s: i.label, c: i.changePercent >= 0 ? 'var(--b-green-deep)' : 'var(--b-red-deep)' })),
-    previewCopy: p.preview ? { attention: attentionRow(watchAttention(stocks)) } : undefined,
+    previewCopy: p.preview ? { attention: attentionRow(watchAttention(stocks, watch.threshold)) } : undefined,
+    live: p.autoState ? {
+      loading: !watch.loaded || (watch.symbols.length > 0 && isLoading && !stocks.length),
+      offline: networkOffline('watch', { hasData: hasQuotes, error, online, arrivedAt: hasQuotes ? seenAt(stocks, now) : null }, now),
+      // Never on the sample: a canned +2.6% is not news.
+      attention: hasQuotes ? watchAttention(stocks, watch.threshold) : null,
+    } : undefined,
   };
   return <Card p={p} face={face} />;
 }
@@ -488,6 +565,97 @@ export function HomeKitWidget(p: WidgetProps) {
   return <Card p={p} face={face} />;
 }
 
+// --- Up next, Currency, Focus (left-out features, F6) -------------------------------
+
+/** The next events from now on, not only today's: "1:1 Maya · in 18 min", then what follows. */
+export function UpNextWidget(p: WidgetProps) {
+  const { events, isLoading } = useCalendarEvents();
+  const now = useTick(30000);
+  const [next, ...after] = upNextEvents(events, now);
+  const face: Face = {
+    label: 'Up next',
+    meta: 'Next event',
+    value: next ? shortTitle(next.title, p.size === 'S' ? 12 : 18) : 'Free',
+    delta: next ? upNextWhen(next, now) : undefined,
+    deltaTone: 'blue',
+    sub: next ? withLine(next) ?? eventTime(next) : 'Nothing coming up',
+    rows: after.map<FaceRow>((e) => ({ key: e.id, lead: eventTime(e), title: e.title, value: upNextWhen(e, now), valueTone: 'muted' })),
+    previewCopy: p.preview ? { attention: attentionRow(todayAttention(next ?? null, now)) } : undefined,
+    // The Today widget's rule: ten minutes out or on now, with Join when the event carries a link.
+    live: p.autoState ? { loading: isLoading && !events.length, offline: null, attention: todayAttention(next ?? null, now) } : undefined,
+  };
+  return <Card p={p} face={face} />;
+}
+
+/** "€1 Euro | $1.09 US dollar" — the ECB reference rate for the pair the user picked. */
+export function CurrencyWidget(p: WidgetProps) {
+  const { prefs, reading, isLoading, error } = useCurrency();
+  const online = useOnline();
+  const rate = reading && reading.base === prefs.base && reading.quote === prefs.quote ? reading : null;
+  const move = rate ? monthMove(rate) : null;
+  const stale = !!rate && (!!error || !online);
+  const face: Face = {
+    label: 'Currency',
+    meta: rate ? rateDateLabel(rate.date) : 'ECB rates',
+    children: (
+      <span className="bw-split">
+        <span><b>{fmtMoney(prefs.amount, prefs.base)}</b><i>{currencyName(prefs.base)}</i></span>
+        <span className="bw-split-rule" aria-hidden />
+        <span><b>{rate ? fmtMoney(prefs.amount * rate.rate, prefs.quote) : '—'}</b><i>{rate ? currencyName(prefs.quote) : error && !isLoading ? error : currencyName(prefs.quote)}</i></span>
+      </span>
+    ),
+    spark: rate && rate.series.length > 1 ? rate.series.map((s) => s.rate) : undefined,
+    sparkColour: move != null && move < 0 ? 'var(--b-red)' : 'var(--b-green-deep)',
+    kv: rate ? [
+      { t: rate.rate.toFixed(4), s: `1 ${prefs.base} in ${prefs.quote}` },
+      ...(move != null ? [{ t: `${move >= 0 ? '+' : '−'}${Math.abs(move).toFixed(1)}%`, s: 'last 30 days', c: move >= 0 ? 'var(--b-green-deep)' : 'var(--b-red-deep)' }] : []),
+    ] : undefined,
+    live: p.autoState ? {
+      loading: isLoading && !rate,
+      offline: stale && rate ? `${online ? 'rate service unreachable' : 'this Mac is offline'} · ${rateDateLabel(rate.date).toLowerCase()} kept` : null,
+      attention: null,
+    } : undefined,
+  };
+  return <Card p={p} face={face} />;
+}
+
+/** The running session's clock and what it held; between sessions, today's focus. */
+export function FocusWidget(p: WidgetProps) {
+  const focus = useFocus();
+  const running = isRunning(focus.session);
+  const now = useTick(1000, !!focus.session && running);
+  const s = focus.session;
+  const today = dayStats(focus.log, now);
+  const face: Face = s ? {
+    label: 'Focus',
+    meta: running ? 'Holding notifications' : 'Paused',
+    value: fmtClock(leftMs(s, now)),
+    delta: running ? 'left' : 'paused',
+    deltaTone: running ? 'blue' : 'muted',
+    sub: [heldLabel(s.held.length), s.task].filter(Boolean).join(' · '),
+    bar: { fraction: progress(s, now), colour: 'var(--b-blue)' },
+    rows: s.held.slice(-3).reverse().map<FaceRow>((h) => ({ key: `${h.at}-${h.title}`, leadKind: 'dot', title: h.title, sub: h.source })),
+  } : {
+    label: 'Focus',
+    meta: 'Today',
+    value: fmtFocusMinutes(today.minutes),
+    delta: today.sessions ? `${today.sessions} ${today.sessions === 1 ? 'session' : 'sessions'}` : undefined,
+    deltaTone: 'muted',
+    sub: today.longest ? `Longest run ${today.longest} minutes` : `Start ${focus.prefs.lengthMin} minutes and Atlas holds its notifications`,
+    rows: today.entries.slice(-3).reverse().map<FaceRow>((e) => ({
+      key: String(e.startedAt), lead: new Date(e.startedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }),
+      title: e.task ?? 'Focus', value: `${e.minutes} min`, valueTone: 'muted',
+    })),
+    kv: today.sessions ? [{ t: `${today.sessions}`, s: 'Sessions' }, { t: `${today.longest}m`, s: 'Longest' }, { t: `${today.held}`, s: 'Held' }] : undefined,
+    tail: (
+      <button type="button" className="b-btn b-btn--primary bw-focus-go" onClick={() => startFocus(null)}>
+        Start {focus.prefs.lengthMin} min
+      </button>
+    ),
+  };
+  return <Card p={p} face={face} tone={s ? 'ink' : 'sky'} />;
+}
+
 // --- Not wired yet -----------------------------------------------------------------
 
 export function UnwiredWidget(p: WidgetProps & { id: string }) {
@@ -517,6 +685,9 @@ const BY_ID: Record<string, (p: WidgetProps) => JSX.Element> = {
   steps: StepsWidget,
   sleep: SleepWidget,
   home: HomeKitWidget,
+  upnext: UpNextWidget,
+  fx: CurrencyWidget,
+  focus: FocusWidget,
 };
 
 export function HomeWidget({ id, ...p }: WidgetProps & { id: string }) {

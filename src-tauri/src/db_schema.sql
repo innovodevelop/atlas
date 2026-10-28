@@ -1409,3 +1409,32 @@ CREATE TABLE IF NOT EXISTS dashboard_layout (
 CREATE TRIGGER IF NOT EXISTS trg_dashboard_layout_updated AFTER UPDATE ON dashboard_layout
   FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
   BEGIN UPDATE dashboard_layout SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+
+-- ###########################################################################
+-- # BETA HOME — what Atlas wrote for a calendar event or a task               #
+-- ###########################################################################
+-- "Prepare" on a calendar event and "Research" on a task ask the brain for a
+-- short note; the note is kept here, one row per item, so it is still on the
+-- card tomorrow. A task's row also remembers when it was handed to Atlas (the
+-- "Atlas is on it" badge). No foreign key: events and tasks are deleted from
+-- several places (the screens, the brain's ops), and a note left behind is
+-- harmless — the cards only ever look a note up by the id they hold.
+CREATE TABLE IF NOT EXISTS atlas_item_notes (
+  id           TEXT PRIMARY KEY NOT NULL,
+  user_id      TEXT NOT NULL,
+  item_kind    TEXT NOT NULL CHECK (item_kind IN ('event','task')),
+  item_id      TEXT NOT NULL,
+  -- The note Atlas wrote, as it wrote it. NULL until it has written one.
+  body         TEXT,
+  -- When the note was written; the card says how old it is.
+  noted_at     TEXT,
+  -- Tasks only: when the user handed the task to Atlas.
+  delegated_at TEXT,
+  created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE(user_id, item_kind, item_id)
+);
+
+CREATE TRIGGER IF NOT EXISTS trg_atlas_item_notes_updated AFTER UPDATE ON atlas_item_notes
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE atlas_item_notes SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;

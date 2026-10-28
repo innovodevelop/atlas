@@ -11,7 +11,8 @@
    (the week, the task list, "Atlas found time") read as the step they are.
    The Workshop bodies (Watchlist, Mail, Music) keep the frame. */
 .b-fullview:has(> .b-wv--weather), .b-fullview:has(> .b-wv--calendar),
-.b-fullview:has(> .b-wv--tasks), .b-fullview:has(> .b-wv--news) { background: transparent; padding: 0; min-height: 0; }
+.b-fullview:has(> .b-wv--tasks), .b-fullview:has(> .b-wv--news),
+.b-fullview:has(> .b-wv--stocks), .b-fullview:has(> .b-wv--focus), .b-fullview:has(> .b-wv--fx) { background: transparent; padding: 0; min-height: 0; }
 
 .b-wv { display: flex; flex-direction: column; gap: var(--b-gap); min-width: 0; color: var(--b-ink); }
 
@@ -260,10 +261,94 @@
 .b-wv-legacy.focusview .ebody { padding: 4px 0 8px; }
 .b-wv--music > .b-wv-empty, .b-wv--email > .b-wv-empty { background: var(--b-card); }
 
+/* ---- Left-out features (package F6): the values follow the screens above -- */
+
+/* Weather: the reading's feel and wind, a slice's rain, every pollutant, the place. */
+.b-wv-line--small { margin-top: 6px; font-size: 14px; color: var(--b-on-ink-body); }
+.b-wv-hour-rain { width: 4px; height: 18px; border-radius: var(--b-r-pill); background: rgba(249, 247, 244, .14); display: flex; align-items: flex-end; overflow: hidden; }
+.b-wv-hour-rain > span { display: block; width: 100%; background: #8fa9ff; }
+.b-wv-hour-pop { font-size: 10px; color: #b9c9ff; }
+.b-wv-air-rows .b-wv-air-row--b3 .b-wv-air-bar > span { background: #e07a1f; }
+.b-wv-air-rows .b-wv-air-row--b4 .b-wv-air-bar > span, .b-wv-air-rows .b-wv-air-row--b5 .b-wv-air-bar > span { background: var(--b-red); }
+.b-wv-place { padding: 22px 24px; border-radius: var(--b-r-band); background: var(--b-panel); display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.b-wv-place > .b-wv-sub { margin-top: 0; }
+.b-wv-place-list { display: flex; flex-direction: column; gap: 4px; }
+.b-wv-place > .b-wv-why-ask { align-self: flex-start; }
+
+/* Briefing: the topics. */
+.b-wv-topics { padding: 22px 24px; border-radius: var(--b-r-band); background: var(--b-panel); display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.b-wv-topics > .b-wv-sub { margin-top: 0; line-height: 1.5; }
+.b-wv-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.b-wv .b-wv-chip { height: 34px; padding: 0 14px; border-radius: var(--b-r-pill); background: var(--b-card); color: var(--b-ink); font-size: 13px; font-weight: 600; cursor: pointer; transition: background .2s, color .2s; overflow-wrap: anywhere; }
+.b-wv-chip:hover:not(:disabled) { background: var(--b-hover); }
+.b-wv-chip.on { background: var(--b-ink); color: var(--b-on-ink); }
+.b-wv-chip.on:hover { background: var(--b-ink-raised); }
+.b-wv-chip:disabled { opacity: .45; cursor: default; }
+
+/* Calendar and Tasks: the note Atlas wrote. */
+.b-wv-note { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: var(--b-r-inset); background: var(--b-panel); }
+.b-wv-note--ink { background: var(--b-ink-raised); }
+.b-wv-note-h { font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--b-blue-deep); }
+.b-wv-note--ink .b-wv-note-h { color: #b9c9ff; }
+.b-wv-note-p { margin: 0; font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.b-wv-note--ink .b-wv-note-p { color: var(--b-on-ink-body); }
+.b-wv-note-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* Watchlist: the editable list and the threshold. */
+.b-wv-watch-head { padding: 14px 16px 10px; }
+.b-wv-watch-head .b-wv-h1 { font-size: clamp(26px, 3vw, 40px); }
+.b-wv-tick-sym { flex: none; width: 64px; font-size: 14px; font-weight: 600; }
+.b-wv-tick-move { flex: none; font-size: 13px; font-weight: 600; }
+.b-wv-tick-move--up { color: var(--b-green-deep); }
+.b-wv-tick-move--down { color: var(--b-red-deep); }
+.b-wv-tick-move--flat { color: var(--b-ink2); }
+.b-wv-tick-tools { flex: none; display: flex; gap: 2px; }
+.b-wv-x:disabled { opacity: .35; cursor: default; background: transparent; color: var(--b-neutral); }
+.b-wv-stepper { display: flex; align-items: center; gap: 10px; }
+.b-wv-stepper .b-wv-x { height: 36px; min-width: 36px; font-size: 16px; background: var(--b-panel); color: var(--b-ink); }
+.b-wv-stepper-v { min-width: 64px; text-align: center; font-family: var(--b-font-display); font-size: 26px; font-weight: 500; letter-spacing: -.03em; }
+.b-wv-index { display: flex; justify-content: space-between; gap: 12px; }
+@media (max-width: 640px) { .b-wv-tick-tools { margin-left: auto; } }
+
+/* Focus: the ink hero with the ring, the clock and the lengths (the design's #focus). */
+.b-wv-focus { border-radius: 40px; background: var(--b-ink); color: var(--b-on-ink); padding: clamp(24px, 4vw, 56px); display: flex; flex-direction: column; align-items: center; gap: 22px; text-align: center; animation: b-pop .5s var(--b-spring) both; min-width: 0; }
+.b-wv-focus-ring { position: relative; width: min(420px, 80vw); aspect-ratio: 1; }
+.b-wv-focus-ring > svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.b-wv-focus-ring > svg circle + circle { transition: stroke-dashoffset 1s linear; }
+.b-wv-focus-sphere { position: absolute; inset: 12%; border-radius: 50%; overflow: hidden; }
+.b-wv-focus-clock { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--b-font-display); font-size: clamp(56px, 7vw, 96px); font-weight: 500; letter-spacing: -.06em; pointer-events: none; }
+.b-wv-focus-task { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--b-on-ink-small); max-width: 100%; }
+.b-wv-focus-task select { min-width: 0; max-width: min(360px, 70vw); height: 40px; padding: 0 14px; border-radius: var(--b-r-pill); background: var(--b-ink-raised); color: var(--b-on-ink); font-size: 13.5px; }
+.b-wv-focus-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.b-wv .b-wv-focus-go { height: 52px; padding: 0 26px; border-radius: var(--b-r-pill); background: var(--b-on-ink); color: var(--b-ink); font-size: 15px; font-weight: 600; cursor: pointer; }
+.b-wv .b-wv-focus-len { height: 52px; padding: 0 18px; border-radius: var(--b-r-pill); background: var(--b-ink-raised); color: var(--b-on-ink); font-size: 14px; font-weight: 600; cursor: pointer; transition: background .2s; }
+.b-wv-focus-len.on { background: var(--b-blue); }
+.b-wv-focus-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 160px)); gap: 8px; max-width: 100%; }
+.b-wv-focus-stats > div { padding: 14px; border-radius: 20px; background: var(--b-ink-raised); text-align: left; min-width: 0; }
+.b-wv-focus-stats span { display: block; font-size: 11.5px; color: var(--b-on-ink-small); }
+.b-wv-focus-stats b { display: block; margin-top: 4px; font-family: var(--b-font-display); font-size: 24px; font-weight: 500; }
+.b-wv-focus-note { font-size: 13px; color: var(--b-on-ink-small); }
+.b-wv-focus-note--err { color: #ffb4ab; }
+.b-wv-take--paper { background: var(--b-panel); }
+.b-wv-take--paper .b-wv-take-t { color: var(--b-ink); }
+.b-wv-focus-sc { display: flex; flex-direction: column; gap: 4px; }
+@media (max-width: 480px) { .b-wv-focus-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } .b-wv-focus-stats b { font-size: 19px; } }
+
+/* Currency: the pair, the amount, the month's line. */
+.b-wv-fx { padding: 22px 24px; gap: 10px; }
+.b-wv-fx-row { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.b-wv-fx-amount { flex: 1 1 0; font-family: var(--b-font-display); font-size: 26px; }
+.b-wv-fx-out { flex: 1 1 0; min-width: 0; padding: 0 18px; font-family: var(--b-font-display); font-size: clamp(30px, 4vw, 48px); font-weight: 500; letter-spacing: -.04em; overflow-wrap: anywhere; }
+.b-wv-fx-pick { flex: none; max-width: 52%; height: 48px; padding: 0 14px; border-radius: var(--b-r-pill); background: var(--b-card); color: var(--b-ink); font-size: 13.5px; font-weight: 600; }
+.b-wv .b-wv-fx-swap { align-self: flex-start; margin-left: 12px; height: 34px; width: 34px; border-radius: var(--b-r-pill); background: var(--b-card); color: var(--b-ink); font-size: 16px; cursor: pointer; }
+.b-wv-fx-swap:hover { background: var(--b-hover); }
+.b-wv-fx-line { width: 100%; height: 160px; }
+
 /* ---- Motion ------------------------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
-  .b-wv-sky, .b-wv-cal, .b-wv-tasks, .b-wv-brief { animation: none; }
+  .b-wv-sky, .b-wv-cal, .b-wv-tasks, .b-wv-brief, .b-wv-focus { animation: none; }
+  .b-wv-focus-ring > svg circle + circle, .b-wv-chip, .b-wv-focus-len { transition: none; }
   .b-wv-body, .b-wv-arc-dot, .b-wv-hour, .b-wv-dayrow-bar > span, .b-wv-air-ring svg circle + circle,
   .b-wv-ring svg circle + circle, .b-wv-task, .b-wv-listen { transition: none; }
   .b-wv-caret { animation: none; }
