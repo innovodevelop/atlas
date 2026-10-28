@@ -10,12 +10,19 @@
  *
  * What changed in the port:
  *   - typed, and a module instead of `window.QuickSphere`
- *   - `prefers-reduced-motion: reduce` paints one settled frame and stops
  *   - `target()` and the tint tables are exported so the state maths is testable
+ *   - when a sphere runs is one shared decision (src/lib/spherePause.ts):
+ *     off-screen and inactive-window spheres sleep, and Settings' pause switch
+ *     or `prefers-reduced-motion: reduce` holds every sphere on one settled
+ *     frame. The shared rAF only runs while some sphere is animating.
+ *   - `fit` lets a caller size the particle count to the canvas box
+ *     (src/lib/sphereBudget.ts), re-read on every resize
  *
  * The older contour/field engine (`atlasSphere.ts`) stays for the non-Beta
  * screens until phase 8 retires them.
  */
+import { SPHERE_PAUSED_KEY, readSpherePaused, sphereRun, type SphereRun, type SpherePauseInputs } from './spherePause';
+import { FRAME_BUDGET } from './sphereBudget';
 
 export type QuickSphereMode = 'contour' | 'tide' | 'spiral' | 'veil' | 'vortex' | 'breathe' | 'murmur';
 
@@ -42,6 +49,12 @@ export interface QuickSphereOpts {
   scale: number;
   mode: QuickSphereMode;
   state: QuickSphereState;
+  /**
+   * Particle count for a canvas box (CSS px, shorter side). When set it wins
+   * over `count`, and is re-read on every resize so a sphere that shrinks
+   * (phone width) also gets lighter. See src/lib/sphereBudget.ts.
+   */
+  fit?: (box: number) => number;
 }
 
 export interface QuickSphereHandle {
@@ -142,12 +155,113 @@ export function target(mode: QuickSphereMode, st: QuickSphereState): Params & { 
 }
 const sm = (u: number) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
 
-interface Live { vis: boolean; tick(now: number): void }
-const live = new Set<Live>();
+/* ---- The shared runtime ----------------------------------------------------
+   One rAF for every sphere, as in the reference. It re-arms only while some
+   sphere is animating, so a screen whose spheres are all off-screen, paused,
+   or in an inactive window costs nothing per frame (the reference kept the
+   loop spinning as long as any sphere was mounted). */
+interface Inst {
+  run: SphereRun;
+  /** On screen, per the IntersectionObserver (120 px margin). */
+  vis: boolean;
+  particles(): number;
+  tick(now: number): void;
+  /** Re-decide `run` from the shared inputs and this sphere's visibility. */
+  refresh(): void;
+}
+const all = new Set<Inst>();
 let pump = 0;
-function loop(now: number) { pump = 0; for (const s of live) if (s.vis) s.tick(now); if (live.size) pump = requestAnimationFrame(loop); }
-function wake() { if (!pump) pump = requestAnimationFrame(loop); }
+function loop(now: number) {
+  pump = 0;
+  let any = false;
+  for (const s of all) if (s.run === 'animate') { s.tick(now); any = true; }
+  if (any) pump = requestAnimationFrame(loop);
+}
+function wake() { if (!pump && typeof requestAnimationFrame === 'function') pump = requestAnimationFrame(loop); }
 
+/* What every sphere's run decision reads (src/lib/spherePause.ts).
+   `windowActive` is pushed in by the Beta shell, which owns the
+   useWindowActivity hook; the other two are read here and kept current by
+   listeners that exist exactly while some sphere is mounted. */
+const inputs: SpherePauseInputs = { userPaused: false, reducedMotion: false, windowActive: true };
+let motionQuery: MediaQueryList | null = null;
+let recheckTimer = 0;
+let warned = false;
+
+function refreshAll() { for (const s of all) s.refresh(); }
+function recheckPaused() {
+  const p = readSpherePaused();
+  if (p === inputs.userPaused) return;
+  inputs.userPaused = p;
+  refreshAll();
+}
+function onStorage(e: StorageEvent) { if (e.key === null || e.key === SPHERE_PAUSED_KEY) recheckPaused(); }
+// A same-document write sends no storage event. The pause switch is flipped
+// with a click (Space and Enter on a native button are clicks too), so read
+// the key once after each click; the timeout lets the click's own handler, and
+// the React commit it causes, write first. The keyup covers a custom
+// role="switch" that toggles on its own key handler and sends no click.
+function onClick() {
+  if (!recheckTimer) recheckTimer = window.setTimeout(() => { recheckTimer = 0; recheckPaused(); }, 0);
+}
+function onKeyUp(e: KeyboardEvent) { if (e.key === ' ' || e.key === 'Enter') onClick(); }
+function onMotion() {
+  const r = !!motionQuery?.matches;
+  if (r === inputs.reducedMotion) return;
+  inputs.reducedMotion = r;
+  refreshAll();
+}
+function listen() {
+  if (typeof window === 'undefined') return;
+  inputs.userPaused = readSpherePaused();
+  motionQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)') ?? null;
+  inputs.reducedMotion = !!motionQuery?.matches;
+  motionQuery?.addEventListener?.('change', onMotion);
+  window.addEventListener('storage', onStorage);
+  window.addEventListener('click', onClick, { capture: true, passive: true });
+  window.addEventListener('keyup', onKeyUp, { capture: true, passive: true });
+}
+function unlisten() {
+  if (typeof window === 'undefined') return;
+  motionQuery?.removeEventListener?.('change', onMotion);
+  motionQuery = null;
+  window.removeEventListener('storage', onStorage);
+  window.removeEventListener('click', onClick, { capture: true });
+  window.removeEventListener('keyup', onKeyUp, { capture: true });
+  if (recheckTimer) { window.clearTimeout(recheckTimer); recheckTimer = 0; }
+}
+/** Development only: say so, once, when a screen animates more than the budget. */
+function checkBudget() {
+  if (warned || !import.meta.env?.DEV) return;
+  const n = animatingParticles();
+  if (n <= FRAME_BUDGET) return;
+  warned = true;
+  console.warn(`[atlas] ${n} sphere particles animating at once; the shell's budget is ${FRAME_BUDGET} (src/lib/sphereBudget.ts).`);
+}
+
+/**
+ * The window is (not) being looked at: hidden, unfocused past its grace, or
+ * idle. The Beta shell feeds this from useWindowActivity, once for every
+ * sphere, including the ones mounted without VeilSphere.
+ */
+export function setSpheresWindowActive(active: boolean): void {
+  if (inputs.windowActive === active) return;
+  inputs.windowActive = active;
+  refreshAll();
+}
+
+/** Did `next` change anything in `o`? Colours are arrays and compare by value. */
+function changes(o: QuickSphereOpts, next: Partial<QuickSphereOpts>): boolean {
+  for (const key of Object.keys(next) as (keyof QuickSphereOpts)[]) {
+    const a = o[key], b = next[key];
+    if (a === b) continue;
+    if (Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((v, i) => v === b[i])) continue;
+    return true;
+  }
+  return false;
+}
+
+/** For pages that pick a still or a moving sphere state themselves (Architecture's state rows). */
 export function reducedMotion(): boolean {
   return typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 }
@@ -170,10 +284,15 @@ export function mount(canvas: HTMLCanvasElement, opts: Partial<QuickSphereOpts>)
   let waves: Wave[] = [], vort: Vort[] = [], packs: Pack[] = [];
   let rand: () => number = Math.random;
   let W = 0, H = 0, dpr = 1, img: ImageData | null = null, px8: Uint8ClampedArray | null = null, px32: Uint32Array | null = null, bg32 = 0, t = 0, last = 0, rot = 0, frameN = 0;
+  /** The canvas's CSS box (shorter side), for `fit`. */
+  let cssBox = 0;
+  /** The canvas does not show the current options, and no running loop will repaint it. */
+  let dirty = true, stillReq = 0, dead = false;
+  const want = () => Math.max(1, Math.round(o.fit ? o.fit(cssBox) : o.count));
 
   function init() {
     const r = rng(o.seed); rand = r;
-    N = Math.round(o.count);
+    N = want();
     X = new Float32Array(N); Y = new Float32Array(N); Z = new Float32Array(N); R = new Float32Array(N);
     AGE = new Float32Array(N); LIFE = new Float32Array(N); T = new Uint8Array(N); L = new Float32Array(N);
     RR = new Float32Array(N); DR = new Float32Array(N); RT = new Float32Array(N);
@@ -393,49 +512,110 @@ export function mount(canvas: HTMLCanvasElement, opts: Partial<QuickSphereOpts>)
   function resize() {
     dpr = Math.min(2, window.devicePixelRatio || 1);
     const b = canvas.getBoundingClientRect();
+    cssBox = Math.min(b.width, b.height);
+    // A box that crossed a budget step re-seeds the particles (sphereBudget.ts
+    // keeps that to quarter steps, so a dragged window does it rarely).
+    if (want() !== N) { init(); dirty = true; }
     const w = Math.max(1, Math.round(b.width * dpr)), h = Math.max(1, Math.round(b.height * dpr));
-    if (w === W && h === H && img) return;
-    W = canvas.width = w; H = canvas.height = h;
-    img = ctx.createImageData(W, H); px8 = img.data; px32 = new Uint32Array(px8.buffer);
-    if (still) paintStill();
+    if (w !== W || h !== H || !img) {
+      W = canvas.width = w; H = canvas.height = h;
+      img = ctx.createImageData(W, H); px8 = img.data; px32 = new Uint32Array(px8.buffer);
+      dirty = true; // setting the size cleared the canvas
+    }
+    if (dirty) owe();
   }
-  const inst: Live = {
+  const inst: Inst = {
+    run: 'sleep',
     vis: true,
+    particles: () => N,
     tick(now: number) {
       const dt = Math.min(0.05, last ? (now - last) / 1000 : 0.016); last = now;
       t += dt; settle(dt); rot += dt * o.spin * o.speed * P.spin;
       step(frameN ? dt * 2 : dt, frameN & 1); frameN++;
       draw();
+      dirty = false;
+    },
+    refresh() {
+      const prev = inst.run, next = sphereRun(inputs, inst.vis);
+      inst.run = next;
+      if (next === 'animate') {
+        // The loop paints from its next frame; a still frame owed is moot.
+        if (stillReq) { cancelAnimationFrame(stillReq); stillReq = 0; }
+        if (prev !== 'animate') { last = 0; wake(); checkBudget(); }
+        return;
+      }
+      // Holding still is a decision about what the canvas shows: paint the
+      // settled frame now, even over a frame that was mid-motion. Sleeping
+      // keeps the last frame, unless something changed while it slept.
+      if (next === 'still' && prev !== 'still') dirty = true;
+      if (dirty && inst.vis) scheduleStill();
     },
   };
-  // Reduced motion: settle the state instantly and paint one frame. The
-  // guidelines say the sphere is never swapped for a static image, but the
-  // app's accessibility rule wins for the people who asked for it.
-  const still = reducedMotion();
+  /** Something changed; repaint, unless the running loop is about to. */
+  function owe() {
+    dirty = true;
+    if (inst.run !== 'animate' && inst.vis) scheduleStill();
+  }
+  // Coalesced to one frame: a mount sets state, count and colours in three
+  // calls, and each would otherwise run the settle below.
+  function scheduleStill() {
+    if (stillReq || typeof requestAnimationFrame !== 'function') return;
+    stillReq = requestAnimationFrame(() => {
+      stillReq = 0;
+      if (dead || inst.run === 'animate' || !dirty) return;
+      paintStill();
+    });
+  }
+  // One settled frame for the current state. The guidelines say the sphere is
+  // never swapped for a static image, but the app's accessibility rule (and
+  // the user's own pause switch) wins for the people who asked for it, and
+  // the frame still carries the state's colour.
   function paintStill() {
     const tg = target(o.mode, o.state || 'idle');
-    for (const key in DEF) { const k = key as ParamKey; P[k] = tg[k]; }
+    for (const key in DEF) { const k = key as ParamKey; P[k] = tg[k]; PV[k] = 0; }
     if (tg.tint) { const c = (o.blend === 'lighter' ? TINT_INK : TINT)[tg.tint]; TC[0] = c[0]; TC[1] = c[1]; TC[2] = c[2]; }
     for (let i = 0; i < 24; i++) step(0.05, i & 1);
     draw();
+    dirty = false;
   }
-  init(); setBg(); resize();
+  if (!all.size) listen();
+  all.add(inst);
+  setBg(); resize(); // sizes the canvas and seeds the particles for its box
   const ro = new ResizeObserver(resize); ro.observe(canvas);
-  const io = new IntersectionObserver((es) => { for (const e of es) { inst.vis = e.isIntersecting; if (inst.vis) { last = 0; wake(); } } }, { rootMargin: '120px' });
+  const io = new IntersectionObserver((es) => { for (const e of es) { inst.vis = e.isIntersecting; inst.refresh(); } }, { rootMargin: '120px' });
   io.observe(canvas);
-  if (!still) { live.add(inst); wake(); } else paintStill();
+  inst.refresh();
   return {
     set(n) {
       if (n.state && n.state !== o.state && n.state === 'waking') ph.W = 0.85;
-      const re = (n.count != null && Math.round(n.count) !== N) || (n.mode && n.mode !== o.mode);
-      Object.assign(o, n); setBg(); if (re) init();
-      if (still) paintStill();
+      if (!changes(o, n)) return;
+      const re = !!n.mode && n.mode !== o.mode;
+      Object.assign(o, n); setBg();
+      if (re || want() !== N) { init(); if (inst.run === 'animate') checkBudget(); }
+      owe();
     },
-    destroy() { live.delete(inst); ro.disconnect(); io.disconnect(); },
+    destroy() {
+      dead = true;
+      all.delete(inst); ro.disconnect(); io.disconnect();
+      if (stillReq) { cancelAnimationFrame(stillReq); stillReq = 0; }
+      if (!all.size) {
+        unlisten();
+        if (pump) { cancelAnimationFrame(pump); pump = 0; }
+      }
+    },
   };
 }
 
-/** How many instances are animating — for the perf pass and tests. */
+/** How many instances are animating right now — for the perf pass and tests. */
 export function liveCount(): number {
-  return live.size;
+  let n = 0;
+  for (const s of all) if (s.run === 'animate') n++;
+  return n;
+}
+
+/** Particles being simulated this frame across every animating sphere. */
+export function animatingParticles(): number {
+  let n = 0;
+  for (const s of all) if (s.run === 'animate') n += s.particles();
+  return n;
 }

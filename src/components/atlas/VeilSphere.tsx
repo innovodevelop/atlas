@@ -10,19 +10,28 @@
  * matching the panel they sit on (the handoff's performance rule); small ones
  * may use `bg="transparent"` with `tone` set to the fill behind them so the
  * dust colour lifts toward the right paper.
+ *
+ * Cost: `size` picks a row of the particle budget (src/lib/sphereBudget.ts),
+ * and the count follows the box the sphere is actually drawn in, so the band
+ * at phone width is not drawing its desktop count into a third of the area.
+ * A `count` prop is the page's own tuning and is kept (capped at the band's).
+ * When it animates at all is the engine's call (src/lib/spherePause.ts):
+ * off-screen, an inactive window, the Settings pause switch and reduced motion
+ * all stop it, for every sphere at once.
  */
-import { useEffect, useRef, type CSSProperties } from 'react';
+import { useCallback, useEffect, useRef, type CSSProperties, type KeyboardEvent } from 'react';
 import { mount, type QuickSphereHandle, type QuickSphereState, type RGB } from '@/lib/quickSphere';
 import { useAtlasState } from '@/lib/atlasStateBus';
 import { SPHERE } from '@/lib/betaTokens';
+import { particleBudget, type SphereSize } from '@/lib/sphereBudget';
 
 export interface VeilSphereProps {
   /** Omit to follow the state bus. */
   state?: QuickSphereState;
-  /** Particle count; defaults by `size`. */
+  /** Particle count, tuned by the page for its own box; defaults by `size`. */
   count?: number;
   /** Picks the particle budget when `count` is omitted. */
-  size?: 'band' | 'hero' | 'short' | 'mini' | 'orb' | 'panel';
+  size?: SphereSize;
   /** Opaque hex fill, or 'transparent'. Default: the panel paper. */
   bg?: string;
   /** The fill behind a transparent sphere (RGB), for the dust lift. */
@@ -35,19 +44,11 @@ export interface VeilSphereProps {
   className?: string;
   style?: CSSProperties;
   title?: string;
+  /** Makes the sphere a button (keyboard included); give it a `label`. */
   onClick?: () => void;
   /** Accessible name; the canvas is otherwise decorative. */
   label?: string;
 }
-
-const COUNT_BY_SIZE: Record<NonNullable<VeilSphereProps['size']>, number> = {
-  band: SPHERE.bandCount,
-  hero: SPHERE.heroCount,
-  short: SPHERE.shortBandCount,
-  mini: SPHERE.miniCount,
-  orb: SPHERE.orbCount,
-  panel: SPHERE.panelCount,
-};
 
 export function VeilSphere({
   state, count, size = 'mini', bg, tone, ink = false, scale, alpha, seed = 11,
@@ -58,11 +59,16 @@ export function VeilSphere({
   const ref = useRef<HTMLCanvasElement | null>(null);
   const handle = useRef<QuickSphereHandle | null>(null);
 
-  const n = count ?? COUNT_BY_SIZE[size];
+  // The engine calls this with the canvas box on every resize; a new identity
+  // only when the size or the page's count changes.
+  const fit = useCallback((box: number) => particleBudget(size, { count, box }), [size, count]);
   const palette = ink ? SPHERE.ink : SPHERE.paper;
   const fill = bg ?? (ink ? '#1e1e24' : '#f1eeea');
   const a = alpha ?? palette.alpha;
   const sc = scale ?? 0.42;
+  // Pages pass `tone` as an inline array; compare it by value so a parent's
+  // re-render does not look like a colour change.
+  const toneKey = tone ? tone.join(',') : '';
 
   useEffect(() => {
     const el = ref.current;
@@ -76,7 +82,7 @@ export function VeilSphere({
       blend: ink ? 'lighter' : 'source-over',
       alpha: a,
       seed,
-      count: n,
+      fit,
       scale: sc,
       state: effective,
     });
@@ -87,8 +93,16 @@ export function VeilSphere({
   }, [ink, seed]);
 
   useEffect(() => { handle.current?.set({ state: effective }); }, [effective]);
-  useEffect(() => { handle.current?.set({ count: n }); }, [n]);
-  useEffect(() => { handle.current?.set({ bg: fill, tone, alpha: a, scale: sc }); }, [fill, tone, a, sc]);
+  useEffect(() => { handle.current?.set({ fit }); }, [fit]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `tone` is compared by value through toneKey
+  useEffect(() => { handle.current?.set({ bg: fill, tone, alpha: a, scale: sc }); }, [fill, toneKey, a, sc]);
+
+  const onKeyDown = (e: KeyboardEvent<HTMLCanvasElement>) => {
+    if (!onClick || (e.key !== 'Enter' && e.key !== ' ')) return;
+    e.preventDefault();
+    onClick();
+  };
+  const role = onClick ? 'button' : label ? 'img' : undefined;
 
   return (
     <canvas
@@ -96,9 +110,11 @@ export function VeilSphere({
       className={className}
       title={title}
       onClick={onClick}
-      role={label ? 'img' : undefined}
-      aria-label={label}
-      aria-hidden={label ? undefined : true}
+      onKeyDown={onClick ? onKeyDown : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      role={role}
+      aria-label={label ?? (onClick ? title : undefined)}
+      aria-hidden={role ? undefined : true}
       data-state={effective}
       style={{ width: '100%', height: '100%', display: 'block', cursor: onClick ? 'pointer' : undefined, ...style }}
     />
