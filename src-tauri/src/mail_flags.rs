@@ -463,7 +463,7 @@ pub fn flag_messages(conn: &Connection, user_id: &str, account_id: &str, since: 
             .prepare(
                 "SELECT id, from_address, subject, snippet, received_at FROM mail_messages
                   WHERE account_id = ?1 AND user_id = ?2 AND created_at >= ?3
-                  ORDER BY received_at ASC LIMIT ?4",
+                  ORDER BY received_at ASC, rowid ASC LIMIT ?4",
             )
             .map_err(|e| e.to_string())?;
         let rows = stmt
