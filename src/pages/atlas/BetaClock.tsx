@@ -14,6 +14,12 @@
  * (components/atlas/clock/ClockRinging.tsx) rings it on whatever screen is
  * up. The arithmetic is src/lib/betaClock.ts, tested.
  *
+ * In the Mac app the Alarm tab also keeps the Mac awake until an early alarm
+ * (betaClockAwake.ts), rings an alarm on a Home Assistant speaker
+ * (betaClockSpeakers.ts), and takes "wake me at seven", "stop" and "snooze"
+ * from Atlas (betaClockVoice.ts) — the voice hints show only once that path
+ * is listening.
+ *
  * Keys: Esc closes the alarm editor, then goes Home — except while an alarm
  * rings, which needs Snooze or Stop.
  */
@@ -299,6 +305,9 @@ const BetaClock = () => {
           onDraft={setDraft}
           onClose={closeEditor}
           onNew={newAlarm}
+          awake={prefs.awake}
+          awakeUntil={clock.awakeUntil}
+          voiceReady={clock.voiceReady}
         />
       ) : null}
       {tab === 'clocks' ? (

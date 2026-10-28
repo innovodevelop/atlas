@@ -9,8 +9,18 @@
  * matters to you" is not written in advance — the card asks the brain
  * (`askAtlas`) when you tap it and streams the answer. Open hands the story's
  * address to the browser (`openExternal`); the sample's '#' has no Open.
+ *
+ * Topics (row 8): the user picks what the headlines are about — any of
+ * NewsAPI's seven categories, or a keyword of their own, up to four — and
+ * every `useNews()` follows the choice (src/lib/briefingTopics.ts). With no
+ * topic picked the Briefing is the general top headlines, as before.
  */
 import { useEffect, useRef, useState } from 'react';
+import {
+  CATEGORY_LABEL, MAX_TOPICS, NEWS_CATEGORIES, checkTopic, isCategory, setBriefingTopics, toggleTopic, topicLabel,
+  useBriefingTopics,
+} from '@/lib/briefingTopics';
+import { escapeBlurs } from './fieldKeys';
 import { useNews } from '@/hooks/useNews';
 import { useStreamingTTS } from '@/hooks/useStreamingTTS';
 import { VeilSphere } from '@/components/atlas/VeilSphere';
@@ -64,6 +74,7 @@ export function BriefingView() {
   const count = reading.length;
 
   return (
+    <>
     <section className="b-wv-brief" aria-label="Briefing">
       <article className="b-wv-story">
         {story ? (
@@ -116,6 +127,65 @@ export function BriefingView() {
           </button>
         ))}
       </aside>
+    </section>
+    <BriefingTopics />
+    </>
+  );
+}
+
+/** The topics the headlines follow: category chips to switch, keywords to add and remove. */
+function BriefingTopics() {
+  const topics = useBriefingTopics();
+  const [draft, setDraft] = useState('');
+  const [err, setErr] = useState<string | null>(null);
+  const keywords = topics.filter((t) => !isCategory(t));
+  const add = () => {
+    const check = checkTopic(draft, topics);
+    if ('reason' in check) { setErr(check.reason); return; }
+    setErr(null);
+    setDraft('');
+    setBriefingTopics([...topics, check.topic]);
+  };
+  const full = topics.length >= MAX_TOPICS;
+  return (
+    <section className="b-wv-topics" aria-label="Briefing topics">
+      <span className="b-wv-h2">Topics</span>
+      <span className="b-wv-sub">
+        {topics.length
+          ? `The headlines follow ${topics.map(topicLabel).join(', ')}.`
+          : 'No topics picked: the Briefing is the general top headlines.'}{' '}
+        Up to {MAX_TOPICS}. Each topic is one request to NewsAPI with the key on this Mac, so the topics leave the Mac; the
+        Briefing refreshes less often the more you pick, to stay inside the key's daily allowance.
+      </span>
+      <div className="b-wv-chips" role="group" aria-label="Categories">
+        {NEWS_CATEGORIES.map((c) => {
+          const on = topics.includes(c);
+          return (
+            <button key={c} type="button" className={`b-wv-chip${on ? ' on' : ''}`} aria-pressed={on} disabled={!on && full} onClick={() => setBriefingTopics(toggleTopic(topics, c))}>
+              {CATEGORY_LABEL[c]}
+            </button>
+          );
+        })}
+        {keywords.map((k) => (
+          <button key={k} type="button" className="b-wv-chip on" aria-label={`Remove the topic ${k}`} title="Remove" onClick={() => setBriefingTopics(toggleTopic(topics, k))}>
+            {k} ×
+          </button>
+        ))}
+      </div>
+      <div className="b-wv-add">
+        <input
+          className="b-wv-add-in"
+          placeholder={full ? 'Remove a topic to add another' : 'Add a topic of your own, such as climate or Formula 1'}
+          aria-label="New topic"
+          value={draft}
+          maxLength={40}
+          disabled={full}
+          onChange={(e) => { setDraft(e.target.value); setErr(null); }}
+          onKeyDown={(e) => { if (e.key === 'Enter') add(); else escapeBlurs(e); }}
+        />
+        <button type="button" className="b-wv-add-btn" onClick={add} disabled={full || !draft.trim()}>Add</button>
+      </div>
+      {err ? <p className="b-wv-err">{err}</p> : null}
     </section>
   );
 }
