@@ -50,7 +50,7 @@ describe('Pull requests', () => {
 describe('Deploys', () => {
   test('a published release is live, with a newer draft named', () => {
     const f = deploysFace(deploys([release({ tag: 'v0.4.1', draft: true, publishedAt: null, createdAt: minsAgo(10) }), release({ tag: 'v0.4.0' })], [ghRun({ id: 1, workflow: 'CI' })]), NOW);
-    expect(f).toMatchObject({ value: 'v0.4.0', delta: 'live', deltaTone: 'up', sub: 'Published 41 min ago · v0.4.1 drafted', openUrl: 'https://github.com/innovodevelop/atlas/releases' });
+    expect(f).toMatchObject({ value: 'v0.4.0', delta: 'live', deltaTone: 'up', sub: 'Shipped 41 min ago · v0.4.1 drafted', openUrl: 'https://github.com/innovodevelop/atlas/releases' });
   });
 
   test('a draft alone says how to ship it; a pre-release is not “live”', () => {

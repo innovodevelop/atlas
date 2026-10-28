@@ -207,7 +207,8 @@ export function deploysFace(r: Extract<DeploysReport, { ok: true }>, now: number
       value: published.tag,
       delta: published.prerelease ? 'pre-release' : 'live',
       deltaTone: published.prerelease ? 'blue' : 'up',
-      sub: [`Published ${ago(published.publishedAt ?? published.createdAt, now) || 'recently'}`, newerDraft ? `${newerDraft.tag} drafted` : null].filter(Boolean).join(' · '),
+      // The design's "Shipped 41 minutes ago": publishing the release is what ships it.
+      sub: [`Shipped ${ago(published.publishedAt ?? published.createdAt, now) || 'recently'}`, newerDraft ? `${newerDraft.tag} drafted` : null].filter(Boolean).join(' · '),
     };
   } else if (newerDraft) {
     hero = { value: newerDraft.tag, delta: 'draft', deltaTone: 'muted', sub: `Drafted ${ago(newerDraft.createdAt, now) || 'recently'} · publish it on GitHub to ship` };
