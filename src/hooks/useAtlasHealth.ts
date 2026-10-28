@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { localClient as supabase } from '@/integrations/local/localClient';
 import { isWindowActive } from '@/hooks/useWindowActivity';
+import { computeErrorRate, computeHealthScore } from '@/lib/atlasHealth';
 
 interface AtlasStats {
   knowledgeCount: number;
@@ -38,17 +39,13 @@ export const useAtlasHealth = () => {
         .gte('created_at', oneDayAgo)
         .eq('resolved', false);
 
-      // Calculate error rate (errors per 100 operations - simplified)
-      const errorRate = recentErrors ? Math.min((recentErrors / 100) * 100, 100) : 0;
-
-      // Health score calculation
-      const healthScore = Math.max(0, 100 - errorRate - (activeResearch || 0 > 10 ? 5 : 0));
+      const errorRate = computeErrorRate(recentErrors);
 
       setStats({
         knowledgeCount: knowledgeCount || 0,
         activeResearch: activeResearch || 0,
         errorRate: Math.round(errorRate * 10) / 10,
-        healthScore: Math.round(healthScore),
+        healthScore: computeHealthScore(errorRate, activeResearch),
       });
     } catch (error) {
       console.error('Error fetching Atlas health stats:', error);
