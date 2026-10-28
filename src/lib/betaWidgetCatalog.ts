@@ -227,10 +227,21 @@ export const EMPTY_COPY: Record<string, EmptySpec> = {
   sleep: { title: 'No sleep yet', hint: 'Import a Health export and last night shows here, stage by stage.', action: { label: 'Open Health', route: '/health' } },
   home: { title: 'No home hub', hint: 'Connect Home Assistant and your rooms, temperatures and the front door show here.', action: { label: 'Open Smart Home', route: '/smart-home' } },
   energy: { title: 'Not wired yet', hint: 'No energy meter is connected yet; this widget arrives with one.' },
-  podcast: { title: 'Not wired yet', hint: 'There is no podcast source in Atlas yet.' },
+  podcast: { title: 'No episode started', hint: 'Follow a show on Spotify and play an episode through Atlas; where you stopped shows here.' },
   focus: { title: 'No focus yet today', hint: 'Start a 25 or 50 minute session and Atlas holds its own notifications until it ends.' },
   upnext: { title: 'Nothing coming up', hint: 'Your next events show here, with how long until each.', action: { label: 'Block focus time', ask: 'Block an hour of focus time in my calendar this afternoon.' } },
   fx: { title: 'No rate yet', hint: 'Rates are the European Central Bank’s daily reference, fetched through the Mac app with no key.' },
+  // Smart Home (F3): the lamp, light and camera widgets, all from Home Assistant.
+  lamp: { title: 'No lamp yet', hint: 'Link Home Assistant and a colour light shows here, with its swatches.', action: { label: 'Open Smart Home', route: '/smart-home' } },
+  lights: { title: 'No lights yet', hint: 'Link Home Assistant and the lights that are on show here, room by room.', action: { label: 'Open Smart Home', route: '/smart-home' } },
+  bulb: { title: 'No bulb yet', hint: 'Link Home Assistant and a light shows here, with its brightness.', action: { label: 'Open Smart Home', route: '/smart-home' } },
+  floorlamp: { title: 'No floor lamp', hint: 'Atlas looks for a light whose name says floor lamp. Rename one in Home Assistant and it shows here.', action: { label: 'Open Smart Home', route: '/smart-home' } },
+  frontdoor: { title: 'No camera yet', hint: 'Link Home Assistant and its door camera shows here, with the last motion it saw.', action: { label: 'Open Smart Home', route: '/smart-home' } },
+  // The Money widgets; listed only in admin builds, like /money itself.
+  spend: { title: 'No bank data yet', hint: 'Import a CSV export from your netbank, or connect a bank read-only, and this month’s spending shows here by category.', action: { label: 'Open Money', route: '/money' } },
+  budget: { title: 'No budget yet', hint: 'Set monthly limits per category in Money and the card shows what is left and whether you are ahead of an even pace.', action: { label: 'Open Money', route: '/money' } },
+  subscriptions: { title: 'No subscriptions found', hint: 'Atlas finds subscriptions among payments that repeat every month or year, once your transactions are in Money.', action: { label: 'Open Money', route: '/money' } },
+  transit: { title: 'No departures yet', hint: 'Add a Rejseplanen access ID and choose your stop; the next departures show here, live. Open the card to set it up.' },
 };
 
 export function emptyCopy(id: string): EmptySpec {

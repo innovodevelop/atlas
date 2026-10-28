@@ -19,7 +19,7 @@
  * Card draws the face that reading calls for (`liveFaceState`). The catalog,
  * the sheet and Edit Home do not pass it, so they draw what they always drew.
  */
-import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { WidgetFace, type FacePreview, type FacePreviewCopy, type FaceProps, type FaceRow, type FaceTone } from './WidgetFace';
 import { AtlasIcon } from '../AtlasIcon';
 import { WIDGET_BY_ID, type WidgetSize } from '@/lib/betaHome';
@@ -44,7 +44,12 @@ import { useMailIntelligence } from '@/hooks/useMailIntelligence';
 import { useStocks } from '@/hooks/useStocks';
 import { usePortfolio } from '@/hooks/usePortfolio';
 import { useNews } from '@/hooks/useNews';
-import { useMusicPlayer } from '@/hooks/useMusicPlayer';
+import { engineHoldsUri, useMusicPlayer } from '@/hooks/useMusicPlayer';
+import { musicQueue, useMusicQueue } from '@/hooks/useMusicQueue';
+import { useRecentEpisodes } from '@/hooks/usePodcasts';
+import { MusicLike } from '@/components/atlas/music/MusicLike';
+import { THIS_MAC, episodeLeft, nextLine, resumeFrom, roomsFrom } from '@/lib/betaMusic';
+import { ROOM_SCOPES, isEpisode, lacks } from '@/lib/musicSpotify';
 import { useSmartHome } from '@/hooks/useSmartHome';
 import { useHealth } from '@/hooks/useHealth';
 import { systemZone } from '@/lib/betaClock';
@@ -54,7 +59,20 @@ import { useClockPrefs } from '@/lib/betaClockStore';
 import '@/styles/beta/clock.css';
 import { citiesMeta, countdownFace, countdownTickMs, dialCount, dials, elsewhere } from '@/lib/betaClockWidgets';
 import { fmtPct } from '@/pages/atlas/atlasHelpers';
+import { useTransit } from '@/hooks/useTransit';
+import { countdown, departureNote, type Departure } from '@/lib/transit';
+import { useBetaNavigate } from '@/lib/viewTransitions';
 import { eventTime, focusEvent, focusIn, thenEvents, todaysEvents } from '@/lib/stageFocus';
+// The Now playing extras and the Podcast face (bw-music-*) live with the widget screens' styles.
+import '@/styles/beta/views.css';
+import {
+  SWATCHES, cameraEventLine, cameraSensors, colourName, lastMotion, lightsSummary, pickDoorCamera, pickLight, powerValue,
+  type HistoryEvent, type LightWidget,
+} from '@/lib/betaSmartHome';
+import '@/styles/beta/smartHome.css';
+import { useBank } from '@/hooks/useBank';
+import { dayLabel, spendRows, totalSpent } from '@/lib/betaMoney';
+import { paceSentence } from '@/lib/bankLedger';
 
 export interface WidgetProps {
   size: WidgetSize;
@@ -329,6 +347,65 @@ export function WatchWidget(p: WidgetProps) {
   return <Card p={p} face={face} />;
 }
 
+// --- Money: the bank store (admin builds list these; see betaHome.ts) --------------
+
+function moneyEmptySub(available: boolean): string {
+  return available ? 'Import a CSV or connect a bank in Money' : 'Money keeps its data in the Mac app';
+}
+
+const monthName = (today: string) => new Date(`${today}T12:00:00`).toLocaleDateString(undefined, { month: 'long' });
+
+export function SpendWidget(p: WidgetProps) {
+  const { model, available, today } = useBank();
+  const cur = model.currency;
+  const rows = spendRows(model).filter((r) => r.spent > 0);
+  const face: Face = {
+    label: 'Spend',
+    meta: monthName(today),
+    value: model.hasData ? money(totalSpent(model), cur) : '—',
+    sub: model.hasData ? `spent in ${monthName(today)}` : moneyEmptySub(available),
+    rows: rows.slice(0, 4).map<FaceRow>((r) => ({ key: r.id, leadKind: 'dot', dotOn: true, title: r.label, value: money(r.spent, cur), valueTone: 'ink' })),
+    kv: p.size === 'M' ? rows.slice(0, 3).map((r) => ({ t: money(r.spent, cur), s: r.label })) : undefined,
+  };
+  return <Card p={p} face={face} />;
+}
+
+export function BudgetWidget(p: WidgetProps) {
+  const { model, available } = useBank();
+  const cur = model.currency;
+  const ring = model.ring;
+  const budgeted = ring.mode === 'budget';
+  const limited = spendRows(model).filter((r) => r.limit);
+  const face: Face = {
+    label: 'Budget',
+    meta: budgeted ? `${Math.round(ring.pace * 100)}% through the month` : undefined,
+    value: budgeted ? money(ring.left, cur) : '—',
+    delta: budgeted ? paceSentence(ring, (v) => money(v, cur)) : undefined,
+    deltaTone: budgeted ? (ring.over ? 'down' : 'up') : 'muted',
+    sub: budgeted ? `left of ${money(ring.budget, cur)}` : model.hasData ? 'Set monthly limits in Money' : moneyEmptySub(available),
+    bar: budgeted ? { fraction: Math.min(1, ring.budget > 0 ? ring.spent / ring.budget : 0), colour: ring.over ? 'var(--b-red)' : 'var(--b-blue)' } : undefined,
+    rows: limited.slice(0, 4).map<FaceRow>((r) => ({
+      key: r.id, title: r.label, value: `${money(r.spent, cur)} / ${money(r.limit ?? 0, cur)}`, valueTone: r.limit && r.spent > r.limit ? 'down' : 'muted',
+    })),
+  };
+  return <Card p={p} face={face} />;
+}
+
+export function SubscriptionsWidget(p: WidgetProps) {
+  const { model, available, today } = useBank();
+  const cur = model.currency;
+  const active = model.subs.filter((s) => s.status === 'active').sort((a, b) => (a.next < b.next ? -1 : a.next > b.next ? 1 : 0));
+  const face: Face = {
+    label: 'Subscriptions',
+    meta: active.length ? `${active.length} found` : undefined,
+    value: active.length ? money(model.subTotals.monthly, cur) : '—',
+    sub: active.length ? 'a month' : model.hasData ? 'None found yet: a payment must repeat first' : moneyEmptySub(available),
+    rows: active.slice(0, 4).map<FaceRow>((s) => ({ key: s.key, title: s.merchant, sub: `next ${dayLabel(s.next, today)}`, value: money(s.amount, cur), valueTone: 'muted' })),
+    note: model.subTotals.saved ? `Saving ${money(model.subTotals.saved, cur)} a month from cancellations` : undefined,
+  };
+  return <Card p={p} face={face} />;
+}
+
 // --- Air & time --------------------------------------------------------------------
 
 const AQI_LABEL = ['', 'Good', 'Fair', 'Moderate', 'Poor', 'Very poor'];
@@ -436,33 +513,129 @@ export function CountdownWidget(p: WidgetProps) {
 
 // --- Media -------------------------------------------------------------------------
 
+/** Clicks and keys on a widget's own controls are theirs, not the card's (which would open the full view). */
+const own = {
+  onClick: (e: { stopPropagation: () => void }) => e.stopPropagation(),
+  onKeyDown: (e: { stopPropagation: () => void }) => e.stopPropagation(),
+};
+
+/**
+ * Now playing, driven by the music queue store: previous and next step
+ * through Up next (the engine itself holds one record), play moves the record
+ * here when another device has it, and at L the design's extras — shuffle,
+ * repeat, Atlas's volume, the output room and what plays next.
+ */
 export function MusicWidget(p: WidgetProps) {
   const music = useMusicPlayer();
+  const q = useMusicQueue();
   const np = music.nowPlaying;
+  const track = np?.track ?? null;
   const playing = !!np?.isPlaying;
+  const atlasOwns = !!track && music.audioReady && engineHoldsUri(track.uri);
+  const showPause = playing && atlasOwns;
   const tick = useTick(1000, playing);
-  const progress = np?.track?.durationMs ? Math.min(1, music.readPosition() / np.track.durationMs) : 0;
+  const progress = track?.durationMs ? Math.min(1, music.readPosition() / track.durationMs) : 0;
   void tick;
+  const canQueue = music.available && music.connected && music.premium;
+  const roomsMissing = lacks(music.scopes, ROOM_SCOPES);
+  const rooms = roomsFrom(roomsMissing ? [] : q.devices, { atlasOwnsAudio: atlasOwns, isPlaying: playing, macVolume: q.prefs.volume });
+  const activeRoom = rooms.find((r) => r.active)?.id ?? THIS_MAC;
+  const canVolume = canQueue && music.audioReady;
+  const extras = p.size === 'L' && music.connected;
   const face: Face = {
     label: 'Now playing',
-    meta: music.connected ? (np?.deviceName ?? 'Spotify') : music.available ? 'Not connected' : 'Mac app only',
+    meta: music.connected ? (atlasOwns || !track ? 'This Mac' : (np?.deviceName ?? 'Spotify')) : music.available ? 'Not connected' : 'Mac app only',
     children: (
-      <span className="bw-music">
-        <span className="bw-art">{np?.track?.artUrl ? <img src={np.track.artUrl} alt="" /> : <AtlasIcon name="music" size={22} weight={1.6} />}</span>
-        <span className="bw-music-text">
-          <span className="bw-music-t">{np?.track?.title ?? (music.connected ? 'Nothing playing' : 'Connect Spotify')}</span>
-          <span className="bw-music-s">{np?.track?.artist ?? (music.connected ? 'Pick something in Music' : 'Through the Music screen')}</span>
+      <span className="bw-music-wrap">
+        <span className="bw-music">
+          <span className="bw-art">{track?.artUrl ? <img src={track.artUrl} alt="" /> : <AtlasIcon name="music" size={22} weight={1.6} />}</span>
+          <span className="bw-music-text">
+            <span className="bw-music-t">{track?.title ?? (music.connected ? 'Nothing playing' : 'Connect Spotify')}</span>
+            <span className="bw-music-s">{track?.artist ?? (music.connected ? 'Pick something in Music' : 'Through the Music screen')}</span>
+          </span>
+          {music.connected ? (
+            <span className="bw-music-ctl" {...own}>
+              <MusicLike track={track} className="bw-music-like" size={15} />
+              <button type="button" className="flip" aria-label="Previous" disabled={!canQueue} onClick={() => musicQueue.prev()}><AtlasIcon name="skip" size={16} /></button>
+              <button type="button" className="main" aria-label={showPause ? 'Pause' : 'Play'} disabled={!canQueue} title={canQueue ? undefined : 'Full-track playback needs Spotify Premium.'} onClick={() => void musicQueue.togglePlay()}><AtlasIcon name={showPause ? 'pause' : 'play'} size={16} /></button>
+              <button type="button" aria-label="Next" disabled={!canQueue} onClick={() => musicQueue.next()}><AtlasIcon name="skip" size={16} /></button>
+            </span>
+          ) : null}
         </span>
-        {music.connected ? (
-          <span className="bw-music-ctl" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="flip" aria-label="Previous" onClick={() => void music.prev()}><AtlasIcon name="skip" size={16} /></button>
-            <button type="button" className="main" aria-label={playing ? 'Pause' : 'Play'} onClick={() => void (playing ? music.pause() : music.play())}><AtlasIcon name={playing ? 'pause' : 'play'} size={16} /></button>
-            <button type="button" aria-label="Next" onClick={() => void music.next()}><AtlasIcon name="skip" size={16} /></button>
+        {extras ? (
+          <span className="bw-music-x" {...own}>
+            <button type="button" className={`bw-music-tog${q.prefs.shuffle ? ' on' : ''}`} aria-label="Shuffle" aria-pressed={q.prefs.shuffle} title="Shuffle Up next" onClick={() => musicQueue.setPrefs({ shuffle: !q.prefs.shuffle })}><AtlasIcon name="shuffle" size={15} /></button>
+            <button type="button" className={`bw-music-tog${q.prefs.repeat ? ' on' : ''}`} aria-label="Repeat" aria-pressed={q.prefs.repeat} title="Repeat this track" onClick={() => musicQueue.setPrefs({ repeat: !q.prefs.repeat })}><AtlasIcon name="repeat" size={15} /></button>
+            <span className="bw-music-vol" title={canVolume ? 'Atlas’s own output on this Mac' : 'Volume applies once Atlas is the one playing.'}>
+              <AtlasIcon name="speaker" size={15} />
+              <input type="range" min={0} max={1} step={0.01} value={q.prefs.volume} disabled={!canVolume} aria-label="Atlas output volume" onChange={(e) => musicQueue.setPrefs({ volume: Number(e.currentTarget.value) })} />
+            </span>
+            <select
+              className="bw-music-out"
+              aria-label="Output"
+              value={activeRoom}
+              disabled={!canQueue || roomsMissing || q.rooms.moving !== null}
+              title={roomsMissing ? 'Reconnect Spotify in Music to turn on Rooms.' : 'Where the music plays. Other rooms are your Spotify Connect speakers.'}
+              onFocus={() => { if (!roomsMissing) void musicQueue.refreshRooms(); }}
+              onChange={(e) => void musicQueue.moveTo(e.currentTarget.value)}
+            >
+              {rooms.map((r) => <option key={r.id} value={r.id} disabled={r.restricted}>{r.name}</option>)}
+            </select>
+            {q.nextUp ? <span className="bw-music-next">Next · {nextLine(q.nextUp)}</span> : null}
           </span>
         ) : null}
       </span>
     ),
-    bar: np?.track ? { fraction: progress, colour: 'var(--b-on-ink)' } : undefined,
+    bar: track ? { fraction: progress, colour: 'var(--b-on-ink)' } : undefined,
+  };
+  return <Card p={p} face={face} tone="ink" />;
+}
+
+/**
+ * Podcast: the episode playing now, or the one Atlas last kept a place in,
+ * with how much is left and a play button that resumes it. Opens the
+ * Podcast view (saved shows and episodes).
+ */
+export function PodcastWidget(p: WidgetProps) {
+  const music = useMusicPlayer();
+  const recent = useRecentEpisodes(1);
+  const np = music.nowPlaying;
+  const nowEp = np?.track && isEpisode(np.track) ? np.track : null;
+  const last = recent[0] ?? null;
+  const track = nowEp ?? last?.track ?? null;
+  const isNow = !!nowEp;
+  const playing = isNow && !!np?.isPlaying;
+  useTick(1000, playing);
+  const durationMs = track?.durationMs ?? 0;
+  const pos = isNow ? music.readPosition() : last?.positionMs ?? 0;
+  const start = !isNow && last ? resumeFrom({ local: { positionMs: last.positionMs }, spotify: null, durationMs: last.durationMs }) : 0;
+  const canQueue = music.available && music.connected && music.premium;
+  const showPause = playing && music.audioReady && !!track && engineHoldsUri(track.uri);
+  const onPlay = () => {
+    if (!track) return;
+    if (isNow) void musicQueue.togglePlay();
+    else void musicQueue.playTrack(track, undefined, start);
+  };
+  const face: Face = {
+    label: 'Podcast',
+    meta: music.connected ? 'Spotify' : music.available ? 'Not connected' : 'Mac app only',
+    children: (
+      <span className="bw-music">
+        <span className="bw-art">{track?.artUrl ? <img src={track.artUrl} alt="" /> : <AtlasIcon name="voice" size={22} weight={1.6} />}</span>
+        <span className="bw-music-text">
+          <span className="bw-music-t">{track?.title ?? (music.connected ? 'No episode started' : 'Connect Spotify')}</span>
+          <span className="bw-music-s">{track ? `${track.artist} · ${episodeLeft(durationMs, pos)}` : music.connected ? 'Open to pick from your shows' : 'Through the Music screen'}</span>
+        </span>
+        {track ? (
+          <span className="bw-music-ctl" {...own}>
+            <button type="button" className="main" aria-label={showPause ? 'Pause' : start > 0 ? 'Resume' : 'Play'} disabled={!canQueue} title={canQueue ? undefined : 'Episodes play through Atlas with Spotify Premium.'} onClick={onPlay}>
+              <AtlasIcon name={showPause ? 'pause' : 'play'} size={16} />
+            </button>
+          </span>
+        ) : null}
+      </span>
+    ),
+    bar: track && durationMs > 0 ? { fraction: Math.min(1, Math.max(0, pos / durationMs)), colour: 'var(--b-on-ink)' } : undefined,
   };
   return <Card p={p} face={face} tone="ink" />;
 }
@@ -547,7 +720,8 @@ export function SleepWidget(p: WidgetProps) {
 export function HomeKitWidget(p: WidgetProps) {
   const { snapshot, usable } = useSmartHome();
   const devices = snapshot?.rooms.flatMap((r) => r.devices) ?? [];
-  const thermostats = devices.filter((d) => d.kind === 'thermostat' && d.control === 'stepper');
+  // A water heater's tank is not the inside temperature (Smart Home row 47).
+  const thermostats = devices.filter((d) => d.kind === 'thermostat' && d.control === 'stepper' && d.domain !== 'water_heater');
   const avg = thermostats.length ? thermostats.reduce((a, d) => a + d.value, 0) / thermostats.length : null;
   const lock = devices.find((d) => d.kind === 'lock');
   const face: Face = {
@@ -619,6 +793,104 @@ export function CurrencyWidget(p: WidgetProps) {
   return <Card p={p} face={face} />;
 }
 
+// --- Smart Home: lamps, lights, the door camera ------------------------------------
+
+/** Clicks and keys inside a widget's own controls must not also open the widget. */
+const keep = {
+  onClick: (e: { stopPropagation: () => void }) => e.stopPropagation(),
+  onKeyDown: (e: { stopPropagation: () => void }) => e.stopPropagation(),
+};
+
+/** The design's three lamp drawings; `glass` is the light's colour, or unlit paper. */
+function LampArt({ which, glass, lit }: { which: LightWidget; glass: string; lit: boolean }) {
+  const cone = lit ? 0.55 : 0;
+  if (which === 'bulb') {
+    return (
+      <svg height="72" viewBox="0 0 64 84" fill="none" aria-hidden>
+        <path d="M32 6C20 6 12 15 12 26c0 8 5 12 8 17 2 3 3 5 3 8h18c0-3 1-5 3-8 3-5 8-9 8-17C52 15 44 6 32 6z" fill={glass} />
+        <path d="M27 47c0-5-3-8-3-12m13 12c0-5 3-8 3-12" stroke="#b6b1aa" strokeWidth="1.6" strokeLinecap="round" />
+        <rect x="24" y="55" width="16" height="3.5" rx="1.75" fill="#b6b1aa" />
+        <rect x="25" y="60" width="14" height="3.5" rx="1.75" fill="#c9c3ba" />
+        <path d="M27 66h10l-3 5h-4z" fill="#b6b1aa" />
+      </svg>
+    );
+  }
+  if (which === 'floorlamp') {
+    return (
+      <svg height="80" viewBox="0 0 64 96" fill="none" aria-hidden>
+        <path d="M22 28 L42 28 L48 88 L16 88 Z" fill={glass} opacity={cone} />
+        <rect x="18" y="8" width="28" height="20" rx="5" fill="#55524b" />
+        <rect x="21" y="24" width="22" height="4" rx="2" fill={glass} />
+        <rect x="31" y="28" width="2.4" height="58" fill="#8b8681" />
+        <rect x="20" y="86" width="24" height="4" rx="2" fill="#b6b1aa" />
+      </svg>
+    );
+  }
+  return (
+    <svg height="72" viewBox="0 0 84 84" fill="none" aria-hidden>
+      <path d="M40 40 L52 40 L64 76 L28 76 Z" fill={glass} opacity={cone} />
+      <ellipse cx="24" cy="76" rx="14" ry="3.5" fill="#c9c3ba" />
+      <path d="M24 74 36 48 45 31" stroke="#8b8681" strokeWidth="3" strokeLinecap="round" />
+      <path d="M34 26h24l-6 15H40z" fill="#55524b" />
+      <circle cx="46" cy="43" r="4.5" fill={glass} />
+    </svg>
+  );
+}
+
+const UNLIT = '#e8e4de';
+const LIGHT_LABEL: Record<LightWidget, string> = { lamp: 'Lamp', bulb: 'Bulb', floorlamp: 'Floor lamp' };
+
+/**
+ * Lamp, Bulb and Floor lamp: one real light from Home Assistant, the design's
+ * drawing of it, a tap on the drawing to switch it, and — for a colour light —
+ * the swatches, which go through `setDeviceColour` like the Smart Home stage's.
+ */
+function LightCard({ p, which }: { p: WidgetProps; which: LightWidget }) {
+  const { snapshot, usable, setDeviceValue, setDeviceColour } = useSmartHome();
+  const devices = snapshot.rooms.flatMap((r) => r.devices);
+  const d = pickLight(devices, which);
+  // The level the light last ran at, so a tap brings it back there.
+  const lastOn = useRef<Record<string, number>>({});
+  if (d && d.value > 0 && d.control !== 'toggle' && !d.pending) lastOn.current[d.id] = d.value;
+  const hasBridge = snapshot.bridgeState !== 'none';
+  const inert = !usable || (hasBridge && snapshot.bridgeState !== 'connected') || !d || !d.available;
+  const on = !!d && d.available && d.value > 0;
+  const glass = on ? d?.colour ?? '#ffd9a0' : UNLIT;
+  const status = !d
+    ? !usable ? 'Mac app only' : !hasBridge ? 'Link Home Assistant in Smart Home' : which === 'floorlamp' ? 'No light is named a floor lamp' : 'Your bridge reports no light'
+    : !d.available ? 'Not responding'
+      : d.pending || d.note ? d.state
+        : on ? (d.control === 'toggle' ? 'On' : `${colourName(d.colour) ?? 'On'} · ${Math.round(d.value)}%`) : 'Off · tap the lamp';
+  const face: Face = {
+    label: LIGHT_LABEL[which],
+    meta: d ? [d.name, d.roomName].filter(Boolean).join(' · ') : snapshot.hub?.name ?? (usable ? 'No hub' : 'Mac app only'),
+    children: (
+      <span className="bw-sh-lamp">
+        <span className="bw-sh-lamp-glow" style={{ background: `radial-gradient(closest-side, ${glass}, transparent 70%)`, opacity: on ? 0.9 : 0 }} />
+        <button
+          type="button" className="bw-sh-lamp-btn" onKeyDown={keep.onKeyDown} disabled={inert}
+          aria-label={d ? `${d.name}: ${on ? 'turn off' : 'turn on'}` : LIGHT_LABEL[which]} aria-pressed={on}
+          onClick={(e) => { e.stopPropagation(); if (d) setDeviceValue(d.id, powerValue(d, lastOn.current[d.id])); }}
+        >
+          <LampArt which={which} glass={glass} lit={on} />
+        </button>
+        <span className="bw-sh-lamp-status">{status}</span>
+        {d && d.control === 'colour' ? (
+          <span className="bw-sh-swatches" {...keep}>
+            {SWATCHES.map((w) => (
+              <button
+                type="button" key={w.c} aria-label={w.l} title={w.l} aria-pressed={d.colour?.toLowerCase() === w.c} disabled={inert}
+                style={{ background: w.c }} onClick={(e) => { e.stopPropagation(); setDeviceColour(d.id, w.c); }}
+              />
+            ))}
+          </span>
+        ) : null}
+      </span>
+    ),
+  };
+  return <Card p={p} face={face} />;
+}
+
 /** The running session's clock and what it held; between sessions, today's focus. */
 export function FocusWidget(p: WidgetProps) {
   const focus = useFocus();
@@ -656,6 +928,161 @@ export function FocusWidget(p: WidgetProps) {
   return <Card p={p} face={face} tone={s ? 'ink' : 'sky'} />;
 }
 
+export const LampWidget = (p: WidgetProps) => <LightCard p={p} which="lamp" />;
+export const BulbWidget = (p: WidgetProps) => <LightCard p={p} which="bulb" />;
+export const FloorLampWidget = (p: WidgetProps) => <LightCard p={p} which="floorlamp" />;
+
+/** Lights: how many are on and where, each one switchable, and All off. */
+export function LightsWidget(p: WidgetProps) {
+  const { snapshot, usable, setDeviceValue } = useSmartHome();
+  const devices = snapshot.rooms.flatMap((r) => r.devices);
+  const sum = lightsSummary(devices);
+  const hasBridge = snapshot.bridgeState !== 'none';
+  const inert = !usable || (hasBridge && snapshot.bridgeState !== 'connected');
+  const face: Face = {
+    label: 'Lights',
+    meta: sum.total ? `${sum.on.length} of ${sum.total} on` : snapshot.hub?.name ?? (usable ? 'No hub' : 'Mac app only'),
+    value: sum.total ? (sum.on.length ? (sum.brightness != null ? `${sum.brightness}%` : 'On') : 'Off') : '—',
+    sub: !usable ? 'Smart home runs in the Mac app'
+      : !hasBridge ? 'Link Home Assistant in Smart Home'
+        : !sum.total ? 'Your bridge reports no lights'
+          : sum.on.length ? `${sum.on.length} on in ${sum.rooms} ${sum.rooms === 1 ? 'room' : 'rooms'}` : 'Every light is off',
+    bar: sum.brightness != null ? { fraction: sum.brightness / 100, colour: '#ffd9a0' } : undefined,
+    // A row is a light that is on; tapping it switches that light off.
+    rows: sum.on.slice(0, 4).map<FaceRow>((d) => ({
+      key: d.id, leadKind: 'dot', dotOn: true, title: d.name, sub: d.roomName,
+      value: d.control === 'toggle' ? 'On' : `${Math.round(d.value)}%`, valueTone: 'muted',
+      onClick: inert ? undefined : () => setDeviceValue(d.id, 0),
+    })),
+    tail: sum.on.length && !inert ? (
+      <button type="button" className="b-btn b-btn--card b-btn--row" onKeyDown={keep.onKeyDown} onClick={(e) => { e.stopPropagation(); for (const d of sum.on) setDeviceValue(d.id, 0); }}>
+        All off
+      </button>
+    ) : undefined,
+  };
+  return <Card p={p} face={face} />;
+}
+
+/**
+ * Front door: the door camera, the last motion its own sensors saw, and a
+ * still frame on request. The frame is fetched from the hub when asked and
+ * lives only as long as this card; nothing is polled or kept.
+ */
+export function FrontDoorWidget(p: WidgetProps) {
+  const { snapshot, usable, loadHistory, cameraStill } = useSmartHome();
+  const devices = useMemo(() => snapshot.rooms.flatMap((r) => r.devices), [snapshot.rooms]);
+  const cam = pickDoorCamera(devices);
+  const sensors = useMemo(() => (cam ? cameraSensors(cam, devices) : []), [cam, devices]);
+  const sensorKey = sensors.map((s) => `${s.id}:${s.value}`).join('|');
+  const [events, setEvents] = useState<HistoryEvent[]>([]);
+  const [shot, setShot] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const now = useTick(30000, !!cam);
+  const hasBridge = snapshot.bridgeState !== 'none';
+  useEffect(() => {
+    if (!usable || !hasBridge || !sensorKey) return;
+    let on = true;
+    loadHistory({ since: new Date(Date.now() - 7 * 86_400_000).toISOString(), limit: 200 })
+      .then((h) => { if (on) setEvents(h.events); })
+      .catch(() => { /* the card still says what the sensors say now */ });
+    return () => { on = false; };
+  }, [usable, hasBridge, sensorKey, loadHistory]);
+  const line = cam ? cameraEventLine(lastMotion(sensors, events), now) : null;
+  const inert = !usable || !cam || (hasBridge && snapshot.bridgeState !== 'connected');
+  const face: Face = {
+    label: 'Front door',
+    meta: cam ? cam.name : snapshot.hub?.name ?? (usable ? 'No hub' : 'Mac app only'),
+    value: cam ? (cam.available ? 'Camera' : 'Offline') : '—',
+    sub: !usable ? 'Smart home runs in the Mac app'
+      : !hasBridge ? 'Link Home Assistant in Smart Home'
+        : !cam ? 'Your bridge reports no camera'
+          : line ?? (sensors.length ? 'No motion seen this week' : 'No motion sensor on this camera'),
+    bleed: shot ? <img className="bw-sh-cam" src={shot} alt={cam ? `${cam.name}, still frame` : ''} /> : null,
+    tail: cam ? (
+      <span className="bw-sh-cam-row" {...keep}>
+        <button
+          type="button" className="b-btn b-btn--onink b-btn--row" disabled={inert || busy}
+          onClick={(e) => {
+            e.stopPropagation();
+            setBusy(true);
+            setErr(null);
+            cameraStill(cam.id)
+              .then((r) => setShot(r.dataUrl))
+              .catch((x) => setErr(x instanceof Error ? x.message : String(x)))
+              .finally(() => setBusy(false));
+          }}
+        >{busy ? 'Fetching…' : shot ? 'New still' : 'Show a still'}</button>
+        {err ? <span className="bw-sh-cam-err">{err}</span> : null}
+      </span>
+    ) : undefined,
+  };
+  return <Card p={p} face={face} tone="ink" />;
+}
+
+// --- Transit (left-out row 20) -----------------------------------------------------
+
+/** Every two minutes while Home is visible: a day of it stays well inside the access ID's monthly allowance. */
+const TRANSIT_REFRESH_MS = 120_000;
+
+/**
+ * Rejseplanen departures from the user's stop. Dormant until an access ID is
+ * in the Keychain and a stop is chosen, and the face says which is missing;
+ * opening it goes to the Answer screen's board, where both are set up.
+ */
+export function TransitWidget(p: WidgetProps) {
+  const transit = useTransit();
+  const navigate = useBetaNavigate();
+  const { status, stop, departures } = transit;
+  const [deps, setDeps] = useState<Departure[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const live = status === 'ready' && !!stop && !p.preview;
+  // The countdowns are the only thing that moves, so a dormant card does not tick.
+  const now = useTick(30000, live);
+
+  useEffect(() => {
+    if (!live || !stop) return;
+    let alive = true;
+    const load = () => {
+      if (document.visibilityState !== 'visible') return;
+      departures(stop)
+        .then((list) => { if (alive) { setDeps(list); setError(null); } })
+        .catch((e: unknown) => { if (alive) setError(e instanceof Error ? e.message : 'Rejseplanen did not answer.'); });
+    };
+    load();
+    const id = window.setInterval(load, TRANSIT_REFRESH_MS);
+    return () => { alive = false; window.clearInterval(id); };
+  }, [live, stop, departures]);
+
+  const upcoming = (deps ?? []).filter((d) => d.at >= now - 60_000);
+  const next = upcoming.find((d) => !d.cancelled) ?? null;
+  const open = p.open ? () => navigate('/answer', { state: { departures: true } }) : undefined;
+  const face: Face = status !== 'ready' || !stop
+    ? {
+        label: 'Transit',
+        meta: status === 'unavailable' ? 'Mac app only' : status === 'needs-key' ? 'Not connected' : 'Rejseplanen',
+        value: '—',
+        sub: status === 'unavailable'
+          ? 'Departures come through the Atlas app on your Mac'
+          : status === 'needs-key'
+            ? 'Add a Rejseplanen access ID. Open this card to set it up.'
+            : status === 'ready' ? 'Choose your stop. Open this card to pick one.' : 'Checking Rejseplanen…',
+      }
+    : {
+        label: 'Transit',
+        meta: stop.name,
+        value: next ? next.expected : '—',
+        delta: next ? countdown(next, new Date(now)) : undefined,
+        deltaTone: next && next.delayMin > 0 ? 'down' : 'blue',
+        // A preview never asks Rejseplanen, so it must not say it is asking.
+        sub: error ?? (next ? `${next.line}${next.direction ? ` → ${next.direction}` : ''}` : deps ? 'Nothing leaves in the next two hours' : p.preview ? 'Live departures from Rejseplanen' : 'Asking Rejseplanen…'),
+        rows: upcoming.filter((d) => d !== next).slice(0, 3).map<FaceRow>((d) => ({
+          key: d.key, lead: d.expected, title: d.line, sub: d.direction || undefined, value: departureNote(d), valueTone: d.cancelled || d.delayMin > 0 ? 'down' : 'muted', strike: d.cancelled,
+        })),
+      };
+  return <Card p={{ ...p, open }} face={face} />;
+}
+
 // --- Not wired yet -----------------------------------------------------------------
 
 export function UnwiredWidget(p: WidgetProps & { id: string }) {
@@ -681,6 +1108,7 @@ const BY_ID: Record<string, (p: WidgetProps) => JSX.Element> = {
   dials: DialsWidget,
   countdown: CountdownWidget,
   music: MusicWidget,
+  podcast: PodcastWidget,
   activity: ActivityWidget,
   steps: StepsWidget,
   sleep: SleepWidget,
@@ -688,6 +1116,21 @@ const BY_ID: Record<string, (p: WidgetProps) => JSX.Element> = {
   upnext: UpNextWidget,
   fx: CurrencyWidget,
   focus: FocusWidget,
+  lamp: LampWidget,
+  lights: LightsWidget,
+  bulb: BulbWidget,
+  floorlamp: FloorLampWidget,
+  frontdoor: FrontDoorWidget,
+  transit: TransitWidget,
+  // The Money faces exist only where /money does, like their WIDGETS entries
+  // (betaHome.ts moneyWidgets). The direct comparison is what Vite folds, so a
+  // consumer bundle drops these faces and, with them, useBank and its bank_*
+  // commands — not listing a widget is not the same as not shipping it.
+  ...(import.meta.env.VITE_ATLAS_EDITION === 'consumer' ? {} : {
+    spend: SpendWidget,
+    budget: BudgetWidget,
+    subscriptions: SubscriptionsWidget,
+  }),
 };
 
 export function HomeWidget({ id, ...p }: WidgetProps & { id: string }) {

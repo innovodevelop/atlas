@@ -71,6 +71,13 @@ export const HOME_COMMANDS = {
   setAutonomy: 'home_set_autonomy',
   liveStart: 'home_live_start',
   liveStop: 'home_live_stop',
+  // The Beta extras (src-tauri/src/home/beta.rs).
+  history: 'home_history',
+  energyToday: 'home_energy_today',
+  cameraStill: 'home_camera_still',
+  automationSet: 'home_automation_set',
+  modeMap: 'home_mode_map',
+  modeSet: 'home_mode_set',
 } as const;
 
 export type InvokeFn = <T = unknown>(cmd: string, args: Record<string, unknown>) => Promise<T>;
@@ -110,6 +117,155 @@ export interface LiveDevice extends SmartDevice {
   pending: OverlayPhase | null;
   /** Why the last actuation for this device did not happen, in Rust's words. */
   note: DeviceNote | null;
+  // ── The Beta extras (home_device_detail). Each is absent or null when the
+  // bridge did not say — a thermostat with no target is not set to 0°. ──
+  /** The Home Assistant domain: `climate`, `water_heater`, `binary_sensor`… */
+  domain?: string | null;
+  deviceClass?: string | null;
+  unit?: string | null;
+  /** What a thermostat or water heater is SET to. `value` stays the reading. */
+  target?: number | null;
+  /** `heating`, `cooling`, `idle`, `off` — the thermostat's own word. */
+  hvacAction?: string | null;
+  /** The Home Assistant device this entity belongs to. */
+  hubDeviceId?: string | null;
+  /** `grid` | `solar` | `device`, from Home Assistant's Energy dashboard. */
+  energyRole?: string | null;
+  /** The raw ISO of the last state change ("Locked at 08:31"). */
+  lastChangedAt?: string | null;
+}
+
+/** One Home Assistant automation, with the switch the Beta screen draws. */
+export interface LiveAutomation {
+  id: string;
+  externalId: string;
+  label: string;
+  on: boolean;
+  available: boolean;
+  lastTriggered: string | null;
+}
+
+/** One script, and whether Atlas may run it (it reaches no lock). */
+export interface LiveScript {
+  id: string;
+  externalId: string;
+  label: string;
+  runnable: boolean;
+  available: boolean;
+}
+
+/** A person (or a phone's GPS tracker) and where Home Assistant says they are. */
+export interface LivePerson {
+  id: string;
+  name: string;
+  kind: 'person' | 'device_tracker';
+  /** `home`, `not_home`, or a zone's name. */
+  state: string | null;
+  available: boolean;
+  lastChanged: string | null;
+}
+
+export type HomeMode = 'home' | 'away' | 'night';
+export const HOME_MODES: readonly HomeMode[] = ['home', 'away', 'night'];
+
+/** What one mode runs. `routineId` is null when the bridge no longer reports it. */
+export interface ModeRoutine {
+  mode: HomeMode;
+  kind: 'scene' | 'script' | null;
+  externalId: string | null;
+  label: string | null;
+  routineId: string | null;
+  runnable: boolean | null;
+}
+
+export interface LiveModes {
+  current: HomeMode | null;
+  since: string | null;
+  map: ModeRoutine[];
+}
+
+/** One row of `home_events`: a change the mirror saw, or a command Atlas sent. */
+export interface HomeEvent {
+  id: number;
+  externalId: string;
+  /** The local device id, when the entity is still a device in the mirror. */
+  deviceId: string | null;
+  kind: 'state' | 'command';
+  value: number | null;
+  state: string | null;
+  available: boolean | null;
+  /** A command's verb: `lock`, `unlock`, `set`, `colour`, `run`, `turn_on`… */
+  detail: string | null;
+  at: string;
+}
+
+export interface HomeHistory {
+  events: HomeEvent[];
+  keptDays: number;
+}
+
+export interface EnergySensorToday {
+  deviceId: string;
+  externalId: string;
+  /** The day's kWh, or null when Home Assistant keeps no statistics for it. */
+  kwh: number | null;
+  /** 24 local hours; null is an hour the recorder did not compile, not zero. */
+  hours: (number | null)[];
+}
+
+export interface EnergyToday {
+  at: string;
+  since: string | null;
+  sensors: EnergySensorToday[];
+}
+
+export interface CameraStill {
+  dataUrl: string;
+  at: string;
+}
+
+const optNum = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+export function decodeHistory(raw: unknown): HomeHistory {
+  const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const list = Array.isArray(r.events) ? (r.events as Record<string, unknown>[]) : [];
+  return {
+    keptDays: optNum(r.keptDays) ?? 30,
+    events: list
+      .filter((e) => e && typeof e.at === 'string' && typeof e.externalId === 'string')
+      .map((e) => ({
+        id: optNum(e.id) ?? 0,
+        externalId: e.externalId as string,
+        deviceId: typeof e.deviceId === 'string' ? e.deviceId : null,
+        kind: e.kind === 'command' ? 'command' : 'state',
+        value: optNum(e.value),
+        state: typeof e.state === 'string' ? e.state : null,
+        available: typeof e.available === 'boolean' ? e.available : null,
+        detail: typeof e.detail === 'string' ? e.detail : null,
+        at: e.at as string,
+      })),
+  };
+}
+
+export function decodeEnergy(raw: unknown): EnergyToday {
+  const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const list = Array.isArray(r.sensors) ? (r.sensors as Record<string, unknown>[]) : [];
+  return {
+    at: typeof r.at === 'string' ? r.at : '',
+    since: typeof r.since === 'string' ? r.since : null,
+    sensors: list
+      .filter((x) => x && typeof x.deviceId === 'string')
+      .map((x) => {
+        const hours = Array.isArray(x.hours) ? (x.hours as unknown[]).map(optNum) : [];
+        while (hours.length < 24) hours.push(null);
+        return {
+          deviceId: x.deviceId as string,
+          externalId: typeof x.externalId === 'string' ? x.externalId : '',
+          kwh: optNum(x.kwh),
+          hours: hours.slice(0, 24),
+        };
+      }),
+  };
 }
 
 export interface LiveRoom extends SmartRoom {
@@ -141,6 +297,12 @@ export interface LiveSnapshot extends SmartHomeSnapshot {
   /** "40 minutes ago", or null if Atlas has never completed a sync. */
   lastReachedLabel: string | null;
   counts: { devices: number; rooms: number; scenes: number; unavailable: number };
+  automations: LiveAutomation[];
+  scripts: LiveScript[];
+  presence: LivePerson[];
+  modes: LiveModes;
+  /** Scenes Atlas will not run (a lock in them, or contents it cannot see). */
+  lockedSceneIds: string[];
 }
 
 /** `bad` — it did not happen. `warn` — it may have; nobody has confirmed. */
@@ -155,6 +317,8 @@ export interface DeviceOverlay {
   phase: OverlayPhase;
   value?: number;
   colour?: string;
+  /** A thermostat's requested target: the stepper moves this, not the reading. */
+  target?: number;
 }
 
 export interface UseSmartHome extends SmartHomeState {
@@ -168,6 +332,20 @@ export interface UseSmartHome extends SmartHomeState {
   warning: string | null;
   /** The last scene Atlas applied. No bridge reports which scene is "on". */
   lastSceneRun: { id: string; label: string; at: number } | null;
+  /** Automations whose switch is in flight: id → the state asked for. */
+  automationPending: Record<string, boolean>;
+  /** The mode being switched to while its scene or script runs. */
+  modePending: HomeMode | null;
+  setAutomation(id: string, on: boolean): void;
+  /** Map a mode to a scene or script (a local id), or clear it with null. */
+  mapMode(mode: HomeMode, routineId: string | null): Promise<void>;
+  setMode(mode: HomeMode): void;
+  /** The history Atlas keeps (home_events), newest first. Throws the sentence to show. */
+  loadHistory(opts?: { deviceId?: string; since?: string; limit?: number }): Promise<HomeHistory>;
+  /** Today's kWh per energy sensor, from Home Assistant's statistics. Throws the sentence to show. */
+  loadEnergy(): Promise<EnergyToday>;
+  /** One still frame from a camera, on request. Throws the sentence to show. */
+  cameraStill(deviceId: string): Promise<CameraStill>;
   refresh(): Promise<void>;
   linkHomeAssistant(baseUrl: string, token: string): Promise<void>;
   unlink(kind: string): Promise<void>;
@@ -238,8 +416,77 @@ function decodeDevice(raw: Raw, nowMs: number): LiveDevice {
   };
   if (typeof raw.colour === 'string') device.colour = raw.colour;
   if (seen) device.lastChanged = seen;
+  // The Beta extras. Absent stays absent: a thermostat with no target is not
+  // one set to 0°, and a device synced before the extras has no domain.
+  const optStr = (v: unknown): string | null => (typeof v === 'string' && v.length > 0 ? v : null);
+  device.domain = optStr(raw.domain);
+  device.deviceClass = optStr(raw.deviceClass);
+  device.unit = optStr(raw.unit);
+  device.target = typeof raw.target === 'number' && Number.isFinite(raw.target) ? raw.target : null;
+  device.hvacAction = optStr(raw.hvacAction);
+  device.hubDeviceId = optStr(raw.hubDeviceId);
+  device.energyRole = optStr(raw.energyRole);
+  device.lastChangedAt = optStr(raw.lastChanged);
   return device;
 }
+
+function decodeAutomation(raw: Raw): LiveAutomation {
+  return {
+    id: str(raw.id),
+    externalId: str(raw.externalId),
+    label: str(raw.label, 'Automation'),
+    on: bool(raw.on),
+    available: bool(raw.available),
+    lastTriggered: typeof raw.lastTriggered === 'string' ? raw.lastTriggered : null,
+  };
+}
+
+function decodeScript(raw: Raw): LiveScript {
+  return {
+    id: str(raw.id),
+    externalId: str(raw.externalId),
+    label: str(raw.label, 'Script'),
+    runnable: bool(raw.runnable),
+    available: bool(raw.available),
+  };
+}
+
+function decodePerson(raw: Raw): LivePerson {
+  return {
+    id: str(raw.id),
+    name: str(raw.name, 'Someone'),
+    kind: raw.kind === 'device_tracker' ? 'device_tracker' : 'person',
+    state: typeof raw.state === 'string' ? raw.state : null,
+    available: bool(raw.available),
+    lastChanged: typeof raw.lastChanged === 'string' ? raw.lastChanged : null,
+  };
+}
+
+const isMode = (v: unknown): v is HomeMode => typeof v === 'string' && (HOME_MODES as readonly string[]).includes(v);
+
+/** The modes block. Every mode is present in the result, mapped or not. */
+export function decodeModes(raw: unknown): LiveModes {
+  const r = raw && typeof raw === 'object' ? (raw as Raw) : {};
+  const given: Raw[] = Array.isArray(r.map) ? r.map : [];
+  const map = HOME_MODES.map((mode): ModeRoutine => {
+    const m = given.find((x) => x && x.mode === mode) ?? {};
+    return {
+      mode,
+      kind: m.kind === 'scene' || m.kind === 'script' ? m.kind : null,
+      externalId: typeof m.externalId === 'string' ? m.externalId : null,
+      label: typeof m.label === 'string' ? m.label : null,
+      routineId: typeof m.routineId === 'string' ? m.routineId : null,
+      runnable: typeof m.runnable === 'boolean' ? m.runnable : null,
+    };
+  });
+  return {
+    current: isMode(r.current) ? r.current : null,
+    since: typeof r.since === 'string' ? r.since : null,
+    map,
+  };
+}
+
+export const NO_MODES: LiveModes = decodeModes(null);
 
 function decodeRoom(raw: Raw, nowMs: number): LiveRoom {
   const tone = raw.tone === 'error' || raw.tone === 'warn' ? raw.tone : 'ok';
@@ -307,6 +554,11 @@ export const NO_BRIDGE_SNAPSHOT: LiveSnapshot = {
   lastReachedLabel: null,
   autonomy: [],
   counts: { devices: 0, rooms: 0, scenes: 0, unavailable: 0 },
+  automations: [],
+  scripts: [],
+  presence: [],
+  modes: NO_MODES,
+  lockedSceneIds: [],
 };
 
 /**
@@ -378,6 +630,15 @@ export function decodeSnapshot(raw: unknown, nowMs: number): LiveSnapshot {
         rooms.reduce((n, room) => n + room.devices.filter((d) => !d.available).length, 0),
       ),
     },
+    automations: Array.isArray(r.automations) ? r.automations.map((a: Raw) => decodeAutomation(a)) : [],
+    scripts: Array.isArray(r.scripts) ? r.scripts.map((x: Raw) => decodeScript(x)) : [],
+    presence: Array.isArray(r.presence) ? r.presence.map((x: Raw) => decodePerson(x)) : [],
+    modes: decodeModes(r.modes),
+    // Fail closed, as Rust does: a scene whose flag is missing is one Atlas
+    // cannot vouch for.
+    lockedSceneIds: Array.isArray(r.scenes)
+      ? r.scenes.filter((s: Raw) => s.touchesLocks !== false).map((s: Raw) => str(s.id))
+      : [],
   };
 }
 
@@ -398,7 +659,7 @@ const UNCONFIRMED_LINE = 'Sent · never confirmed';
  * the same mark are the same reading; a different mark is the device speaking.
  */
 export function deviceMark(d: LiveDevice): string {
-  return `${d.value}|${d.colour ?? ''}|${d.available ? 1 : 0}|${d.lastKnownState}`;
+  return `${d.value}|${d.colour ?? ''}|${d.available ? 1 : 0}|${d.lastKnownState}|${d.target ?? ''}|${d.hvacAction ?? ''}`;
 }
 
 /**
@@ -476,6 +737,7 @@ export function applyOverlays(
           ...d,
           value: overlay.value ?? d.value,
           colour: overlay.colour ?? d.colour,
+          target: overlay.target ?? d.target,
           pending: overlay.phase,
           state: PENDING_LINE[overlay.phase],
         };
@@ -552,6 +814,16 @@ export interface SmartHomeDeps {
   now?: () => number;
 }
 
+/**
+ * How many mounted hooks hold the push channel open. Rust runs ONE live loop
+ * and `home_live_stop` ends it for everyone, while Home can mount several
+ * hooks at once (the Lamp, Lights, Front door and Home widgets each hold
+ * one). Without the count, the first of them to unmount — a widget removed in
+ * Edit Home — would switch live updates off for the rest. Starting is
+ * idempotent in Rust; only the last holder to leave sends the stop.
+ */
+let liveHolders = 0;
+
 export function useSmartHome(deps?: SmartHomeDeps): UseSmartHome {
   const { user } = useAuth();
   const userId = user?.id ?? null;
@@ -627,7 +899,7 @@ export function useSmartHome(deps?: SmartHomeDeps): UseSmartHome {
   useEffect(() => {
     if (!usable) return;
     const channel = localClient.channel('smart-home');
-    for (const table of ['home_bridges', 'home_rooms', 'home_devices', 'home_scenes']) {
+    for (const table of ['home_bridges', 'home_rooms', 'home_devices', 'home_device_state', 'home_scenes', 'home_hub_entities', 'home_modes']) {
       channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => {
         void refresh();
       });
@@ -648,12 +920,16 @@ export function useSmartHome(deps?: SmartHomeDeps): UseSmartHome {
   useEffect(() => {
     if (!usable || !userId || !raw.bridgeConnected) return;
     let stopped = false;
+    liveHolders += 1;
     void invoke(HOME_COMMANDS.liveStart, { userId }).catch((e) => {
       // Live updates are an enhancement; the page reads correctly without them.
       if (!stopped) setWarning(`Live updates are off: ${messageOf(e)}`);
     });
     return () => {
       stopped = true;
+      liveHolders = Math.max(0, liveHolders - 1);
+      // Another mounted hook still reads the push channel.
+      if (liveHolders > 0) return;
       void invoke(HOME_COMMANDS.liveStop, {}).catch(() => {
         /* Unmounting; there is nobody left to tell. Rust stops it on exit too. */
       });
@@ -762,6 +1038,7 @@ export function useSmartHome(deps?: SmartHomeDeps): UseSmartHome {
       }
       if (overlay.value !== undefined && Math.abs(d.value - overlay.value) < 0.001) confirmed.push(deviceId);
       else if (overlay.colour !== undefined && d.colour === overlay.colour) confirmed.push(deviceId);
+      else if (overlay.target !== undefined && d.target != null && Math.abs(d.target - overlay.target) < 0.001) confirmed.push(deviceId);
     }
     if (confirmed.length === 0) return;
     for (const id of confirmed) clearTimer(id);
@@ -823,7 +1100,13 @@ export function useSmartHome(deps?: SmartHomeDeps): UseSmartHome {
         return;
       }
       const plan = deviceSetPlan(uid, device, value);
-      void actuate(deviceId, { phase: 'sending', value: plan.optimistic }, plan);
+      // A thermostat's stepper moves its TARGET; the value is the room's
+      // reading and will not become the asked-for number. When the bridge
+      // reports no target at all, the old behaviour stands.
+      const overlay: DeviceOverlay = device.control === 'stepper' && device.target != null
+        ? { phase: 'sending', target: plan.optimistic }
+        : { phase: 'sending', value: plan.optimistic };
+      void actuate(deviceId, overlay, plan);
     },
     [requireSession, findDevice, actuate],
   );
@@ -945,6 +1228,112 @@ export function useSmartHome(deps?: SmartHomeDeps): UseSmartHome {
     }
   }, [requireSession, invoke, refresh]);
 
+  // -------------------------------------------------------------------------
+  // The Beta extras: automations, modes, and the reads behind energy,
+  // history and the camera
+  // -------------------------------------------------------------------------
+
+  const [automationPending, setAutomationPending] = useState<Record<string, boolean>>({});
+  const [modePending, setModePending] = useState<HomeMode | null>(null);
+
+  const setAutomation = useCallback(
+    (id: string, on: boolean) => {
+      let uid: string;
+      try {
+        uid = requireSession();
+      } catch (e) {
+        setError(messageOf(e));
+        return;
+      }
+      setError(null);
+      setAutomationPending((p) => ({ ...p, [id]: on }));
+      void invoke(HOME_COMMANDS.automationSet, { userId: uid, automationId: id, on })
+        .then(() => refresh())
+        .catch((e) => setError(messageOf(e)))
+        .finally(() => setAutomationPending((p) => {
+          const next = { ...p };
+          delete next[id];
+          return next;
+        }));
+    },
+    [requireSession, invoke, refresh],
+  );
+
+  const mapMode = useCallback(
+    async (mode: HomeMode, routineId: string | null) => {
+      const uid = requireSession();
+      setError(null);
+      try {
+        await invoke(HOME_COMMANDS.modeMap, { userId: uid, mode, routineId });
+        await refresh();
+      } catch (e) {
+        setError(messageOf(e));
+        throw e instanceof Error ? e : new Error(messageOf(e));
+      }
+    },
+    [requireSession, invoke, refresh],
+  );
+
+  const setMode = useCallback(
+    (mode: HomeMode) => {
+      let uid: string;
+      try {
+        uid = requireSession();
+      } catch (e) {
+        setError(messageOf(e));
+        return;
+      }
+      setError(null);
+      setModePending(mode);
+      void invoke(HOME_COMMANDS.modeSet, { userId: uid, mode })
+        .then(() => refresh())
+        .catch((e) => setError(messageOf(e)))
+        .finally(() => setModePending(null));
+    },
+    [requireSession, invoke, refresh],
+  );
+
+  const loadHistory = useCallback(
+    async (opts?: { deviceId?: string; since?: string; limit?: number }): Promise<HomeHistory> => {
+      const uid = requireSession();
+      try {
+        const raw = await invoke(HOME_COMMANDS.history, {
+          userId: uid, deviceId: opts?.deviceId ?? null, since: opts?.since ?? null, limit: opts?.limit ?? null,
+        });
+        return decodeHistory(raw);
+      } catch (e) {
+        throw new Error(messageOf(e));
+      }
+    },
+    [requireSession, invoke],
+  );
+
+  const loadEnergy = useCallback(async (): Promise<EnergyToday> => {
+    const uid = requireSession();
+    try {
+      return decodeEnergy(await invoke(HOME_COMMANDS.energyToday, { userId: uid }));
+    } catch (e) {
+      throw new Error(messageOf(e));
+    }
+  }, [requireSession, invoke]);
+
+  const cameraStill = useCallback(
+    async (deviceId: string): Promise<CameraStill> => {
+      const uid = requireSession();
+      try {
+        const raw = await invoke<{ dataUrl?: unknown; at?: unknown }>(HOME_COMMANDS.cameraStill, { userId: uid, deviceId });
+        // Only an image data URL may reach an <img>; anything else is refused.
+        if (!raw || typeof raw.dataUrl !== 'string' || !raw.dataUrl.startsWith('data:image/')) {
+          throw new Error('The camera did not send an image.');
+        }
+        return { dataUrl: raw.dataUrl, at: typeof raw.at === 'string' ? raw.at : new Date(now()).toISOString() };
+      } catch (e) {
+        throw new Error(messageOf(e));
+      }
+    },
+    [requireSession, invoke, now],
+  );
+
   const snapshot = useMemo(() => applyOverlays(raw, overlays, notes), [raw, overlays, notes]);
 
   const dismissError = useCallback(() => setError(null), []);
@@ -960,6 +1349,14 @@ export function useSmartHome(deps?: SmartHomeDeps): UseSmartHome {
     linking,
     syncing,
     lastSceneRun,
+    automationPending,
+    modePending,
+    setAutomation,
+    mapMode,
+    setMode,
+    loadHistory,
+    loadEnergy,
+    cameraStill,
     setDeviceValue,
     setDeviceColour,
     setWidgetOn,

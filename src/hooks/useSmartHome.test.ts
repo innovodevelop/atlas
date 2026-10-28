@@ -22,6 +22,9 @@ import {
   applyOverlays,
   decodeSnapshot,
   decodeBridgeState,
+  decodeEnergy,
+  decodeHistory,
+  decodeModes,
   deviceMark,
   deviceSetPlan,
   expiredWarnNotes,
@@ -466,5 +469,80 @@ describe('a warn note is withdrawn when the device does report', () => {
 
   test('with no notes there is nothing to carry', () => {
     expect(expiredWarnNotes({}, { d1: 'x' }, () => null)).toEqual({ clear: [], marks: {} });
+  });
+});
+
+describe('the Beta extras on the wire', () => {
+  const thermostat = {
+    id: 'd3', name: 'Hall', roomId: 'r1', roomName: 'Living room', kind: 'thermostat', control: 'stepper', value: 20.8, state: 'Heat',
+    available: true, lastChanged: '2026-08-08T11:00:00.000Z', domain: 'climate', target: 21.5, hvacAction: 'heating', hubDeviceId: 'dev-1',
+  };
+  const withExtras = () => wire({
+    rooms: [{ id: 'r1', name: 'Living room', status: '', tone: 'ok', devices: [thermostat] }],
+    scenes: [{ id: 'sc1', label: 'Evening', touchesLocks: false }, { id: 'sc2', label: 'Leaving', touchesLocks: true }, { id: 'sc3', label: 'Old' }],
+    automations: [{ id: 'a1', externalId: 'automation.morning', label: 'Morning', on: true, available: true, lastTriggered: '2026-08-08T06:30:00+00:00' }],
+    scripts: [{ id: 's1', externalId: 'script.lights_out', label: 'Lights out', runnable: true, available: true }],
+    presence: [{ id: 'p1', name: 'Marcus', kind: 'person', state: 'not_home', available: true, lastChanged: null }],
+    modes: { current: 'night', since: '2026-08-08T22:00:00.000Z', map: [{ mode: 'night', kind: 'scene', externalId: 'scene.evening', label: 'Evening', routineId: 'sc1', runnable: true }] },
+  });
+
+  test('a device carries its domain, target, action and raw last change', () => {
+    const d = deviceOf(decodeSnapshot(withExtras(), NOW), 'd3');
+    expect(d.domain).toBe('climate');
+    expect(d.target).toBe(21.5);
+    expect(d.hvacAction).toBe('heating');
+    expect(d.hubDeviceId).toBe('dev-1');
+    expect(d.lastChangedAt).toBe('2026-08-08T11:00:00.000Z');
+    // Absent is null, never zero.
+    const plain = deviceOf(decodeSnapshot(wire(), NOW), 'd1');
+    expect(plain.target).toBeNull();
+    expect(plain.domain).toBeNull();
+  });
+
+  test('automations, scripts, people and modes decode, and a missing block is empty', () => {
+    const snap = decodeSnapshot(withExtras(), NOW);
+    expect(snap.automations).toEqual([{ id: 'a1', externalId: 'automation.morning', label: 'Morning', on: true, available: true, lastTriggered: '2026-08-08T06:30:00+00:00' }]);
+    expect(snap.scripts[0].runnable).toBe(true);
+    expect(snap.presence[0]).toMatchObject({ name: 'Marcus', kind: 'person', state: 'not_home' });
+    expect(snap.modes.current).toBe('night');
+    expect(snap.modes.map.map((m) => m.mode)).toEqual(['home', 'away', 'night']);
+    expect(snap.modes.map[2]).toMatchObject({ kind: 'scene', routineId: 'sc1', label: 'Evening' });
+    expect(snap.modes.map[0]).toMatchObject({ kind: null, routineId: null });
+    // A scene with no lock flag is one Atlas cannot vouch for.
+    expect(snap.lockedSceneIds).toEqual(['sc2', 'sc3']);
+    const bare = decodeSnapshot(wire(), NOW);
+    expect(bare.automations).toEqual([]);
+    expect(bare.modes.current).toBeNull();
+    expect(NO_BRIDGE_SNAPSHOT.modes.map).toHaveLength(3);
+    expect(decodeModes({ current: 'vacation' }).current).toBeNull();
+  });
+
+  test('a thermostat’s in-flight target is the target, not the reading', () => {
+    const snap = decodeSnapshot(withExtras(), NOW);
+    const out = applyOverlays(snap, { d3: { phase: 'sending', target: 22 } }, {});
+    const d = deviceOf(out, 'd3');
+    expect(d.target).toBe(22);
+    expect(d.value).toBe(20.8);
+    expect(deviceMark(d)).toContain('22');
+  });
+
+  test('history, energy and the extras’ commands', () => {
+    const h = decodeHistory({
+      keptDays: 30,
+      events: [
+        { id: 2, externalId: 'lock.front', deviceId: 'd2', kind: 'command', value: 1, state: null, available: null, detail: 'lock', at: '2026-08-08T08:30:00.000Z' },
+        { id: 1, externalId: 'lock.front', deviceId: null, kind: 'state', value: 1, state: 'Locked', available: true, detail: null, at: '2026-08-08T08:31:00.000Z' },
+        { id: 3, kind: 'state' },
+      ],
+    });
+    expect(h.events).toHaveLength(2);
+    expect(h.events[0]).toMatchObject({ kind: 'command', detail: 'lock', deviceId: 'd2' });
+    expect(decodeHistory(null)).toEqual({ keptDays: 30, events: [] });
+    const e = decodeEnergy({ at: 'x', since: 'y', sensors: [{ deviceId: 'd9', externalId: 'sensor.e', kwh: 4.2, hours: [0.1, null] }] });
+    expect(e.sensors[0].kwh).toBe(4.2);
+    expect(e.sensors[0].hours).toHaveLength(24);
+    expect(e.sensors[0].hours[1]).toBeNull();
+    expect(HOME_COMMANDS.modeSet).toBe('home_mode_set');
+    expect(HOME_COMMANDS.automationSet).toBe('home_automation_set');
   });
 });

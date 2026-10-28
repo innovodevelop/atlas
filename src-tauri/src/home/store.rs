@@ -578,6 +578,24 @@ struct DeviceRow {
     colour: Option<String>,
     available: bool,
     last_changed: Option<String>,
+    /// The Beta extras (`home_device_detail`), all optional: a device synced
+    /// by a build before them, or by the HomeKit adapter, has none.
+    external_id: String,
+    domain: Option<String>,
+    device_class: Option<String>,
+    unit: Option<String>,
+    target: Option<f64>,
+    hvac_action: Option<String>,
+    hub_device_id: Option<String>,
+    energy_role: Option<String>,
+}
+
+/// The HA domain of an entity id, or `None` for an id that is not one (a
+/// HomeKit `aid.iid`). Used when a device has no detail row yet, so a water
+/// heater synced by an older build still stays out of the inside temperature.
+fn ha_domain(external_id: &str) -> Option<String> {
+    let (d, rest) = external_id.split_once('.')?;
+    (!d.is_empty() && !rest.is_empty() && d.chars().all(|c| c.is_ascii_lowercase() || c == '_')).then(|| d.to_string())
 }
 
 /// Build the payload `useSmartHome()` turns into `SmartHomeState.snapshot`.
@@ -620,8 +638,11 @@ pub fn snapshot(
     let mut dev_stmt = conn
         .prepare(
             "SELECT d.id, d.name, d.room_id, d.kind, d.control,
-                    s.value, s.state, s.colour, COALESCE(s.available, 0), s.last_changed
+                    s.value, s.state, s.colour, COALESCE(s.available, 0), s.last_changed,
+                    d.external_id, x.domain, x.device_class, x.unit, x.target, x.hvac_action,
+                    x.hub_device_id, x.energy_role
                FROM home_devices d LEFT JOIN home_device_state s ON s.device_id = d.id
+               LEFT JOIN home_device_detail x ON x.device_id = d.id
               WHERE d.user_id = ?1
               ORDER BY d.name",
         )
@@ -639,6 +660,14 @@ pub fn snapshot(
                 colour: r.get(7)?,
                 available: r.get::<_, i64>(8)? != 0,
                 last_changed: r.get(9)?,
+                external_id: r.get(10)?,
+                domain: r.get(11)?,
+                device_class: r.get(12)?,
+                unit: r.get(13)?,
+                target: r.get(14)?,
+                hvac_action: r.get(15)?,
+                hub_device_id: r.get(16)?,
+                energy_role: r.get(17)?,
             })
         })
         .map_err(store_err)?
@@ -768,7 +797,7 @@ pub fn snapshot(
         })
     });
 
-    Ok(json!({
+    let mut snap = json!({
         "bridgeConnected": answering,
         // The three-valued answer `bridgeConnected` cannot give. Additive, so
         // the mock's `SmartHomeSnapshot` still type-checks against it.
@@ -806,7 +835,13 @@ pub fn snapshot(
             "scenes": scenes.len(),
             "unavailable": unavailable,
         },
-    }))
+    });
+    // The Beta screen's automations, scripts, people and modes. Additive, and
+    // kept out of the control port by ops_home.rs' projection.
+    if let Value::Object(obj) = &mut snap {
+        obj.extend(super::history::snapshot_extras(conn, user_id)?);
+    }
+    Ok(snap)
 }
 
 /// `bridge_answering` is false when the bridge itself is not reachable. Every
@@ -844,6 +879,25 @@ fn device_json(d: &DeviceRow, room_id: &str, room_name: &str, bridge_answering: 
     }
     if let Some(t) = &d.last_changed {
         obj.insert("lastChanged".into(), json!(t));
+    }
+    // The Beta extras. Each is present only when the bridge said it, so the
+    // surface can tell "no target" from a target of zero.
+    if let Some(dom) = d.domain.clone().or_else(|| ha_domain(&d.external_id)) {
+        obj.insert("domain".into(), json!(dom));
+    }
+    for (key, v) in [
+        ("deviceClass", &d.device_class),
+        ("unit", &d.unit),
+        ("hvacAction", &d.hvac_action),
+        ("hubDeviceId", &d.hub_device_id),
+        ("energyRole", &d.energy_role),
+    ] {
+        if let Some(s) = v {
+            obj.insert(key.into(), json!(s));
+        }
+    }
+    if let Some(t) = d.target {
+        obj.insert("target".into(), json!(t));
     }
     Value::Object(obj)
 }

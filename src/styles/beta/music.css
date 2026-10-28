@@ -151,6 +151,62 @@ html[data-ui="beta"] .beta-page:has(> .b-mu) { padding-bottom: 0; background: va
 .b-mu-station.on .b-mu-station-text span { color: var(--b-ink2); }
 .b-mu-station--more { justify-content: center; font-size: 13px; font-weight: 600; color: var(--b-on-ink-body); }
 
+/* The title with Like beside it (the design's 44px round button; red when liked). */
+.b-mu-titlerow { display: flex; align-items: flex-start; gap: 14px; min-width: 0; }
+.b-mu-titletext { flex: 1; min-width: 0; }
+.b-mu-like { flex: none; width: 44px; height: 44px; margin-top: 4px; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(249, 247, 244, .08); color: var(--b-on-ink); cursor: pointer; transition: background .2s, color .2s; }
+.b-mu-like:hover:not(:disabled) { background: rgba(249, 247, 244, .14); }
+.b-mu-like.on { background: var(--b-on-ink); color: var(--b-red); }
+.b-mu-like:disabled { opacity: .4; cursor: default; }
+
+/* Ducking: the design's row, a status dot, the line and a switch. */
+.b-mu-duck { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 18px; background: rgba(249, 247, 244, .06); }
+.b-mu-duck-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--b-tertiary); }
+.b-mu-duck-dot.on { background: #50dca0; }
+.b-mu-duck-line { flex: 1; min-width: 0; font-size: 13px; line-height: 1.45; color: var(--b-on-ink-body); }
+.b-mu-switch { flex: none; display: flex; justify-content: flex-start; width: 42px; height: 25px; padding: 3px; border-radius: var(--b-r-pill); background: rgba(249, 247, 244, .22); cursor: pointer; transition: background .2s; }
+.b-mu-switch.on { justify-content: flex-end; background: var(--b-blue); }
+.b-mu-switch span { width: 19px; height: 19px; border-radius: 50%; background: #fff; }
+
+/* The one reconnect, when the stored Spotify grant predates Like and Rooms. */
+.b-mu-reconnect { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 12px 14px; border-radius: 18px; background: rgba(52, 97, 242, .16); }
+.b-mu-reconnect p { flex: 1 1 220px; margin: 0; font-size: 13px; line-height: 1.5; color: var(--b-on-ink-body); }
+
+/* Lyrics: the sung line large and bright, the sung ones dimmed (the design's sizes and inks). */
+.b-mu-lyrics { padding: 14px 16px; display: flex; flex-direction: column; gap: 14px; }
+.b-mu-lyr { margin: 0; font-family: var(--b-font-display); font-size: 20px; font-weight: 600; letter-spacing: -.02em; line-height: 1.25; color: var(--b-on-ink-small); transition: color .4s, font-size .4s; overflow-wrap: anywhere; }
+.b-mu-lyr.past { color: rgba(249, 247, 244, .38); }
+.b-mu-lyr.now { font-size: 26px; color: var(--b-on-ink); }
+.b-mu-lyr--plain { font-size: 17px; color: var(--b-on-ink-body); }
+.b-mu-lyr--plain.gap { height: 6px; }
+.b-mu-lyr-none, .b-mu-lyr-plainnote { margin: 0; font-size: 14px; line-height: 1.5; color: var(--b-on-ink-small); }
+.b-mu-lyr-note { margin: 10px 16px 6px; font-size: 12px; line-height: 1.5; color: var(--b-on-ink-small); }
+
+/* Rooms: this Mac and the account's Spotify Connect speakers. */
+.b-mu-rooms { display: flex; flex-direction: column; gap: 6px; padding: 4px; }
+.b-mu-room { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 20px; background: transparent; transition: background .2s; }
+.b-mu-room.on { background: rgba(249, 247, 244, .08); }
+.b-mu-room-row { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.b-mu-room-ico { flex: none; width: 40px; height: 40px; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(249, 247, 244, .08); color: var(--b-on-ink); cursor: pointer; transition: background .2s; }
+.b-mu-room-ico:hover:not(:disabled) { background: rgba(249, 247, 244, .16); }
+.b-mu-room.on .b-mu-room-ico { background: var(--b-on-ink); color: var(--b-ink); }
+.b-mu-room-ico:disabled { cursor: default; opacity: .6; }
+.b-mu-room.on .b-mu-room-ico:disabled { opacity: 1; }
+.b-mu-room-text { flex: 1; min-width: 0; }
+.b-mu-room-text b { display: block; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-mu-room-text span { display: block; margin-top: 2px; font-size: 12.5px; color: var(--b-on-ink-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-mu-room-vol { flex: none; font-family: var(--b-font-mono); font-size: 12px; color: var(--b-on-ink-small); }
+.b-mu-room input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; margin: 0; border-radius: var(--b-r-pill); background: rgba(249, 247, 244, .14); outline: none; cursor: pointer; }
+.b-mu-room input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--b-on-ink); cursor: pointer; }
+.b-mu-room input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border: none; border-radius: 50%; background: var(--b-on-ink); cursor: pointer; }
+.b-mu-rooms .b-mu-note, .b-mu-rooms .b-mu-err { padding: 4px 12px; }
+.b-mu-empty-act { margin-top: 12px; display: flex; justify-content: center; }
+
+/* Mood stations: the swatch is the design's colour; a station that could not be picked says why in its line. */
+.b-mu-station.err .b-mu-station-text span { color: #ff9a9a; white-space: normal; }
+.b-mu-station[aria-busy="true"] .b-mu-station-text span { color: var(--b-on-ink-body); }
+.b-mu-stations-note { grid-column: 1 / -1; margin: 2px 4px 0; font-size: 12px; line-height: 1.5; color: var(--b-on-ink-small); }
+
 /* Narrower or shorter windows: the aside drops under the hero and the page scrolls as a page. */
 @media (max-width: 1100px), (max-height: 680px) {
   .b-mu { height: auto; min-height: calc(100vh - var(--b-topbar)); overflow: visible; }
@@ -179,10 +235,13 @@ html[data-ui="beta"] .beta-page:has(> .b-mu) { padding-bottom: 0; background: va
   .b-mu-tbtn--play { width: 64px; height: 64px; }
   .b-mu-volrow { flex-wrap: wrap; }
   .b-mu-volrow > span:first-of-type { flex-basis: calc(100% - 30px); }
+  .b-mu-tabs button { padding: 0 6px; font-size: 12.5px; }
+  .b-mu-like { width: 40px; height: 40px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .b-mu-hero, .b-mu-aside, .b-mu-cover, .b-mu-title { animation: none; }
   .b-mu-disc { animation: none; }
   .b-mu-tbtn, .b-mu-row, .b-mu-station, .b-mu-btn, .b-mu-back { transition: none; }
+  .b-mu-like, .b-mu-switch, .b-mu-lyr, .b-mu-room, .b-mu-room-ico { transition: none; }
 }

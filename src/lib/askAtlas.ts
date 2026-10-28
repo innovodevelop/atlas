@@ -37,6 +37,15 @@ function sessionId(): string {
   }
 }
 
+/**
+ * The Talk session under way in this window, if one has started, without
+ * starting one. "Earlier conversations" leaves it out: it is this session,
+ * not an earlier one.
+ */
+export function currentTalkSession(): string | null {
+  try { return sessionStorage.getItem(SESSION_KEY); } catch { return null; }
+}
+
 export async function askAtlas(question: string, handlers: AskHandlers = {}): Promise<AskResult> {
   const token = getToken();
   if (!token) throw new Error('Sign in to talk to Atlas.');
