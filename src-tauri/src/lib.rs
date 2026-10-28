@@ -599,6 +599,7 @@ pub fn run() {
       datafetch::fetch_fx,
       focus_mode::focus_shortcut_list,
       focus_mode::focus_shortcut_run,
+      focus_mode::focus_hold_set,
       // Battery / Wi-Fi / Bluetooth for the Beta top bar. Read-only, no secrets.
       system_vitals::system_vitals,
       mail::mail_sync,

@@ -28,6 +28,9 @@
 // the switch was off is announced when it is turned on only if it is still
 // coming due, which is what "something due in the next 7 days" promises.
 //
+// A running focus session holds these like Atlas's other messages: they are
+// not posted, and the Focus screen lists them when it ends (focus_mode.rs).
+//
 // The scan modules call `mark` before a sync and `after_sync` after a
 // successful one; everything here works on the rows that sync inserted.
 
@@ -620,6 +623,12 @@ pub fn after_sync(app: &AppHandle, db: &DbState, user_id: &str, account_id: &str
         let _ = app.emit("db:changed", json!({ "table": "mail_messages", "op": "UPDATE" }));
     }
     for n in notices {
+        // A running focus session holds it (focus_mode.rs): the webview files
+        // it with the session, and the Focus screen lists it at the end.
+        if crate::focus_mode::holding() {
+            let _ = app.emit("focus:held", json!({ "source": "Mail", "title": n.title, "body": n.body }));
+            continue;
+        }
         // The notification stays on this Mac (Notification Centre). A denied
         // permission is the user's answer, not an error worth surfacing.
         let _ = app.notification().builder().title(&n.title).body(&n.body).show();

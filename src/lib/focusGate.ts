@@ -18,6 +18,12 @@
  * so a reload resumes the session (a paused one stays paused, a running one
  * that should have ended while the app was closed is logged as done).
  *
+ * Mail's bill and deadline alerts are posted by Rust (mail_flags.rs), which
+ * cannot call holdForFocus. So every change tells Rust when the running
+ * session ends (`focus_hold_set`, null while none runs or it is paused), Rust
+ * holds its notice until then, and sends it here as `focus:held` to be filed
+ * with the session like any other.
+ *
  * The optional macOS Focus: macOS lets an app turn on a system Focus only
  * through the user's own Shortcuts, so when the user has named one, a start
  * runs it through `focus_shortcut_run` (src-tauri/src/focus_mode.rs) and an
@@ -63,7 +69,22 @@ function set(patch: Partial<FocusSnapshot>, save = true): void {
   snap = { ...snap, ...patch };
   if (save) persist();
   schedule();
+  pushHold();
   listeners.forEach((l) => l());
+}
+
+/** What Rust was last told (undefined: nothing yet, or the last push failed). */
+let pushedHold: number | null | undefined;
+
+/** Tell Rust's notifiers when the running session ends; only when that changed. */
+function pushHold(): void {
+  if (!inTauri()) return;
+  const until = snap.session ? endsAt(snap.session) : null;
+  if (until === pushedHold) return;
+  pushedHold = until;
+  void import('@tauri-apps/api/core')
+    .then(({ invoke }) => invoke('focus_hold_set', { untilMs: until }))
+    .catch(() => { pushedHold = undefined; });
 }
 
 /** One timeout to the end of a running session; none otherwise. */
@@ -99,20 +120,24 @@ async function runShortcut(name: string): Promise<void> {
   }
 }
 
-async function notifyEnd(held: number, minutes: number): Promise<void> {
-  const body = held
-    ? `${minutes} minutes done. Atlas held ${held} ${held === 1 ? 'notification' : 'notifications'} for you.`
-    : `${minutes} minutes done. Nothing came in.`;
+async function post(title: string, body: string): Promise<void> {
   try {
     if (inTauri()) {
       const plugin = await import('@tauri-apps/plugin-notification');
       let granted = await plugin.isPermissionGranted();
       if (!granted) granted = (await plugin.requestPermission()) === 'granted';
-      if (granted) plugin.sendNotification({ title: 'Focus done', body });
+      if (granted) plugin.sendNotification({ title, body });
     } else if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      new Notification('Focus done', { body });
+      new Notification(title, { body });
     }
   } catch { /* the screen shows the same summary; a refused notification is not worth a crash */ }
+}
+
+async function notifyEnd(held: number, minutes: number): Promise<void> {
+  const body = held
+    ? `${minutes} minutes done. Atlas held ${held} ${held === 1 ? 'notification' : 'notifications'} for you.`
+    : `${minutes} minutes done. Nothing came in.`;
+  await post('Focus done', body);
 }
 
 function finish(completed: boolean, at: number): void {
@@ -125,12 +150,30 @@ function finish(completed: boolean, at: number): void {
 }
 
 // A session saved by an earlier launch: end it if its time ran out meanwhile,
-// otherwise arm its timer.
+// otherwise arm its timer (and tell Rust how long to hold).
 if (typeof window !== 'undefined') {
   const s = snap.session;
   const end = s ? endsAt(s) : null;
   if (s && end != null && Date.now() >= end) finish(true, end);
-  else schedule();
+  else { schedule(); pushHold(); }
+}
+
+// What Rust held for the session (mail_flags.rs). Like the session itself,
+// this listener lives as long as the app. A notice that arrives just after
+// the session ended is posted now rather than lost.
+if (inTauri()) {
+  void import('@tauri-apps/api/event')
+    .then(({ listen }) =>
+      listen<{ source?: unknown; title?: unknown; body?: unknown }>('focus:held', (e) => {
+        const p = e.payload ?? {};
+        const title = typeof p.title === 'string' ? p.title : '';
+        const body = typeof p.body === 'string' ? p.body : undefined;
+        if (!title) return;
+        const source = typeof p.source === 'string' ? p.source : 'Atlas';
+        if (!holdForFocus({ source, title, body })) void post(title, body ?? '');
+      }),
+    )
+    .catch(() => { /* outside the app there is nothing for Rust to hold */ });
 }
 
 // --- The gate ------------------------------------------------------------------------
