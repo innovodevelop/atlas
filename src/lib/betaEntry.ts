@@ -184,15 +184,30 @@ export function authEyebrow(stage: AuthStage, mode: EntryMode | null): string {
  * The sphere on the sign-in screen, from what is actually happening.
  *
  * The design shows `speaking` while a line types, but only with its voice
- * switched on; the Beta entry has no voice, so a typing line is not Atlas
- * speaking and the sphere does not pretend it is. Listening is the open
+ * switched on. Here `speaking` is the voice actually playing (the Voice pill
+ * on and audio coming out), never a line merely typing — a typed line is not
+ * Atlas speaking and the sphere does not pretend it is. Listening is the open
  * microphone, thinking is the account server answering, and otherwise the
  * sphere follows the state bus (undefined).
  */
-export function authSphereState(micListening: boolean, submitting: boolean): 'listening' | 'thinking' | undefined {
+export function authSphereState(micListening: boolean, submitting: boolean, speaking = false): 'listening' | 'thinking' | 'speaking' | undefined {
   if (micListening) return 'listening';
   if (submitting) return 'thinking';
+  if (speaking) return 'speaking';
   return undefined;
+}
+
+/**
+ * THE OTHER RULE: Atlas never speaks on the password step.
+ *
+ * Its question there ("And your password?"), and anything it says about a
+ * refused password, stays typed even with the Voice pill on — the step is the
+ * one where a voice in the room tells everyone nearby what the person is
+ * about to type. The microphone rule is `micAllowed`; this is its twin for
+ * the speaker.
+ */
+export function lineSpeakable(stage: AuthStage, key: FieldKey | null): boolean {
+  return !(stage === 'field' && key === 'password');
 }
 
 /* ---- the typewriter --------------------------------------------------- */
@@ -218,11 +233,12 @@ export function stepIndex(stage: OnboardingStage): number {
 
 /**
  * The onboarding sphere: working while macOS is being asked (a real call is
- * in flight), the state bus otherwise. Not `speaking` while a line types —
- * nothing is said out loud here (see authSphereState).
+ * in flight), speaking while the voice actually plays, the state bus
+ * otherwise. Not `speaking` merely because a line types (see authSphereState).
  */
-export function onboardingSphereState(stage: OnboardingStage): 'working' | undefined {
-  return stage === 'asking' ? 'working' : undefined;
+export function onboardingSphereState(stage: OnboardingStage, speaking = false): 'working' | 'speaking' | undefined {
+  if (stage === 'asking') return 'working';
+  return speaking ? 'speaking' : undefined;
 }
 
 const WORDS = ['none', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];

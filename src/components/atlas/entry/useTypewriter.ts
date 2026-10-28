@@ -3,11 +3,12 @@
  * characters every 28 ms, a caret while it runs, and the whole line at once
  * when the user has asked for less motion.
  *
- * This is the typed half of what the Workshop's `useAtlasSpeech` did; the
- * spoken half is deliberately absent. The sign-in greeting read out loud was
- * the most-complained-about thing on the old Entry (a stranger's laptop
- * announcing "And your password?" in a quiet room), and the Beta entry makes
- * no sound.
+ * This is the typed half of what the Workshop's `useAtlasSpeech` did. The
+ * spoken half is the Voice pill's (useEntryVoice.ts), off by default: the
+ * sign-in greeting read out loud was the most-complained-about thing on the
+ * old Entry (a stranger's laptop announcing "And your password?" in a quiet
+ * room), so the Beta entry makes no sound until asked to, and never on the
+ * password step.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TYPE_MS, typedLength } from '@/lib/betaEntry';

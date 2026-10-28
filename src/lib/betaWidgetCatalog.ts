@@ -241,6 +241,7 @@ export const EMPTY_COPY: Record<string, EmptySpec> = {
   spend: { title: 'No bank data yet', hint: 'Import a CSV export from your netbank, or connect a bank read-only, and this month’s spending shows here by category.', action: { label: 'Open Money', route: '/money' } },
   budget: { title: 'No budget yet', hint: 'Set monthly limits per category in Money and the card shows what is left and whether you are ahead of an even pace.', action: { label: 'Open Money', route: '/money' } },
   subscriptions: { title: 'No subscriptions found', hint: 'Atlas finds subscriptions among payments that repeat every month or year, once your transactions are in Money.', action: { label: 'Open Money', route: '/money' } },
+  transit: { title: 'No departures yet', hint: 'Add a Rejseplanen access ID and choose your stop; the next departures show here, live. Open the card to set it up.' },
 };
 
 export function emptyCopy(id: string): EmptySpec {

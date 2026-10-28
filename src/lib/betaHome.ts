@@ -106,6 +106,9 @@ export const WIDGETS: readonly WidgetDef[] = [
   { id: 'podcast', label: 'Podcast', meta: 'Your Spotify shows, where you stopped', group: 'Media', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'live', opens: { view: 'podcast' } },
   { id: 'focus', label: 'Focus', meta: 'A timer that holds Atlas’s notifications', group: 'Day', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'live', opens: { view: 'focus' } },
   { id: 'upnext', label: 'Up next', meta: 'Your next events, with how long until each', group: 'Day', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'live', opens: { view: 'calendar' } },
+  // Left-out row 20: live once the user adds a Rejseplanen access ID (the
+  // face says so until then); opens the Answer screen's departures board.
+  { id: 'transit', label: 'Transit', meta: 'Next departures from your stop, from Rejseplanen (needs an access ID)', group: 'Day', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'live', opens: { route: '/answer' } },
   { id: 'fx', label: 'Currency', meta: 'ECB reference rates for the pair you pick', group: 'Money', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { view: 'fx' } },
   ...moneyWidgets(),
 ];

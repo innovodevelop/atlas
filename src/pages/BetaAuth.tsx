@@ -11,14 +11,15 @@
  * (a refused credential stays on the step it was refused on, with the
  * password cleared and the email kept).
  *
- * What is deliberately NOT here: Atlas's voice. The Workshop greeting read
- * out loud was the most-complained-about thing on the old Entry, so the Beta
- * entry types and never speaks, and the design's "Voice on/off" pill goes
- * with it — a toggle for a sound that does not exist would be a control that
- * does nothing. Voice INPUT stays: the microphone in the answer pill is the
- * Workshop's `useLoginVoice`, with the same rule (never on the password
- * step; see `micAllowed`) and the same contract (a transcript fills the
- * field, the user still presses the button).
+ * Atlas's voice is the design's "Voice on/off" pill (useEntryVoice.ts),
+ * OFF by default: the Workshop greeting read out loud was the most-
+ * complained-about thing on the old Entry. Turned on, each line is spoken
+ * as it types — except on the password step, where nothing is said out loud
+ * at all, its question and any refusal included (`lineSpeakable`). Voice
+ * INPUT is the Workshop's `useLoginVoice`, with the same rule (never on the
+ * password step; see `micAllowed`) and the same contract (a transcript fills
+ * the field, the user still presses the button); a transcript that may be
+ * Atlas hearing its own voice is dropped.
  *
  * The name a new account gives is kept in the local profile
  * (`entryProfile.ts`), so Home greets them by it; the Workshop dropped it.
@@ -26,12 +27,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useLoginVoice } from '@/hooks/useLoginVoice';
+import { useEntryVoice } from '@/hooks/useEntryVoice';
 import { requestPasswordReset } from '@/lib/authClient';
 import { readOnboarding } from '@/lib/atlasPermissions';
 import { emailFromSpeech } from '@/lib/loginSpeech';
 import {
   FIELD_ORDER, GREETING, PLACEHOLDER, afterSignInPath, authEyebrow, authSphereState, authSubline, autocompleteFor,
-  callName, enterLabel, fieldType, micAllowed, nextLabel, promptFor, spokenForAuthError, trailFor, validateField,
+  callName, enterLabel, fieldType, lineSpeakable, micAllowed, nextLabel, promptFor, spokenForAuthError, trailFor, validateField,
   type AuthStage, type EntryMode, type FieldKey,
 } from '@/lib/betaEntry';
 import { rememberName } from '@/lib/entryProfile';
@@ -61,11 +63,33 @@ const MicBlocked = () => (
 const BetaAuth = () => {
   const navigate = useBetaNavigate();
   const { signIn, signUp, isAuthenticated, loading } = useAuth();
-  const { shown, target, typing, say } = useTypewriter();
+  const { shown, target, typing, say: type } = useTypewriter();
+  const voice = useEntryVoice();
 
   const [stage, setStage] = useState<AuthStage>('start');
   const [mode, setMode] = useState<EntryMode | null>(null);
   const [key, setKey] = useState<FieldKey | null>(null);
+
+  /**
+   * Every line Atlas says goes through here. It types at once; whether it is
+   * also spoken is decided after the render that carries it, because the
+   * step a line belongs to is set in the same handler that says it, and only
+   * that render knows it. A counter rather than the line itself, so a
+   * refusal said twice is spoken twice.
+   */
+  const [said, setSaid] = useState(0);
+  const say = useCallback((line: string) => { type(line); setSaid((n) => n + 1); }, [type]);
+  const lineRef = useRef({ target, stage, key });
+  lineRef.current = { target, stage, key };
+  const { say: speak, silence } = voice;
+  useEffect(() => {
+    if (!said) return;
+    const { target: line, stage: s, key: k } = lineRef.current;
+    // THE PASSWORD RULE: nothing out loud on the password step, and whatever
+    // was still being said when it opened stops now.
+    if (lineSpeakable(s, k)) speak(line);
+    else silence();
+  }, [said, speak, silence]);
   const [vals, setVals] = useState<Record<FieldKey, string>>(BLANK);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -103,6 +127,9 @@ const BetaAuth = () => {
   heardRef.current = (text: string) => {
     const heard = text.trim();
     if (!heard) return;
+    // With the voice on, the microphone hears Atlas too: "What's your
+    // email?" must not land in the email field.
+    if (voice.mayBeEcho()) return;
     const k: FieldKey | null = stage === 'forgot' ? 'email' : key;
     // Unreachable: the hook is gated on `allowed` and disconnects before the
     // password step renders. Kept as the last line of defence, because the
@@ -271,7 +298,8 @@ const BetaAuth = () => {
       screenLabel={signingUp ? 'Atlas Sign up — Beta' : 'Atlas Login — Beta'}
       kicker={signingUp ? 'New here' : 'Sign in'}
       line="Speak to Atlas or type. Passwords are always typed, and the microphone switches off while one is on screen."
-      sphereState={authSphereState(micOn, submitting)}
+      sphereState={authSphereState(micOn, submitting, voice.playing)}
+      voice={{ on: voice.on, onToggle: () => voice.toggle(lineSpeakable(stage, key) ? target : null) }}
       eyebrow={authEyebrow(stage, mode)}
       said={shown}
       target={target}

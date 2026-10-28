@@ -48,6 +48,8 @@ mod school;
 // Money: the local bank store (CSV imports) and the optional read-only
 // GoCardless Bank Account Data link. See src/bank.rs.
 mod bank;
+// Rejseplanen departures (Beta Answer + Transit widget); dormant until an access ID is stored.
+mod transit;
 
 /// Outcome of a sidecar spawn attempt. `integrity_error` is set when the
 /// binary failed integrity verification (and was therefore NOT spawned) — it
@@ -683,6 +685,12 @@ pub fn run() {
       bank::bank_gc_link_refresh,
       bank::bank_gc_sync,
       bank::bank_gc_unlink,
+      // Rejseplanen. Async: each one is an HTTPS call or a Keychain read. The
+      // access ID is written by transit_set_key and never returned.
+      transit::transit_status,
+      transit::transit_set_key,
+      transit::transit_find_stops,
+      transit::transit_departures,
     ])
     .setup(|app| {
       // ONE DATABASE, AND THIS LAUNCH'S IDENTITY — both before anything else in
