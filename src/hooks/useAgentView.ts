@@ -22,26 +22,39 @@ export interface AgentEventRow {
   ts: string;
 }
 
+/**
+ * The admin interval is right for a surface nobody watches (see useAdminApi).
+ * The Beta Agent View is watched — its log is the screen's point — so it asks
+ * for a shorter one while the selected session is live. The brain's JSONL
+ * watcher re-ingests about two seconds after a transcript changes, so there is
+ * fresh data to poll for; react-query still pauses the interval when the
+ * window is in the background.
+ */
+export interface AgentViewPolling {
+  /** Milliseconds between refetches; defaults to ADMIN_REFETCH_INTERVAL_MS. */
+  refetchMs?: number;
+}
+
 /** GET /admin/agent-sessions — backs the "Active Sessions" panel on /agent-view. */
-export function useAgentSessions(status?: string) {
+export function useAgentSessions(status?: string, polling: AgentViewPolling = {}) {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['admin', 'agent-sessions', status ?? null],
     queryFn: () => adminGet<AgentSessionRow[]>(`/admin/agent-sessions${status ? `?status=${encodeURIComponent(status)}` : ''}`),
     staleTime: 10_000,
-    refetchInterval: ADMIN_REFETCH_INTERVAL_MS,
+    refetchInterval: polling.refetchMs ?? ADMIN_REFETCH_INTERVAL_MS,
     ...ADMIN_QUERY_OPTIONS,
   });
   return { sessions: data ?? [], isLoading, error: error as Error | null, refetch };
 }
 
 /** GET /admin/agent-events/:sessionId — backs the "Event Feed" panel. */
-export function useAgentEvents(sessionId: string | null) {
+export function useAgentEvents(sessionId: string | null, polling: AgentViewPolling = {}) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['admin', 'agent-events', sessionId],
     queryFn: () => adminGet<AgentEventRow[]>(`/admin/agent-events/${encodeURIComponent(sessionId!)}`),
     enabled: !!sessionId,
     staleTime: 5_000,
-    refetchInterval: ADMIN_REFETCH_INTERVAL_MS,
+    refetchInterval: polling.refetchMs ?? ADMIN_REFETCH_INTERVAL_MS,
     ...ADMIN_QUERY_OPTIONS,
   });
   return { events: data ?? [], isLoading, error: error as Error | null };
