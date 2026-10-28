@@ -663,8 +663,322 @@ fn apply_rules(
 }
 
 // ---------------------------------------------------------------------------
+// Snooze wake-ups
+//
+// Nothing used to wake a snoozed thread: the worker stores no wake time (it
+// has no route that writes one, see mail_thread_fetch), so "Tomorrow 08:00"
+// sat in Snoozed until someone moved it by hand. Two things wake one now:
+//   * its snoozed_until has passed. Every snooze has one; for a snooze that
+//     watches for a reply it is the fallback date.
+//   * for a snooze with a reply watch (mail_snoozes), a new inbound message in
+//     the thread from the watched address, or from anyone for '*'.
+// mail_sync runs the pass after every list sync, which is when new mail and a
+// fresh last_message_at arrive; mail_wake_snoozes runs it while the Mail
+// screen is open, so a snooze also comes back on time between syncs.
+//
+// The worker already flips a snoozed thread to 'triage' on ANY inbound reply
+// (contract §5.4). For a watch on one person that is the wrong answer when
+// someone else wrote, so the pass puts such a thread back to 'snooze' — on the
+// server first, like every status change here — and says why in the trail.
+// When the pass cannot tell who wrote, it leaves the thread in Needs you:
+// showing mail the user did not need is cheaper than hiding mail they did.
+// ---------------------------------------------------------------------------
+
+/// One pass at a time: the screen's timer and a sync can overlap, and two
+/// passes over the same thread would write its wake-up to the trail twice.
+static WAKE_PASS: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// A worker or local timestamp as an instant. The worker writes ISO-8601; an
+/// SQLite `datetime()` value ("2026-10-28 09:12:00") is UTC by definition.
+fn parse_instant(s: &str) -> Option<chrono::DateTime<Utc>> {
+    if let Ok(t) = chrono::DateTime::parse_from_rfc3339(s) {
+        return Some(t.with_timezone(&Utc));
+    }
+    ["%Y-%m-%d %H:%M:%S%.f", "%Y-%m-%dT%H:%M:%S%.f"]
+        .iter()
+        .find_map(|f| chrono::NaiveDateTime::parse_from_str(s, f).ok())
+        .map(|n| n.and_utc())
+}
+
+/// A snoozed or watched thread, as the wake pass reads it after a list sync.
+struct Snoozed {
+    id: String,
+    provider_thread_id: String,
+    status: String,
+    snoozed_until: Option<String>,
+    last_message_at: Option<String>,
+    /// '*' or a lower-cased address; None for a plain timed snooze.
+    watch: Option<String>,
+    snoozed_at: Option<String>,
+    seen_message_at: Option<String>,
+}
+
+#[derive(Debug, PartialEq)]
+enum WakePlan {
+    /// The snooze time has passed.
+    Due,
+    /// The watched thread has mail newer than this; read it to decide.
+    Look(chrono::DateTime<Utc>),
+    /// The watch no longer applies: the thread left Snoozed some other way.
+    Drop,
+    Nothing,
+}
+
+fn plan_wake(t: &Snoozed, now: chrono::DateTime<Utc>) -> WakePlan {
+    let due = t.snoozed_until.as_deref().and_then(parse_instant).is_some_and(|u| u <= now);
+    if t.status == "snooze" && due {
+        return WakePlan::Due;
+    }
+    if t.watch.is_none() {
+        return WakePlan::Nothing;
+    }
+    if t.status != "snooze" && t.status != "triage" {
+        return WakePlan::Drop;
+    }
+    let Some(after) = t.seen_message_at.as_deref().or(t.snoozed_at.as_deref()).and_then(parse_instant) else {
+        return WakePlan::Drop;
+    };
+    let newer = t.last_message_at.as_deref().and_then(parse_instant).is_some_and(|l| l > after);
+    match (newer, t.status.as_str()) {
+        (true, _) => WakePlan::Look(after),
+        // Back in triage with nothing new to explain it: someone moved it.
+        (false, "triage") => WakePlan::Drop,
+        _ => WakePlan::Nothing,
+    }
+}
+
+#[derive(Debug, PartialEq)]
+enum ReplyCheck {
+    /// The watched person (or, for '*', anyone) wrote.
+    Watched(String),
+    /// Only someone else wrote.
+    Someone(String),
+    Nothing,
+}
+
+/// Inbound messages in a thread's detail that arrived after `after`.
+fn check_replies(messages: &[Value], watch: &str, after: chrono::DateTime<Utc>) -> ReplyCheck {
+    let mut other: Option<String> = None;
+    for m in messages {
+        if m["direction"].as_str() != Some("inbound") {
+            continue;
+        }
+        let Some(at) = m["sent_at"].as_str().and_then(parse_instant) else { continue };
+        if at <= after {
+            continue;
+        }
+        let from = crate::mail_flags::sender_address(m["from_address"].as_str().unwrap_or(""));
+        if watch == "*" || from == watch {
+            return ReplyCheck::Watched(from);
+        }
+        other.get_or_insert(from);
+    }
+    other.map_or(ReplyCheck::Nothing, ReplyCheck::Someone)
+}
+
+#[derive(Debug, PartialEq)]
+enum WakeStep {
+    /// Back to Needs you; the text is the audit detail.
+    Wake(String),
+    /// Someone other than the watched person wrote: back to Snoozed.
+    Keep(String),
+    /// The new mail was read and changes nothing.
+    Seen,
+    Drop,
+}
+
+fn step_after_look(check: ReplyCheck, status: &str, watch: &str) -> WakeStep {
+    let waiting = if watch == "*" { "anyone".to_string() } else { watch.to_string() };
+    match check {
+        ReplyCheck::Watched(from) => WakeStep::Wake(format!("{from} replied")),
+        ReplyCheck::Someone(from) if status == "triage" => WakeStep::Keep(format!("{from} replied; still waiting for {waiting}")),
+        ReplyCheck::Someone(_) => WakeStep::Seen,
+        // The server moved it on a reply this pass could not place: keep it in view.
+        ReplyCheck::Nothing if status == "triage" => WakeStep::Wake("a new reply arrived".into()),
+        ReplyCheck::Nothing => WakeStep::Seen,
+    }
+}
+
+fn watched_threads(conn: &Connection, user_id: &str) -> Result<std::collections::HashSet<String>, String> {
+    let mut stmt = conn
+        .prepare("SELECT thread_id FROM mail_snoozes WHERE user_id = ?1")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([user_id], |r| r.get::<_, String>(0))
+        .map_err(|e| e.to_string())?;
+    rows.collect::<Result<_, _>>().map_err(|e| e.to_string())
+}
+
+#[derive(Default)]
+struct WakeOutcome {
+    woke: usize,
+    kept: usize,
+    warnings: Vec<String>,
+}
+
+fn wake_snoozes(app: &AppHandle, db: &DbState, token: &str, user_id: &str) -> WakeOutcome {
+    let mut out = WakeOutcome::default();
+    let Ok(_pass) = WAKE_PASS.try_lock() else { return out };
+
+    let rows: Vec<Snoozed> = {
+        let Ok(conn) = db.conn.lock() else { return out };
+        let read = || -> Result<Vec<Snoozed>, String> {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT t.id, t.provider_thread_id, t.status, t.snoozed_until, t.last_message_at,
+                            s.watch, s.snoozed_at, s.seen_message_at
+                       FROM mail_threads t LEFT JOIN mail_snoozes s ON s.thread_id = t.id
+                      WHERE t.user_id = ?1 AND (t.status = 'snooze' OR s.thread_id IS NOT NULL)",
+                )
+                .map_err(|e| e.to_string())?;
+            let rows = stmt
+                .query_map([user_id], |r| {
+                    Ok(Snoozed {
+                        id: r.get(0)?,
+                        provider_thread_id: r.get(1)?,
+                        status: r.get(2)?,
+                        snoozed_until: r.get(3)?,
+                        last_message_at: r.get(4)?,
+                        watch: r.get(5)?,
+                        snoozed_at: r.get(6)?,
+                        seen_message_at: r.get(7)?,
+                    })
+                })
+                .map_err(|e| e.to_string())?;
+            rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+        };
+        match read() {
+            Ok(r) => r,
+            Err(e) => {
+                out.warnings.push(format!("Snoozes were not checked: {e}"));
+                return out;
+            }
+        }
+    };
+    if rows.is_empty() {
+        return out;
+    }
+
+    // Decide, with the network, and with no lock held.
+    let now = Utc::now();
+    let mut steps: Vec<(&Snoozed, WakeStep)> = Vec::new();
+    for t in &rows {
+        match plan_wake(t, now) {
+            WakePlan::Due => {
+                let why = match t.watch.as_deref() {
+                    Some("*") => "no reply came before the snooze time".to_string(),
+                    Some(who) => format!("no reply from {who} before the snooze time"),
+                    None => "snooze time reached".to_string(),
+                };
+                steps.push((t, WakeStep::Wake(why)));
+            }
+            WakePlan::Look(after) => {
+                let watch = t.watch.as_deref().unwrap_or("*");
+                match get_json(token, &format!("/api/threads/{}", t.provider_thread_id)) {
+                    Ok(detail) => {
+                        let messages = detail["messages"].as_array().cloned().unwrap_or_default();
+                        steps.push((t, step_after_look(check_replies(&messages, watch, after), &t.status, watch)));
+                    }
+                    Err(e) => out.warnings.push(format!("A snoozed thread could not be checked for replies: {e}")),
+                }
+            }
+            WakePlan::Drop => steps.push((t, WakeStep::Drop)),
+            WakePlan::Nothing => {}
+        }
+    }
+
+    // Server first for every status change, for the reason mail_set_status
+    // gives: a status the worker does not share is reverted by the next sync.
+    let mut confirmed: Vec<(&Snoozed, WakeStep)> = Vec::new();
+    for (t, step) in steps {
+        let target = match &step {
+            WakeStep::Wake(_) if t.status == "snooze" => Some("triage"),
+            WakeStep::Keep(_) => Some("snooze"),
+            _ => None,
+        };
+        if let Some(status) = target {
+            if let Err(e) = post_json(token, &format!("/api/threads/{}/status", t.provider_thread_id), json!({ "status": status })) {
+                out.warnings.push(format!("A snoozed thread could not be moved: {e}"));
+                continue;
+            }
+        }
+        confirmed.push((t, step));
+    }
+
+    let applied = (|| -> Result<(), String> {
+        let conn = db.conn.lock().map_err(|e| e.to_string())?;
+        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        let stamp = now_iso();
+        for (t, step) in &confirmed {
+            match step {
+                WakeStep::Wake(why) => {
+                    tx.execute(
+                        "UPDATE mail_threads SET status = 'triage', snoozed_until = NULL, updated_at = ?1 WHERE id = ?2",
+                        rusqlite::params![stamp, t.id],
+                    )
+                    .map_err(|e| e.to_string())?;
+                    tx.execute("DELETE FROM mail_snoozes WHERE thread_id = ?1", [&t.id]).map_err(|e| e.to_string())?;
+                    audit(&tx, user_id, Some(&t.id), "atlas", "snooze_woke", why, None)?;
+                    out.woke += 1;
+                }
+                WakeStep::Keep(why) => {
+                    tx.execute(
+                        "UPDATE mail_threads SET status = 'snooze', updated_at = ?1 WHERE id = ?2",
+                        rusqlite::params![stamp, t.id],
+                    )
+                    .map_err(|e| e.to_string())?;
+                    tx.execute(
+                        "UPDATE mail_snoozes SET seen_message_at = ?1 WHERE thread_id = ?2",
+                        rusqlite::params![t.last_message_at, t.id],
+                    )
+                    .map_err(|e| e.to_string())?;
+                    audit(&tx, user_id, Some(&t.id), "atlas", "snooze_kept", why, None)?;
+                    out.kept += 1;
+                }
+                WakeStep::Seen => {
+                    tx.execute(
+                        "UPDATE mail_snoozes SET seen_message_at = ?1 WHERE thread_id = ?2",
+                        rusqlite::params![t.last_message_at, t.id],
+                    )
+                    .map_err(|e| e.to_string())?;
+                }
+                WakeStep::Drop => {
+                    tx.execute("DELETE FROM mail_snoozes WHERE thread_id = ?1", [&t.id]).map_err(|e| e.to_string())?;
+                }
+            }
+        }
+        tx.commit().map_err(|e| e.to_string())
+    })();
+    if let Err(e) = applied {
+        out.warnings.push(format!("Snooze changes were not saved: {e}"));
+        out.woke = 0;
+        out.kept = 0;
+        return out;
+    }
+    if !confirmed.is_empty() {
+        for table in ["mail_threads", "mail_snoozes", "mail_audit_events"] {
+            let _ = app.emit("db:changed", json!({ "table": table, "op": "update" }));
+        }
+    }
+    out
+}
+
+// ---------------------------------------------------------------------------
 // Commands
 // ---------------------------------------------------------------------------
+
+/// Wake what is due. The Mail screen calls this while it is open, only when a
+/// snooze time has passed, so it costs nothing on a quiet mailbox.
+#[tauri::command(async)]
+pub fn mail_wake_snoozes(
+    app: AppHandle,
+    state: State<'_, DbState>,
+    token: String,
+    user_id: String,
+) -> Result<Value, String> {
+    let out = wake_snoozes(&app, &state, &token, &user_id);
+    Ok(json!({ "woke": out.woke, "kept": out.kept, "warnings": out.warnings }))
+}
 
 /// List sync: account + every thread, in one transaction.
 ///
@@ -769,6 +1083,18 @@ pub fn mail_sync(
     // `db:changed` emits below, so a single rule failure made the UI report a
     // failed sync and skip its refresh while the mail was in fact safely stored.
     // That is the exact outcome the paragraph above says we do not want.
+    //
+    // A thread snoozed until someone replies belongs to its watch, not to the
+    // rules: the worker flips it to 'triage' on any reply, and a rule placing
+    // it on that flip would beat the watch to it. Snoozes wake (or go back to
+    // sleep) first, on the threads this sync just refreshed.
+    match state.conn.lock().map_err(|e| e.to_string()).and_then(|c| watched_threads(&c, &user_id)) {
+        Ok(watched) => candidates.retain(|c| !watched.contains(&c.thread_id)),
+        Err(e) => warnings.push(format!("Snooze watches were not read: {e}")),
+    }
+    let wake = wake_snoozes(&app, &state, &token, &user_id);
+    warnings.extend(wake.warnings);
+
     let rules = match apply_rules(&state, &token, &user_id, &candidates) {
         Ok(outcome) => outcome,
         Err(e) => RuleOutcome {
@@ -790,6 +1116,8 @@ pub fn mail_sync(
         "threadsUpdated": updated,
         "messagesInserted": 0,
         "rulesApplied": rules.applied,
+        "snoozesWoken": wake.woke,
+        "snoozesKept": wake.kept,
         "lastSyncedAt": synced_at,
         "warnings": warnings,
     }))
@@ -1114,4 +1442,83 @@ pub fn mail_send_reply(
 pub fn mail_ingest_errors(token: String) -> Result<Value, String> {
     let payload = get_json(&token, "/api/ingest-errors")?;
     Ok(json!({ "errors": payload["errors"].clone() }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn at(s: &str) -> chrono::DateTime<Utc> {
+        parse_instant(s).unwrap()
+    }
+
+    fn snoozed(status: &str, until: Option<&str>, last: Option<&str>, watch: Option<&str>) -> Snoozed {
+        Snoozed {
+            id: "t1".into(),
+            provider_thread_id: "p1".into(),
+            status: status.into(),
+            snoozed_until: until.map(Into::into),
+            last_message_at: last.map(Into::into),
+            watch: watch.map(Into::into),
+            snoozed_at: watch.map(|_| "2026-10-28T09:00:00.000Z".into()),
+            seen_message_at: watch.map(|_| "2026-10-28T08:00:00Z".into()),
+        }
+    }
+
+    #[test]
+    fn worker_and_sqlite_timestamps_both_parse() {
+        assert_eq!(at("2026-10-28T09:12:00+01:00"), at("2026-10-28T08:12:00Z"));
+        assert_eq!(at("2026-10-28 08:12:00"), at("2026-10-28T08:12:00.000Z"));
+        assert!(parse_instant("tomorrow").is_none());
+    }
+
+    #[test]
+    fn a_snooze_wakes_when_its_time_has_passed() {
+        let now = at("2026-10-29T08:00:00+01:00");
+        assert_eq!(plan_wake(&snoozed("snooze", Some("2026-10-29T08:00:00+01:00"), None, None), now), WakePlan::Due);
+        assert_eq!(plan_wake(&snoozed("snooze", Some("2026-10-29T09:00:00+01:00"), None, None), now), WakePlan::Nothing);
+        // The fallback date applies to a watched snooze too.
+        assert_eq!(plan_wake(&snoozed("snooze", Some("2026-10-28T10:00:00Z"), None, Some("dana@x.com")), now), WakePlan::Due);
+    }
+
+    #[test]
+    fn a_watched_thread_is_read_only_when_it_has_new_mail() {
+        let now = at("2026-10-28T12:00:00Z");
+        let until = Some("2026-11-04T09:00:00+01:00");
+        let quiet = snoozed("snooze", until, Some("2026-10-28T08:00:00Z"), Some("dana@x.com"));
+        assert_eq!(plan_wake(&quiet, now), WakePlan::Nothing);
+        let replied = snoozed("triage", until, Some("2026-10-28T11:00:00Z"), Some("dana@x.com"));
+        assert_eq!(plan_wake(&replied, now), WakePlan::Look(at("2026-10-28T08:00:00Z")));
+        // Moved out of Snoozed some other way: the watch goes.
+        assert_eq!(plan_wake(&snoozed("triage", until, Some("2026-10-28T08:00:00Z"), Some("*")), now), WakePlan::Drop);
+        assert_eq!(plan_wake(&snoozed("handled", until, Some("2026-10-28T11:00:00Z"), Some("*")), now), WakePlan::Drop);
+    }
+
+    #[test]
+    fn only_the_watched_sender_wakes_it() {
+        let after = at("2026-10-28T08:00:00Z");
+        let msgs = vec![
+            json!({ "direction": "inbound", "from_address": "Old <dana@x.com>", "sent_at": "2026-10-28T07:00:00Z" }),
+            json!({ "direction": "outbound", "from_address": "me@x.dk", "sent_at": "2026-10-28T09:00:00Z" }),
+            json!({ "direction": "inbound", "from_address": "Priya <priya@y.io>", "sent_at": "2026-10-28T10:00:00Z" }),
+        ];
+        assert_eq!(check_replies(&msgs, "dana@x.com", after), ReplyCheck::Someone("priya@y.io".into()));
+        assert_eq!(check_replies(&msgs, "*", after), ReplyCheck::Watched("priya@y.io".into()));
+        let mut with_dana = msgs.clone();
+        with_dana.push(json!({ "direction": "inbound", "from_address": "Dana W <Dana@X.com>", "sent_at": "2026-10-28 11:00:00" }));
+        assert_eq!(check_replies(&with_dana, "dana@x.com", after), ReplyCheck::Watched("dana@x.com".into()));
+        assert_eq!(check_replies(&msgs[..2], "dana@x.com", after), ReplyCheck::Nothing);
+    }
+
+    #[test]
+    fn someone_else_replying_puts_it_back_to_sleep() {
+        assert_eq!(
+            step_after_look(ReplyCheck::Someone("priya@y.io".into()), "triage", "dana@x.com"),
+            WakeStep::Keep("priya@y.io replied; still waiting for dana@x.com".into())
+        );
+        assert_eq!(step_after_look(ReplyCheck::Someone("priya@y.io".into()), "snooze", "dana@x.com"), WakeStep::Seen);
+        assert_eq!(step_after_look(ReplyCheck::Watched("dana@x.com".into()), "triage", "dana@x.com"), WakeStep::Wake("dana@x.com replied".into()));
+        // A flip the pass cannot explain stays in view.
+        assert_eq!(step_after_look(ReplyCheck::Nothing, "triage", "dana@x.com"), WakeStep::Wake("a new reply arrived".into()));
+    }
 }

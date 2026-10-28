@@ -1409,3 +1409,66 @@ CREATE TABLE IF NOT EXISTS dashboard_layout (
 CREATE TRIGGER IF NOT EXISTS trg_dashboard_layout_updated AFTER UPDATE ON dashboard_layout
   FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
   BEGIN UPDATE dashboard_layout SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+
+-- ###########################################################################
+-- # MAIL — Beta left-out features: reply watches, archive, bill alerts       #
+-- ###########################################################################
+
+-- "Snooze until they reply": a snoozed thread that also wakes when a given
+-- address (or '*' for anyone) writes back. The wake time itself stays on
+-- mail_threads.snoozed_until, so a watch is an addition to a snooze, never a
+-- replacement for its fallback date. `seen_message_at` is the newest message
+-- time the wake pass has already looked at; only mail after it can wake the
+-- thread, which is also what keeps the pass to one detail fetch per reply
+-- instead of one per sync. mail.rs (wake_snoozes) is the only reader.
+CREATE TABLE IF NOT EXISTS mail_snoozes (
+  thread_id       TEXT PRIMARY KEY REFERENCES mail_threads(id) ON DELETE CASCADE,
+  user_id         TEXT NOT NULL,
+  watch           TEXT NOT NULL,
+  snoozed_at      TEXT NOT NULL,
+  seen_message_at TEXT,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_mail_snoozes_user ON mail_snoozes(user_id);
+
+-- The Archive lane. mail_threads.status mirrors the mail server's enum, which
+-- has no 'archived', so an archived thread is 'handled' there and carries a
+-- row here. `prev_status` is what Undo puts back. A thread whose
+-- last_message_at moves past `archived_at` is back in the inbox (a reply
+-- un-archives, as it does in every mail client), so the row needs no cleanup
+-- to stop applying.
+CREATE TABLE IF NOT EXISTS mail_archived (
+  thread_id   TEXT PRIMARY KEY REFERENCES mail_threads(id) ON DELETE CASCADE,
+  user_id     TEXT NOT NULL,
+  archived_at TEXT NOT NULL,
+  prev_status TEXT NOT NULL,
+  created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_mail_archived_user ON mail_archived(user_id);
+
+-- Settings → Mail → Alerts. One row per user; no row reads as the design's
+-- default (on). Rust reads it before posting a notification (mail_flags.rs).
+CREATE TABLE IF NOT EXISTS mail_prefs (
+  user_id        TEXT PRIMARY KEY,
+  alerts_enabled INTEGER NOT NULL DEFAULT 1,
+  updated_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+-- One row per mail thread a bill or deadline alert was raised for, so a
+-- reminder, a forward or a re-sync of the same thread never raises or
+-- notifies twice. `thread_key` is account + sender + subject without its
+-- Re:/Fwd: prefixes (the connected mailboxes store no thread ids). `due_on`
+-- is the date the subject or preview names, when one does; `notified_at` is
+-- set once the notification went out. Deleting the alert (a disconnect
+-- cascades through mail_messages) forgets the thread with it.
+CREATE TABLE IF NOT EXISTS mail_alert_threads (
+  user_id     TEXT NOT NULL,
+  thread_key  TEXT NOT NULL,
+  alert_id    TEXT NOT NULL REFERENCES mail_alerts(id) ON DELETE CASCADE,
+  alert_type  TEXT NOT NULL CHECK (alert_type IN ('bill','deadline')),
+  due_on      TEXT,
+  received_at TEXT,
+  notified_at TEXT,
+  created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  PRIMARY KEY (user_id, thread_key)
+);

@@ -409,7 +409,12 @@ fn delete_account(conn: &rusqlite::Connection, id: &str) -> rusqlite::Result<usi
 // ---------------------------------------------------------------------------
 
 fn sync_and_record(app: &AppHandle, db: &DbState, outlook: &OutlookState, account_id: &str, user_id: &str) -> Result<Value, String> {
+    let since = crate::mail_flags::mark();
     let result = sync_account(app, db, outlook, account_id, user_id);
+    // Bills and deadlines in what this sync brought in (Settings → Mail → Alerts).
+    if result.is_ok() {
+        crate::mail_flags::after_sync(app, db, user_id, account_id, &since);
+    }
     if let Err(e) = &result {
         {
             let conn = db.conn.lock().unwrap();

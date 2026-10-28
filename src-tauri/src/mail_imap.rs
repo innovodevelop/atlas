@@ -296,7 +296,12 @@ fn sync_and_record(
     user_id: &str,
     limit: Option<u32>,
 ) -> Result<Value, String> {
+    let since = crate::mail_flags::mark();
     let result = sync_account(app, db, imap, account_id, user_id, limit);
+    // Bills and deadlines in what this sync brought in (Settings → Mail → Alerts).
+    if result.is_ok() {
+        crate::mail_flags::after_sync(app, db, user_id, account_id, &since);
+    }
     if let Err(e) = &result {
         {
             let conn = db.conn.lock().unwrap();
