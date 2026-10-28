@@ -26,6 +26,8 @@ import { getToken } from '@/lib/authClient';
 import { getBrainEndpoint } from '@/lib/brainClient';
 import { useAuth } from '@/hooks/useAuth';
 import { MAIL_AUDIT_ACTIONS, MailSendBlockedError, NEEDS_YOU_STATUSES } from '@/types/mail';
+import { isArchived, nextWakeDelay } from '@/lib/betaMail';
+import { isUserMailbox } from '@/hooks/useMailIntelligence';
 import type {
   MailAccount,
   MailAuditActor,
@@ -88,6 +90,10 @@ export interface UseAtlasMail {
   rules: MailRule[];
   /** Lower-cased, de-duplicated participants across every thread. */
   knownAddresses: string[];
+  /** Snooze reply watches by thread id: '*' or the address the snooze waits for (mail_snoozes). */
+  watches: Record<string, string>;
+  /** Thread ids the Beta's Archive lane holds right now. */
+  archivedIds: ReadonlySet<string>;
 
   // ---- view state ----
   view: MailView;
@@ -123,7 +129,16 @@ export interface UseAtlasMail {
   sync(): Promise<void>;
   markRead(threadId: string): Promise<void>;
   setStatus(threadId: string, status: MailThreadStatus): Promise<void>;
-  snooze(threadId: string, until: string): Promise<void>;
+  /**
+   * Snooze until `until`. With `watch` ('*' or an address) the snooze also
+   * waits for a reply: the sync's wake pass (mail.rs) brings the thread back
+   * when that person writes, and `until` is the fallback.
+   */
+  snooze(threadId: string, until: string, watch?: string | null): Promise<void>;
+  /** The Beta's Archive: 'handled' on the worker, plus a local mail_archived row Undo reads. */
+  archive(threadId: string): Promise<void>;
+  /** Undo an archive: back to the status it had before. */
+  unarchive(threadId: string): Promise<void>;
 
   // ---- draft actions ----
   draft(threadId: string, opts?: { instruction?: string; tone?: string }): Promise<MailDraft>;
@@ -319,7 +334,7 @@ const MAIL_VIEWS: readonly MailView[] = [
 ] as const;
 
 /** 'snoozed' is the view, 'snooze' is the status — the one place they differ. */
-const VIEW_STATUS: Record<Exclude<MailView, 'sent_today' | 'needs_you' | 'inbox'>, MailThreadStatus> = {
+const VIEW_STATUS: Record<Exclude<MailView, 'sent_today' | 'needs_you' | 'inbox' | 'archive'>, MailThreadStatus> = {
   triage: 'triage',
   approve: 'approve',
   drafting: 'drafting',
@@ -356,7 +371,13 @@ function byRecencyDesc(a: MailThread, b: MailThread): number {
 // The hook
 // ---------------------------------------------------------------------------
 
-export function useAtlasMail(): UseAtlasMail {
+/**
+ * `archiveLane`: the caller shows the Beta's Archive lane, so archived
+ * threads leave "handled" for it. The Workshop, which has no Archive lane,
+ * leaves it off and keeps them in Handled.
+ */
+export function useAtlasMail(opts: { archiveLane?: boolean } = {}): UseAtlasMail {
+  const archiveLane = opts.archiveLane ?? false;
   const { user } = useAuth();
   const userId = user?.id ?? null;
 
@@ -367,6 +388,8 @@ export function useAtlasMail(): UseAtlasMail {
   const [messages, setMessages] = useState<MailMessage[]>([]);
   const [audit, setAudit] = useState<MailAuditEvent[]>([]);
   const [accountAudit, setAccountAudit] = useState<MailAuditEvent[]>([]);
+  const [watches, setWatches] = useState<Record<string, string>>({});
+  const [archivedRows, setArchivedRows] = useState<Record<string, { archived_at: string; prev_status: MailThreadStatus }>>({});
 
   const [view, setView] = useState<MailView>('triage');
   const [mailbox, setMailbox] = useState<string | null>(null);
@@ -399,16 +422,22 @@ export function useAtlasMail(): UseAtlasMail {
       setAllThreads([]);
       setAllDrafts([]);
       setRules([]);
+      setWatches({});
+      setArchivedRows({});
       setLoading(false);
       return;
     }
     try {
-      const [accRes, thrRes, drfRes, rulRes] = await Promise.all([
+      const [accRes, thrRes, drfRes, rulRes, snzRes, arcRes] = await Promise.all([
         localClient.from('mail_accounts').select('*').eq('user_id', userId),
         localClient.from('mail_threads').select('*').eq('user_id', userId),
         localClient.from('mail_drafts').select('*').eq('user_id', userId),
         localClient.from('mail_rules').select('*').eq('user_id', userId).order('position'),
+        localClient.from('mail_snoozes').select('*').eq('user_id', userId),
+        localClient.from('mail_archived').select('*').eq('user_id', userId),
       ]);
+      setWatches(Object.fromEntries((snzRes.data ?? []).map((r: Row) => [r.thread_id as string, String(r.watch)])));
+      setArchivedRows(Object.fromEntries((arcRes.data ?? []).map((r: Row) => [r.thread_id as string, { archived_at: String(r.archived_at), prev_status: r.prev_status as MailThreadStatus }])));
 
       const accountRows: MailAccount[] = (accRes.data ?? []).map(toAccount);
       const mailboxOf = new Map(accountRows.map((a) => [a.id, a.email_address]));
@@ -497,7 +526,7 @@ export function useAtlasMail(): UseAtlasMail {
   useEffect(() => {
     if (!isTauri() || !userId) return;
     const channel = localClient.channel('mail');
-    for (const table of ['mail_accounts', 'mail_threads', 'mail_drafts', 'mail_rules']) {
+    for (const table of ['mail_accounts', 'mail_threads', 'mail_drafts', 'mail_rules', 'mail_snoozes', 'mail_archived']) {
       channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => {
         void loadAll();
       });
@@ -536,6 +565,13 @@ export function useAtlasMail(): UseAtlasMail {
     return ids;
   }, [allDrafts]);
 
+  // The Beta's Archive lane: archived from Mail, and not brought back since
+  // (by a reply, or by anything moving it out of 'handled'). See isArchived.
+  const archivedIds = useMemo(
+    () => new Set(allThreads.filter((t) => isArchived(t, archivedRows[t.id]?.archived_at)).map((t) => t.id)),
+    [allThreads, archivedRows],
+  );
+
   const threadsInView = useCallback(
     (v: MailView) =>
       v === 'sent_today'
@@ -543,14 +579,21 @@ export function useAtlasMail(): UseAtlasMail {
         : v === 'needs_you'
           ? allThreads.filter((t) => NEEDS_YOU_STATUSES.includes(t.status))
           : v === 'inbox'
-            ? allThreads.filter((t) => t.status !== 'snooze')
-            : allThreads.filter((t) => t.status === VIEW_STATUS[v]),
-    [allThreads, sentTodayThreadIds],
+            ? allThreads.filter((t) => t.status !== 'snooze' && !archivedIds.has(t.id))
+            : v === 'archive'
+              ? allThreads.filter((t) => archivedIds.has(t.id))
+              : v === 'handled' && archiveLane
+                // The Beta lists archived threads in their own lane, so its
+                // "Atlas handled" leaves them out. The Workshop has no Archive
+                // lane to find them in, so its Handled view keeps them.
+                ? allThreads.filter((t) => t.status === 'handled' && !archivedIds.has(t.id))
+                : allThreads.filter((t) => t.status === VIEW_STATUS[v]),
+    [allThreads, sentTodayThreadIds, archivedIds, archiveLane],
   );
 
   const counts = useMemo(() => {
     const out = {} as MailCounts;
-    for (const v of [...MAIL_VIEWS, 'needs_you', 'inbox'] as MailView[]) out[v] = threadsInView(v).length;
+    for (const v of [...MAIL_VIEWS, 'needs_you', 'inbox', 'archive'] as MailView[]) out[v] = threadsInView(v).length;
     return out;
   }, [threadsInView]);
 
@@ -660,6 +703,26 @@ export function useAtlasMail(): UseAtlasMail {
     const { error: err } = await localClient.from('mail_threads').update(patch).eq('id', threadId);
     if (err) throw new Error(err.message);
     setAllThreads((prev) => prev.map((t) => (t.id === threadId ? { ...t, ...patch } : t)));
+  }, []);
+
+  /**
+   * Remove a thread's mail_snoozes or mail_archived row, if it has one.
+   * Best-effort and logged: the thread's status, which the worker shares, is
+   * what the user acted on; a stale side row is cleaned up by the next wake
+   * pass (a watch on a thread that left Snoozed is dropped) or reads as not
+   * archived (isArchived needs 'handled').
+   */
+  const dropSideRow = useCallback(async (table: 'mail_snoozes' | 'mail_archived', threadId: string) => {
+    const { error: err } = await localClient.from(table).delete().eq('thread_id', threadId);
+    if (err) console.error(`${table} cleanup failed:`, err.message);
+    const strip = <T,>(prev: Record<string, T>) => {
+      if (!(threadId in prev)) return prev;
+      const next = { ...prev };
+      delete next[threadId];
+      return next;
+    };
+    if (table === 'mail_snoozes') setWatches(strip);
+    else setArchivedRows(strip);
   }, []);
 
   const findDraft = useCallback((draftId: string): MailDraft => {
@@ -798,12 +861,17 @@ export function useAtlasMail(): UseAtlasMail {
         action: MAIL_AUDIT_ACTIONS.STATUS_CHANGED,
         detail: `${before.status} → ${status}`,
       });
+      // A thread moved by hand is out of its snooze and out of the Archive:
+      // the rows that said otherwise go, so neither the wake pass nor the
+      // Archive lane acts on a decision the user just replaced.
+      if (status !== 'snooze') await dropSideRow('mail_snoozes', threadId);
+      if (status !== 'handled') await dropSideRow('mail_archived', threadId);
     },
-    [beginAction, patchThreadLocal, appendAudit],
+    [beginAction, patchThreadLocal, appendAudit, dropSideRow],
   );
 
   const snooze = useCallback(
-    async (threadId: string, until: string) => {
+    async (threadId: string, until: string, watch?: string | null) => {
       const uid = beginAction();
       if (!ISO_WITH_OFFSET.test(until)) {
         throw new Error('Snooze time must be an ISO-8601 timestamp with a timezone offset.');
@@ -825,15 +893,103 @@ export function useAtlasMail(): UseAtlasMail {
         setError(msgOf(e));
         throw e instanceof Error ? e : new Error(msgOf(e));
       }
+      // The watch is local: the worker has no route that stores one. mail.rs
+      // reads it on every sync (wake_snoozes). Written after the server took
+      // the snooze, so a failed snooze leaves no watch behind; a re-snooze
+      // replaces the old watch (delete, then insert: localClient has no
+      // real upsert).
+      await dropSideRow('mail_snoozes', threadId);
+      if (watch) {
+        const { error: err } = await localClient.from('mail_snoozes').insert({
+          thread_id: threadId,
+          user_id: uid,
+          watch,
+          snoozed_at: new Date().toISOString(),
+        });
+        if (err) {
+          // The snooze itself stands; only the early wake-up is missing, and
+          // the fallback time still brings the thread back.
+          setWarning(`Snoozed, but Atlas could not save the reply watch: ${err.message}`);
+        } else {
+          setWatches((prev) => ({ ...prev, [threadId]: watch }));
+        }
+      }
       await appendAudit({
         threadId,
         actor: 'user',
         action: MAIL_AUDIT_ACTIONS.SNOOZED,
-        detail: `until ${until}`,
+        detail: watch ? `until ${watch === '*' ? 'anyone' : watch} replies, at the latest ${until}` : `until ${until}`,
       });
     },
-    [beginAction, patchThreadLocal, appendAudit],
+    [beginAction, patchThreadLocal, appendAudit, dropSideRow],
   );
+
+  const archive = useCallback(
+    async (threadId: string) => {
+      const uid = beginAction();
+      const before = threadsRef.current.find((t) => t.id === threadId);
+      if (!before) throw new Error('That thread is not in the local store — sync first.');
+      // The worker has no archived status; 'handled' is its "out of the way".
+      // setStatus is server-first and reverts on failure, so the archive row
+      // is written only once the worker agreed.
+      if (before.status !== 'handled') await setStatus(threadId, 'handled');
+      const archivedAt = new Date().toISOString();
+      await dropSideRow('mail_archived', threadId);
+      const { error: err } = await localClient.from('mail_archived').insert({
+        thread_id: threadId,
+        user_id: uid,
+        archived_at: archivedAt,
+        prev_status: before.status,
+      });
+      if (err) {
+        setError(`Marked done, but not archived: ${err.message}`);
+        throw new Error(err.message);
+      }
+      setArchivedRows((prev) => ({ ...prev, [threadId]: { archived_at: archivedAt, prev_status: before.status } }));
+      await appendAudit({ threadId, actor: 'user', action: MAIL_AUDIT_ACTIONS.ARCHIVED, detail: `from ${before.status}` });
+    },
+    [beginAction, setStatus, dropSideRow, appendAudit],
+  );
+
+  const unarchive = useCallback(
+    async (threadId: string) => {
+      beginAction();
+      const row = archivedRows[threadId];
+      const back = row?.prev_status ?? 'triage';
+      // setStatus drops the archive row itself when `back` is not 'handled';
+      // a thread that was already handled when archived only loses the row.
+      if (back !== 'handled') await setStatus(threadId, back);
+      else await dropSideRow('mail_archived', threadId);
+      await appendAudit({ threadId, actor: 'user', action: MAIL_AUDIT_ACTIONS.UNARCHIVED, detail: `back to ${back}` });
+    },
+    [beginAction, archivedRows, setStatus, dropSideRow, appendAudit],
+  );
+
+  // While Mail is open, a snooze comes back on time even between syncs: when
+  // the earliest snoozed thread is due, ask Rust's wake pass (the same one
+  // every sync runs) to bring it back on the worker and here. A quiet mailbox
+  // costs one timer and no requests.
+  // A due thread the pass could not move (the worker unreachable) stays due,
+  // and every reload re-arms this effect: the next attempt waits a minute
+  // after the last one instead of retrying once a second.
+  const nextWakeAttempt = useRef(0);
+  useEffect(() => {
+    if (!userId || !isTauri()) return;
+    const due = nextWakeDelay(allThreads);
+    if (due === null) return;
+    // setTimeout fires at once for anything past 2^31-1 ms, so stay under it.
+    const delay = Math.min(Math.max(due + 1000, nextWakeAttempt.current - Date.now()), 2_147_483_647);
+    const timer = setTimeout(() => {
+      nextWakeAttempt.current = Date.now() + 60_000;
+      void tauriInvoke<{ warnings?: string[] }>('mail_wake_snoozes', { token: getToken() ?? '', userId })
+        .then((res) => {
+          if (res?.warnings?.length) setWarning(res.warnings.join(' '));
+          return loadAll();
+        })
+        .catch((e) => setWarning(msgOf(e)));
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [userId, allThreads, loadAll]);
 
   // -------------------------------------------------------------------------
   // Draft actions
@@ -1187,7 +1343,11 @@ export function useAtlasMail(): UseAtlasMail {
   const dismissWarning = useCallback(() => setWarning(null), []);
 
   return {
-    account: accounts[0] ?? null,
+    // The mailbox the threads come from. mail_accounts also holds the Gmail,
+    // Outlook and IMAP mailboxes the user connected for scanning, which have
+    // no threads, rules or autonomy here; the first row used to be whichever
+    // SQLite returned first.
+    account: accounts.find((a) => !isUserMailbox(a)) ?? accounts[0] ?? null,
     threads,
     counts,
     selectedThreadId,
@@ -1198,6 +1358,8 @@ export function useAtlasMail(): UseAtlasMail {
     accountAudit,
     rules,
     knownAddresses,
+    watches,
+    archivedIds,
 
     view,
     mailbox,
@@ -1223,6 +1385,8 @@ export function useAtlasMail(): UseAtlasMail {
     markRead,
     setStatus,
     snooze,
+    archive,
+    unarchive,
 
     draft,
     saveDraft,
