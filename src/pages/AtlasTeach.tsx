@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, MicOff, Volume2, VolumeX, ChevronRight, ChevronLeft, Brain, Heart, User, Sparkles, Briefcase, Shield, Rocket, Smile, Users, Activity, Star, Clock, Trophy, LucideIcon, Zap, Wifi, WifiOff, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,15 @@ import { useToast } from '@/hooks/use-toast';
 import { AtlasSphereCanvas } from '@/components/atlas-ui/AtlasSphereCanvas';
 import { isBetaUi } from '@/lib/betaFlag';
 import { TeachHero } from '@/components/atlas/BetaScreenHero';
+import { AtlasIcon } from '@/components/atlas/AtlasIcon';
+import { useBetaNavigate } from '@/lib/viewTransitions';
+import { escapeAction } from '@/lib/betaScreenKeys';
+import {
+  canSendDraft, categoryLabel, teachCategoryOf, teachCountLabel, teachEyebrow, teachGapLine, teachGaps,
+  teachMicLabel, teachPrompts, teachRows, teachTiles, teachVoiceChip, type TeachVoiceStatus,
+} from '@/lib/betaTeach';
+// Scoped to the Beta classes only; inert with the flag off.
+import '@/styles/beta/teach.css';
 
 /**
  * Registration data. Mirrored in `src/surfaces.ts`, which is what the router,
@@ -473,6 +483,29 @@ const AtlasTeach = () => {
     setIsMuted(prev => !prev);
   }, [isPlaying, stopPlayback]);
 
+  // The Beta body's copies of the Workshop status pill's two buttons (connect
+  // when off, retry after an error) — the same calls in the same order, lifted
+  // out of the JSX so the Beta chip can carry them. The Workshop pill below
+  // keeps its own inline handlers untouched.
+  const connectVoice = useCallback(async () => {
+    setVoiceStatus('connecting');
+    const success = await connect();
+    if (!success) setVoiceStatus('error');
+  }, [connect]);
+  const retryVoice = useCallback(async () => {
+    setVoiceStatus('connecting');
+    setVoiceError(null);
+    const success = await retryConnect();
+    if (!success) setVoiceStatus('error');
+  }, [retryConnect]);
+  // A prompt chip puts its question in the conversation as Atlas's turn, so
+  // the next thing said is sent as the answer to it (the history goes with
+  // every request).
+  const askPrompt = useCallback((question: string) => {
+    setMessages(prev => [...prev, { role: 'assistant', content: question }]);
+  }, []);
+  const newSession = useCallback(() => setMessages([]), []);
+
   // Group memories by category
   const memoriesByCategory = memories.reduce((acc, memory) => {
     const cat = memory.category || 'general';
@@ -507,20 +540,51 @@ const AtlasTeach = () => {
     event: Clock,
   };
 
-  return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* Beta phase 3: the sphere-as-microphone hero above the same body. The
-          sphere is the mic button this page already has (handleMicClick). */}
-      {isBetaUi() ? (
+  // The Beta screen (Atlas Teach Beta.dc.html): the sphere-as-microphone hero
+  // above the conversation and what Atlas keeps. Every hook above runs for
+  // both bodies — the voice pipeline, the memory query and its realtime
+  // subscription are this page's, not the body's — and the flag is fixed for
+  // the life of the window, so the early return never changes the hook order.
+  if (isBetaUi()) {
+    return (
+      <div className="b-teach" data-screen-label="Atlas — Teach">
+        {/* The sphere is the mic button this page already has (handleMicClick). */}
         <TeachHero
-          eyebrow={`Teach · ${memories.length} ${memories.length === 1 ? 'thing' : 'things'} kept${isConnected ? ' · listening' : ''}`}
+          eyebrow={teachEyebrow(memories.length, isConnected)}
           title="Tell Atlas who you are."
-          intro="It listens for the durable things, like values, people and plans, and shows you everything it keeps. Tap the sphere and start talking."
-          micLabel={!isConnected ? 'Tap to talk' : isProcessing ? 'Thinking…' : listeningMode === 'active' ? 'Listening · tap to stop' : 'Waiting for “Hey Atlas”'}
+          intro="It listens for the durable things, like values, people and plans, and shows you what it keeps. Tap the sphere and start talking, or type."
+          micLabel={teachMicLabel({ isConnected, isProcessing, listeningMode })}
           state={atlasState === 'dormant' ? 'idle' : atlasState}
           onTapSphere={handleMicClick}
         />
-      ) : null}
+        <BetaTeachBody
+          messages={messages}
+          memories={memories}
+          recentlyLearned={recentlyLearned}
+          liveTranscript={liveTranscript}
+          listeningMode={listeningMode}
+          awake={isAwakeRef.current}
+          isConnected={isConnected}
+          isProcessing={isProcessing}
+          isMuted={isMuted}
+          voiceStatus={voiceStatus}
+          voiceError={voiceError}
+          retryCount={retryCount}
+          maxRetries={maxRetries}
+          onMic={handleMicClick}
+          onSend={sendToAtlas}
+          onToggleMute={toggleMute}
+          onConnect={connectVoice}
+          onRetry={retryVoice}
+          onAsk={askPrompt}
+          onNewSession={newSession}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background relative overflow-hidden">
       {/* Voice Status Header */}
       <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
         <motion.div
@@ -880,5 +944,239 @@ const AtlasTeach = () => {
     </div>
   );
 };
+
+// ── Beta body ────────────────────────────────────────────────────────────────
+
+interface BetaTeachProps {
+  messages: Message[];
+  memories: Memory[];
+  recentlyLearned: LearnedItem[];
+  liveTranscript: string;
+  listeningMode: ListeningMode;
+  /** The wake word has been heard this session (the page's own ref, read at render). */
+  awake: boolean;
+  isConnected: boolean;
+  isProcessing: boolean;
+  isMuted: boolean;
+  voiceStatus: TeachVoiceStatus;
+  voiceError: string | null;
+  retryCount: number;
+  maxRetries: number;
+  onMic: () => void;
+  onSend: (text: string) => Promise<void>;
+  onToggleMute: () => void;
+  onConnect: () => void;
+  onRetry: () => void;
+  onAsk: (question: string) => void;
+  onNewSession: () => void;
+}
+
+/**
+ * Teach's body in the Beta style. It owns only what the design adds on top of
+ * the page — the typed draft, the picked category and two refs — and calls
+ * the page's own actions for everything else: the microphone is
+ * `handleMicClick`, typing goes through `sendToAtlas` (the same turn a spoken
+ * sentence makes), mute is `toggleMute`. The Workshop's memory sidebar is the
+ * aside here, always open, so its toggle has nothing left to do.
+ */
+function BetaTeachBody(p: BetaTeachProps) {
+  const navigate = useBetaNavigate();
+  const [draft, setDraft] = useState('');
+  const [cat, setCat] = useState('');
+  const logRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const now = Date.now();
+
+  // The newest turn stays in view by scrolling the conversation, not the page
+  // (the Workshop's scrollIntoView would drag the whole screen down with it).
+  useEffect(() => {
+    const el = logRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [p.messages.length, p.isProcessing, p.liveTranscript]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const act = escapeAction(e);
+      if (act === 'blur') (e.target as HTMLElement).blur();
+      else if (act === 'step') navigate('/');
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [navigate]);
+
+  const tiles = useMemo(() => teachTiles(p.memories, cat), [p.memories, cat]);
+  const gaps = useMemo(() => teachGaps(p.memories), [p.memories]);
+  const prompts = useMemo(() => teachPrompts(p.memories, cat), [p.memories, cat]);
+  const freshIds = useMemo(() => new Set(p.recentlyLearned.map((l) => l.id)), [p.recentlyLearned]);
+  const rows = teachRows(p.memories, { selected: cat, freshIds, now });
+  const chip = teachVoiceChip({ voiceStatus: p.voiceStatus, listeningMode: p.listeningMode, retryCount: p.retryCount, maxRetries: p.maxRetries });
+  const canSend = canSendDraft(draft, p.isProcessing);
+  const micName = p.isConnected ? 'Stop listening' : 'Start listening';
+  const micTone = !p.isConnected ? '' : p.listeningMode === 'active' ? ' live' : ' on';
+  const hint = !p.isConnected
+    ? 'Tap the sphere or the microphone, then say “Atlas” and tell me something about you. Or type it below: your name, what you care about, anything you’d like me to remember.'
+    : p.listeningMode === 'passive'
+      ? 'Just say “Atlas” followed by what you want to tell me. For example: “Atlas, my name is…” or “Atlas, I love…”'
+      : 'I’m listening. Tell me something about you.';
+
+  const send = () => {
+    if (!canSend) return;
+    const text = draft.trim();
+    setDraft('');
+    if (inputRef.current) inputRef.current.style.height = '';
+    void p.onSend(text);
+  };
+
+  return (
+    <div className="b-teach-body">
+      <section className="b-teach-conv" aria-label="Conversation">
+        <div className="b-teach-conv-top">
+          <span className={`b-teach-voice b-teach-voice--${chip.tone}`} role="status">
+            <i aria-hidden />{chip.label}
+          </span>
+          {chip.action === 'connect' ? <button type="button" className="b-teach-ghost" onClick={p.onConnect}>Connect voice</button> : null}
+          {chip.action === 'retry' ? <button type="button" className="b-teach-ghost" onClick={p.onRetry}>Retry</button> : null}
+          {p.voiceStatus === 'error' && p.voiceError ? <span className="b-teach-voice-err" title={p.voiceError}>{p.voiceError}</span> : null}
+          <span className="b-teach-sp" />
+          <button
+            type="button"
+            className="b-teach-ghost"
+            aria-pressed={p.isMuted}
+            title={p.isMuted ? 'Atlas answers in text only. Tap to hear it again.' : 'Atlas speaks its answers. Tap to mute.'}
+            onClick={p.onToggleMute}
+          >
+            <AtlasIcon name="speaker" size={15} weight={1.8} />
+            {p.isMuted ? 'Replies muted' : 'Replies spoken'}
+          </button>
+          <button type="button" className="b-teach-ghost" onClick={p.onNewSession} disabled={p.messages.length === 0 || p.isProcessing}>New session</button>
+        </div>
+
+        <div ref={logRef} className="b-teach-log" role="log" aria-label="Messages" aria-live="polite">
+          {p.messages.length === 0 ? <div className="b-teach-msg atlas hint">{hint}</div> : null}
+          {p.messages.map((m, i) => (
+            <div key={i} className={`b-teach-msg ${m.role === 'user' ? 'me' : 'atlas'}`}>{m.content}</div>
+          ))}
+          {p.liveTranscript ? (
+            // The partial transcript changes several times a second; a screen
+            // reader hears the finished turn when it lands in the log instead.
+            <div className="b-teach-msg me live" aria-hidden>
+              {p.listeningMode === 'passive' && !p.awake ? <span className="b-teach-wait">(waiting for “Atlas”) </span> : null}
+              {p.liveTranscript}
+            </div>
+          ) : null}
+          {p.isProcessing ? <div className="b-teach-dots" role="status" aria-label="Atlas is thinking"><i /><i /><i /></div> : null}
+        </div>
+
+        {p.recentlyLearned.length > 0 ? (
+          <div className="b-teach-learned" role="status">
+            {p.recentlyLearned.map((l) => (
+              <span key={l.id} className="b-teach-learn">
+                <AtlasIcon name="check" size={13} weight={2} />
+                Learned · {categoryLabel(teachCategoryOf(l.category))}: {l.key}
+              </span>
+            ))}
+          </div>
+        ) : null}
+
+        <div className="b-teach-prompts">
+          {prompts.map((q) => (
+            <button
+              key={q.category}
+              type="button"
+              className="b-teach-prompt"
+              onClick={() => { p.onAsk(q.question); inputRef.current?.focus(); }}
+            >
+              <span>{q.label} · </span>{q.question}
+            </button>
+          ))}
+        </div>
+
+        <div className="b-teach-composer">
+          <button
+            type="button"
+            className={`b-teach-mic${micTone}`}
+            onClick={p.onMic}
+            disabled={p.isProcessing}
+            aria-label={micName}
+            aria-pressed={p.isConnected}
+            title={micName}
+          >
+            <AtlasIcon name="mic" size={20} weight={1.8} />
+          </button>
+          <textarea
+            ref={inputRef}
+            rows={1}
+            value={draft}
+            placeholder="Tell Atlas something about you…"
+            aria-label="Message"
+            onChange={(e) => {
+              const el = e.currentTarget;
+              el.style.height = 'auto';
+              el.style.height = `${Math.min(120, el.scrollHeight)}px`;
+              setDraft(el.value);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); }
+            }}
+          />
+          <button type="button" className="b-teach-send" onClick={send} disabled={!canSend}>Send</button>
+        </div>
+      </section>
+
+      <aside className="b-teach-aside" aria-label="What Atlas keeps">
+        <section className="b-teach-card b-teach-card--linen" aria-labelledby="b-teach-knows">
+          <div className="b-teach-head">
+            <h2 id="b-teach-knows" className="b-teach-h">What Atlas knows about you</h2>
+            <span className="b-teach-total">{teachCountLabel(p.memories.length)} things</span>
+          </div>
+          <div className="b-teach-tiles">
+            {tiles.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                className={`b-teach-tile${t.selected ? ' on' : ''}${t.count ? '' : ' none'}`}
+                aria-pressed={t.selected}
+                title={t.count ? `${t.count} about your ${t.label.toLowerCase()}` : 'Nothing yet'}
+                onClick={() => setCat((c) => (c === t.key ? '' : t.key))}
+              >
+                <span className="b-teach-tile-top">{t.label}<span className="b-teach-tile-n">{t.count}</span></span>
+                <span className="b-teach-pips" aria-hidden>
+                  {[0, 1, 2, 3, 4].map((i) => <i key={i} className={i < t.pips ? 'on' : undefined} />)}
+                </span>
+              </button>
+            ))}
+          </div>
+          <p className="b-teach-gap">{teachGapLine(gaps)}</p>
+        </section>
+
+        <section className="b-teach-card" aria-labelledby="b-teach-list">
+          <div className="b-teach-head">
+            <h2 id="b-teach-list" className="b-teach-h">{cat ? categoryLabel(cat) : 'Recently learned'}</h2>
+            {cat ? <button type="button" className="b-teach-ghost b-teach-ghost--fill" onClick={() => setCat('')}>Show all</button> : null}
+          </div>
+          {rows.map((r) => (
+            <div key={r.id} className={`b-teach-row${r.fresh ? ' fresh' : ''}`}>
+              <p className="b-teach-row-t">{r.title}</p>
+              {r.value ? <p className="b-teach-row-v">{r.value}</p> : null}
+              <p className="b-teach-row-m">{r.meta}</p>
+            </div>
+          ))}
+          {rows.length === 0 ? (
+            <p className="b-teach-none">{cat ? 'Nothing here yet. Tell Atlas about this part of you.' : 'Nothing learned yet. Start talking, or type below.'}</p>
+          ) : null}
+          {/* Forgetting lives in Settings, behind its confirmation; see src/lib/betaTeach.ts. */}
+          <Link className="b-teach-manage" to="/settings#memory">Manage or forget in Settings → Memory &amp; Privacy</Link>
+        </section>
+
+        <section className="b-teach-guide" aria-label="What is worth teaching">
+          <span className="b-teach-guide-k">Worth teaching</span>
+          <p>Things that will still be true next month: who you are, the people around you, what you value, what you’re working towards.</p>
+          <span className="b-teach-guide-k">Not worth it</span>
+          <p>Passwords, card numbers and one-off errands. Keep secrets out: what Atlas keeps can go into the requests it sends to answer you.</p>
+        </section>
+      </aside>
+    </div>
+  );
+}
 
 export default AtlasTeach;
