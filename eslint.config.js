@@ -14,7 +14,7 @@ export default tseslint.config(
   // `scripts` is NOT ignored any more: it now holds shipped tooling with its
 // own test suite (scripts/new-surface.ts + newSurface.test.ts), and an
 // ignored directory is a directory the lint gate lies about.
-{ ignores: ["dist", "dist-admin", "supabase/functions", "src-tauri"] },
+{ ignores: ["dist", "dist-admin", "supabase/functions", "src-tauri", ".claude"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],

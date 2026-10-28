@@ -200,7 +200,7 @@ export const OutageNotice = ({
       </p>
       <p style={{ margin: '2px 0 0' }}>
         {lastReached ? `Atlas last reached it ${lastReached}. ` : 'Atlas has not completed a sync with it. '}
-        Everything below is the last thing your house reported \u2014 it is not a claim about now,
+        Everything below is the last thing your house reported — it is not a claim about now,
         and Atlas cannot command anything until the bridge answers again.
       </p>
       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>

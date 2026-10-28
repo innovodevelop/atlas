@@ -66,8 +66,10 @@
 
 html[data-ui="beta"] body { background: var(--b-page); color: var(--b-ink); font-family: var(--b-font-ui); }
 html[data-ui="beta"] ::selection { background: #e8d8c2; }
-/* Flat, borderless: no element border anywhere under the shell. */
-html[data-ui="beta"] button, html[data-ui="beta"] input, html[data-ui="beta"] textarea, html[data-ui="beta"] select { border: none; font: inherit; }
+/* Flat, borderless: no element border anywhere under the shell.
+   Zero specificity on purpose: at (0,1,2) this beat every single-class rule,
+   so `.b-btn` and its kin lost their font size and weight on every screen. */
+:where(html[data-ui="beta"]) :where(button, input, textarea, select) { border: none; font: inherit; }
 /* No focus ring for pointer users; the keyboard keeps a visible one. */
 html[data-ui="beta"] :focus { outline: none; }
 html[data-ui="beta"] :focus-visible { box-shadow: 0 0 0 3px rgba(52, 97, 242, .18); }

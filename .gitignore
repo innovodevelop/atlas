@@ -41,3 +41,6 @@ services/voice-gateway/vad.out
 # ACAV100M feature set — which is CC BY-NC-SA 4.0 and must never enter this repo.
 scripts/train-wakeword/work/
 scripts/train-wakeword/output/
+
+# Agent worktrees (Claude Code workflows); each is a full checkout.
+.claude/worktrees/

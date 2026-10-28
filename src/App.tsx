@@ -16,14 +16,14 @@ import { OnboardingGate } from "./components/OnboardingGate";
 // These two are static because they are the FIRST paint of a cold start —
 // the desk you land on, and the consent screen a new user is sent to — so
 // neither may depend on a runtime chunk fetch that can fail in the webview.
+import { lazy } from "react";
 import AtlasDashboard from "./pages/atlas/AtlasDashboard";
 import BetaHome from "./pages/atlas/BetaHome";
-import BetaMail from "./pages/atlas/BetaMail";
-import BetaVoice from "./pages/atlas/BetaVoice";
-import BetaMoney from "./pages/atlas/BetaMoney";
-import BetaHealth from "./pages/atlas/BetaHealth";
 import { isBetaUi } from "./lib/betaFlag";
 import AtlasPermissions from "./pages/AtlasPermissions";
+// The Beta twin of the consent screen is static for the same reason: it is the
+// first paint a new user gets while the flag is on. It brings BetaOnboarding.
+import BetaPermissions from "./pages/BetaPermissions";
 
 // The twenty-odd `const X = lazy(() => import("./pages/…"))` lines that used to
 // sit here are gone, and their absence is the point rather than tidiness.
@@ -60,6 +60,43 @@ const PageLoader = () => (
   </div>
 );
 
+// ── The Beta redesign's screens ─────────────────────────────────────────────
+//
+// While the beta_ui flag is on, these replace the Workshop page at the same
+// path (the registry still owns the path, its dock slot and its edition). They
+// are lazy for the reason the registry's loaders are: every page named
+// statically here lands on the entry chunk of every build.
+//
+// The admin half sits behind the same build-time test as ADMIN_LOADERS in
+// src/surfaces.ts, written out in full rather than through `EDITION`, so Vite
+// substitutes a literal and Rollup deletes the branch and its import() calls
+// from a consumer build. A consumer asking for one of these paths still gets
+// the 404, because the registry routes no admin surface there at all.
+const BETA_CONSUMER: Readonly<Record<string, RouteOverride>> = {
+  "/mail": { Component: lazy(() => import("./pages/atlas/BetaMail")) },
+  "/home": { Component: lazy(() => import("./pages/atlas/BetaVoice")) },
+  "/health": { Component: lazy(() => import("./pages/atlas/BetaHealth")) },
+  "/smart-home": { Component: lazy(() => import("./pages/atlas/BetaSmartHome")) },
+  "/settings": { Component: lazy(() => import("./pages/atlas/BetaSettings")) },
+  "/auth": { Component: lazy(() => import("./pages/BetaAuth")) },
+  "/onboarding": { Component: lazy(() => import("./pages/atlas/BetaOnboarding")) },
+  "/permissions": { Component: BetaPermissions },
+};
+
+const BETA_ADMIN: Readonly<Record<string, RouteOverride>> = import.meta.env.VITE_ATLAS_EDITION === "consumer" ? {} : (() => {
+  // One page, two tabs: /widgets is the catalog, /widget-sheet the states.
+  const BetaWidgetCatalog = lazy(() => import("./pages/atlas/BetaWidgetCatalog"));
+  return {
+    "/money": { Component: lazy(() => import("./pages/atlas/BetaMoney")) },
+    "/system-status": { Component: lazy(() => import("./pages/atlas/BetaSystemStatus")) },
+    "/agent-view": { Component: lazy(() => import("./pages/atlas/BetaAgentView")) },
+    "/browser": { Component: lazy(() => import("./pages/atlas/BetaBrowser")) },
+    "/model-lab": { Component: lazy(() => import("./pages/atlas/BetaModelLab")) },
+    "/widgets": { Component: BetaWidgetCatalog },
+    "/widget-sheet": { Component: BetaWidgetCatalog },
+  };
+})();
+
 // The registry's `eager` surfaces, supplied to the generated table.
 //
 // ADDING A ROUTE IS NOT DONE HERE ANY MORE. A new screen is a new entry in
@@ -83,8 +120,8 @@ const ROUTE_OVERRIDES: Readonly<Record<string, RouteOverride>> = {
   // OnboardingGate and Auth, which made AtlasPermissions' own "you can change
   // it later" a broken promise.
   "/permissions": { Component: AtlasPermissions },
-  // Phase 3: the Beta Mail takes `/mail` while the flag is on.
-  ...(isBetaUi() ? { "/mail": { Component: BetaMail }, "/home": { Component: BetaVoice }, "/money": { Component: BetaMoney }, "/health": { Component: BetaHealth } } : {}),
+  // Phases 3–7: the Beta screens take their paths while the flag is on.
+  ...(isBetaUi() ? { ...BETA_CONSUMER, ...BETA_ADMIN } : {}),
 };
 
 const App = () => (
