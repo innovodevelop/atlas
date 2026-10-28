@@ -48,13 +48,17 @@ export interface WidgetDef {
   defaultSize: WidgetSize;
   source: WidgetSource;
   /** The screen the widget opens; a path for a route, or a full-view key. */
-  opens: { route: string } | { view: 'weather' | 'calendar' | 'tasks' | 'stocks' | 'email' | 'news' | 'music' } | null;
+  opens: { route: string } | { view: HomeViewKey } | null;
 }
+
+/** The full views Home can open under its band (components/atlas/home/views/FullView.tsx). */
+export type HomeViewKey = 'weather' | 'calendar' | 'tasks' | 'stocks' | 'email' | 'news' | 'music' | 'focus' | 'fx';
 
 /**
  * Every widget Home can show, in the handoff's catalog order. `source` is
- * honest per widget: Energy, Podcast and Focus have no source in the app yet
- * and are listed so the editor can say so, not so a fake card can be added.
+ * honest per widget: Energy and Podcast have no source in the app yet and are
+ * listed so the editor can say so, not so a fake card can be added. Focus,
+ * Up next and Currency came with the Beta's left-out features (package F6).
  */
 export const WIDGETS: readonly WidgetDef[] = [
   { id: 'weather', label: 'Weather', meta: 'Now, the next hours, sunrise and sunset', group: 'Day', sizes: ['S', 'M', 'L'], defaultSize: 'L', source: 'live', opens: { view: 'weather' } },
@@ -64,7 +68,9 @@ export const WIDGETS: readonly WidgetDef[] = [
   { id: 'watch', label: 'Watchlist', meta: 'Your tickers and portfolio', group: 'Money', sizes: ['S', 'M', 'L', 'XL'], defaultSize: 'M', source: 'live', opens: { view: 'stocks' } },
   { id: 'briefing', label: 'Briefing', meta: 'The headlines worth your morning', group: 'Communication', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { view: 'news' } },
   { id: 'air', label: 'Air quality', meta: 'PM2.5 where you are', group: 'Air & time', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { view: 'weather' } },
-  { id: 'clock', label: 'Elsewhere', meta: 'The cities you watch', group: 'Air & time', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/clock' } },
+  { id: 'clock', label: 'Elsewhere', meta: 'Your Clock cities, next alarm and timer', group: 'Air & time', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/clock' } },
+  { id: 'dials', label: 'Clock dials', meta: 'Home and your Clock cities as faces', group: 'Air & time', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'live', opens: { route: '/clock' } },
+  { id: 'countdown', label: 'Countdown', meta: 'The countdown you run in Clock', group: 'Air & time', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/clock' } },
   { id: 'music', label: 'Now playing', meta: 'Spotify through Atlas', group: 'Media', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'live', opens: { view: 'music' } },
   { id: 'activity', label: 'Activity', meta: 'Move, exercise, stand', group: 'Body', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'sample', opens: { route: '/health' } },
   { id: 'steps', label: 'Steps', meta: 'Today and the last seven days', group: 'Body', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/health' } },
@@ -72,7 +78,9 @@ export const WIDGETS: readonly WidgetDef[] = [
   { id: 'home', label: 'Home', meta: 'Rooms, temperatures, the front door', group: 'Home', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/smart-home' } },
   { id: 'energy', label: 'Energy', meta: 'No energy meter is connected yet', group: 'Home', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'unwired', opens: { route: '/smart-home' } },
   { id: 'podcast', label: 'Podcast', meta: 'No podcast source yet', group: 'Media', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'unwired', opens: null },
-  { id: 'focus', label: 'Focus', meta: 'Focus sessions arrive with the Focus screen', group: 'Day', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'unwired', opens: null },
+  { id: 'focus', label: 'Focus', meta: 'A timer that holds Atlas’s notifications', group: 'Day', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'live', opens: { view: 'focus' } },
+  { id: 'upnext', label: 'Up next', meta: 'Your next events, with how long until each', group: 'Day', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'live', opens: { view: 'calendar' } },
+  { id: 'fx', label: 'Currency', meta: 'ECB reference rates for the pair you pick', group: 'Money', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { view: 'fx' } },
 ];
 
 export const WIDGET_BY_ID: ReadonlyMap<string, WidgetDef> = new Map(WIDGETS.map((w) => [w.id, w]));

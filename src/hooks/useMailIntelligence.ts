@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { localClient as supabase } from '@/integrations/local/localClient';
 import { useAuth } from '@/hooks/useAuth';
+import { holdForFocus } from '@/lib/focusGate';
 
 // Mail intelligence (read-only Gmail scanning — see docs/mail-setup.md).
 // Gmail connects, syncs and disconnects through the local gmail_* Rust
@@ -152,6 +153,9 @@ function subscribeAlerts(userId: string, listener: AlertListener): () => void {
 }
 
 async function notifyNative(title: string, body: string) {
+  // A running Focus session holds Atlas's own notifications (src/lib/focusGate.ts);
+  // the Focus screen lists what it held when the session ends.
+  if (holdForFocus({ source: 'Mail', title: body })) return;
   // macOS notification via the Tauri plugin; silently no-op in the browser.
   if (!('__TAURI_INTERNALS__' in window)) return;
   try {

@@ -8,9 +8,10 @@
  * Every control calls the clock store (src/lib/betaClockStore.ts); every
  * figure comes from the store's state or the arithmetic in src/lib/betaClock.ts.
  * The page owns only what is the page's: which tab, the alarm being edited,
- * the city search text.
+ * the city search text — and the editor's list of speakers, read from the
+ * smart-home mirror when the editor opens.
  */
-import { memo, useMemo, useState, type KeyboardEvent } from 'react';
+import { memo, useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import { AtlasIcon } from '@/components/atlas/AtlasIcon';
 import {
   COUNTDOWN_PRESETS, CURATED_CITIES, DAY_LETTER, DAY_ORDER, DAY_SHORT, RING_C, RING_R,
@@ -18,12 +19,15 @@ import {
   currentLap, daysLabel, earlyNext, finishAlarm, fmtDuration, lapCountLabel, lapRows, nextAlarm, offsetLabel,
   ringOffset, searchCities, snoozeLine, splitRows, sunCaption, targetInputValue, timerElapsed, timerStatus,
   whenLabel, zoneOffsetMinutes,
-  type Alarm, type CityRef, type CountdownState, type SunReading, type TimerState, type ZoneSource,
+  type Alarm, type ClockPrefs, type CityRef, type CountdownState, type SunReading, type TimerState, type ZoneSource,
 } from '@/lib/betaClock';
+import { awakeLabel, awakeTarget, showAwakeSwitch } from '@/lib/betaClockAwake';
+import { isNative, listSpeakers, messageOf } from '@/lib/betaClockNative';
+import { outLabel, outNote, ringOptions, speakersNote, type SpeakerList } from '@/lib/betaClockSpeakers';
 import {
   addCity, checkAlerts, deleteAlarm, lapTimer, moveCity, pauseCountdown, pauseTimer, removeCity, requestAlerts,
   resetCountdown, resetTimer, ringNow, saveAlarm, setCountdownDuration, setCountdownMode, setCountdownTarget,
-  splitCountdown, startCountdown, startTimer, stepCountdown, toggleAlarm, type AlertPermission,
+  setKeepAwake, splitCountdown, startCountdown, startTimer, stepCountdown, toggleAlarm, type AlertPermission,
 } from '@/lib/betaClockStore';
 
 // ── Timer ────────────────────────────────────────────────────────────────────
@@ -158,6 +162,29 @@ interface AlarmPanelProps {
   onDraft: (a: Alarm) => void;
   onClose: () => void;
   onNew: () => void;
+  /** The stored "Keep this Mac awake until then" switch. */
+  awake: ClockPrefs['awake'];
+  /** The hold the Mac app confirmed, or null. */
+  awakeUntil: number | null;
+  /** The brain's clock tools reach the store, so the voice hint can show. */
+  voiceReady: boolean;
+}
+
+/** The speakers an alarm can ring on, read from the smart-home mirror while the editor is open. */
+function useSpeakers(open: boolean): { list: SpeakerList | null; error: string | null; native: boolean } {
+  const native = isNative();
+  const [list, setList] = useState<SpeakerList | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open || !native) return;
+    let live = true;
+    listSpeakers().then(
+      (l) => { if (live) { setList(l); setError(null); } },
+      (e: unknown) => { if (live) setError(messageOf(e)); },
+    );
+    return () => { live = false; };
+  }, [open, native]);
+  return { list, error, native };
 }
 
 function AlertsRow({ alerts }: { alerts: AlertPermission }) {
@@ -175,10 +202,16 @@ function AlertsRow({ alerts }: { alerts: AlertPermission }) {
   );
 }
 
-export function AlarmPanel({ alarms, now, tz, alerts, draft, draftIsNew, onEdit, onDraft, onClose, onNew }: AlarmPanelProps) {
+export function AlarmPanel({ alarms, now, tz, alerts, draft, draftIsNew, onEdit, onDraft, onClose, onNew, awake, awakeUntil, voiceReady }: AlarmPanelProps) {
   const next = nextAlarm(alarms, now, tz);
   const early = earlyNext(next, now, tz);
   const finished = draft ? finishAlarm(draft) : null;
+  const hold = awakeTarget({ awake, alarms }, now, tz);
+  const awakeOn = !!hold;
+  const native = isNative();
+  const speakers = useSpeakers(!!draft);
+  const options = draft ? ringOptions(speakers.list, draft.ringOn ?? null) : [];
+  const speakerNote = speakersNote(speakers.list, speakers.native, speakers.error);
   const toggleDay = (d: number) => {
     if (!draft) return;
     onDraft({ ...draft, days: draft.days.includes(d) ? draft.days.filter((x) => x !== d) : [...draft.days, d] });
@@ -197,6 +230,19 @@ export function AlarmPanel({ alarms, now, tz, alerts, draft, draftIsNew, onEdit,
             <p className="b-ck-note-body">A Mac that is asleep, lid closed or with Atlas quit won’t ring. macOS doesn’t let apps wake it. For anything you can’t miss, set one on your phone too.</p>
           </div>
         </div>
+        {showAwakeSwitch(early, awakeOn) ? (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={awakeOn}
+            className={`b-ck-awake${awakeOn ? ' on' : ''}`}
+            disabled={!native}
+            onClick={() => setKeepAwake(!awakeOn)}
+          >
+            <span>{native ? awakeLabel(awakeOn, hold, awakeUntil, tz, now) : 'Keeping this Mac awake needs the Atlas Mac app.'}</span>
+            <span className="b-ck-awake-sw" aria-hidden><span /></span>
+          </button>
+        ) : null}
         <AlertsRow alerts={alerts} />
       </section>
 
@@ -215,7 +261,7 @@ export function AlarmPanel({ alarms, now, tz, alerts, draft, draftIsNew, onEdit,
                       <span className="b-ck-days" title={daysLabel(a.days)} aria-label={daysLabel(a.days)}>
                         {DAY_ORDER.map((d) => <i key={d} className={a.days.includes(d) ? 'in' : ''}>{DAY_LETTER[d]}</i>)}
                       </span>
-                      <span className="b-ck-out"><AtlasIcon name="mac" size={13} weight={1.6} />This Mac</span>
+                      <span className="b-ck-out"><AtlasIcon name={a.ringOn ? 'speaker' : 'mac'} size={13} weight={1.6} />{outLabel(a)}</span>
                     </span>
                     {snz ? <span className="b-ck-snz">{snz}</span> : null}
                   </span>
@@ -227,7 +273,11 @@ export function AlarmPanel({ alarms, now, tz, alerts, draft, draftIsNew, onEdit,
           {!alarms.length ? (
             <div className="b-ck-none">
               <p>No alarms</p>
-              <p>Set one here. It rings on this Mac, with a notification, while Atlas is running.</p>
+              <p>
+                {voiceReady
+                  ? 'Set one here, or just tell Atlas “wake me at seven”. It rings on this Mac, with a notification, while Atlas is running.'
+                  : 'Set one here. It rings on this Mac, with a notification, while Atlas is running.'}
+              </p>
               <button type="button" className="b-ck-new" onClick={onNew}>New alarm</button>
             </div>
           ) : null}
@@ -246,9 +296,27 @@ export function AlarmPanel({ alarms, now, tz, alerts, draft, draftIsNew, onEdit,
                 <button key={d} type="button" className={`b-ck-ed-day${draft.days.includes(d) ? ' on' : ''}`} aria-pressed={draft.days.includes(d)} onClick={() => toggleDay(d)}>{DAY_SHORT[d]}</button>
               ))}
             </div>
-            <span className="b-ck-ed-cap">Rings on</span>
-            <div className="b-ck-ed-out"><AtlasIcon name="mac" size={16} weight={1.5} />This Mac</div>
-            <p className="b-ck-hint">Rings on this Mac’s speakers, at the system volume, and posts a notification.</p>
+            <span className="b-ck-ed-cap" id="b-ck-ringon">Ring on</span>
+            <div className="b-ck-ed-outs" role="radiogroup" aria-labelledby="b-ck-ringon">
+              {options.map((o) => {
+                const picked = (o.target?.id ?? null) === (draft.ringOn?.id ?? null);
+                return (
+                  <button
+                    key={o.target?.id ?? 'mac'}
+                    type="button"
+                    role="radio"
+                    aria-checked={picked}
+                    className={`b-ck-ed-out${picked ? ' on' : ''}${o.missing ? ' missing' : ''}`}
+                    onClick={() => onDraft({ ...draft, ringOn: o.target })}
+                  >
+                    <AtlasIcon name={o.target ? 'speaker' : 'mac'} size={16} weight={1.5} />
+                    <span className="b-ck-ed-out-t"><b>{o.label}</b>{o.sub ? <small>{o.sub}</small> : null}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {speakerNote ? <p className="b-ck-hint">{speakerNote}</p> : null}
+            <p className="b-ck-hint">{outNote(draft.ringOn ?? null)}</p>
             <div className="b-ck-ed-acts">
               <button type="button" className="b-btn b-btn--primary" disabled={!finished} onClick={() => { if (finished) { saveAlarm(finished); onClose(); } }}>Save</button>
               <button type="button" className="b-btn" disabled={!finished} onClick={() => { if (finished) ringNow(finished); }}>Ring now to test</button>

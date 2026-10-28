@@ -28,12 +28,13 @@ const READ_OPS = [
   "tasks.list", "notes.list", "events.list", "watchlist.list",
 ];
 
-/** The 11 ops the registry declares above Tier::Read. */
+/** The 14 ops the tool layer maps above Tier::Read. */
 const MUTATING_OPS = [
   "tasks.create", "tasks.update", "notes.create", "notes.update",
   "events.create", "watchlist.add",
   "music.play", "music.pause", "music.volume",
   "mail.archive", "mail.mark_read",
+  "clock.set_alarm", "clock.stop_alarm", "clock.snooze_alarm",
 ];
 
 const ALL_OPS = [...READ_OPS, ...MUTATING_OPS];
@@ -119,11 +120,26 @@ describe("buildAtlasTools", () => {
   // -------------------------------------------------------------------------
   // The write tier
 
-  test("the five-domain shape survives the write tier — still five tools, not sixteen", () => {
+  test("the domain shape survives the write tier — six tools, not nineteen", () => {
     const desktop = names(buildAtlasTools(ALL_OPS)).filter((n) => n.startsWith("atlas_"));
     expect(desktop.sort()).toEqual([
-      "atlas_data", "atlas_finance", "atlas_lists", "atlas_mail", "atlas_music",
+      "atlas_clock", "atlas_data", "atlas_finance", "atlas_lists", "atlas_mail", "atlas_music",
     ]);
+  });
+
+  test("the Clock's three voice actions are one domain, with only their own params", () => {
+    const tools = buildAtlasTools(ALL_OPS);
+    expect(actionsOf(tools, "atlas_clock")).toEqual(["set_alarm", "stop_alarm", "snooze_alarm"]);
+    const props = tool(tools, "atlas_clock").function.parameters.properties;
+    expect(Object.keys(props).sort()).toEqual(["action", "days", "label", "minutes", "time"]);
+    // Only snooze advertised: no set_alarm params are offered for it.
+    const snoozeOnly = tool(buildAtlasTools(["clock.snooze_alarm"]), "atlas_clock").function.parameters.properties;
+    expect(Object.keys(snoozeOnly).sort()).toEqual(["action", "minutes"]);
+    expect(tool(tools, "atlas_clock").function.description).toContain("ring on this Mac");
+  });
+
+  test("the Clock is never offered to a read-only context", () => {
+    expect(names(buildAtlasTools(ALL_OPS, { allowMutating: false }))).not.toContain("atlas_clock");
   });
 
   test("write actions appear inside the existing domains' enums", () => {
@@ -259,6 +275,9 @@ describe("resolveAtlasOp", () => {
     expect(resolveAtlasOp("atlas_music", "play")).toEqual({ op: "music.play" });
     expect(resolveAtlasOp("atlas_music", "pause")).toEqual({ op: "music.pause" });
     expect(resolveAtlasOp("atlas_music", "volume")).toEqual({ op: "music.volume" });
+    expect(resolveAtlasOp("atlas_clock", "set_alarm")).toEqual({ op: "clock.set_alarm" });
+    expect(resolveAtlasOp("atlas_clock", "stop_alarm")).toEqual({ op: "clock.stop_alarm" });
+    expect(resolveAtlasOp("atlas_clock", "snooze_alarm")).toEqual({ op: "clock.snooze_alarm" });
     expect(resolveAtlasOp("atlas_mail", "archive")).toEqual({ op: "mail.archive" });
     expect(resolveAtlasOp("atlas_mail", "mark_read")).toEqual({ op: "mail.mark_read" });
   });
@@ -271,6 +290,20 @@ describe("executeTool — desktop delegation", () => {
 
     expect(opsOf(ctx)).toEqual([{ op: "music.search", args: { query: "aphex" } }]);
     expect(out.result).toEqual({ items: [] });
+  });
+
+  test("\"wake me at seven\" reaches clock.set_alarm with only its own arguments", async () => {
+    const ctx = ctxWith(() => ({ ok: true, data: { done: true, message: "Set the alarm “Alarm” for 07:00." } }));
+    const out = await executeTool(call("atlas_clock", { action: "set_alarm", time: "07:00", days: ["mon"] }), ctx);
+    expect(opsOf(ctx)).toEqual([{ op: "clock.set_alarm", args: { time: "07:00", days: ["mon"] } }]);
+    expect(out.result).toEqual({ done: true, message: "Set the alarm “Alarm” for 07:00." });
+  });
+
+  test("the background digest cannot stop or snooze an alarm", async () => {
+    const ctx = ctxWith(() => ({ ok: true, data: null }), { allowMutating: false });
+    const out = await executeTool(call("atlas_clock", { action: "stop_alarm" }), ctx);
+    expect(ctx.seen).toHaveLength(0);
+    expect(out.result).toHaveProperty("error");
   });
 
   test("with no control client it returns a result rather than throwing", async () => {

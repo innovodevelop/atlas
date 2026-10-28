@@ -321,7 +321,7 @@ describe('parsePrefs', () => {
     }));
     expect(p.cities).toEqual([{ name: 'Tokyo', tz: 'Asia/Tokyo' }]);
     expect(p.alarms).toHaveLength(1);
-    expect(p.alarms[0]).toEqual({ id: 'a', time: '07:30', label: 'Run', days: [1, 3], on: true, snoozedUntil: null });
+    expect(p.alarms[0]).toEqual({ id: 'a', time: '07:30', label: 'Run', days: [1, 3], on: true, snoozedUntil: null, ringOn: null });
     expect(p.timer).toEqual({ running: true, startedAt: 1000, accMs: 0, laps: [] });
     expect(p.countdown.mode).toBe('target');
     expect(p.countdown.durMs).toBe(60000);
@@ -330,6 +330,24 @@ describe('parsePrefs', () => {
   });
   test('an emptied city list stays empty', () => {
     expect(parsePrefs(JSON.stringify({ cities: [] })).cities).toEqual([]);
+  });
+  test('a saved speaker is kept; an unreadable one is This Mac', () => {
+    const p = parsePrefs(JSON.stringify({
+      alarms: [
+        { id: 'a', time: '07:00', days: [], on: true, ringOn: { id: 'd1', name: ' Bedroom ' } },
+        { id: 'b', time: '08:00', days: [], on: true, ringOn: { id: 'd2' } },
+        { id: 'c', time: '09:00', days: [], on: true, ringOn: { name: 'No id' } },
+        { id: 'd', time: '10:00', days: [], on: true, ringOn: 'kitchen' },
+      ],
+    }));
+    expect(p.alarms.map((a) => a.ringOn)).toEqual([{ id: 'd1', name: 'Bedroom' }, { id: 'd2', name: 'Speaker' }, null, null]);
+  });
+  test('the keep-awake switch survives only with the alarm it is for', () => {
+    const alarms = [{ id: 'a', time: '07:00', days: [], on: true }];
+    expect(parsePrefs(JSON.stringify({ alarms, awake: { alarmId: 'a' } })).awake).toEqual({ alarmId: 'a' });
+    expect(parsePrefs(JSON.stringify({ alarms, awake: { alarmId: 'gone' } })).awake).toBeNull();
+    expect(parsePrefs(JSON.stringify({ alarms, awake: true })).awake).toBeNull();
+    expect(parsePrefs(null).awake).toBeNull();
   });
 });
 

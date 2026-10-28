@@ -1,6 +1,8 @@
 /**
  * The ringing alarm (`Atlas Clock Beta.dc.html`, the alertdialog): the time,
- * the label, Snooze 9 min and Stop.
+ * the label, where it is ringing, Snooze 9 min and Stop — and, once the
+ * brain's clock tools can reach the store, the line saying Atlas can be told
+ * to stop or snooze it.
  *
  * The Beta shell mounts this on every screen, because an alarm rings wherever
  * the user is — on Mail, the chime and the notification go out, and this is
@@ -26,18 +28,21 @@ export default function ClockRinging() {
   useEffect(() => { if (ringing) stopRef.current?.focus(); }, [ringing]);
 
   if (!ringing) return null;
-  const { plan, test } = ringing;
+  const { plan, test, on, note, voice } = ringing;
+  const where = on === 'This Mac' ? 'this Mac' : on;
   return (
     <div className="b-ck-ringing" role="alertdialog" aria-modal="true" aria-label={`Alarm: ${plan.alarm.label || 'Alarm'} at ${plan.alarm.time}`}>
       <div className="b-ck-ringcard">
         <AtlasIcon name="alarm" size={34} weight={1.5} />
         <span className="t">{plan.alarm.time}</span>
         <span className="l">{plan.alarm.label || 'Alarm'}</span>
-        <span className="o">{test ? 'Test ring on this Mac' : 'Ringing on this Mac'}</span>
+        <span className="o">{test ? `Test ring on ${where}` : `Ringing on ${where}`}</span>
+        {note ? <span className="o" role="status">{note}</span> : null}
         <div className="b-ck-ringacts">
-          {test ? null : <button type="button" className="snooze" onClick={snoozeRinging}>Snooze {SNOOZE_MINUTES} min</button>}
+          {test ? null : <button type="button" className="snooze" onClick={() => { snoozeRinging(); }}>Snooze {SNOOZE_MINUTES} min</button>}
           <button type="button" className="stop" ref={stopRef} onClick={stopRinging}>Stop</button>
         </div>
+        {voice ? <span className="o">{test ? 'Or tell Atlas “stop”.' : 'Or tell Atlas “stop” or “snooze”.'}</span> : null}
       </div>
     </div>
   );

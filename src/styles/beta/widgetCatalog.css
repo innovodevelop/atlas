@@ -172,3 +172,13 @@
   .b-wc-group, .b-wc-row, .b-wc-rules, .b-wc-band { animation: none; }
   .b-wc-tab, .b-wc-seg button, .b-wc-chip, .b-wc-title { transition: none; }
 }
+
+/* ── Home widgets from the left-out features (package F6) ─────────────────────
+   The Currency widget's split face ("€1 Euro | $1.09 US dollar") and the
+   Focus widget's Start button. Same type scale as the face's hero. */
+.bw-split { display: flex; align-items: center; gap: 14px; min-width: 0; margin-top: 4px; }
+.bw-split > span:not(.bw-split-rule) { display: flex; flex-direction: column; min-width: 0; }
+.bw-split b { font-family: var(--b-font-display); font-size: clamp(22px, 2.4vw, 34px); font-weight: 500; letter-spacing: -.04em; line-height: 1.05; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.bw-split i { font-style: normal; font-size: 12px; color: var(--b-ink2); overflow-wrap: anywhere; }
+.bw-split-rule { flex: none; width: 1px; align-self: stretch; background: var(--b-recessed); }
+.bw .bw-focus-go { height: 34px; padding: 0 14px; font-size: 12.5px; }
