@@ -42,6 +42,32 @@ the gates have not run on it.** Expect half-written files.
 | P8c Dock styles | `beta-wip/dock` | 0 | 0 | WIP |
 | P8d Cutover readiness | `beta-wip/cutover` | 0 | 0 | WIP |
 
+### Update — cloud session, later on 2026-10-28
+
+Steps 1 and 2 below are done.
+
+- **Merged into `ws-beta-redesign`** (`--no-ff`, gates green on each merge):
+  `bodies`, `shell`, `dock`, `cutover`. Two cross-package fixes landed with
+  them: the dock's hub/capsule sphere now counts toward the shell's
+  FRAME_BUDGET (DOCK_SPHERE 2500 → 1800), and `quickSphere.reducedMotion()`
+  is exported again (shell dropped it; Architecture uses it).
+- **Finished and pushed, NOT merged** — each needs `cargo check` on the Mac
+  first; every commit body lists its unverified Rust files:
+
+  | Branch | Tip | Rust / schema | User must provide |
+  |---|---|---|---|
+  | `beta-wip/money` | 10ed7c4 | bank.rs (new), lib.rs, db_schema.sql | GoCardless secret ID + key; check GoCardless accepts `atlas://bank/linked` (`LINK_REDIRECT`) |
+  | `beta-wip/school` | e586fbc | school.rs (new), lib.rs | Lectio calendar link; LearnIT security key |
+  | `beta-wip/smarthome` | 7368ff3 | home/{beta,extras,history}.rs (new), ha.rs, mod.rs, store.rs, lib.rs, db_schema.sql | — (existing HA link). Also fixes live HA updates never reaching the screen (bug already on this branch) |
+  | `beta-wip/music` | 6716e1d | music.rs, music_engine.rs, control/ops_music.rs, lib.rs, db_schema.sql | Reconnect Spotify once for Like |
+  | `beta-wip/clock` | 1d38d4c | clock.rs, control/ops_clock.rs, control/registry.rs, lib.rs | HA TTS engine for ringing on speakers |
+  | `beta-wip/home` | 7eda6f5 | datafetch.rs, focus_mode.rs (new), control/ops_data.rs, lib.rs, db_schema.sql | — (existing OpenWeather/NewsAPI keys) |
+  | `beta-wip/mail` | 8dbb7d0 | mail.rs, mail_flags.rs, mail_archive.rs (new), gmail.rs, outlook.rs, mail_imap.rs, lib.rs, db_schema.sql | `gmail.modify` scope on the Google consent screen, `Mail.ReadWrite` on the Microsoft app, then reconnect (see docs/mail-setup.md) |
+  | `beta-wip/answer` | eda3779 | transit.rs, lib.rs | Rejseplanen access ID; confirm the API base and request link in transit.rs |
+
+  The `mail_imap.rs` calls were checked against the real `imap` 2.4.1 source.
+- **Not started:** F9–F13 (step 3).
+
 ## What the cloud can and cannot do
 
 The cloud is Linux (see CLAUDE.md, "Environment split").
