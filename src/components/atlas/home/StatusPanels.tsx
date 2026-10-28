@@ -39,7 +39,8 @@ export interface StatusPanelProps {
 export function StatusPanel({ kind, vitals, onClose }: StatusPanelProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const navigate = useBetaNavigate();
-  const target = isRoutable('/system-status') ? '/system-status' : '/settings';
+  // Settings opens on the panel's own section (`/settings#wifi` …).
+  const target = isRoutable('/system-status') ? '/system-status' : `/settings#${kind}`;
 
   // Esc and a click anywhere else close it; the cluster's own buttons swap panels.
   useEffect(() => {

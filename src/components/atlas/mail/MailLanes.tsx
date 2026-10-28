@@ -3,6 +3,7 @@
  * counts, the accounts with their autonomy in one line, and the "How Atlas
  * handles mail" card that opens the rules editor.
  */
+import { Link } from 'react-router-dom';
 import { AtlasIcon } from '../AtlasIcon';
 import { LANES, laneCount } from '@/lib/betaMail';
 import type { MailAccount, MailCounts, MailView } from '@/types/mail';
@@ -57,7 +58,7 @@ export function MailLanes({ view, counts, account, mailbox, handledInMailbox, on
             <span className="b-mail-acct-n b-num">{handledInMailbox} auto</span>
           </button>
         ) : (
-          <div className="b-mail-acct b-mail-acct--none"><span className="b-mail-acct-text"><b>No mailbox yet</b><span>Connect one in Settings → Mail</span></span></div>
+          <div className="b-mail-acct b-mail-acct--none"><span className="b-mail-acct-text"><b>No mailbox yet</b><span>Connect one in <Link to="/settings#mail">Settings → Mail</Link></span></span></div>
         )}
       </div>
 
