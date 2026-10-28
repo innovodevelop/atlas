@@ -12,11 +12,16 @@
  * and sets `data-beta-tone`. A page can also declare it with
  * `data-beta-tone="ink"` on its root and skip the measurement.
  */
-import { useEffect, useLayoutEffect, type ReactNode } from 'react';
+import { Suspense, lazy, useEffect, useLayoutEffect, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { TopBar } from './TopBar';
 import { BetaDock } from './BetaDock';
 import { TalkToAtlas } from './TalkToAtlas';
+
+// The Clock's ringing alarm, on every screen: an alarm set on /clock rings
+// wherever the user is, and mounting this also starts the clock store for the
+// run. Lazy, so the shell's own chunk does not grow by the clock's.
+const ClockRinging = lazy(() => import('./clock/ClockRinging'));
 
 /** Relative luminance of a CSS colour string, or null when transparent/unparseable. */
 export function luminance(color: string): number | null {
@@ -64,6 +69,7 @@ export function BetaShell({ children }: { children: ReactNode }) {
       <div className="beta-page">{children}</div>
       <BetaDock />
       <TalkToAtlas />
+      <Suspense fallback={null}><ClockRinging /></Suspense>
     </>
   );
 }
