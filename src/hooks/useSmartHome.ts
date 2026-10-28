@@ -814,6 +814,16 @@ export interface SmartHomeDeps {
   now?: () => number;
 }
 
+/**
+ * How many mounted hooks hold the push channel open. Rust runs ONE live loop
+ * and `home_live_stop` ends it for everyone, while Home can mount several
+ * hooks at once (the Lamp, Lights, Front door and Home widgets each hold
+ * one). Without the count, the first of them to unmount — a widget removed in
+ * Edit Home — would switch live updates off for the rest. Starting is
+ * idempotent in Rust; only the last holder to leave sends the stop.
+ */
+let liveHolders = 0;
+
 export function useSmartHome(deps?: SmartHomeDeps): UseSmartHome {
   const { user } = useAuth();
   const userId = user?.id ?? null;
@@ -910,12 +920,16 @@ export function useSmartHome(deps?: SmartHomeDeps): UseSmartHome {
   useEffect(() => {
     if (!usable || !userId || !raw.bridgeConnected) return;
     let stopped = false;
+    liveHolders += 1;
     void invoke(HOME_COMMANDS.liveStart, { userId }).catch((e) => {
       // Live updates are an enhancement; the page reads correctly without them.
       if (!stopped) setWarning(`Live updates are off: ${messageOf(e)}`);
     });
     return () => {
       stopped = true;
+      liveHolders = Math.max(0, liveHolders - 1);
+      // Another mounted hook still reads the push channel.
+      if (liveHolders > 0) return;
       void invoke(HOME_COMMANDS.liveStop, {}).catch(() => {
         /* Unmounting; there is nobody left to tell. Rust stops it on exit too. */
       });
