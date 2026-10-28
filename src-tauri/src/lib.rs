@@ -37,6 +37,8 @@ mod health;
 mod watchdog;
 mod brain;
 mod system_vitals;
+// Rejseplanen departures (Beta Answer + Transit widget); dormant until an access ID is stored.
+mod transit;
 
 /// Outcome of a sidecar spawn attempt. `integrity_error` is set when the
 /// binary failed integrity verification (and was therefore NOT spawned) — it
@@ -616,6 +618,12 @@ pub fn run() {
       health::health_series,
       health::health_workouts,
       health::health_forget,
+      // Rejseplanen. Async: each one is an HTTPS call or a Keychain read. The
+      // access ID is written by transit_set_key and never returned.
+      transit::transit_status,
+      transit::transit_set_key,
+      transit::transit_find_stops,
+      transit::transit_departures,
     ])
     .setup(|app| {
       // ONE DATABASE, AND THIS LAUNCH'S IDENTITY — both before anything else in

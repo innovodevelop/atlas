@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   FIELD_ORDER, MAX_NAME, afterSignInPath, askVerb, authEyebrow, authSphereState, authSubline, autocompleteFor, callName,
-  countWord, enterLabel, fieldType, introAskLine, micAllowed, nextLabel, onboardingSphereState, permsButton,
+  countWord, enterLabel, fieldType, introAskLine, lineSpeakable, micAllowed, nextLabel, onboardingSphereState, permsButton,
   permsSubline, promptFor, spokenForAuthError, stepIndex, summaryRows, trailFor, typedLength, validateField, welcomeLine,
 } from './betaEntry';
 
@@ -100,15 +100,30 @@ describe('the microphone rule', () => {
 });
 
 describe('the sphere', () => {
-  test('sign-in: listening, thinking, or the bus — never speaking, because nothing is said', () => {
+  test('sign-in: listening, thinking, speaking only while audio plays, or the bus', () => {
     expect(authSphereState(true, true)).toBe('listening');
     expect(authSphereState(false, true)).toBe('thinking');
     expect(authSphereState(false, false)).toBeUndefined();
+    expect(authSphereState(false, false, true)).toBe('speaking');
+    expect(authSphereState(true, false, true)).toBe('listening');
   });
-  test('onboarding: working only while macOS is being asked', () => {
+  test('onboarding: working while macOS is being asked, speaking while audio plays', () => {
     expect(onboardingSphereState('asking')).toBe('working');
+    expect(onboardingSphereState('asking', true)).toBe('working');
     expect(onboardingSphereState('intro')).toBeUndefined();
+    expect(onboardingSphereState('intro', true)).toBe('speaking');
     expect(onboardingSphereState('welcome')).toBeUndefined();
+  });
+});
+
+describe('lineSpeakable', () => {
+  test('Atlas never speaks on the password step', () => {
+    expect(lineSpeakable('field', 'password')).toBe(false);
+    expect(lineSpeakable('field', 'email')).toBe(true);
+    expect(lineSpeakable('field', 'name')).toBe(true);
+    expect(lineSpeakable('start', null)).toBe(true);
+    expect(lineSpeakable('forgot', 'email')).toBe(true);
+    expect(lineSpeakable('done', null)).toBe(true);
   });
 });
 
