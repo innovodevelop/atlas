@@ -1,6 +1,7 @@
 import { useMemo, useSyncExternalStore } from 'react';
 import { localClient as supabase } from '@/integrations/local/localClient';
 import { createSharedPoll } from '@/lib/sharedStore';
+import { locationKey, useWeatherLocation } from '@/lib/weatherLocation';
 
 export interface WeatherData {
   location: string;
@@ -15,6 +16,13 @@ export interface WeatherData {
     time: string;
     temp: number;
     icon: string;
+    /** Chance of precipitation in this 3-hour slice, 0–100. Absent from the sample and the "now" fallback. */
+    pop?: number | null;
+    /** Rain expected in this 3-hour slice, mm (OpenWeather `rain.3h`; 0 when none is forecast). */
+    rain?: number | null;
+    feelsLike?: number | null;
+    /** Wind in this slice, in the reading's unit (mph). */
+    wind?: number | null;
   }>;
   daily?: Array<{
     day: string;
@@ -24,8 +32,16 @@ export interface WeatherData {
   }>;
   high?: number;
   low?: number;
-  /** OpenWeather air quality: aqi 1–5 scale + PM2.5 µg/m³. */
-  air?: { aqi: number; pm25: number } | null;
+  /** How warm it feels now. Only on a real reading. */
+  feelsLike?: number | null;
+  /** Wind direction in degrees (meteorological: where it blows from). */
+  windDeg?: number | null;
+  windGust?: number | null;
+  /**
+   * OpenWeather air quality: aqi 1–5 scale + PM2.5 µg/m³, and PM10, O₃ and
+   * NO₂ in µg/m³ when the station reports them (null when it does not).
+   */
+  air?: { aqi: number; pm25: number; pm10?: number | null; o3?: number | null; no2?: number | null } | null;
 }
 
 const FALLBACK_WEATHER: WeatherData = {
@@ -71,8 +87,20 @@ const REFRESH_MS = 30 * 60 * 1000;
  * The return shape is unchanged on purpose: every caller destructures
  * `{ weather }` (some also `error`), and the point of this change is that none
  * of them had to notice it.
+ *
+ * Where: with no `city`, the place the user picked on the Weather screen
+ * (src/lib/weatherLocation.ts), else the city this Mac's time zone names —
+ * no longer a fixed "San Francisco". A picked place is asked for by its
+ * coordinates, so two towns of the same name cannot be confused. `location`
+ * is returned so a screen can say where the reading is for and how it chose.
  */
-export const useWeather = (city: string = 'San Francisco') => {
+export const useWeather = (cityOverride?: string) => {
+  const place = useWeatherLocation();
+  const city = cityOverride ?? place.city;
+  const lat = cityOverride ? null : place.lat;
+  const lon = cityOverride ? null : place.lon;
+  const key = locationKey({ city, lat, lon });
+
   const fallbackData = useMemo(() => ({
     ...FALLBACK_WEATHER,
     location: city,
@@ -81,17 +109,19 @@ export const useWeather = (city: string = 'San Francisco') => {
   const poll = useMemo(
     () =>
       createSharedPoll<WeatherData>({
-        key: `weather:${city}`,
+        key: `weather:${key}`,
         fetch: async () => {
           const { data, error } = await supabase.functions.invoke('get-weather', {
-            body: { city },
+            body: lat != null && lon != null ? { city, lat, lon } : { city },
           });
           if (error) throw error;
           return data as WeatherData;
         },
         intervalMs: REFRESH_MS,
       }),
-    [city],
+    // `key` names city, lat and lon together; the closure reads the same three.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [key],
   );
 
   const snap = useSyncExternalStore(poll.subscribe, poll.getSnapshot, poll.getSnapshot);
@@ -115,5 +145,7 @@ export const useWeather = (city: string = 'San Francisco') => {
     isLoading: snap.isLoading,
     error: snap.error,
     refetch: poll.refresh,
+    /** Where the reading is for and how that place was chosen. */
+    place: cityOverride ? null : place,
   };
 };

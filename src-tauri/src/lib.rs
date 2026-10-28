@@ -37,6 +37,8 @@ mod health;
 mod watchdog;
 mod brain;
 mod system_vitals;
+// The Focus screen's optional "run my Shortcut" (Beta row 12).
+mod focus_mode;
 
 /// Outcome of a sidecar spawn attempt. `integrity_error` is set when the
 /// binary failed integrity verification (and was therefore NOT spawned) — it
@@ -557,6 +559,12 @@ pub fn run() {
       datafetch::fetch_weather,
       datafetch::fetch_stocks,
       datafetch::fetch_news,
+      // Beta Home (F6): the weather place search and the Currency widget's
+      // ECB rates; the Focus screen's Shortcuts bridge.
+      datafetch::weather_geocode,
+      datafetch::fetch_fx,
+      focus_mode::focus_shortcut_list,
+      focus_mode::focus_shortcut_run,
       // Battery / Wi-Fi / Bluetooth for the Beta top bar. Read-only, no secrets.
       system_vitals::system_vitals,
       mail::mail_sync,

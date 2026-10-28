@@ -174,7 +174,7 @@ export const ATTENTION_RULE: Record<CoreWidgetId, string> = {
   today: 'Attention ten minutes before an event and while it is on, with Join when the event carries a link.',
   tasks: 'Attention when a task is past its due date. The alert turns red.',
   inbox: 'Attention when Atlas raises a mail alert that nobody has acknowledged.',
-  watch: 'Attention when a ticker on the watchlist moves past ±3% today.',
+  watch: 'Attention when a ticker on the watchlist moves past your ± threshold today (3% until you set one in Watchlist).',
   briefing: 'Attention when a headline is trending.',
 };
 
@@ -215,7 +215,7 @@ export const EMPTY_COPY: Record<string, EmptySpec> = {
   today: { title: 'Nothing scheduled', hint: 'A clear day. Ask Atlas to block focus time and it adds the event to your calendar.', action: { label: 'Block focus time', ask: 'Block an hour of focus time in my calendar this afternoon.' } },
   tasks: { title: 'All clear', hint: 'Nothing open. Add one on the card, or tell Atlas and it files the task.' },
   inbox: { title: 'Inbox zero', hint: 'Nothing needs you. Atlas keeps triaging in the background.' },
-  watch: { title: 'No holdings yet', hint: 'The watchlist is fixed for now. Connect a brokerage and your portfolio leads the card.', action: { label: 'Connect brokerage', route: '/money' } },
+  watch: { title: 'No tickers yet', hint: 'Add tickers in Watchlist and their moves show here. Connect a brokerage and your portfolio leads the card.', action: { label: 'Connect brokerage', route: '/money' } },
   briefing: { title: 'No headlines yet', hint: 'Headlines come through the news key on this Mac, refreshed every fifteen minutes.', action: { label: 'Ask Atlas', ask: 'What are the top headlines this morning?' } },
   air: { title: 'No air reading', hint: 'Air quality arrives with the forecast wherever the provider measures it.' },
   clock: { title: 'No cities yet', hint: 'The cities are fixed in this build; choosing your own arrives with the Clock screen.' },
@@ -226,7 +226,9 @@ export const EMPTY_COPY: Record<string, EmptySpec> = {
   home: { title: 'No home hub', hint: 'Connect Home Assistant and your rooms, temperatures and the front door show here.', action: { label: 'Open Smart Home', route: '/smart-home' } },
   energy: { title: 'Not wired yet', hint: 'No energy meter is connected yet; this widget arrives with one.' },
   podcast: { title: 'Not wired yet', hint: 'There is no podcast source in Atlas yet.' },
-  focus: { title: 'Not wired yet', hint: 'Focus sessions arrive with the Focus screen.' },
+  focus: { title: 'No focus yet today', hint: 'Start a 25 or 50 minute session and Atlas holds its own notifications until it ends.' },
+  upnext: { title: 'Nothing coming up', hint: 'Your next events show here, with how long until each.', action: { label: 'Block focus time', ask: 'Block an hour of focus time in my calendar this afternoon.' } },
+  fx: { title: 'No rate yet', hint: 'Rates are the European Central Bank’s daily reference, fetched through the Mac app with no key.' },
 };
 
 export function emptyCopy(id: string): EmptySpec {
@@ -331,6 +333,84 @@ export function mailOffline(accounts: readonly { last_synced_at: string | null }
   const times = accounts.map((a) => (a.last_synced_at ? Date.parse(a.last_synced_at) : NaN)).filter((t) => Number.isFinite(t));
   if (!times.length) return null;
   return `mail sync paused · last synced ${ageLabel(now - Math.max(...times))}`;
+}
+
+// --- Live states on Home ------------------------------------------------------------
+
+/**
+ * What a live widget on Home knows about its own reading. Home draws the
+ * same faces the sheet previews, but only when they are true: the skeleton
+ * while the first reading is on its way, the offline row while the source is
+ * unreachable and an older reading stands in, the attention row while a rule
+ * above holds. Nothing here forces a state the data does not show.
+ */
+export interface LiveReading {
+  /** The first reading is on its way and nothing real is on hand yet. */
+  loading: boolean;
+  /** The offline row's text, when the source is unreachable; null otherwise. */
+  offline: string | null;
+  attention: AttentionCopy | null;
+}
+
+/**
+ * The face Home draws: loading first (no number before it is real), then
+ * offline (stale data must say so before it raises an alarm on it), then
+ * attention; otherwise undefined, the ordinary live face.
+ */
+export function liveFaceState(r: LiveReading): PreviewState | undefined {
+  if (r.loading) return 'loading';
+  if (r.offline) return 'offline';
+  if (r.attention) return 'attention';
+  return undefined;
+}
+
+/** The three network-backed core widgets. */
+export type NetworkWidgetId = Extract<CoreWidgetId, 'weather' | 'watch' | 'briefing'>;
+
+const OFFLINE_SOURCE: Record<NetworkWidgetId, { source: string; kept: string }> = {
+  weather: { source: 'weather service unreachable', kept: 'last reading' },
+  watch: { source: 'market feed unreachable', kept: 'last quotes' },
+  briefing: { source: 'news feed unreachable', kept: 'last headlines' },
+};
+
+export interface NetworkReading {
+  /** A real reading is on hand (not the built-in sample). */
+  hasData: boolean;
+  /** The last refresh failed. */
+  error: string | null;
+  /** `navigator.onLine`: false means this Mac has no network at all. */
+  online: boolean;
+  /** When the reading on hand arrived (dataAge.ts), if known. */
+  arrivedAt: number | null;
+}
+
+/**
+ * The offline row for a network source, or null when it is reachable. Only a
+ * source with a real reading on hand goes offline: one that never answered
+ * shows its sample stamp or its empty face instead, because there is nothing
+ * cached to dim.
+ */
+export function networkOffline(id: NetworkWidgetId, r: NetworkReading, now: number): string | null {
+  if (!r.hasData) return null;
+  if (r.online && !r.error) return null;
+  const { source, kept } = OFFLINE_SOURCE[id];
+  const why = r.online ? source : 'this Mac is offline';
+  return r.arrivedAt != null ? `${why} · ${kept} ${ageLabel(now - r.arrivedAt)}` : `${why} · ${kept} kept`;
+}
+
+/**
+ * The Inbox's offline row: a connected mailbox whose sync is failing (or a
+ * Mac with no network), with the real age of the last sync.
+ */
+export function inboxOffline(
+  accounts: readonly { status: string; last_error: string | null; last_synced_at: string | null }[],
+  online: boolean,
+  now: number,
+): string | null {
+  if (!accounts.length) return null;
+  const failing = accounts.some((a) => a.status === 'error' || !!a.last_error);
+  if (online && !failing) return null;
+  return mailOffline(accounts, now) ?? 'mail sync paused';
 }
 
 // --- What each core widget is bound to ----------------------------------------------

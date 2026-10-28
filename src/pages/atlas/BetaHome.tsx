@@ -24,10 +24,9 @@ import { HomeWidget } from '@/components/atlas/home/widgets';
 import { EditHome } from '@/components/atlas/home/EditHome';
 import { AtlasIcon } from '@/components/atlas/AtlasIcon';
 import { FullView } from '@/components/atlas/home/views/FullView';
-import { WIDGET_BY_ID, packStage, stageRowCount, type HomeSlot } from '@/lib/betaHome';
+import { WIDGET_BY_ID, packStage, stageRowCount, type HomeSlot, type HomeViewKey } from '@/lib/betaHome';
 import { useBetaNavigate } from '@/lib/viewTransitions';
 import { isRoutable } from '@/surfaces';
-import type { AtlasExpandedKey } from './AtlasDashboard';
 import type { CalendarEvent } from '@/hooks/useCalendarEvents';
 
 const BetaHome = () => {
@@ -42,7 +41,7 @@ const BetaHome = () => {
   const needsYou = alerts.filter((a) => !a.acknowledged).length;
   const tasksOpen = tasks.filter((t) => !t.completed).length;
 
-  const [expanded, setExpanded] = useState<AtlasExpandedKey>(null);
+  const [expanded, setExpanded] = useState<HomeViewKey | null>(null);
   const [editing, setEditing] = useState(false);
 
   // The row budget: what fits between the band and the dock at this window size.
@@ -70,7 +69,7 @@ const BetaHome = () => {
     const def = WIDGET_BY_ID.get(slot.id);
     if (!def?.opens) return undefined;
     if ('view' in def.opens) {
-      const view = def.opens.view as Exclude<AtlasExpandedKey, null>;
+      const view = def.opens.view;
       return () => setExpanded(view);
     }
     const route = def.opens.route;
@@ -138,7 +137,7 @@ const BetaHome = () => {
             slots={home.slots}
             rows={layout === 'stage' ? rows : undefined}
             density={settings.density}
-            render={(slot) => <HomeWidget key={slot.id} id={slot.id} size={slot.size} delay={slot.delay} open={openWidget(slot)} forceTone={forceTone} />}
+            render={(slot) => <HomeWidget key={slot.id} id={slot.id} size={slot.size} delay={slot.delay} open={openWidget(slot)} forceTone={forceTone} autoState />}
           />
           {home.slots.length === 0 ? (
             <div className="b-empty b-home-empty">
