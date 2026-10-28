@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { localClient as supabase } from '@/integrations/local/localClient';
 import { useAuth } from '@/hooks/useAuth';
-import { holdForFocus } from '@/lib/focusGate';
 
 // Mail intelligence (read-only Gmail scanning — see docs/mail-setup.md).
 // Gmail connects, syncs and disconnects through the local gmail_* Rust
@@ -105,11 +104,14 @@ type AlertListener = (alerts: MailAlert[]) => void;
 let alertListeners: AlertListener[] = [];
 let alertChannel: ReturnType<typeof supabase.channel> | null = null;
 let alertChannelUserId: string | null = null;
-let knownAlertIds: Set<string> | null = null;
 
 // Local realtime events carry no row data, so on every change we re-query the
-// open alerts, hand every listener the fresh list, and native-notify only the
-// alerts not seen before (the first fetch seeds the set without notifying).
+// open alerts and hand every listener the fresh list. Nothing is notified from
+// here: Rust (mail_flags.rs) posts the bill and deadline notification once per
+// thread, after the scan that found it, while Settings → Mail → Alerts is on,
+// and whether or not a window is open; a running Focus session holds it like
+// any other message (focus_mode.rs, src/lib/focusGate.ts). A second
+// notification from this hook would ignore that switch and double every alert.
 async function refetchAlerts() {
   const { data } = await supabase
     .from('mail_alerts')
@@ -118,10 +120,7 @@ async function refetchAlerts() {
     .order('created_at', { ascending: false })
     .limit(20);
   const alerts = (data as MailAlert[] | null) ?? [];
-  const fresh = knownAlertIds ? alerts.filter((a) => !knownAlertIds.has(a.id)) : [];
-  knownAlertIds = new Set(alerts.map((a) => a.id));
   for (const l of alertListeners) l(alerts);
-  for (const a of fresh) notifyNative('Atlas Mail', a.title);
 }
 
 function subscribeAlerts(userId: string, listener: AlertListener): () => void {
@@ -129,7 +128,6 @@ function subscribeAlerts(userId: string, listener: AlertListener): () => void {
   if (!alertChannel || alertChannelUserId !== userId) {
     if (alertChannel) supabase.removeChannel(alertChannel);
     alertChannelUserId = userId;
-    knownAlertIds = null;
     alertChannel = supabase
       .channel(`mail-alerts-${userId}`)
       .on(
@@ -147,26 +145,24 @@ function subscribeAlerts(userId: string, listener: AlertListener): () => void {
       supabase.removeChannel(alertChannel);
       alertChannel = null;
       alertChannelUserId = null;
-      knownAlertIds = null;
     }
   };
 }
 
-async function notifyNative(title: string, body: string) {
-  // A running Focus session holds Atlas's own notifications (src/lib/focusGate.ts);
-  // the Focus screen lists what it held when the session ends.
-  if (holdForFocus({ source: 'Mail', title: body })) return;
-  // macOS notification via the Tauri plugin; silently no-op in the browser.
-  if (!('__TAURI_INTERNALS__' in window)) return;
+/**
+ * Ask macOS for permission to post notifications, which Rust needs for the
+ * bill and deadline alerts. Called when the user turns Alerts on, so the
+ * system prompt follows their own click. False in the browser, when denied,
+ * or when the plugin is unavailable.
+ */
+export async function askNotificationPermission(): Promise<boolean> {
+  if (!('__TAURI_INTERNALS__' in window)) return false;
   try {
-    const { isPermissionGranted, requestPermission, sendNotification } = await import(
-      '@tauri-apps/plugin-notification'
-    );
-    let granted = await isPermissionGranted();
-    if (!granted) granted = (await requestPermission()) === 'granted';
-    if (granted) sendNotification({ title, body });
+    const { isPermissionGranted, requestPermission } = await import('@tauri-apps/plugin-notification');
+    if (await isPermissionGranted()) return true;
+    return (await requestPermission()) === 'granted';
   } catch {
-    /* plugin unavailable — never break the app over a notification */
+    return false;
   }
 }
 
@@ -278,7 +274,12 @@ export function useMailIntelligence() {
   // Outlook signs in the same way through outlook.rs: its flows share Rust's
   // registry (so mail-oauth-cancel cancels them too) and report on
   // outlook:status.
-  const connect = useCallback(async (provider: OAuthMailProvider = 'gmail') => {
+  //
+  // `archive: true` is Mail's "Reconnect <account> to archive": the same
+  // sign-in, asking the provider for the one extra permission archiving needs
+  // (Gmail gmail.modify, Outlook Mail.ReadWrite). Every other connect stays
+  // read-only.
+  const connect = useCallback(async (provider: OAuthMailProvider = 'gmail', opts: { archive?: boolean } = {}) => {
     if (!user) return;
     const labels = OAUTH_LABELS[provider];
     connectCleanup.current?.();
@@ -297,7 +298,7 @@ export function useMailIntelligence() {
     try {
       if (!('__TAURI_INTERNALS__' in window)) throw new Error(`${labels.name} can only be connected in the desktop app.`);
       const { data, error } = await supabase.functions.invoke(labels.start, {
-        body: { provider, userId: user.id },
+        body: { provider, userId: user.id, archive: opts.archive === true },
       });
       flow = data?.flow;
       if (stale()) {
