@@ -46,6 +46,7 @@ import { startJsonlWatcher } from "./jsonlWatcher.ts";
 import { createControlClient } from "./control.ts";
 import { embedText } from "./localEmbed.ts";
 import { AUTO_EMBED_BATCH, embedPending, scheduleAutoEmbed } from "./autoEmbed.ts";
+import { readRememberShared } from "./memorySettings.ts";
 
 import { runChat } from "../../../supabase/functions/_shared/orchestrator.ts";
 import { aiChatCompletion, hasAIKey } from "../../../supabase/functions/_shared/aiGateway.ts";
@@ -199,6 +200,9 @@ async function handleChatWithMemory(req: Request): Promise<Response> {
       // Persisted trait/lexicon state — composed into the system prompt by the
       // orchestrator (personality.ts). Absent for other callers ⇒ defaults.
       personality: getPersonality(localDb._db, userId),
+      // Settings → "Remember things I share" (memorySettings.ts). Off, the
+      // orchestrator saves only what the user explicitly asks it to.
+      rememberShared: readRememberShared(localDb._db, userId),
       // Desktop reads. `controlCaps` decides which domain tools get declared,
       // so an unreachable port simply means no desktop tools this turn.
       control: control.available() ? control : undefined,

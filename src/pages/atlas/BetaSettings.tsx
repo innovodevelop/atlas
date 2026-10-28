@@ -17,10 +17,23 @@
  * Personality, Permissions, Mail, Portfolio, Music and Software Update are
  * redrawn on the design's cards over the same hooks the Workshop tabs use —
  * which is also how the design's confirm-before-disconnect reaches the
- * mailboxes and the brokerage, both of which delete stored data. "This Mac"
- * reads `useSystemVitals` and shows what the Mac reports: no switch, no join,
- * no pair, because the webview has no command for any of them. "Beta UI" is
- * the way back.
+ * mailboxes and the brokerage, both of which delete stored data. Voice adds
+ * how Atlas listens (src/lib/voiceInput.ts, read by the voice session), and
+ * Memory & Privacy the "Remember things I share" switch the brain obeys
+ * (src/hooks/useMemorySettings.ts).
+ *
+ * "This Mac" reads and switches the Mac itself through src/hooks/
+ * useMacControls.ts (Rust: src-tauri/src/mac_controls.rs): Wi-Fi power,
+ * join and forget; Bluetooth power and connections when blueutil
+ * is installed; the Mac's chip, memory, storage and processor; the battery's
+ * 24-hour history, health and energy use, and the switch that pauses the
+ * sphere (`atlas:sphere_paused`, src/lib/spherePause.ts). What needs an
+ * administrator or has no tool stays out and the screen says so: Disconnect
+ * (macOS rejoins at once), per-network auto-join and "ask to join", Low
+ * Power Mode (shown read-only), optimised
+ * charging, pairing, and Bluetooth without blueutil. Software Update adds the
+ * two automatic-update switches (src/lib/updatePrefs.ts) and Restart Atlas
+ * (the Rust `app_restart`). "Beta UI" is the way back.
  */
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -35,6 +48,15 @@ import { useMailAlertsPref } from '@/hooks/useMailAlertsPref';
 import { usePortfolio } from '@/hooks/usePortfolio';
 import { useMusicPlayer } from '@/hooks/useMusicPlayer';
 import { useSystemVitals, type BtDevice, type SystemVitalsState } from '@/hooks/useSystemVitals';
+import { restartAtlas, useBatteryDetails, useBluetoothControls, useMacDetails, useWifiControls } from '@/hooks/useMacControls';
+import { useRememberShared } from '@/hooks/useMemorySettings';
+import {
+  currentNetworkLine, gigabytes, historyBars, knownNetworkLine, macMeters, otherNetworkLine, otherNetworks, rateLabel, signalLine, uptimeLabel,
+  wifiHeadline, type MeterTone, type NearbyNetwork, type PairedDevice,
+} from '@/lib/macProbes';
+import { onVoiceInputChange, readVoiceInput, setVoiceInput, type VoiceInputPrefs } from '@/lib/voiceInput';
+import { onUpdatePrefsChange, readUpdatePrefs, setUpdatePrefs, type UpdatePrefs } from '@/lib/updatePrefs';
+import { readSpherePaused, setSpheresPaused } from '@/lib/spherePause';
 import { ATLAS_PERMISSIONS, readOnboarding } from '@/lib/atlasPermissions';
 import { getActiveWakePhrases } from '@/lib/wakeWord';
 import { setBetaUi } from '@/lib/betaFlag';
@@ -151,7 +173,7 @@ const BetaSettings = () => {
 
   const open = (id: SectionId) => plainNavigate({ pathname: '/settings', search: '', hash: `#${id}` }, { replace: true });
   const mailAttention = mail.accounts.filter(isUserMailbox).filter((a) => a.status !== 'active').length;
-  const badgeCtx = { mailAttention, updateAvailable: updater.phase === 'available' };
+  const badgeCtx = { mailAttention, updateAvailable: updater.phase === 'available' || updater.phase === 'downloaded' };
 
   return (
     <div className="b-st" data-screen-label="Beta — Settings">
@@ -190,14 +212,14 @@ const BetaSettings = () => {
         <main className="b-st-main" ref={mainRef}>
           {current === 'voice' ? <VoiceSection /> : null}
           {current === 'personality' ? <PersonalitySection /> : null}
-          {current === 'memory' ? <section className="b-st-card b-st-embed" aria-label="Memory and privacy"><MemoryPrivacyPanel /></section> : null}
+          {current === 'memory' ? <MemorySection /> : null}
           {current === 'permissions' ? <PermissionsSection onReview={() => plainNavigate('/permissions')} /> : null}
           {current === 'mail' ? <MailSection mail={mail} say={say} /> : null}
           {current === 'portfolio' ? <PortfolioSection say={say} /> : null}
           {current === 'music' ? <MusicSection say={say} /> : null}
-          {current === 'wifi' ? <WifiSection vitals={vitals} /> : null}
-          {current === 'bluetooth' ? <BluetoothSection vitals={vitals} /> : null}
-          {current === 'devices' ? <DevicesSection vitals={vitals} /> : null}
+          {current === 'wifi' ? <WifiSection say={say} /> : null}
+          {current === 'bluetooth' ? <BluetoothSection say={say} /> : null}
+          {current === 'devices' ? <DevicesSection vitals={vitals} version={version} /> : null}
           {current === 'battery' ? <BatterySection vitals={vitals} /> : null}
           {current === 'updates' ? <UpdatesSection updater={updater} version={version} /> : null}
           {current === 'budget' && AtlasBudgetTab ? (
@@ -233,10 +255,10 @@ function Stat({ k, v, ok }: { k: string; v: string; ok?: boolean }) {
 type ChipTone = 'quiet' | 'on' | 'ink' | 'ok' | 'warn' | 'off';
 type LineTone = 'quiet' | 'ok' | 'warn' | 'blue';
 
-/** One row of a card: the round icon chip, a title and a line, an optional trail, then its buttons. */
-function Row({ icon, chip = 'quiet', title, sub, subTone = 'quiet', trail, trailTone, emphasis, children }: {
+/** One row of a card: the round icon chip, a title and a line, an optional meter and trail, then its buttons. */
+function Row({ icon, chip = 'quiet', title, sub, subTone = 'quiet', trail, trailTone, emphasis, meter, children }: {
   icon?: IconName; chip?: ChipTone; title: string; sub?: string; subTone?: LineTone; trail?: string; trailTone?: 'ok' | 'warn' | 'ink';
-  emphasis?: boolean; children?: ReactNode;
+  emphasis?: boolean; meter?: { pct: number; tone?: MeterTone } | null; children?: ReactNode;
 }) {
   return (
     <div className={`b-st-row${emphasis ? ' b-st-row--emphasis' : ''}`}>
@@ -244,6 +266,11 @@ function Row({ icon, chip = 'quiet', title, sub, subTone = 'quiet', trail, trail
       <div className="b-st-row-text">
         <p className="b-st-row-t">{title}</p>
         {sub ? <p className={`b-st-row-s b-st-row-s--${subTone}`}>{sub}</p> : null}
+        {meter ? (
+          <div className={`b-st-meter b-st-meter--${meter.tone ?? 'ink'}`} role="meter" aria-label={title} aria-valuenow={Math.round(meter.pct)} aria-valuemin={0} aria-valuemax={100}>
+            <b style={{ width: `${Math.max(0, Math.min(100, meter.pct))}%` }} />
+          </div>
+        ) : null}
       </div>
       {trail || children ? (
         <div className="b-st-row-end">
@@ -268,9 +295,27 @@ function Confirm({ text, go, busy, onGo, onKeep }: { text: string; go: string; b
   );
 }
 
-/** The "Sample" stamp the top bar uses, for the browser preview's fixture vitals. */
-function SampleStamp({ vitals }: { vitals: SystemVitalsState }) {
-  return vitals.fixture ? <span className="b-topbar-fixture" title="The browser preview cannot see this Mac">Sample</span> : null;
+/** The design's on/off switch (the shell's .b-switch). */
+function Toggle({ on, label, disabled, onChange }: { on: boolean; label: string; disabled?: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <button type="button" role="switch" aria-checked={on} aria-label={label} className={`b-switch b-st-switch${on ? ' on' : ''}`} disabled={disabled} onClick={() => onChange(!on)}>
+      <span />
+    </button>
+  );
+}
+
+function errorText(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
+/** The browser preview's stand-in for a section that only the Mac app can run. */
+function MacOnly({ title, icon, what }: { title: string; icon: IconName; what: string }) {
+  return (
+    <section className="b-st-card" aria-label={title}>
+      <CardHead title={title} />
+      <Row icon={icon} title="Runs in the Mac app" sub={`${what} run in the Atlas desktop app. Open Atlas on your Mac to use them.`} />
+    </section>
+  );
 }
 
 /* ── Voice ───────────────────────────────────────────────────────────────── */
@@ -284,6 +329,11 @@ function VoiceSection() {
   const consent = readOnboarding();
   const mic = consent?.choices?.microphone;
   const phrases = getActiveWakePhrases();
+  // How Atlas listens: stored on this Mac, read live by the voice session.
+  const [input, setInput] = useState<VoiceInputPrefs>(readVoiceInput);
+  useEffect(() => onVoiceInputChange(setInput), []);
+  const flip = (key: keyof VoiceInputPrefs) => (on: boolean) => setInput(setVoiceInput({ [key]: on }));
+  const wakeTitle = `Listen for ${(phrases.length ? phrases : ['Hey Atlas']).map((p) => `“${p}”`).join(' or ')}`;
 
   return (
     <>
@@ -325,10 +375,17 @@ function VoiceSection() {
           trail={consent ? (mic ? 'Allowed' : 'Off') : '—'} trailTone={mic ? 'ok' : undefined}
         />
         <Row
-          icon="voice" title={phrases.length ? `Listens for ${phrases.map((p) => `“${p}”`).join(' or ')}` : 'No wake word loaded'}
-          sub={phrases.length ? 'Detected on this Mac by Atlas’s own model, once the microphone is on. Nothing is sent until Atlas wakes.' : 'The wake-word model did not load; the microphone button still works.'}
-          trail="On-device"
-        />
+          title={wakeTitle}
+          sub={phrases.length ? 'Wake word is detected on-device. Nothing is sent until Atlas wakes.' : 'The wake-word model did not load; the microphone button and push to talk still work.'}
+        >
+          <Toggle on={input.wakeWord} label={wakeTitle} onChange={flip('wakeWord')} />
+        </Row>
+        <Row title="Push to talk" sub="Hold the right ⌥ Option key on Home or the Voice screen to speak, and release to send. macOS keeps fn for itself, so Option stands in. Works alongside the wake word.">
+          <Toggle on={input.pushToTalk} label="Push to talk" onChange={flip('pushToTalk')} />
+        </Row>
+        <Row title="Mute when the Mac is locked" sub="Atlas stops listening the moment the screen locks.">
+          <Toggle on={input.muteWhenLocked} label="Mute when the Mac is locked" onChange={flip('muteWhenLocked')} />
+        </Row>
       </section>
     </>
   );
@@ -693,26 +750,263 @@ function reading(vitals: SystemVitalsState): boolean {
   return !vitals.fixture && vitals.at == null;
 }
 
-function WifiSection({ vitals }: { vitals: SystemVitalsState }) {
-  const { wifi } = vitals;
-  const source = vitals.fixture ? 'Sample' : 'This Mac';
+/** A Wi-Fi network name as 802.11 allows it (1–32 bytes); mac_controls.rs checks it again. */
+function ssidOk(name: string): boolean {
+  const bytes = new TextEncoder().encode(name).length;
+  return bytes > 0 && bytes <= 32;
+}
+
+/**
+ * One action at a time per section: which control is working, the last
+ * failure in the tool's own words, and a runner that records both. A toast
+ * only follows an action the command confirmed.
+ */
+function useMacAction(say: Say) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
+  const run = useCallback(async (key: string, action: () => Promise<void>, done?: string): Promise<boolean> => {
+    setBusy(key);
+    setFailure(null);
+    try {
+      await action();
+      if (done) say(done);
+      return true;
+    } catch (e) {
+      setFailure(errorText(e));
+      return false;
+    } finally {
+      setBusy(null);
+    }
+  }, [say]);
+  return { busy, failure, setFailure, run };
+}
+
+/** The join form: which network, and whether its name was picked from a list (then it is not editable). */
+interface JoinTarget { ssid: string; fixed: boolean }
+
+/** Known networks listed before "Show all": a Mac that has travelled knows a hundred or more. */
+const KNOWN_SHOWN = 8;
+
+/**
+ * Wi-Fi, over useWifiControls: the power switch, the network in use with its
+ * signal, speed, address and router, the known networks (join, forget), the
+ * networks in range, and joining one by name with a password.
+ * The password lives in this form's state only while it is typed; it goes to
+ * `wifi_join` as an argument and the field is emptied whatever the outcome.
+ */
+function WifiSection({ say }: { say: Say }) {
+  const ctl = useWifiControls({ scan: true });
+  const { busy, failure, setFailure, run } = useMacAction(say);
+  const [confirm, setConfirm] = useState<string | null>(null);
+  const [form, setForm] = useState<JoinTarget | null>(null);
+  const [password, setPassword] = useState('');
+  const [allKnown, setAllKnown] = useState(false);
+
+  if (!ctl.available) return <MacOnly title="Wi-Fi" icon="wi-fi" what="Turning Wi-Fi on and off, joining and forgetting networks" />;
+  const w = ctl.wifi;
+
+  const openForm = (target: JoinTarget) => { setForm(target); setPassword(''); setFailure(null); };
+  const closeForm = () => { setForm(null); setPassword(''); setFailure(null); };
+  // A known network joins with the password macOS already holds; when it
+  // will not, the form opens for one, with the tool's reason above it.
+  const joinKnown = async (ssid: string) => {
+    const ok = await run(`join:${ssid}`, () => ctl.join(ssid), `Joined ${ssid}`);
+    if (!ok) { setForm({ ssid, fixed: true }); setPassword(''); }
+  };
+  const joinOther = (n: NearbyNetwork) => {
+    if (n.security && n.security !== 'Open') openForm({ ssid: n.name, fixed: true });
+    else void run(`join:${n.name}`, () => ctl.join(n.name), `Joined ${n.name}`);
+  };
+  const formSsid = form ? (form.fixed ? form.ssid : form.ssid.trim()) : '';
+  const submit = async () => {
+    const ssid = formSsid;
+    if (!form || !ssidOk(ssid)) return;
+    const secret = password;
+    setPassword('');
+    const ok = await run(`join:${ssid}`, () => ctl.join(ssid, secret || undefined), `Joined ${ssid}`);
+    if (ok) setForm(null);
+  };
+  const joining = busy?.startsWith('join:') ? busy.slice(5) : null;
+  const known = w ? w.known.filter((n) => n !== w.ssid) : [];
+  const others = w ? otherNetworks(w) : [];
+
   return (
-    <section className="b-st-card" aria-label="Wi-Fi">
-      <CardHead title="Wi-Fi" sub={wifi == null ? 'Checking…' : wifi.connected ? `Connected to ${wifi.ssid}` : 'Not connected'}><SampleStamp vitals={vitals} /></CardHead>
-      {wifi?.connected ? (
-        <Row emphasis icon="wi-fi" chip="on" title={wifi.ssid ?? 'Wi-Fi'} sub="Connected" subTone="blue" />
-      ) : wifi == null ? (
-        <div className="b-empty"><p><b>Reading this Mac</b></p><p>The first check takes a moment.</p></div>
-      ) : (
-        <div className="b-empty"><p><b>No Wi-Fi network</b></p><p>Join one from the macOS menu bar; Atlas keeps working offline on what it already has.</p></div>
-      )}
-      <div className="b-st-stats b-st-stats--top">
-        <Stat k="Network" v={wifi?.ssid ?? '—'} />
-        <Stat k="Status" v={wifi == null ? '…' : wifi.connected ? 'Online' : 'Off'} ok={!!wifi?.connected} />
-        <Stat k="Source" v={source} />
-      </div>
-      <p className="b-st-note">Joining, forgetting and auto-join live in macOS. Atlas reads which network this Mac is on and nothing more.</p>
-    </section>
+    <>
+      <section className="b-st-card" aria-label="Wi-Fi">
+        <CardHead title="Wi-Fi" sub={joining ? `Joining ${joining}…` : w ? wifiHeadline(w) : ctl.error ?? 'Checking…'}>
+          {w?.power != null ? (
+            <Toggle on={w.power} label="Wi-Fi" disabled={busy != null} onChange={(on) => void run('power', () => ctl.setPower(on), on ? 'Wi-Fi on' : 'Wi-Fi off')} />
+          ) : null}
+        </CardHead>
+        {w && w.power == null ? <p className="b-st-note">macOS reports no Wi-Fi on this Mac.</p> : null}
+        {failure && !form && !confirm ? <p className="b-st-err" role="alert">{failure}</p> : null}
+      </section>
+
+      {w?.power && w.connected ? (
+        <section className="b-st-card b-st-card--current" aria-label="Current network">
+          <CardHead title={w.ssid ?? 'Wi-Fi network'} sub={currentNetworkLine(w)} />
+          <div className="b-st-stats">
+            <Stat k="Signal" v={signalLine(w.link?.signal ?? null) ?? (ctl.scanning ? '…' : '—')} />
+            <Stat k="Speed" v={rateLabel(w.link?.rateMbps ?? null) ?? (ctl.scanning ? '…' : '—')} />
+            <Stat k="IP address" v={w.ip ?? '—'} />
+            <Stat k="Router" v={w.router ?? '—'} />
+          </div>
+          {w.nameHidden ? <p className="b-st-note">macOS tells apps a network’s name only with Location Services access, which Atlas does not ask for.</p> : null}
+          {/* No Disconnect: macOS rejoins a known network about a second after any app leaves it (mac_controls.rs). */}
+          <p className="b-st-note">macOS rejoins known networks on its own, so leaving this one for good means forgetting it below or turning Wi-Fi off.</p>
+        </section>
+      ) : null}
+
+      {w?.power && known.length ? (
+        <section className="b-st-card" aria-label="Known networks">
+          <CardHead title="Known networks" sub="This Mac joins these on its own when one is in range. Turning auto-join off for one needs an administrator, in System Settings → Wi-Fi." />
+          {(allKnown ? known : known.slice(0, KNOWN_SHOWN)).map((n) => (
+            <div key={n}>
+              <Row icon="wi-fi" chip={joining === n ? 'on' : 'quiet'} title={n} sub={joining === n ? 'Joining…' : knownNetworkLine(n, w)} subTone={joining === n ? 'blue' : 'quiet'}>
+                <button type="button" className="b-btn b-btn--tinted b-st-rowb" disabled={busy != null} onClick={() => void joinKnown(n)}>{joining === n ? 'Joining…' : 'Join'}</button>
+                <button type="button" className="b-btn b-btn--ghost b-st-rowb" aria-expanded={confirm === n} disabled={busy != null} onClick={() => { setConfirm(confirm === n ? null : n); setFailure(null); }}>Forget</button>
+              </Row>
+              {confirm === n ? (
+                <Confirm
+                  text={`Forget ${n}? This Mac won’t join it again until you enter the password.`}
+                  go="Forget network" busy={busy === `forget:${n}`}
+                  onGo={() => void run(`forget:${n}`, () => ctl.forget(n), 'Network forgotten').then((ok) => { if (ok) setConfirm(null); })}
+                  onKeep={() => { setConfirm(null); setFailure(null); }}
+                />
+              ) : null}
+              {confirm === n && failure ? <p className="b-st-err" role="alert">{failure}</p> : null}
+            </div>
+          ))}
+          {known.length > KNOWN_SHOWN ? (
+            <div className="b-st-actions">
+              <button type="button" className="b-btn" aria-expanded={allKnown} onClick={() => setAllKnown(!allKnown)}>{allKnown ? 'Show fewer' : `Show all ${known.length}`}</button>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {w?.power ? (
+        <section className="b-st-card" aria-label="Other networks">
+          <CardHead title="Other networks" sub={ctl.scanning && !w.nearby ? 'Looking for networks…' : undefined}>
+            <button type="button" className="b-btn b-btn--tinted b-st-rowb" disabled={ctl.scanning} onClick={() => void ctl.scan()}>{ctl.scanning ? 'Scanning…' : 'Scan again'}</button>
+          </CardHead>
+          {others.map((n) => (
+            <Row key={n.name} icon="wi-fi" chip={joining === n.name ? 'on' : 'quiet'} title={n.name} sub={joining === n.name ? 'Joining…' : otherNetworkLine(n)} subTone={joining === n.name ? 'blue' : 'quiet'}>
+              <button type="button" className="b-btn b-btn--tinted b-st-rowb" disabled={busy != null} onClick={() => joinOther(n)}>{joining === n.name ? 'Joining…' : 'Join'}</button>
+            </Row>
+          ))}
+          {w.nearby && !others.length && !w.hiddenNearby ? <div className="b-empty"><p><b>No other networks in range</b></p><p>Scan again, or join one by its name.</p></div> : null}
+          {w.hiddenNearby ? (
+            <p className="b-st-note">
+              {w.hiddenNearby === 1 ? 'One more network is' : `${w.hiddenNearby} more networks are`} in range. macOS hides their names from apps without Location Services access, so join one by its name below.
+            </p>
+          ) : null}
+          {!form ? (
+            <div className="b-st-actions">
+              <button type="button" className="b-btn" disabled={busy != null} onClick={() => openForm({ ssid: '', fixed: false })}>Join another network…</button>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {w?.power && form ? (
+        <section className="b-st-card b-st-form" aria-label="Join a network">
+          <CardHead
+            title={form.fixed ? `Join ${form.ssid}` : 'Join a network'}
+            sub="The password goes straight to macOS, which keeps it in the Keychain as it does for every network. Atlas never stores it. Leave it empty for an open network."
+          />
+          {!form.fixed ? (
+            <input
+              className="b-input" autoComplete="off" spellCheck={false} maxLength={32} placeholder="Network name" aria-label="Network name"
+              value={form.ssid} onChange={(e) => { setForm({ ssid: e.target.value, fixed: false }); setFailure(null); }}
+            />
+          ) : null}
+          <input
+            className="b-input" type="password" autoComplete="off" spellCheck={false} maxLength={64} placeholder="Password" aria-label="Password"
+            value={password} onChange={(e) => { setPassword(e.target.value); setFailure(null); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') void submit(); }}
+          />
+          {failure ? <p className="b-st-err" role="alert">{failure}</p> : null}
+          <div className="b-st-form-actions">
+            <button type="button" className="b-btn b-btn--primary" disabled={busy != null || !ssidOk(formSsid)} onClick={() => void submit()}>{joining ? 'Joining…' : 'Join'}</button>
+            <button type="button" className="b-btn" disabled={busy != null} onClick={closeForm}>Cancel</button>
+          </div>
+        </section>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * Bluetooth, over useBluetoothControls: power and connecting paired devices
+ * when blueutil is installed, and otherwise the same list read-only with what
+ * the switches need.
+ */
+function BluetoothSection({ say }: { say: Say }) {
+  const ctl = useBluetoothControls();
+  const { busy, failure, run } = useMacAction(say);
+
+  if (!ctl.available) return <MacOnly title="Bluetooth" icon="bluetooth" what="Bluetooth and the devices paired with this Mac" />;
+  const bt = ctl.bluetooth;
+  const devices = bt?.devices ?? [];
+  const connected = devices.filter((d) => d.connected);
+  const low = connected.filter((d) => d.battery != null && d.battery <= 15);
+  const canAct = !!bt?.canSwitch && bt.on === true;
+  const sub = bt == null
+    ? (ctl.error ?? 'Checking… the first Bluetooth read takes a moment.')
+    : bt.on === false
+      ? 'Off. AirPods, trackpads and Apple Watch unlock are paused until you turn it back on.'
+      : `${connected.length} connected`;
+  const toggleDevice = (d: PairedDevice, key: string) => {
+    if (!d.address) return;
+    const address = d.address;
+    void run(key, () => ctl.setConnected(address, !d.connected), d.connected ? `${d.name} disconnected` : `${d.name} connected`);
+  };
+
+  return (
+    <>
+      <section className="b-st-card" aria-label="Bluetooth">
+        <CardHead title="Bluetooth" sub={sub}>
+          {bt?.canSwitch && bt.on != null ? (
+            <Toggle on={bt.on} label="Bluetooth" disabled={busy != null} onChange={(on) => void run('power', () => ctl.setPower(on), on ? 'Bluetooth on' : 'Bluetooth off')} />
+          ) : null}
+        </CardHead>
+        {bt && !bt.canSwitch ? (
+          <p className="b-st-note">
+            Switching Bluetooth and connecting devices from Atlas needs the free blueutil tool (brew install blueutil), which is not on this Mac. Atlas never installs it; until then this list is read-only, and the macOS menu bar has the switches.
+          </p>
+        ) : null}
+        {failure ? <p className="b-st-err" role="alert">{failure}</p> : null}
+      </section>
+
+      {bt?.on !== false ? (
+        <section className="b-st-card" aria-label="My devices">
+          <CardHead title="My devices" sub={bt && !devices.length ? undefined : 'Paired with this Mac. Pairing and removing devices stay in System Settings → Bluetooth.'} />
+          {devices.map((d, i) => {
+            // macOS can list one device twice (an iPhone seen over two radios), so the index keeps keys apart.
+            const key = `dev:${d.address ?? d.name}-${i}`;
+            const working = busy === key;
+            return (
+              <Row
+                key={key} icon={btIcon({ name: d.name, kind: d.kind })} chip={d.connected ? 'ink' : 'quiet'} title={d.name}
+                sub={working ? (d.connected ? 'Disconnecting…' : 'Connecting…') : d.connected ? `${d.kind ?? 'Bluetooth device'} · connected` : 'Not connected'}
+                subTone={working ? 'blue' : 'quiet'}
+                trail={d.connected && d.battery != null ? `${d.battery}%` : undefined} trailTone={d.battery != null && d.battery <= 15 ? 'warn' : 'ink'}
+              >
+                {canAct && d.address ? (
+                  <button type="button" className={`b-btn b-st-rowb ${d.connected ? 'b-st-paper' : 'b-btn--tinted'}`} disabled={busy != null} onClick={() => toggleDevice(d, key)}>
+                    {working ? '…' : d.connected ? 'Disconnect' : 'Connect'}
+                  </button>
+                ) : null}
+              </Row>
+            );
+          })}
+          {bt && !devices.length ? <div className="b-empty"><p><b>No paired devices</b></p><p>Pair one in System Settings → Bluetooth; it appears here and in the top bar.</p></div> : null}
+          {bt == null ? <div className="b-empty"><p><b>Looking for devices</b></p><p>The first check takes a moment.</p></div> : null}
+          {low.length ? <p className="b-st-note b-st-note--warn">{low.map((d) => d.name).join(', ')} {low.length === 1 ? 'is' : 'are'} low on battery. Charge soon.</p> : null}
+        </section>
+      ) : null}
+    </>
   );
 }
 
@@ -724,70 +1018,149 @@ function DeviceRow({ d }: { d: BtDevice }) {
   );
 }
 
-function BluetoothSection({ vitals }: { vitals: SystemVitalsState }) {
+/** This Mac: what it is (chip, memory, macOS, Atlas), how long it has been up, and the three meters. */
+function DevicesSection({ vitals, version }: { vitals: SystemVitalsState; version: string | null }) {
+  const { available, mac, error } = useMacDetails();
   const bt = vitals.bluetooth;
-  const n = bt?.connected.length ?? 0;
-  const low = (bt?.connected ?? []).filter((d) => d.battery_percent != null && d.battery_percent <= 15);
+  if (!available) return <MacOnly title="This Mac" icon="mac" what="The chip, memory, storage and processor readings" />;
+  const meters = mac ? macMeters(mac) : null;
+  const uptime = mac ? uptimeLabel(mac.bootedAt, Date.now()) : null;
+  const pending = mac ? '—' : '…';
   return (
     <>
-      <section className="b-st-card" aria-label="Bluetooth">
-        <CardHead title="Bluetooth" sub={bt == null ? 'Checking… the first Bluetooth probe takes a moment.' : bt.on ? `${n} connected` : 'Off. Turn it on from the macOS menu bar; Atlas has no switch for it.'}><SampleStamp vitals={vitals} /></CardHead>
-        <div className="b-st-stats b-st-stats--top">
-          <Stat k="Bluetooth" v={bt == null ? '…' : bt.on ? 'On' : 'Off'} ok={!!bt?.on} />
-          <Stat k="Connected" v={bt == null ? '…' : String(n)} />
-          <Stat k="Source" v={vitals.fixture ? 'Sample' : 'This Mac'} />
+      <section className="b-st-card" aria-label="This Mac">
+        <CardHead title={mac?.name ?? 'This Mac'} sub={mac ? ['This Mac', uptime].filter(Boolean).join(' · ') : error ?? 'Reading this Mac…'} />
+        <div className="b-st-stats">
+          <Stat k="Chip" v={mac?.chip ?? pending} />
+          <Stat k="Memory" v={mac?.memoryBytes != null ? gigabytes(mac.memoryBytes, true) : pending} />
+          <Stat k="macOS" v={mac?.macos ?? pending} />
+          <Stat k="Atlas" v={version ?? '…'} />
         </div>
+        <Row title="Processor" sub={meters?.processor?.sub ?? pending} meter={meters?.processor} />
+        <Row title="Memory" sub={meters?.memory?.sub ?? pending} meter={meters?.memory} />
+        <Row title="Storage" sub={meters?.storage?.sub ?? pending} meter={meters?.storage} />
       </section>
       <section className="b-st-card" aria-label="Connected devices">
-        <CardHead title="Connected now" sub="Pairing, connecting and forgetting live in macOS; this is what it reports." />
-        {n ? bt!.connected.map((d) => <DeviceRow d={d} key={d.name} />) : (
-          <div className="b-empty"><p><b>{bt == null ? 'Looking for devices' : bt.on ? 'Nothing connected' : 'Bluetooth is off'}</b></p><p>{bt == null ? 'The first check takes a moment.' : 'Devices you connect in macOS appear here and in the top bar.'}</p></div>
-        )}
-        {low.length ? <p className="b-st-note b-st-note--warn">{low.map((d) => d.name).join(', ')} {low.length === 1 ? 'is' : 'are'} low on battery. Charge soon.</p> : null}
+        <CardHead title="Connected now" sub="Bluetooth devices this Mac is using right now. Connect and disconnect them under Bluetooth." />
+        {(bt?.connected ?? []).map((d, i) => <DeviceRow d={d} key={`${d.name}-${i}`} />)}
+        {!bt?.connected.length ? <p className="b-st-note">{bt == null ? 'Looking for Bluetooth devices…' : 'No Bluetooth devices are connected right now.'}</p> : null}
       </section>
     </>
   );
 }
 
-function DevicesSection({ vitals }: { vitals: SystemVitalsState }) {
-  const { wifi, battery, bluetooth: bt } = vitals;
-  const line = reading(vitals)
-    ? 'Reading this Mac…'
-    : `${wifi?.connected ? `On ${wifi.ssid}` : 'Offline'}${battery ? ` · ${battery.percent}%${battery.charging ? ', charging' : ''}` : ' · mains power'}`;
-  return (
-    <section className="b-st-card" aria-label="Devices">
-      <CardHead title="This Mac and what is around it" sub="What macOS reports right now. Chip, memory and storage readings are not wired yet, so they are not shown."><SampleStamp vitals={vitals} /></CardHead>
-      <Row emphasis icon="mac" chip="on" title="This Mac" sub={line} subTone="blue" />
-      {(bt?.connected ?? []).map((d) => <DeviceRow d={d} key={d.name} />)}
-      {!bt?.connected.length ? <p className="b-st-note">{bt == null ? 'Looking for Bluetooth devices…' : 'No Bluetooth devices are connected right now.'}</p> : null}
-    </section>
-  );
-}
-
+/**
+ * Battery: the charge with its last 24 hours (recorded every ten minutes by
+ * mac_controls.rs), what is using the processor, Low Power Mode as macOS has
+ * it (read-only: switching it needs an administrator), the switch that holds
+ * the sphere still, and the battery's health.
+ */
 function BatterySection({ vitals }: { vitals: SystemVitalsState }) {
+  const { available, battery: detail } = useBatteryDetails();
+  const [paused, setPaused] = useState(readSpherePaused);
   const b = vitals.battery;
   const loading = reading(vitals);
   const head = batteryHeadline(b, loading);
+  const hist = detail?.present ? historyBars(detail.history, Date.now()) : null;
+  const recorded = hist ? hist.bars.filter((x) => x.percent != null).length : 0;
+  const pauseTitle = 'Pause the sphere';
+  const flipPause = (on: boolean) => { setSpheresPaused(on); setPaused(on); };
+  const lowPower = detail?.lowPowerMode;
+
   return (
     <>
       <section className="b-st-card" aria-label="Battery">
         <div className="b-st-bat">
           <div className="b-st-bat-left">
-            <span className="b-st-kicker">{head.kicker}{vitals.fixture ? ' · sample' : ''}</span>
+            <span className="b-st-kicker">{lowPower ? 'Low Power Mode' : head.kicker}{vitals.fixture ? ' · sample' : ''}</span>
             <span className="b-st-bat-big b-num">{head.big}</span>
             <span className="b-st-bat-line">{head.line}</span>
             <div className={`b-st-bar b-st-bar--${head.tone}`} role="progressbar" aria-valuenow={b?.percent ?? 0} aria-valuemin={0} aria-valuemax={100} aria-label="Charge"><b style={{ width: `${b?.percent ?? 0}%` }} /></div>
           </div>
-          <div className="b-st-stats b-st-stats--start">
-            <Stat k="Power" v={b ? (b.on_power ? 'Adapter' : 'Battery') : loading ? '…' : 'Mains'} />
-            <Stat k="Charging" v={b ? (b.charging ? 'Yes' : 'No') : loading ? '…' : '—'} ok={!!b?.charging} />
-            <Stat k="Source" v={vitals.fixture ? 'Sample' : 'This Mac'} />
-          </div>
+          {hist ? (
+            <div className="b-st-hist">
+              <div className="b-st-hist-head"><span>Last 24 hours</span><small>Charge level</small></div>
+              <div className="b-st-hist-bars" role="img" aria-label={`Charge level over the last 24 hours: ${recorded} of 24 hours recorded`}>
+                {hist.bars.map((x, i) => (
+                  <span key={i} className={`b-st-hist-bar b-st-hist-bar--${x.tone}`} style={x.percent != null ? { height: `${Math.max(4, x.percent)}%` } : undefined} title={x.title} />
+                ))}
+              </div>
+              <div className="b-st-hist-axis"><span>{hist.startLabel}</span><span>{hist.midLabel}</span><span>Now</span></div>
+              <div className="b-st-hist-key"><span><i className="b-st-hist-key--battery" />On battery</span><span><i className="b-st-hist-key--power" />Plugged in</span></div>
+              {recorded < 2 ? <p className="b-st-note">Atlas records the charge every ten minutes while it runs, so the chart fills in over the next day.</p> : null}
+            </div>
+          ) : (
+            <div className="b-st-stats b-st-stats--start">
+              <Stat k="Power" v={b ? (b.on_power ? 'Adapter' : 'Battery') : loading ? '…' : 'Mains'} />
+              <Stat k="Charging" v={b ? (b.charging ? 'Yes' : 'No') : loading ? '…' : '—'} ok={!!b?.charging} />
+              <Stat k="Source" v={vitals.fixture ? 'Sample' : 'This Mac'} />
+            </div>
+          )}
         </div>
       </section>
-      <section className="b-st-card" aria-label="On battery">
-        <CardHead title="Atlas on battery" sub="Atlas reads the charge for the top bar and the status panel every thirty seconds. It has no low-power mode of its own yet, so there is nothing to switch here; macOS’s Low Power Mode applies as usual." />
+
+      {detail?.energy.length ? (
+        <section className="b-st-card" aria-label="Using significant energy">
+          <CardHead title="Using significant energy" sub="Each app’s share of the processor right now. macOS reports energy per app only to Activity Monitor; the processor is the part an app decides." />
+          {detail.energy.map((r) => (
+            <Row
+              key={r.name} title={r.name} sub={r.atlas ? `Atlas and its helpers · ${r.processes} ${r.processes === 1 ? 'process' : 'processes'}` : `${r.processes} ${r.processes === 1 ? 'process' : 'processes'}`}
+              meter={{ pct: r.share, tone: r.atlas ? 'blue' : 'ink' }} trail={`${r.share}%`} trailTone="ink"
+            />
+          ))}
+        </section>
+      ) : null}
+
+      <section className="b-st-card" aria-label="Power">
+        <CardHead title="Power" />
+        {available ? (
+          <Row
+            title="Low Power Mode"
+            sub="Set in System Settings → Battery. Switching it needs an administrator’s password, so Atlas shows it and leaves the switch to macOS."
+            trail={lowPower == null ? (detail ? '—' : '…') : lowPower ? 'On' : 'Off'} trailTone={lowPower ? 'ok' : undefined}
+          />
+        ) : null}
+        <Row title={pauseTitle} sub="The Veil sphere holds still on every screen to save energy. Its colour still shows when Atlas is listening or speaking.">
+          <Toggle on={paused} label={pauseTitle} onChange={flipPause} />
+        </Row>
       </section>
+
+      {detail?.present ? (
+        <section className="b-st-card" aria-label="Battery health">
+          <CardHead title="Battery health" />
+          <div className="b-st-stats">
+            <Stat k="Maximum capacity" v={detail.maxCapacityPct != null ? `${detail.maxCapacityPct}%` : '—'} />
+            <Stat k="Cycle count" v={detail.cycleCount != null ? String(detail.cycleCount) : '—'} />
+            <Stat k="Condition" v={detail.condition ?? '—'} ok={/^(good|normal)$/i.test(detail.condition ?? '')} />
+          </div>
+        </section>
+      ) : null}
+    </>
+  );
+}
+
+/* ── Memory & Privacy ────────────────────────────────────────────────────── */
+
+/** The "Remember things I share" switch the brain obeys, above the Workshop's own memory panel. */
+function MemorySection() {
+  const remember = useRememberShared();
+  const title = 'Remember things I share';
+  const sub = 'Atlas saves facts from conversation, like names, plans and preferences, and a short summary of each chat. Off means it only remembers what you ask it to.';
+  return (
+    <>
+      <section className="b-st-card" aria-label="Remembering">
+        <CardHead title="Remembering" />
+        <Row
+          title={title} sub={remember.available ? sub : `${sub} The switch is kept on this Mac, in the Atlas desktop app.`}
+          trail={remember.available && remember.on == null && !remember.error ? '…' : undefined}
+        >
+          {remember.available && remember.on != null ? (
+            <Toggle on={remember.on} label={title} disabled={remember.saving} onChange={(on) => void remember.set(on)} />
+          ) : null}
+        </Row>
+        {remember.error ? <p className="b-st-note b-st-note--warn">{remember.error}</p> : null}
+      </section>
+      <section className="b-st-card b-st-embed" aria-label="Memory and privacy"><MemoryPrivacyPanel /></section>
     </>
   );
 }
@@ -795,6 +1168,10 @@ function BatterySection({ vitals }: { vitals: SystemVitalsState }) {
 /* ── Software Update ─────────────────────────────────────────────────────── */
 
 function UpdatesSection({ updater, version }: { updater: ReturnType<typeof useAppUpdater>; version: string | null }) {
+  const [prefs, setPrefs] = useState<UpdatePrefs>(readUpdatePrefs);
+  useEffect(() => onUpdatePrefsChange(setPrefs), []);
+  const [restarting, setRestarting] = useState(false);
+  const [restartError, setRestartError] = useState<string | null>(null);
   const card = updateCard({
     supported: updater.supported,
     phase: updater.phase,
@@ -803,8 +1180,28 @@ function UpdatesSection({ updater, version }: { updater: ReturnType<typeof useAp
     error: updater.error,
     downloaded: updater.progress.downloaded,
     total: updater.progress.total,
+    installOvernight: prefs.installOvernight,
+    restarting,
   });
-  const busy = updater.phase === 'checking' || updater.phase === 'downloading';
+  const busy = updater.phase === 'checking' || updater.phase === 'downloading' || updater.phase === 'installing' || restarting;
+  const flip = (key: keyof UpdatePrefs) => (on: boolean) => setPrefs(setUpdatePrefs({ [key]: on }));
+  // The window closes moments after `app_restart` answers, so "Restarting…"
+  // stays up; a refusal brings the button back with the reason.
+  const restart = async () => {
+    setRestarting(true);
+    setRestartError(null);
+    try {
+      await restartAtlas();
+    } catch (e) {
+      setRestarting(false);
+      setRestartError(`Atlas could not restart itself: ${errorText(e)}. Quit and reopen it instead.`);
+    }
+  };
+  const act = () => {
+    if (card.action === 'install') void updater.install();
+    else if (card.action === 'restart') void restart();
+    else void updater.check();
+  };
   return (
     <>
       <section className={`b-st-upd b-st-upd--${card.tone}`} aria-label="Update status" aria-live="polite">
@@ -817,20 +1214,37 @@ function UpdatesSection({ updater, version }: { updater: ReturnType<typeof useAp
             <span className="b-num">{card.pct != null ? `${card.pct}% · ${megabytes(updater.progress.downloaded)} of ${megabytes(updater.progress.total ?? 0)}` : `${megabytes(updater.progress.downloaded)} downloaded`}</span>
           </div>
         ) : null}
-        {updater.phase === 'available' && updater.update?.notes ? <div className="b-st-notes">{updater.update.notes}</div> : null}
+        {(updater.phase === 'available' || updater.phase === 'downloaded') && updater.update?.notes ? <div className="b-st-notes">{updater.update.notes}</div> : null}
         {card.action ? (
           <div className="b-st-actions">
-            <button type="button" className={`b-btn ${card.action === 'install' ? 'b-btn--primary' : 'b-btn--tinted'}`} disabled={busy} onClick={() => void (card.action === 'install' ? updater.install() : updater.check())}>{card.actionLabel}</button>
+            <button type="button" className={`b-btn ${card.action === 'check' ? 'b-btn--tinted' : 'b-btn--primary'}`} disabled={busy} onClick={act}>{card.actionLabel}</button>
           </div>
         ) : null}
       </section>
+      {updater.supported ? (
+        <section className="b-st-card" aria-label="Automatic updates">
+          <CardHead title="Automatic updates" sub="Off until you switch them on. Every update is signature-verified before anything is installed, either way." />
+          <Row title="Download updates automatically" sub="Atlas checks the release feed every six hours and downloads a new version in the background. Installing still waits for you, or for the night.">
+            <Toggle on={prefs.autoDownload} label="Download updates automatically" onChange={flip('autoDownload')} />
+          </Row>
+          <Row title="Install overnight" sub="Between 2 and 5 AM, when the Mac is plugged in and nobody has used it for 15 minutes. Atlas installs the update and restarts itself; conversations and memories carry over.">
+            <Toggle on={prefs.installOvernight} label="Install overnight" onChange={flip('installOvernight')} />
+          </Row>
+        </section>
+      ) : null}
       <section className="b-st-card" aria-label="Current version">
         <CardHead title="Current version" sub="Updates come from the signed release feed; nothing unsigned or altered is ever installed." />
         <div className="b-st-stats">
           <Stat k="Atlas" v={version ?? (updater.supported ? '…' : 'Browser preview')} />
           <Stat k="Signature" v="Verified before install" ok />
-          <Stat k="Installs" v="Only when you approve" />
+          <Stat k="Installs" v={prefs.installOvernight ? 'Overnight, or when you approve' : 'Only when you approve'} />
         </div>
+        {updater.supported && card.action !== 'restart' ? (
+          <Row title="Restart Atlas" sub="Quits and reopens Atlas, its brain and its voice. Settings that take effect on a restart apply then.">
+            <button type="button" className="b-btn b-st-paper b-st-rowb" disabled={busy} onClick={() => void restart()}>{restarting ? 'Restarting…' : 'Restart Atlas'}</button>
+          </Row>
+        ) : null}
+        {restartError ? <p className="b-st-note b-st-note--warn">{restartError}</p> : null}
       </section>
     </>
   );

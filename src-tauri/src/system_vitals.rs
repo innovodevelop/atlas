@@ -19,11 +19,13 @@
 //
 // The parsers take the tool's text so they can be tested on fixtures.
 use serde::Serialize;
-use std::process::Command;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 const CACHE_SECS: u64 = 30;
+
+/// What macOS prints in place of a network name the asking app may not see.
+const REDACTED: &str = "<redacted>";
 
 #[derive(Serialize, Clone, Debug, Default, PartialEq)]
 pub struct Battery {
@@ -96,11 +98,16 @@ pub fn parse_pmset(out: &str) -> Option<Battery> {
 /// `ipconfig getsummary en0` prints a dictionary; the line we want is
 /// `  SSID : Fogware 5G`. Falls back to `networksetup -getairportnetwork en0`
 /// output: `Current Wi-Fi Network: Fogware 5G` / `You are not associated…`.
+///
+/// Since macOS 14.4 both tools print `<redacted>` for the name unless the app
+/// asking has Location Services access. That is still a connection: it is
+/// reported as connected with no name, never as a network called "<redacted>".
 pub fn parse_wifi(summary: &str, airport: &str) -> Wifi {
     if let Some(line) = summary.lines().find(|l| l.trim_start().starts_with("SSID :")) {
         let ssid = line.splitn(2, ':').nth(1).map(str::trim).filter(|s| !s.is_empty());
         if let Some(s) = ssid {
-            return Wifi { ssid: Some(s.to_string()), connected: true };
+            let name = if s == REDACTED { None } else { Some(s.to_string()) };
+            return Wifi { ssid: name, connected: true };
         }
     }
     if let Some(rest) = airport.trim().strip_prefix("Current Wi-Fi Network:") {
@@ -147,14 +154,11 @@ pub fn parse_bluetooth(json: &str) -> Option<Bluetooth> {
 
 // --- Probes --------------------------------------------------------------------
 
+/// Through mac_controls.rs's reader, which kills a tool that runs past its
+/// limit: a hung `system_profiler` would otherwise hold `refreshing` true, and
+/// the Bluetooth answer would never refresh again.
 fn run(cmd: &str, args: &[&str]) -> String {
-    Command::new(cmd)
-        .args(args)
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
-        .unwrap_or_default()
+    crate::mac_controls::read(cmd, args)
 }
 
 fn probe_battery() -> Option<Battery> {
@@ -199,6 +203,16 @@ fn refresh_bluetooth_in_background() {
             .map(|d| d.as_secs());
         c.refreshing = false;
     });
+}
+
+/// Mark the cached Bluetooth answer stale, so the next `system_vitals` reads
+/// it again. Settings and the status panels call this (mac_controls.rs) after
+/// switching Bluetooth, so the top bar does not show the old state for half a
+/// minute.
+pub fn forget_bluetooth() {
+    if let Ok(mut c) = bt_cache().lock() {
+        c.at = None;
+    }
 }
 
 /// The top bar's data. Quick fields now; Bluetooth from the cache, refreshed
@@ -254,6 +268,12 @@ mod tests {
         assert_eq!(parse_wifi(summary, ""), Wifi { ssid: Some("Fogware 5G".into()), connected: true });
         assert_eq!(parse_wifi("", "Current Wi-Fi Network: Home\n"), Wifi { ssid: Some("Home".into()), connected: true });
         assert_eq!(parse_wifi("", "You are not associated with an AirPort network.\n"), Wifi { ssid: None, connected: false });
+    }
+
+    #[test]
+    fn wifi_with_a_redacted_name_is_connected_and_unnamed() {
+        let summary = "<dictionary> {\n  InterfaceType : WiFi\n  SSID : <redacted>\n  Security : WPA2_PSK\n}\n";
+        assert_eq!(parse_wifi(summary, ""), Wifi { ssid: None, connected: true });
     }
 
     #[test]

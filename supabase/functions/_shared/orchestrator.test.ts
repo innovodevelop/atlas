@@ -25,7 +25,10 @@
 // CI command has to be widened for it to earn its keep.
 import { describe, expect, setSystemTime, test } from "bun:test";
 import {
+  MEMORY_OFF_RESULT,
+  asksToRemember,
   buildTurnContext,
+  executeTool,
   runToolLoop,
   type ChatDeps,
   type ChatOptions,
@@ -500,5 +503,70 @@ describe("runToolLoop bounds", () => {
     expect(out.ok).toBe(true);
     if (!out.ok) throw new Error("unreachable");
     expect(out.citations).toEqual(["https://example.com/a"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// "Remember things I share" (Settings → Memory & Privacy, Beta F9 row 95)
+//
+// On is the golden prompt above, byte for byte. Off changes three things: the
+// prompt stops inviting memory_store, memory_store refuses unless the user's
+// own message asked, and (in streamAndCapture) no conversation summary.
+
+describe("Remember things I share", () => {
+  test("off: the prompt stops inviting memory_store; on: the golden text", async () => {
+    setSystemTime(FROZEN);
+    try {
+      const off = await buildTurnContext({ ...makeDeps(makeSupabase()), rememberShared: false }, OPTS);
+      expect(off.systemPrompt).not.toContain("Pay deep attention to what Mag shares");
+      expect(off.systemPrompt).not.toContain("USE THIS when they share");
+      expect(off.systemPrompt).toContain('Mag has switched off "Remember things I share"');
+      expect(off.systemPrompt).toContain("ONLY when they explicitly ask you to remember something");
+      const on = await buildTurnContext({ ...makeDeps(makeSupabase()), rememberShared: true }, OPTS);
+      expect(on.systemPrompt).toBe(GOLDEN_SYSTEM_PROMPT);
+    } finally {
+      setSystemTime();
+    }
+  });
+
+  test("off: memory_store writes nothing unless the user asked", async () => {
+    const spy = { upserts: [] as unknown[], rpcs: [] as string[] };
+    const call = { id: "c1", type: "function", function: { name: "memory_store", arguments: JSON.stringify({ key: "dog", value: "Bruno", category: "relationship" }) } };
+    const base = { userId: "user-1", supabase: makeSupabase(spy), deadline: Date.now() + 60_000 };
+
+    const refused = await executeTool(call, { ...base, rememberShared: false });
+    expect(refused.result).toEqual(MEMORY_OFF_RESULT);
+    expect(spy.upserts).toHaveLength(0);
+
+    const asked = await executeTool(call, { ...base, rememberShared: false, explicitRemember: true });
+    expect(asked.result).toMatchObject({ success: true });
+    expect(spy.upserts).toHaveLength(1);
+
+    // On (and absent, for every other caller) writes as it always has.
+    await executeTool(call, { ...base, rememberShared: true });
+    await executeTool(call, base);
+    expect(spy.upserts).toHaveLength(3);
+  });
+
+  test("the tool loop hands the setting to memory_store", async () => {
+    const spy = { upserts: [] as unknown[], rpcs: [] as string[] };
+    let calls = 0;
+    const out = await runToolLoop(loopArgs({
+      supabase: makeSupabase(spy),
+      rememberShared: false,
+      explicitRemember: false,
+      chat: (async () => (++calls === 1 ? wantsTool("memory_store", { key: "k", value: "v", category: "fact" }) : done())) as any,
+    }));
+    expect(out.ok).toBe(true);
+    expect(spy.upserts).toHaveLength(0);
+  });
+
+  test("what counts as asking", () => {
+    for (const ask of ["Remember that my sister is called Ida", "Atlas, please remember my gate code is 4521", "Don't forget I'm vegetarian", "keep in mind that I work late on Thursdays", "Let me teach you about my garden"]) {
+      expect(asksToRemember(ask)).toBe(true);
+    }
+    for (const passing of ["My sister is called Ida", "Do you remember what my sister is called?", "I can never remember my gate code", "remember it"]) {
+      expect(asksToRemember(passing)).toBe(false);
+    }
   });
 });

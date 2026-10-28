@@ -3,9 +3,9 @@
  * here, rendered by src/pages/atlas/BetaSettings.tsx.
  *
  * `Atlas Settings Beta.dc.html` draws thirteen sections in four groups. Nine
- * have a store behind them (the Workshop tabs), four read what this Mac
- * reports (`useSystemVitals`, read-only — the webview has no command to join a
- * network or pair a device), and a fourteenth, "Beta UI", is the way back to
+ * have a store behind them (the Workshop tabs), four read and switch this Mac
+ * (src/hooks/useMacControls.ts over src-tauri/src/mac_controls.rs, parsed in
+ * src/lib/macProbes.ts), and a fourteenth, "Beta UI", is the way back to
  * the Workshop while the redesign is in beta. Which section a URL means — the
  * `#wifi` hash the status panels link with, the `?tab=memory` the account menu
  * has always sent — is decided here, so the page and every deep link agree.
@@ -47,10 +47,10 @@ export const SECTIONS: readonly SettingsSection[] = [
   { id: 'mail', group: 'Connections', label: 'Mail', icon: 'mail', intro: 'Mailboxes Atlas reads, read-only, for bills, deadlines and documents.' },
   { id: 'portfolio', group: 'Connections', label: 'Portfolio', icon: 'markets', intro: 'Your brokerage link. Holdings sync read-only and are analysed on this Mac only.' },
   { id: 'music', group: 'Connections', label: 'Music', icon: 'music', intro: 'Spotify playback through Atlas, and the control to withdraw it.' },
-  { id: 'wifi', group: 'This Mac', label: 'Wi-Fi', icon: 'wi-fi', intro: 'The network this Mac is on, as macOS reports it.' },
-  { id: 'bluetooth', group: 'This Mac', label: 'Bluetooth', icon: 'bluetooth', intro: 'Headphones, input devices and everything else connected to this Mac right now.' },
+  { id: 'wifi', group: 'This Mac', label: 'Wi-Fi', icon: 'wi-fi', intro: 'Networks this Mac joins, and which ones it joins on its own.' },
+  { id: 'bluetooth', group: 'This Mac', label: 'Bluetooth', icon: 'bluetooth', intro: 'Headphones, input devices and everything else paired with this Mac.' },
   { id: 'devices', group: 'This Mac', label: 'Devices', icon: 'mac', intro: 'This Mac and the devices Atlas can see around it.' },
-  { id: 'battery', group: 'This Mac', label: 'Battery', icon: 'battery', intro: 'Charge and power, as this Mac reports them.' },
+  { id: 'battery', group: 'This Mac', label: 'Battery', icon: 'battery', intro: 'Charge, what is using it, and how Atlas behaves on battery.' },
   { id: 'updates', group: 'System', label: 'Software Update', icon: 'download', intro: 'Keep Atlas current. Updates are signature-verified and never installed until you say so.' },
   { id: 'budget', group: 'System', label: 'Budget & AI', icon: 'energy', intro: 'Model spend, token usage by tier, provider health and the emergency stop.', admin: true },
   { id: 'beta', group: 'System', label: 'Beta UI', icon: 'sliders', intro: 'The redesigned Atlas, and the way back to the Workshop while it is in beta.' },
@@ -223,7 +223,8 @@ export function mailboxLine(a: MailboxInput, o: { userMailbox: boolean; scanning
 /* ── Software Update ─────────────────────────────────────────────────────── */
 
 /** Mirrors `UpdaterPhase` in src/hooks/useAppUpdater.ts (not imported — see the file header). */
-export type UpdatePhase = 'idle' | 'checking' | 'upToDate' | 'available' | 'downloading' | 'installed' | 'error';
+export type UpdatePhase =
+  | 'idle' | 'checking' | 'upToDate' | 'available' | 'downloading' | 'downloaded' | 'installing' | 'installed' | 'error';
 
 export interface UpdateInput {
   /** False outside the desktop app: the browser preview has no bundle. */
@@ -235,6 +236,10 @@ export interface UpdateInput {
   error: string | null;
   downloaded: number;
   total: number | null;
+  /** Settings → "Install overnight" is on (src/lib/updatePrefs.ts). */
+  installOvernight?: boolean;
+  /** Restart Atlas was pressed and the app is on its way down. */
+  restarting?: boolean;
 }
 
 export interface UpdateCard {
@@ -244,7 +249,7 @@ export interface UpdateCard {
   tone: 'paper' | 'blue' | 'green' | 'ink' | 'red';
   /** Download progress, 0–100, only while downloading with a known size. */
   pct: number | null;
-  action: 'check' | 'install' | null;
+  action: 'check' | 'install' | 'restart' | null;
   actionLabel: string;
 }
 
@@ -263,6 +268,10 @@ export function updateCard(u: UpdateInput): UpdateCard {
   if (!u.supported) {
     return { kicker: 'Desktop app', title: 'Updates live in the Mac app', body: 'This preview has no bundle to update. Open Atlas on your Mac to check for updates.', tone: 'paper', pct: null, action: null, actionLabel: '' };
   }
+  const next = `Atlas ${u.available?.version ?? ''}`.trim();
+  if (u.restarting) {
+    return { kicker: 'Restarting', title: 'Restarting…', body: 'Atlas will be back in a moment.', tone: 'ink', pct: null, action: null, actionLabel: '' };
+  }
   switch (u.phase) {
     case 'checking':
       return { kicker: 'Checking', title: 'Looking for updates…', body: 'This takes a few seconds.', tone: 'blue', pct: null, action: null, actionLabel: '' };
@@ -270,16 +279,36 @@ export function updateCard(u: UpdateInput): UpdateCard {
       return { kicker: 'Up to date', title: running, body: 'You have the latest version. Last checked just now.', tone: 'green', pct: null, action: 'check', actionLabel: 'Check again' };
     case 'available': {
       const when = u.available?.date ? `Released ${u.available.date.split(' ')[0]}. ` : '';
-      return { kicker: 'Update available', title: `Atlas ${u.available?.version ?? ''}`.trim(), body: `${when}It downloads in the background and its signature is verified before anything is installed. Nothing happens until you say so here.`, tone: 'blue', pct: null, action: 'install', actionLabel: 'Download and install' };
+      const then = u.installOvernight
+        ? 'It downloads in the background, its signature is verified, and it installs overnight while this Mac is plugged in and idle, or now if you say so here.'
+        : 'It downloads in the background and its signature is verified before anything is installed. Nothing happens until you say so here.';
+      return { kicker: 'Update available', title: next, body: `${when}${then}`, tone: 'blue', pct: null, action: 'install', actionLabel: 'Download and install' };
     }
     case 'downloading':
-      return { kicker: 'Downloading', title: `Atlas ${u.available?.version ?? ''}`.trim(), body: 'Keep working. Atlas verifies the signature and installs when the download finishes.', tone: 'ink', pct: pctOf(u.downloaded, u.total), action: null, actionLabel: '' };
+      return { kicker: 'Downloading', title: next, body: 'Keep working. Atlas verifies the signature when the download finishes.', tone: 'ink', pct: pctOf(u.downloaded, u.total), action: null, actionLabel: '' };
+    case 'downloaded':
+      return {
+        kicker: 'Downloaded',
+        title: next,
+        body: u.installOvernight
+          ? 'Downloaded and verified. It installs overnight, between 2 and 5 AM, while this Mac is plugged in and idle. Or install it now.'
+          : 'Downloaded and verified. Nothing is installed until you say so here.',
+        tone: 'blue', pct: null, action: 'install', actionLabel: 'Install now',
+      };
+    case 'installing':
+      return { kicker: 'Installing', title: next, body: 'This takes a few seconds.', tone: 'ink', pct: null, action: null, actionLabel: '' };
     case 'installed':
-      return { kicker: 'Ready', title: 'Quit and reopen Atlas to finish', body: 'The signature was verified and the new version is staged. It starts the next time Atlas opens; conversations and memories carry over.', tone: 'ink', pct: null, action: null, actionLabel: '' };
+      return { kicker: 'Ready to install', title: 'Restart Atlas to finish', body: 'The signature was verified and the new version is in place. It runs from the next start; conversations and memories carry over.', tone: 'ink', pct: null, action: 'restart', actionLabel: 'Restart Atlas' };
     case 'error':
       return { kicker: 'Update check failed', title: 'Atlas keeps running', body: u.error ?? 'Unknown error. If you are offline, try again once you are connected.', tone: 'red', pct: null, action: 'check', actionLabel: 'Try again' };
     case 'idle':
     default:
-      return { kicker: 'Not checked yet', title: running, body: 'Atlas checks the release feed when this screen opens. Installing only ever happens when you approve it here.', tone: 'paper', pct: null, action: 'check', actionLabel: 'Check for updates' };
+      return {
+        kicker: 'Not checked yet', title: running,
+        body: u.installOvernight
+          ? 'Atlas checks the release feed when this screen opens. With Install overnight on, it installs while this Mac is plugged in and idle; otherwise only when you approve it here.'
+          : 'Atlas checks the release feed when this screen opens. Installing only ever happens when you approve it here.',
+        tone: 'paper', pct: null, action: 'check', actionLabel: 'Check for updates',
+      };
   }
 }

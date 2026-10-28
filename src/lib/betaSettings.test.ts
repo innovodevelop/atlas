@@ -150,7 +150,22 @@ describe('updateCard', () => {
   test('errors show the real message and offer a retry', () => {
     expect(updateCard({ ...base, phase: 'error', error: 'feed unreachable' })).toMatchObject({ tone: 'red', body: 'feed unreachable', action: 'check', actionLabel: 'Try again' });
   });
-  test('installed has no restart button, because there is no restart command', () => {
-    expect(updateCard({ ...base, phase: 'installed' })).toMatchObject({ tone: 'ink', action: null });
+  test('installed offers Restart Atlas (the app_restart command), and restarting says so', () => {
+    expect(updateCard({ ...base, phase: 'installed' })).toMatchObject({ tone: 'ink', title: 'Restart Atlas to finish', action: 'restart', actionLabel: 'Restart Atlas' });
+    expect(updateCard({ ...base, phase: 'installed', restarting: true })).toMatchObject({ title: 'Restarting…', action: null });
+  });
+  test('a background download waits for an install, now or overnight', () => {
+    const avail = { ...base, available: { version: '2.5.0', date: null } };
+    expect(updateCard({ ...avail, phase: 'downloaded' })).toMatchObject({ kicker: 'Downloaded', title: 'Atlas 2.5.0', action: 'install', actionLabel: 'Install now' });
+    expect(updateCard({ ...avail, phase: 'downloaded' }).body).toContain('Nothing is installed until you say so');
+    expect(updateCard({ ...avail, phase: 'downloaded', installOvernight: true }).body).toContain('between 2 and 5 AM');
+    expect(updateCard({ ...avail, phase: 'installing' })).toMatchObject({ kicker: 'Installing', action: null });
+  });
+  test('the copy only promises an approval-only install while Install overnight is off', () => {
+    expect(updateCard({ ...base, phase: 'idle' }).body).toContain('only ever happens when you approve it');
+    expect(updateCard({ ...base, phase: 'idle', installOvernight: true }).body).toContain('plugged in and idle');
+    const avail = { ...base, phase: 'available' as const, available: { version: '2.5.0', date: null } };
+    expect(updateCard(avail).body).toContain('Nothing happens until you say so here.');
+    expect(updateCard({ ...avail, installOvernight: true }).body).toContain('installs overnight');
   });
 });

@@ -31,6 +31,7 @@ import { TopBar, screenLabel } from './TopBar';
 import { BetaDock } from './BetaDock';
 import { TalkToAtlas } from './TalkToAtlas';
 import { useWindowActivity } from '@/hooks/useWindowActivity';
+import { useAutoUpdate } from '@/hooks/useAppUpdater';
 import { setSpheresWindowActive } from '@/lib/quickSphere';
 import { trackInputModality } from '@/lib/shellLayers';
 import '@/styles/beta/shell-a11y.css';
@@ -93,6 +94,10 @@ export function BetaShell({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => trackInputModality(), []);
+
+  // Settings → Software Update → "Automatic updates" runs here, on every
+  // screen; it does nothing while both of its switches are off.
+  useAutoUpdate();
 
   useEffect(() => { setSpheresWindowActive(active); }, [active]);
   // Leaving the shell (the flag turned off) must not leave the engine asleep.
