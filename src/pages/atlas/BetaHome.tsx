@@ -23,9 +23,8 @@ import { HomeGrid } from '@/components/atlas/home/HomeGrid';
 import { HomeWidget } from '@/components/atlas/home/widgets';
 import { EditHome } from '@/components/atlas/home/EditHome';
 import { AtlasIcon } from '@/components/atlas/AtlasIcon';
-import { AtlasExpanded } from '@/components/atlas-ui/AtlasExpanded';
+import { FullView } from '@/components/atlas/home/views/FullView';
 import { WIDGET_BY_ID, packStage, stageRowCount, type HomeSlot } from '@/lib/betaHome';
-import { openTalk } from '@/lib/talkBus';
 import { useBetaNavigate } from '@/lib/viewTransitions';
 import { isRoutable } from '@/surfaces';
 import type { AtlasExpandedKey } from './AtlasDashboard';
@@ -120,13 +119,7 @@ const BetaHome = () => {
           <button type="button" className="b-fullview-bar" onClick={() => setExpanded(null)} aria-label="Back to Home">
             <AtlasIcon name="chevron left" size={16} />Back to Home · Esc
           </button>
-          <AtlasExpanded
-            which={expanded}
-            onClose={() => setExpanded(null)}
-            onOpenDrawer={() => openTalk()}
-            sphereState={session.effectiveAtlasState}
-            audioLevel={session.audioLevel}
-          />
+          <FullView which={expanded} onClose={() => setExpanded(null)} />
         </div>
       ) : (
         <>
