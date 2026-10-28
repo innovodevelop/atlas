@@ -8,7 +8,10 @@
    outside the Beta shell (it is a consumer surface in the Workshop menu too). */
 
 .b-ck { display: flex; flex-direction: column; gap: var(--b-gap); padding: 14px var(--b-pad-page) 0; color: var(--b-ink); font-family: var(--b-font-ui); -webkit-font-smoothing: antialiased; }
-.b-ck button, .b-ck input { border: none; font: inherit; color: inherit; background: none; }
+/* Zero specificity: as `.b-ck button` (0,1,1) this reset beat every one-class
+   button rule, so Save, Allow notifications and Dismiss lost the .b-btn fill
+   and colour. Classed controls now win; bare ones still start blank. */
+:where(.b-ck) :where(button, input) { border: none; font: inherit; color: inherit; background: none; }
 .b-ck button { cursor: pointer; }
 .b-ck button:disabled { cursor: default; }
 .b-ck-h2 { margin: 0; font-family: var(--b-font-display); font-size: 16px; font-weight: 600; letter-spacing: -.02em; }

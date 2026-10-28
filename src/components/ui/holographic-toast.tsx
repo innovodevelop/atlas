@@ -77,6 +77,10 @@ export const HolographicToast = React.forwardRef<
   const iconBg = iconBgMap[safeVariant] || iconBgMap.default;
   
   const [progress, setProgress] = React.useState(100);
+  // The bar running out used to be all that happened: nothing dismissed the
+  // toast, so it sat on screen for the store's 1000 s removal delay.
+  const dismissRef = React.useRef(onDismiss);
+  dismissRef.current = onDismiss;
   
   React.useEffect(() => {
     if (duration <= 0) return;
@@ -89,6 +93,7 @@ export const HolographicToast = React.forwardRef<
       
       if (remaining <= 0) {
         clearInterval(interval);
+        dismissRef.current?.();
       }
     }, 50);
     

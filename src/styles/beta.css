@@ -106,8 +106,20 @@ html[data-ui="beta"] .alogo { display: none; }
 .b-topbar-bat.low b { background: var(--b-red); }
 .b-topbar-bat.charging b { background: var(--b-green); }
 .b-topbar-fixture { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--b-neutral); }
-@media (max-width: 900px) { .b-topbar-net, .b-topbar-screen { display: none; } }
-@media (max-width: 640px) { .b-topbar-devices { display: none; } }
+/* `.b-topbar-right .b-topbar-net`, not the bare class: `.b-topbar-btn` (status
+   panels, below) sets display at the same weight later in the file, and won. */
+@media (max-width: 900px) { .b-topbar-right .b-topbar-net, .b-topbar-screen { display: none; } }
+/* Phone width: the device stack keeps this Mac only — hiding the whole stack
+   left an empty button — the state pill keeps its dot (the word stays for
+   screen readers) and the bar gives back its outer padding. */
+@media (max-width: 640px) {
+  .b-topbar { gap: 6px; padding: 0 12px 0 16px; }
+  .b-topbar-word { margin-right: 4px; }
+  .b-topbar-state { padding: 0 12px; }
+  .b-topbar-state span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .b-topbar-devices span + span { display: none; }
+  .b-topbar-devices span { margin-right: 0; }
+}
 /* On an ink page the bar inverts: paper text, translucent pills, no shadow. */
 html[data-beta-tone="ink"] .b-topbar { color: var(--b-on-ink); }
 html[data-beta-tone="ink"] .b-topbar-state { background: rgba(249, 247, 244, .08); color: var(--b-on-ink-body); }
@@ -182,6 +194,12 @@ html[data-ui="beta"] .b-orb { view-transition-name: atlas-orb; }
 .b-band--tall { height: clamp(200px, 28vh, 300px); }
 .b-band--short { height: clamp(132px, 19vh, 190px); padding: 12px 18px 12px 8px; gap: 16px; }
 .b-band-sphere { position: relative; height: 100%; aspect-ratio: 1; flex: none; }
+/* Out of flow, so the canvas lends the box no intrinsic size. In flow, its
+   pixel width (CSS size × DPR) was the `auto` grid column's max-content: the
+   column grew to the page, the engine's ResizeObserver widened the canvas to
+   match, and at desktop width Home's sphere filled the band and pushed the
+   greeting off-screen. The box is sized by the band's height alone. */
+.b-band-sphere > canvas { position: absolute; inset: 0; }
 .b-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase; color: var(--b-neutral); }
 .b-title { margin: 0; font-family: var(--b-font-display); font-size: clamp(26px, 3.2vw, 44px); font-weight: 500; letter-spacing: -.045em; line-height: 1.04; text-wrap: pretty; }
 .b-greeting { margin: 0; font-family: var(--b-font-display); font-size: clamp(22px, 2.6vw, 34px); font-weight: 500; letter-spacing: -.042em; line-height: 1.12; }
@@ -297,6 +315,16 @@ textarea.b-input { height: 76px; padding: 12px 14px; resize: none; line-height: 
 
 /* Widget faces */
 .b-home-grid { animation: none; }
+/* Phone width: six columns of ~45 px fit no face, and a 3-column L squeezed
+   its rows over each other. One column, each widget full width at its own row
+   span. The packer writes spans and the row budget inline, so these win with
+   !important; the budget still decides which widgets are placed. */
+@media (max-width: 640px) {
+  .b-home-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: none !important; grid-auto-rows: 121px !important; }
+  .b-home-grid > * { grid-column: 1 / -1 !important; }
+  .b-home-bar { flex-wrap: wrap; row-gap: 6px; }
+  .b-home-bar .b-eyebrow { white-space: nowrap; }
+}
 .bw { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; border-radius: var(--b-r-card); background: var(--b-card); color: var(--b-ink); padding: 18px 20px; box-sizing: border-box; overflow: hidden; animation: b-pop .6s var(--b-spring) both; }
 .bw.clickable { cursor: pointer; transition: background .2s, transform .35s var(--b-spring); }
 .bw.clickable:hover { background: #fdfbf7; }
@@ -479,6 +507,18 @@ textarea.b-input { height: 76px; padding: 12px 14px; resize: none; line-height: 
 .b-editor-add .b-btn:disabled { opacity: .55; cursor: default; }
 .b-editor-nohits { margin: 0; font-size: 12.5px; color: var(--b-ink2); line-height: 1.5; }
 @media (max-width: 980px) { .b-editor-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; } .b-editor-side { max-height: 40vh; } }
+/* Phone width: three fixed panels left the widget grid a ~150 px slot and
+   its cards half a phone wide. The editor scrolls as one page instead, and
+   the grid is a list: one column, each card full width and as tall as its
+   contents, its size still on its S / M / L buttons (the spans are inline,
+   as on Home). */
+@media (max-width: 640px) {
+  .b-editor { overflow-y: auto; padding: 12px 16px 20px; }
+  .b-editor-body { flex: none; display: flex; flex-direction: column; }
+  .b-editor-main, .b-editor-side { overflow: visible; max-height: none; }
+  .b-editor-grid { grid-template-columns: minmax(0, 1fr); grid-auto-rows: auto; }
+  .b-editor-grid > * { grid-column: 1 / -1 !important; grid-row: auto !important; }
+}
 
 /* Status panels under the top bar */
 .b-topbar-right { gap: 4px; padding: 0 10px 0 6px; }
@@ -546,6 +586,15 @@ html[data-ui="beta"] .beta-page:has(> .b-mail) { padding-bottom: 0; }
 .b-mail--mid .b-mail-search { width: 220px; }
 .b-mail--narrow .b-mail-search { width: 150px; }
 .b-mail--stacked .b-mail-search { display: none; }
+/* Phone width: beside a 120 px sphere and the Write button the hero kept
+   ~100 px for its words; the greeting broke over three lines and the eyebrow
+   and intro ellipsised to a word. A smaller sphere, and Write on its own row. */
+@media (max-width: 640px) {
+  .b-mail { padding: 10px 16px 96px; }
+  .b-mail-hero { height: auto; flex-wrap: wrap; gap: 8px 14px; padding: 10px 16px 14px 6px; }
+  .b-mail-hero .b-band-sphere { height: 84px; }
+  .b-mail-hero-tools { flex: 1 1 100%; justify-content: flex-end; }
+}
 .b-mail-lanechips { flex: none; display: flex; gap: 6px; overflow-x: auto; padding: 0 2px; }
 .b-mail-lanechips .b-chip { flex: none; height: 32px; font-size: 12.5px; }
 .b-mail-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: 260px 380px minmax(0, 1fr); gap: var(--b-gap); }
@@ -774,6 +823,14 @@ html[data-ui="beta"] .beta-page:has(> .b-mail) { padding-bottom: 0; }
 .b-link { padding: 0; background: none; color: var(--b-blue); font: inherit; font-weight: 600; cursor: pointer; }
 .b-link:hover { color: var(--b-blue-deep); }
 @media (max-width: 1000px) { .b-voice-body { grid-template-columns: minmax(0, 1fr); } .b-voice-band { height: auto; min-height: 240px; } }
+/* Phone width: beside the sphere the text column was ~150 px, the reply
+   clamped after four words and Back · Esc ran off the screen. Sphere above,
+   text under it, and the top row wraps. */
+@media (max-width: 640px) {
+  .b-voice-band { grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 14px 18px 18px; }
+  .b-voice-band .b-band-sphere { justify-self: center; }
+  .b-voice-top { flex-wrap: wrap; }
+}
 
 /* Screen heroes */
 .b-hero { position: relative; flex: none; border-radius: 36px; background: var(--b-panel); color: var(--b-ink); padding: clamp(22px, 3vw, 40px); display: flex; flex-wrap: wrap; align-items: center; gap: 28px; overflow: hidden; margin: 14px var(--b-pad-page) 0; box-sizing: border-box; animation: b-pop .6s var(--b-spring) both; }

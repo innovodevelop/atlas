@@ -145,6 +145,10 @@ html[data-beta-dock="guide"] { --b-dk-clear: 80px; }
 html[data-beta-dock="lens"], html[data-beta-dock="rail"], html[data-beta-dock="capsule"], html[data-beta-dock="lane"] { --b-dk-clear: 88px; }
 html[data-beta-dock="hub"] { --b-dk-clear: 100px; }
 html[data-beta-dock="status"] { --b-dk-clear: 146px; }
+/* The screens that fit the window keep their own bottom padding, sized for
+   the 80–100 px docks; under the 146 px status dock their last rows (the mail
+   list, a settings card, the queue, the page) sat behind it. */
+html[data-ui="beta"][data-beta-dock="status"] :is(.b-mail, .b-st, .b-mu, .b-br) { padding-bottom: calc(var(--b-dk-clear) + 12px); }
 
 @media (max-width: 760px) {
   /* A centred dock needs the whole bottom edge here, and the 128 px Talk orb

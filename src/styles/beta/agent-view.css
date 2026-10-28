@@ -162,6 +162,13 @@ html[data-ui="beta"] .beta-page:has(> .b-ag) { padding-bottom: 0; background: va
   .b-ag-plan, .b-ag-log { overflow: visible; }
 }
 @media (max-width: 819px) { .b-ag-hero { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 640px) {
+  /* With nothing running the strip holds one card, and started beside the
+     eyebrow it was cut in half at the screen edge. It wraps under it instead. */
+  .b-ag-aside:has(> .b-ag-aside-empty) { flex-wrap: wrap; overflow-x: visible; }
+  .b-ag-aside:has(> .b-ag-aside-empty) > .b-ag-aside-empty { width: 100%; }
+  .b-ag-aside:has(> .b-ag-aside-empty) > .b-ag-aside-foot { flex: 1 1 100%; min-width: 0; }
+}
 @media (max-width: 480px) {
   .b-ag { padding-left: 16px; padding-right: 16px; }
   .b-ag-line { grid-template-columns: 56px 52px minmax(0, 1fr); gap: 8px; }

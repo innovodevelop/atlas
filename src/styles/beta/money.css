@@ -7,7 +7,10 @@
    Values are the design's inline styles mapped to the --b-* tokens. Borderless:
    depth is the paper scale, and every control sets border:none itself. */
 
-.b-money button, .b-money input, .b-money select { border: none; font: inherit; color: inherit; }
+/* Zero specificity, like Clock's: `.b-money button` (0,1,1) beat .b-btn--paper
+   and .b-btn--primary, so "Import a CSV" drew paper text on a paper pill in the
+   hero and ink text on blue below it. */
+:where(.b-money) :where(button, input, select) { border: none; font: inherit; color: inherit; }
 .b-money button { cursor: pointer; }
 .b-money button:disabled { cursor: default; opacity: .55; }
 
