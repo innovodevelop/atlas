@@ -66,8 +66,11 @@ export function ringOptions(list: SpeakerList | null, current: RingTarget | null
     missing: false,
   }));
   const known = current && speakers.some((o) => o.target?.id === current.id);
-  const gone: RingOption[] = current && list && !known
-    ? [{ target: current, label: current.name, sub: 'no longer in Home Assistant', missing: true }]
+  // Before the list arrives (or where it cannot, outside the Mac app) the saved
+  // speaker is still shown, picked, so the editor never looks as if it had
+  // quietly gone back to This Mac.
+  const gone: RingOption[] = current && !known
+    ? [{ target: current, label: current.name, sub: list ? 'no longer in Home Assistant' : null, missing: !!list }]
     : [];
   return [mac, ...speakers, ...gone];
 }

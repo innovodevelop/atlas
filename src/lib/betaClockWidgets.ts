@@ -25,8 +25,8 @@ export interface ElsewhereFace {
   cities: CityRow[];
   /** All saved cities, for the meta line. */
   total: number;
-  /** "Wake up · 07:30", or null with no alarm on. */
-  alarm: string | null;
+  /** The next alarm (its label, and when: "07:30" or "Tue 07:30"), or null with none on. */
+  alarm: { label: string; when: string } | null;
   /** The timer, or the countdown when no timer runs; null when neither does. */
   running: { label: string; value: string; over: boolean } | null;
 }
@@ -46,7 +46,7 @@ export function elsewhere(prefs: Pick<ClockPrefs, 'cities' | 'alarms' | 'timer' 
   return {
     cities: rows,
     total: prefs.cities.length,
-    alarm: next ? `${next.alarm.label || 'Alarm'} · ${whenLabel(tz, next.at, nowMs)}` : null,
+    alarm: next ? { label: next.alarm.label || 'Alarm', when: whenLabel(tz, next.at, nowMs) } : null,
     running,
   };
 }

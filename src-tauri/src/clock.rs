@@ -60,16 +60,11 @@ fn now_ms() -> u64 {
 /// daylight-saving change in between. Anything longer is a mistake, not a wish.
 const AWAKE_MAX_SECS: u64 = 8 * 24 * 3600 + 3600;
 
-struct Hold {
-    child: Child,
-    /// The instant the webview asked for, echoed back so it can tell its own
-    /// hold from a stale one without converting through seconds.
-    until_ms: u64,
-}
+/// The one caffeinate child holding the Mac awake, if any. The webview keeps
+/// the instant it asked for; here only the process matters.
+static AWAKE: OnceLock<Mutex<Option<Child>>> = OnceLock::new();
 
-static AWAKE: OnceLock<Mutex<Option<Hold>>> = OnceLock::new();
-
-fn awake() -> &'static Mutex<Option<Hold>> {
+fn awake() -> &'static Mutex<Option<Child>> {
     AWAKE.get_or_init(|| Mutex::new(None))
 }
 
@@ -91,25 +86,12 @@ pub fn hold_seconds(until_ms: f64, now_ms: u64) -> Result<u64, String> {
 }
 
 /// End a hold: kill caffeinate and reap it so no zombie is left behind.
-fn release(slot: &mut Option<Hold>) {
-    if let Some(mut hold) = slot.take() {
-        let _ = hold.child.kill();
-        let _ = hold.child.wait();
-    }
-}
-
-/// The hold that is really in force. A caffeinate whose timeout has run out
-/// has exited on its own; it is reaped here and no longer counts.
-fn live(slot: &mut Option<Hold>) -> Option<u64> {
-    let running = match slot.as_mut() {
-        Some(hold) => matches!(hold.child.try_wait(), Ok(None)),
-        None => return None,
-    };
-    if running {
-        slot.as_ref().map(|h| h.until_ms)
-    } else {
-        release(slot);
-        None
+/// A caffeinate whose timeout already ran out has exited on its own; killing
+/// it then fails harmlessly and `wait` reaps it.
+fn release(slot: &mut Option<Child>) {
+    if let Some(mut child) = slot.take() {
+        let _ = child.kill();
+        let _ = child.wait();
     }
 }
 
@@ -118,7 +100,9 @@ fn live(slot: &mut Option<Hold>) -> Option<u64> {
 #[tauri::command(async)]
 pub fn clock_keep_awake(until_ms: f64) -> Result<Value, String> {
     let secs = hold_seconds(until_ms, now_ms())?;
-    let mut slot = awake().lock().map_err(|_| "the keep-awake state is unavailable".to_string())?;
+    let mut slot = awake()
+        .lock()
+        .map_err(|_| "the keep-awake state is unavailable".to_string())?;
     release(&mut slot);
     // Arguments one by one, never through a shell: `secs` and the pid are the
     // only inputs, and both are numbers this function produced itself.
@@ -132,31 +116,26 @@ pub fn clock_keep_awake(until_ms: f64) -> Result<Value, String> {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
-        .map_err(|e| format!("macOS would not start caffeinate, so the Mac is not being kept awake: {e}"))?;
-    let until = until_ms as u64;
-    *slot = Some(Hold { child, until_ms: until });
+        .map_err(|e| {
+            format!("macOS would not start caffeinate, so the Mac is not being kept awake: {e}")
+        })?;
+    *slot = Some(child);
     log::info!("[clock] keeping the Mac awake for {secs} s");
-    Ok(json!({ "active": true, "untilMs": until }))
+    Ok(json!({ "active": true, "untilMs": until_ms as u64 }))
 }
 
 /// Let the Mac sleep again. Releasing when nothing is held is success.
 #[tauri::command(async)]
 pub fn clock_release_awake() -> Result<Value, String> {
-    let mut slot = awake().lock().map_err(|_| "the keep-awake state is unavailable".to_string())?;
+    let mut slot = awake()
+        .lock()
+        .map_err(|_| "the keep-awake state is unavailable".to_string())?;
     let had = slot.is_some();
     release(&mut slot);
     if had {
         log::info!("[clock] released the keep-awake hold");
     }
     Ok(json!({ "active": false, "untilMs": Value::Null }))
-}
-
-/// Whether a hold is in force right now, and until when.
-#[tauri::command(async)]
-pub fn clock_awake_status() -> Result<Value, String> {
-    let mut slot = awake().lock().map_err(|_| "the keep-awake state is unavailable".to_string())?;
-    let until = live(&mut slot);
-    Ok(json!({ "active": until.is_some(), "untilMs": until }))
 }
 
 // ---------------------------------------------------------------------------
@@ -215,7 +194,11 @@ pub fn clock_speakers(state: State<'_, DbState>, user_id: String) -> Result<Valu
 /// printable. Pure, so the bounds are tested.
 pub fn speech(message: &str) -> Result<String, String> {
     let words: Vec<&str> = message.split_whitespace().collect();
-    let joined: String = words.join(" ").chars().filter(|c| !c.is_control()).collect();
+    let joined: String = words
+        .join(" ")
+        .chars()
+        .filter(|c| !c.is_control())
+        .collect();
     if joined.is_empty() {
         return Err("there is nothing to say on the speaker".into());
     }
@@ -242,9 +225,7 @@ fn ha_error(e: ureq::Error) -> String {
             "Home Assistant rejected Atlas' token. Link the bridge again in Smart Home.".into()
         }
         ureq::Error::Status(code, _) => format!("Home Assistant answered with an error ({code})."),
-        ureq::Error::Transport(_) => {
-            "Atlas could not reach Home Assistant on the network.".into()
-        }
+        ureq::Error::Transport(_) => "Atlas could not reach Home Assistant on the network.".into(),
     }
 }
 
@@ -319,10 +300,13 @@ pub fn clock_ring_speaker(
         .as_deref()
         .map(|u| u.trim_end_matches('/'))
         .filter(|u| !u.is_empty())
-        .ok_or_else(|| "the Home Assistant bridge has no address stored. Link it again.".to_string())?
+        .ok_or_else(|| {
+            "the Home Assistant bridge has no address stored. Link it again.".to_string()
+        })?
         .to_string();
-    let token = crate::home::keys::ha_token()
-        .ok_or_else(|| "Atlas has no Home Assistant token in the Keychain. Link the bridge again.".to_string())?;
+    let token = crate::home::keys::ha_token().ok_or_else(|| {
+        "Atlas has no Home Assistant token in the Keychain. Link the bridge again.".to_string()
+    })?;
     let engine = tts_engine(&base, &token)?;
     let sent = crate::http::agent()
         .post(&format!("{base}/api/services/tts/speak"))
@@ -383,7 +367,10 @@ pub fn run_voice_command(app: &AppHandle, action: &str, args: Value) -> Result<V
         .lock()
         .map_err(|_| "the Clock bridge is unavailable".to_string())?
         .insert(id.clone(), tx);
-    let emitted = app.emit("clock:command", json!({ "id": id, "action": action, "args": args }));
+    let emitted = app.emit(
+        "clock:command",
+        json!({ "id": id, "action": action, "args": args }),
+    );
     let answer = match emitted {
         Ok(()) => rx.recv_timeout(VOICE_WAIT).ok(),
         Err(e) => {
@@ -412,13 +399,22 @@ pub fn run_voice_command(app: &AppHandle, action: &str, args: Value) -> Result<V
 /// The store's answer to one `clock:command`. A late or unknown id is ignored:
 /// the tool call it belonged to has already reported that it got no answer.
 #[tauri::command(async)]
-pub fn clock_command_reply(id: String, ok: bool, message: String, data: Option<Value>) -> Result<(), String> {
+pub fn clock_command_reply(
+    id: String,
+    ok: bool,
+    message: String,
+    data: Option<Value>,
+) -> Result<(), String> {
     let tx = pending()
         .lock()
         .map_err(|_| "the Clock bridge is unavailable".to_string())?
         .remove(&id);
     if let Some(tx) = tx {
-        let message: String = message.chars().filter(|c| !c.is_control()).take(500).collect();
+        let message: String = message
+            .chars()
+            .filter(|c| !c.is_control())
+            .take(500)
+            .collect();
         let _ = tx.send(Reply { ok, message, data });
     }
     Ok(())
@@ -432,18 +428,27 @@ mod tests {
     fn a_hold_is_rounded_up_and_bounded() {
         assert_eq!(hold_seconds(10_500.0, 10_000), Ok(1));
         assert_eq!(hold_seconds(70_001.0, 10_000), Ok(61));
-        assert!(hold_seconds(9_000.0, 10_000).is_err(), "a moment that has passed");
+        assert!(
+            hold_seconds(9_000.0, 10_000).is_err(),
+            "a moment that has passed"
+        );
         assert!(hold_seconds(f64::NAN, 10_000).is_err());
         assert!(hold_seconds(f64::INFINITY, 10_000).is_err());
         let nine_days = 9.0 * 24.0 * 3600.0 * 1000.0;
-        assert!(hold_seconds(nine_days, 0).is_err(), "longer than the store ever looks ahead");
+        assert!(
+            hold_seconds(nine_days, 0).is_err(),
+            "longer than the store ever looks ahead"
+        );
         let seven_days = 7.0 * 24.0 * 3600.0 * 1000.0;
         assert!(hold_seconds(seven_days, 0).is_ok());
     }
 
     #[test]
     fn speech_is_one_short_printable_line() {
-        assert_eq!(speech("  Wake up.\n It is 07:30.  ").unwrap(), "Wake up. It is 07:30.");
+        assert_eq!(
+            speech("  Wake up.\n It is 07:30.  ").unwrap(),
+            "Wake up. It is 07:30."
+        );
         assert!(speech("   ").is_err());
         assert_eq!(speech(&"a".repeat(500)).unwrap().len(), 200);
         assert_eq!(speech("bell\u{7} rings").unwrap(), "bell rings");
@@ -457,7 +462,10 @@ mod tests {
             { "entity_id": "tts.google_translate_en_com" },
             { "entity_id": "tts." },
         ]);
-        assert_eq!(pick_tts(&states).as_deref(), Some("tts.google_translate_en_com"));
+        assert_eq!(
+            pick_tts(&states).as_deref(),
+            Some("tts.google_translate_en_com")
+        );
         assert_eq!(pick_tts(&json!([{ "entity_id": "light.lamp" }])), None);
         assert_eq!(pick_tts(&json!({})), None);
     }

@@ -561,7 +561,6 @@ pub fn run() {
       // caffeinate, one calls Home Assistant on the LAN.
       clock::clock_keep_awake,
       clock::clock_release_awake,
-      clock::clock_awake_status,
       clock::clock_speakers,
       clock::clock_ring_speaker,
       clock::clock_command_reply,

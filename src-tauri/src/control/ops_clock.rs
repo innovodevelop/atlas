@@ -28,7 +28,15 @@ const SNOOZE_MAX: f64 = 30.0;
 
 /// Weekday words the store understands, normalised to their first three letters.
 const DAYS: &[&str] = &["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
-const FULL_DAYS: &[&str] = &["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+const FULL_DAYS: &[&str] = &[
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+];
 
 pub fn set_alarm(app: &AppHandle, args: &Value, _ctx: &Ctx) -> Result<Value, String> {
     let clean = set_alarm_args(args)?;
@@ -153,7 +161,9 @@ mod tests {
         assert_eq!(normalise_time("07:00").as_deref(), Some("07:00"));
         assert_eq!(normalise_time("7:05").as_deref(), Some("07:05"));
         assert_eq!(normalise_time(" 19:30 ").as_deref(), Some("19:30"));
-        for bad in ["7", "24:00", "07:60", "7:5", "seven", "07:00:00", "-1:00", "", "1a:00"] {
+        for bad in [
+            "7", "24:00", "07:60", "7:5", "seven", "07:00:00", "-1:00", "", "1a:00",
+        ] {
             assert_eq!(normalise_time(bad), None, "{bad}");
         }
     }
@@ -164,7 +174,10 @@ mod tests {
             "time": "6:45", "label": "  Run ", "days": ["Monday", "wed", "WED", "fri"], "user_id": "someone",
         }))
         .unwrap();
-        assert_eq!(out, json!({ "time": "06:45", "label": "Run", "days": ["mon", "wed", "fri"] }));
+        assert_eq!(
+            out,
+            json!({ "time": "06:45", "label": "Run", "days": ["mon", "wed", "fri"] })
+        );
     }
 
     #[test]
@@ -176,13 +189,19 @@ mod tests {
         assert!(set_alarm_args(&json!({ "time": "07:00", "label": 7 })).is_err());
         assert!(set_alarm_args(&json!({ "time": "07:00", "label": "x".repeat(61) })).is_err());
         // An empty label is no label: the store names it "Alarm".
-        assert_eq!(set_alarm_args(&json!({ "time": "07:00", "label": " " })).unwrap(), json!({ "time": "07:00" }));
+        assert_eq!(
+            set_alarm_args(&json!({ "time": "07:00", "label": " " })).unwrap(),
+            json!({ "time": "07:00" })
+        );
     }
 
     #[test]
     fn snooze_minutes_are_bounded() {
         assert_eq!(snooze_args(&json!({})).unwrap(), json!({}));
-        assert_eq!(snooze_args(&json!({ "minutes": 10 })).unwrap(), json!({ "minutes": 10.0 }));
+        assert_eq!(
+            snooze_args(&json!({ "minutes": 10 })).unwrap(),
+            json!({ "minutes": 10.0 })
+        );
         assert!(snooze_args(&json!({ "minutes": 0 })).is_err());
         assert!(snooze_args(&json!({ "minutes": 45 })).is_err());
         assert!(snooze_args(&json!({ "minutes": "ten" })).is_err());
