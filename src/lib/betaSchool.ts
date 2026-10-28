@@ -5,10 +5,12 @@
  * pure and tested here (betaSchool.test.ts), rendered by BetaSchool.tsx and
  * src/components/atlas/school/*.
  *
- * Atlas has no school connector: no Lectio, LearnIT or itslearning feed. So
- * everything on the screen is the student's own — cards they write (or let
- * Atlas draft from notes they paste and then keep), a plan they fill in, a
- * sheet they type, documents they write — kept on this Mac by
+ * What the school sends — Lectio's schedule, LearnIT's assignments,
+ * materials, messages and grades — is read in betaSchoolIcs.ts and
+ * betaSchoolMoodle.ts and cached beside this store, never inside it. What is
+ * here is the student's own — cards they write (or let Atlas draft and then
+ * keep), a plan they fill in, exams they add, what Atlas prepared and they
+ * accepted, a sheet they type, documents they write — kept on this Mac by
  * betaSchoolStore.ts. Nothing here invents a lesson, a grade or an exam.
  */
 
@@ -491,7 +493,12 @@ export interface Doc {
   max: number | null;
   /** How many Atlas rewrites the student has accepted into this document — the honesty line counts them. */
   atlasEdits: number;
+  /** Atlas's margin notes, each anchored to the section it is about (see betaSchoolSections.ts). */
+  notes: MarginNote[];
 }
+
+/** A question or pointer in the margin; `anchor` is the heading of its section ('' before the first heading). */
+export interface MarginNote { id: string; text: string; anchor: string | null }
 
 export function wordCount(text: string): number {
   const t = text.trim();
@@ -534,21 +541,10 @@ export function cleanRewrite(text: string): string {
   return (q ? q[1] : t).trim();
 }
 
-export function marginPrompt(title: string, body: string): string {
-  return [
-    "You are Atlas, reading a student's draft as a writing tutor.",
-    'Leave at most three notes in the margin: questions or pointers that help them improve it themselves.',
-    'Never rewrite their sentences and never suggest replacement text.',
-    'Write each note on its own line starting with "- ". Nothing else.',
-    'Write in the language the draft is written in.',
-    '',
-    `Title: ${title.trim() || '(untitled)'}`,
-    '',
-    body.trim(),
-  ].join('\n');
-}
-
-/** The margin notes out of the brain's answer: bullet lines, or else its questions. */
+/**
+ * Margin notes out of the brain's answer: bullet lines, or else its questions.
+ * The prompt that asks for them anchors each to a section (betaSchoolAtlas.ts).
+ */
 export function parseNotes(text: string, max = 3): string[] {
   const bullets = text.split(/\r?\n/).map((l) => l.match(/^\s*(?:[-*•]|\d+[.)])\s+(.+)$/)?.[1]?.replace(/\*\*/g, '').trim()).filter((l): l is string => !!l);
   if (bullets.length) return bullets.slice(0, max);
@@ -835,6 +831,33 @@ export function sheetPrompt(ask: SheetAsk, sheet: string, selected: { ref: strin
 
 // ── What is stored, read back defensively ────────────────────────────────────
 
+// ── Exams, preparations and what the tutor saw ──────────────────────────────
+
+export type ExamKind = 'written' | 'oral' | 'exam';
+/** An exam the student added; Lectio's come from the schedule and are not stored (betaSchoolExams.ts). */
+export interface OwnExam { id: string; title: string; kind: ExamKind; at: number }
+
+export interface PreparedStep { text: string; done: boolean }
+/**
+ * An assignment Atlas laid out and the student accepted: the steps, and where
+ * the sessions and cards went. `id` names the source — `moodle:<id>` or
+ * `own:<deadline id>` — so an assignment is prepared once.
+ */
+export interface Prepared {
+  id: string;
+  title: string;
+  course: string;
+  due: number | null;
+  steps: PreparedStep[];
+  deadlineId: string | null;
+  deckId: string | null;
+  at: number;
+}
+
+export interface UnderstoodItem { text: string; ok: boolean }
+/** What the student showed they understood in one problem on one day, from their own turns. */
+export interface UnderstoodEntry { day: string; threadId: string; items: UnderstoodItem[]; at: number }
+
 export interface SchoolState {
   decks: Deck[];
   cards: Card[];
@@ -847,10 +870,24 @@ export interface SchoolState {
   docs: Doc[];
   sheet: Record<string, string>;
   focus: FocusState;
+  exams: OwnExam[];
+  /** Decks linked to an exam, by exam key (`own:<id>` or `lectio:<lesson id>`): its topics. */
+  examDecks: Record<string, string[]>;
+  prepared: Prepared[];
+  /** Assignment keys the student has seen in the list, so the rest can be marked new. */
+  seen: string[];
+  /**
+   * LearnIT assignments the student marked handed in. Moodle would say so
+   * itself only through a submission call School does not make; the student's
+   * own deadlines keep this on `Deadline.done`.
+   */
+  handedIn: string[];
+  understood: UnderstoodEntry[];
 }
 
 export const EMPTY_SCHOOL: SchoolState = {
   decks: [], cards: [], reviewLog: {}, subjects: [], deadlines: [], sessions: [], tutor: [], docs: [], sheet: {}, focus: FRESH_FOCUS,
+  exams: [], examDecks: {}, prepared: [], seen: [], handedIn: [], understood: [],
 };
 
 type Obj = Record<string, unknown>;
@@ -933,7 +970,11 @@ export function parseSchool(raw: string | null): SchoolState {
   const docs = each(data.docs, (o): Doc | null => {
     const id = str(o.id, 80), title = str(o.title, 300), body = str(o.body, 400_000), updated = num(o.updated);
     if (!id || title === null || body === null || updated === null) return null;
-    return { id, title, body, updated, min: num(o.min), max: num(o.max), atlasEdits: Math.max(0, num(o.atlasEdits) ?? 0) };
+    const notes = each(o.notes, (n): MarginNote | null => {
+      const nid = str(n.id, 80), text = str(n.text, 2000);
+      return nid && text ? { id: nid, text, anchor: typeof n.anchor === 'string' ? n.anchor.slice(0, 300) : null } : null;
+    }, 12);
+    return { id, title, body, updated, min: num(o.min), max: num(o.max), atlasEdits: Math.max(0, num(o.atlasEdits) ?? 0), notes };
   }, 200);
   const sheet: Record<string, string> = {};
   if (isObj(data.sheet)) {
@@ -947,5 +988,37 @@ export function parseSchool(raw: string | null): SchoolState {
     const left = num(data.focus.left), endsAt = num(data.focus.endsAt);
     focus = { endsAt, left: left === null ? FOCUS_SECONDS : Math.min(FOCUS_SECONDS, Math.max(0, left)) };
   }
-  return { decks, cards, reviewLog, subjects, deadlines, sessions, tutor, docs, sheet, focus };
+  const exams = each(data.exams, (o): OwnExam | null => {
+    const id = str(o.id, 80), title = str(o.title, 300), at = num(o.at);
+    const kind: ExamKind = o.kind === 'written' || o.kind === 'oral' ? o.kind : 'exam';
+    return id && title && at !== null ? { id, title, kind, at } : null;
+  }, 200);
+  const examDecks: Record<string, string[]> = {};
+  if (isObj(data.examDecks)) {
+    for (const [k, v] of Object.entries(data.examDecks).slice(0, 400)) {
+      const ids = arr(v).filter((x): x is string => typeof x === 'string' && deckIds.has(x)).slice(0, 40);
+      if (k.length <= 200 && ids.length) examDecks[k] = ids;
+    }
+  }
+  const prepared = each(data.prepared, (o): Prepared | null => {
+    const id = str(o.id, 120), title = str(o.title, 400), at = num(o.at);
+    if (!id || !title || at === null) return null;
+    const steps = each(o.steps, (x): PreparedStep | null => {
+      const text = str(x.text, 400);
+      return text ? { text, done: x.done === true } : null;
+    }, 20);
+    return { id, title, course: str(o.course, 300) ?? '', due: num(o.due), steps, deadlineId: nullableStr(o.deadlineId), deckId: nullableStr(o.deckId), at };
+  }, 500);
+  const seen = arr(data.seen).filter((x): x is string => typeof x === 'string' && x.length <= 120).slice(-2000);
+  const handedIn = arr(data.handedIn).filter((x): x is string => typeof x === 'string' && x.length <= 120).slice(-2000);
+  const understood = each(data.understood, (o): UnderstoodEntry | null => {
+    const day = str(o.day, 10), threadId = str(o.threadId, 80), at = num(o.at);
+    if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day) || !threadId || at === null) return null;
+    const items = each(o.items, (x): UnderstoodItem | null => {
+      const text = str(x.text, 200);
+      return text ? { text, ok: x.ok === true } : null;
+    }, 8);
+    return { day, threadId, items, at };
+  }, 400);
+  return { decks, cards, reviewLog, subjects, deadlines, sessions, tutor, docs, sheet, focus, exams, examDecks, prepared, seen, handedIn, understood };
 }

@@ -13,6 +13,12 @@
  * follows along through the state bus — thinking while it waits, a short
  * success or alert after.
  *
+ * `useSchoolSyncLoop` keeps the school connections fresh while School is
+ * open: it asks Rust what is connected, refreshes Lectio and LearnIT when the
+ * screen opens (unless they were fetched a moment ago), and again once their
+ * cache is an hour old — checked every few minutes, and only while the window
+ * is in use, so a School screen left open in the background fetches nothing.
+ *
  * Two asks can run at once (Writing has a rewrite and margin notes), so the
  * sphere's state is counted, not toggled: it stays thinking until the last
  * School ask settles. And the screen only ever puts back a state it set
@@ -22,6 +28,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { askAtlas } from '@/lib/askAtlas';
 import { getAtlasState, publishAtlasState } from '@/lib/atlasStateBus';
+import { loadConnections, refreshLectio, refreshMoodle, staleness } from '@/lib/betaSchoolSync';
 import { useWindowActivity } from '@/hooks/useWindowActivity';
 
 export function useNow(intervalMs: number, enabled = true): number {
@@ -34,6 +41,33 @@ export function useNow(intervalMs: number, enabled = true): number {
     return () => window.clearInterval(t);
   }, [intervalMs, enabled, active]);
   return now;
+}
+
+const MINUTE = 60_000;
+const HOURLY = 60 * MINUTE;
+
+/** Refreshes each connection whose cache is at least `lectioAge` / `moodleAge` old. */
+function refreshStale(lectioAge: number, moodleAge: number): void {
+  const age = staleness(Date.now());
+  if (age.lectio !== null && age.lectio >= lectioAge) void refreshLectio();
+  if (age.moodle !== null && age.moodle >= moodleAge) void refreshMoodle();
+}
+
+export function useSchoolSyncLoop(): void {
+  const active = useWindowActivity();
+  // On open: what is connected, then a refresh unless one just ran.
+  useEffect(() => {
+    let live = true;
+    void loadConnections().then(() => { if (live) refreshStale(2 * MINUTE, 10 * MINUTE); });
+    return () => { live = false; };
+  }, []);
+  // Hourly while open and in use; coming back after a long while counts.
+  useEffect(() => {
+    if (!active) return;
+    refreshStale(HOURLY, HOURLY);
+    const t = window.setInterval(() => refreshStale(HOURLY, HOURLY), 5 * MINUTE);
+    return () => window.clearInterval(t);
+  }, [active]);
 }
 
 /** The page's toast: a line of text, with Undo when `undo` is given. */
