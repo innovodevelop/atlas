@@ -43,6 +43,7 @@ import {
 } from '@/lib/betaSettings';
 import { MODELS, VOICES } from '@/components/atlas-health/VoiceSettingsPanel';
 import { MemoryPrivacyPanel } from '@/components/atlas-health/MemoryPrivacyPanel';
+import { DockStylePicker } from '@/components/atlas/DockStylePicker';
 import { VeilSphere } from '@/components/atlas/VeilSphere';
 import { AtlasIcon } from '@/components/atlas/AtlasIcon';
 import type { IconName } from '@/components/atlas/icons';
@@ -816,12 +817,20 @@ function BetaSection() {
     setBetaUi(false, { reload: true });
   };
   return (
-    <section className="b-st-card" aria-label="Interface">
-      <CardHead title="Interface" sub="The redesign ships behind the beta_ui flag while it is finished screen by screen. Switching back reloads the window; nothing you have stored changes, and ?beta=1 brings you here again." />
-      <Row emphasis icon="sparkle" chip="on" title="Beta UI" sub="On — you are using the redesigned Atlas." subTone="blue">
-        <button type="button" className="b-btn b-st-rowb b-st-paper" onClick={back}>Back to the Workshop UI</button>
-      </Row>
-    </section>
+    <>
+      <section className="b-st-card" aria-label="Interface">
+        <CardHead title="Interface" sub="The redesign ships behind the beta_ui flag while it is finished screen by screen. Switching back reloads the window; nothing you have stored changes, and ?beta=1 brings you here again." />
+        <Row emphasis icon="sparkle" chip="on" title="Beta UI" sub="On — you are using the redesigned Atlas." subTone="blue">
+          <button type="button" className="b-btn b-st-rowb b-st-paper" onClick={back}>Back to the Workshop UI</button>
+        </Row>
+      </section>
+      {/* The final dock is chosen here, in the app, rather than in the design file:
+          picking a style changes the dock below at once (no reload). */}
+      <section className="b-st-card" aria-label="Dock">
+        <CardHead title="Dock" sub="The guideline dock and the six directions from the Dock Explorations, all live. The dock changes the moment you pick one, so try each across a few screens; the choice is kept on this Mac until the final dock is decided." />
+        <DockStylePicker />
+      </section>
+    </>
   );
 }
 

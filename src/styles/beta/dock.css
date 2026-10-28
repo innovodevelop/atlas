@@ -1,0 +1,265 @@
+/* ── Phase 8: the dock explorations, as styles of the Beta dock ───────────────
+   Source: Atlas Dock Explorations.dc.html, boards 3a Lens, 3b Sphere hub,
+   3c Breadcrumb rail, 3d Capsule, 3e Colour lane, 3f Status dock. Values are
+   the boards' (44 px items, 6 px dock padding, 76 px hub sphere, 180 px rail,
+   56 px capsule, 96 px lane items, 70 px status tiles); colours are the --b-*
+   tokens. The guideline dock (§09) keeps its rules in beta.css.
+
+   Every class is prefixed b-dk-. The rules that reach outside the dock — the
+   rail's page gutter and the Talk orb's place at phone width — key off
+   html[data-beta-dock], which BetaDock sets only while it is mounted, so the
+   Workshop UI never sees any of this. Phone width (375 px) fits every style
+   with a 16 px gutter; reduced motion stops every slide, pop and magnify. */
+
+/* ── Shared ─────────────────────────────────────────────────────────────── */
+
+html[data-ui="beta"] .b-dk { view-transition-name: beta-dock; }
+.b-dk { position: fixed; z-index: 50; box-sizing: border-box; font-family: var(--b-font-ui); color: var(--b-ink); }
+.b-dk-btn { position: relative; flex: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box; padding: 0; border-radius: var(--b-r-pill); background: transparent; color: var(--b-ink2); font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.b-dk-btn svg { flex: none; }
+/* The paper bar three styles share: centred on the bottom edge, never wider than the window. */
+.b-dk-bar { left: 50%; bottom: 22px; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; padding: 6px; max-width: calc(100vw - 32px); border-radius: var(--b-r-pill); background: rgba(255, 253, 250, .94); box-shadow: var(--b-shadow-dock); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.b-dk-acct { flex: none; }
+.b-dk-av { width: 36px; height: 36px; flex: none; display: flex; align-items: center; justify-content: center; padding: 0; border-radius: 50%; background: var(--b-ink); color: var(--b-on-ink); font-size: 13px; font-weight: 600; cursor: pointer; }
+.b-dk-bar > .b-dk-acct { margin: 0 4px; }
+.b-dk-l { white-space: nowrap; }
+.b-dk-l-short { display: none; }
+/* The keyboard ring has to show on ink items too: a paper gap, then Atlas Blue. */
+html[data-ui="beta"] .b-dk-btn:focus-visible,
+html[data-ui="beta"] .b-dk-av:focus-visible,
+html[data-ui="beta"] .b-dk-cap:focus-visible { box-shadow: 0 0 0 2px var(--b-card), 0 0 0 4px var(--b-blue); }
+
+/* ── 3a · Lens ──────────────────────────────────────────────────────────── */
+
+.b-dk--lens .b-dk-btn { height: 44px; min-width: 44px; gap: 8px; font-size: 13.5px; font-weight: 600; transform-origin: 50% 100%; transition: transform .35s var(--b-spring), background .35s var(--b-spring), color .35s, padding .35s var(--b-spring); }
+.b-dk--lens .b-dk-btn:hover { color: var(--b-ink); }
+.b-dk--lens .b-dk-btn.on { padding: 0 16px; background: var(--b-ink); color: var(--b-on-ink); }
+/* The lens: the item under the pointer (or the keyboard) magnifies, its neighbours follow at half strength.
+   Separate rules on purpose: a browser without :has() drops only its own rule, not the hover. */
+@media (prefers-reduced-motion: no-preference) {
+  .b-dk--lens .b-dk-btn:hover, .b-dk--lens .b-dk-btn:focus-visible { transform: scale(1.12); }
+  .b-dk--lens .b-dk-btn:hover + .b-dk-btn { transform: scale(1.05); }
+  .b-dk--lens .b-dk-btn:has(+ .b-dk-btn:hover) { transform: scale(1.05); }
+}
+
+/* ── 3b · Sphere hub ────────────────────────────────────────────────────── */
+
+.b-dk--hub .b-dk-btn { width: 44px; height: 44px; border-radius: 50%; transition: background .25s, color .25s; }
+.b-dk--hub .b-dk-btn:hover { background: var(--b-panel); color: var(--b-ink); }
+.b-dk--hub .b-dk-btn.on, .b-dk--hub .b-dk-btn.on:hover { background: var(--b-ink); color: var(--b-on-ink); }
+/* The sphere breaks out of the bar above and below, cut into it by a ring of the bar's own paper. */
+.b-dk-hub { position: relative; flex: none; width: 76px; height: 76px; margin: -22px 6px; padding: 0; border-radius: 50%; background: var(--b-panel); box-shadow: 0 0 0 6px var(--b-card); cursor: pointer; transition: transform .35s var(--b-spring), box-shadow .25s; }
+.b-dk-hub canvas { border-radius: 50%; }
+.b-dk-hub:hover { transform: scale(1.04); }
+.b-dk-hub.on { box-shadow: 0 0 0 6px var(--b-card), 0 0 0 8px var(--b-ink); }
+html[data-ui="beta"] .b-dk-hub:focus-visible { box-shadow: 0 0 0 6px var(--b-card), 0 0 0 8px var(--b-blue); }
+/* The current screen raises its name like a tag. */
+.b-dk-tag { position: absolute; left: 50%; bottom: 56px; height: 26px; padding: 0 10px; display: flex; align-items: center; border-radius: var(--b-r-pill); background: var(--b-ink); color: var(--b-on-ink); font-size: 12px; font-weight: 600; white-space: nowrap; pointer-events: none; transform: translateX(-50%); animation: b-dk-tag .3s var(--b-spring) both; }
+.b-dk-hub .b-dk-tag { bottom: 88px; }
+@keyframes b-dk-tag { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* ── 3c · Breadcrumb rail ───────────────────────────────────────────────── */
+
+/* Under the top bar, and clear of the 128 px orb at the bottom-left (it sits at the rail's foot). */
+.b-dk--rail { left: 14px; top: calc(var(--b-topbar) + 4px); bottom: 150px; width: 180px; display: flex; flex-direction: column; gap: 2px; padding: 8px; border-radius: var(--b-r-panel); background: var(--b-card); }
+.b-dk--rail.b-dk--no-orb { bottom: 14px; }
+/* Only the list scrolls (a short window), so the account menu can open beside the rail unclipped. */
+.b-dk-rlist { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; overscroll-behavior: contain; }
+.b-dk--rail .b-dk-btn { justify-content: flex-start; gap: 10px; min-height: 38px; padding: 6px 10px; border-radius: var(--b-r-small); color: var(--b-ink); text-align: left; transition: background .2s, color .2s; }
+.b-dk--rail .b-dk-btn:hover { background: var(--b-hover); }
+.b-dk--rail .b-dk-btn.on, .b-dk--rail .b-dk-btn.on:hover { background: var(--b-ink); color: var(--b-on-ink); }
+.b-dk-rtext { min-width: 0; display: flex; flex-direction: column; }
+.b-dk-rl { font-size: 13px; font-weight: 600; white-space: nowrap; }
+.b-dk-crumb { margin-top: 1px; font-size: 11px; color: var(--b-on-ink-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-dk--rail > .b-dk-acct { flex: none; margin-top: 2px; }
+.b-dk--rail .b-dk-acctrow { width: 100%; }
+.b-dk--rail .b-dk-acctrow .b-dk-av { width: 26px; height: 26px; margin: -2px -4px -2px -4px; font-size: 11.5px; cursor: inherit; }
+.b-dk--rail .acctmenu { left: calc(100% + 18px); right: auto; bottom: -8px; }
+/* The page moves over for the rail: 14 px inset, 180 px rail, 14 px gap. */
+@media (min-width: 761px) {
+  html[data-ui="beta"][data-beta-dock="rail"] .beta-page { padding-left: 208px; }
+}
+
+/* ── 3d · Capsule ───────────────────────────────────────────────────────── */
+
+.b-dk--capsule { left: 50%; bottom: 22px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: calc(100vw - 32px); }
+/* Open, the fan is a temporary overlay: above the orb and the Talk panel until a pick or Esc. */
+.b-dk--capsule.open { z-index: 62; }
+.b-dk-caprow { display: flex; align-items: center; gap: 8px; max-width: 100%; }
+.b-dk-cap { height: 56px; min-width: 0; padding: 0 8px 0 4px; display: flex; align-items: center; gap: 12px; border-radius: var(--b-r-pill); background: var(--b-ink); color: var(--b-on-ink); text-align: left; cursor: pointer; box-shadow: 0 18px 40px -18px rgba(30, 30, 36, .6); transition: background .2s; }
+.b-dk-cap:hover { background: var(--b-ink-raised); }
+.b-dk-cap-sph { position: relative; width: 48px; height: 48px; flex: none; border-radius: 50%; overflow: hidden; }
+.b-dk-cap-t { min-width: 0; display: flex; flex-direction: column; }
+.b-dk-cap-t b { font-size: 14.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-dk-cap-t small { font-size: 11.5px; color: var(--b-on-ink-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-dk-kbd { height: 30px; margin-left: 8px; padding: 0 10px; flex: none; display: flex; align-items: center; border-radius: var(--b-r-pill); background: rgba(249, 247, 244, .1); font: 500 11.5px var(--b-font-mono); }
+.b-dk-caprow .b-dk-av { width: 44px; height: 44px; }
+.b-dk-fan { display: flex; gap: 6px; padding: 6px; max-width: 100%; box-sizing: border-box; border-radius: var(--b-r-panel); background: var(--b-card); box-shadow: 0 18px 40px -22px rgba(30, 30, 36, .35); }
+.b-dk-fan .b-dk-btn { width: 72px; padding: 10px 4px; flex-direction: column; gap: 6px; border-radius: var(--b-r-inset); color: var(--b-ink); font-size: 11.5px; font-weight: 600; animation: b-dk-fan .3s var(--b-spring) both; transition: background .2s, color .2s; }
+.b-dk-fan .b-dk-btn:hover { background: var(--b-hover); }
+.b-dk-fan .b-dk-btn.on, .b-dk-fan .b-dk-btn.on:hover { background: var(--b-ink); color: var(--b-on-ink); }
+.b-dk-fan-l { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@keyframes b-dk-fan { from { opacity: 0; transform: translateY(10px) scale(.9); } to { opacity: 1; transform: none; } }
+/* On an ink page the capsule keeps an edge. */
+html[data-beta-tone="ink"] .b-dk-cap { box-shadow: 0 0 0 1px rgba(249, 247, 244, .16); }
+
+/* ── 3e · Colour lane ───────────────────────────────────────────────────── */
+
+/* The current screen's colour, along the top edge of the window. */
+.b-dk-stripe { position: fixed; left: 0; right: 0; top: 0; z-index: 56; height: 6px; pointer-events: none; transition: background .45s var(--b-spring); }
+html[data-ui="beta"] .b-dk-stripe { view-transition-name: beta-dock-stripe; }
+.b-dk-lane { position: relative; display: flex; gap: 4px; }
+.b-dk-blob { position: absolute; top: 0; left: 0; height: 44px; border-radius: var(--b-r-pill); pointer-events: none; }
+.b-dk-blob.ready { transition: transform .45s var(--b-spring), width .45s var(--b-spring), background .45s; }
+.b-dk--lane .b-dk-btn { width: 96px; height: 44px; gap: 7px; font-size: 12.5px; font-weight: 600; transition: color .3s, background .2s, width .35s var(--b-spring); }
+.b-dk--lane .b-dk-btn:not(.on):hover { background: var(--b-panel); color: var(--b-ink); }
+/* White on the blob: every fill is chosen to read at 4.5:1 (betaDock.test.ts checks). */
+.b-dk--lane .b-dk-btn.on { color: #fff; }
+/* Six 96 px items need about 1000 px before they meet the orb; narrower, only the current item keeps its width. */
+@media (max-width: 1000px) {
+  .b-dk--lane .b-dk-btn { width: 44px; }
+  .b-dk--lane .b-dk-btn.on { width: auto; padding: 0 14px; }
+}
+
+/* ── 3f · Status dock ───────────────────────────────────────────────────── */
+
+.b-dk--status { left: 50%; bottom: 22px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: calc(100vw - 32px); }
+.b-dk-card { max-width: 100%; box-sizing: border-box; padding: 10px 16px; border-radius: var(--b-r-inset); background: var(--b-ink); color: var(--b-on-ink-body); font-size: 13px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; animation: b-dk-pop .3s var(--b-spring) both; }
+.b-dk-card strong { font-weight: 600; color: var(--b-on-ink); }
+html[data-beta-tone="ink"] .b-dk-card { box-shadow: 0 0 0 1px rgba(249, 247, 244, .16); }
+.b-dk-tiles { display: flex; align-items: flex-end; gap: 4px; padding: 6px; max-width: 100%; box-sizing: border-box; border-radius: 24px; background: rgba(255, 253, 250, .94); box-shadow: var(--b-shadow-dock); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.b-dk--status .b-dk-btn { width: 70px; padding: 8px 4px 6px; flex-direction: column; gap: 4px; border-radius: 18px; transition: background .2s, color .2s; }
+.b-dk--status .b-dk-btn:not(.on):hover { background: var(--b-hover); color: var(--b-ink); }
+.b-dk--status .b-dk-btn.on { background: var(--b-emphasis); color: var(--b-blue-deep); }
+.b-dk-ico { position: relative; display: flex; }
+.b-dk-badge { position: absolute; top: -6px; right: -10px; min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-radius: var(--b-r-pill); background: var(--b-red); color: #fff; font-size: 9.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.b-dk-mini { max-width: 100%; font-size: 10.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-dk-tiles > .b-dk-acct { align-self: center; margin: 0 4px; }
+@keyframes b-dk-pop { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (max-width: 820px) { .b-dk--status .b-dk-btn { width: 56px; } }
+
+/* ── Phone width ─────────────────────────────────────────────────────────── */
+
+/* How much of the bottom edge each style takes, for the orb below. */
+html[data-beta-dock="guide"] { --b-dk-clear: 80px; }
+html[data-beta-dock="lens"], html[data-beta-dock="rail"], html[data-beta-dock="capsule"], html[data-beta-dock="lane"] { --b-dk-clear: 88px; }
+html[data-beta-dock="hub"] { --b-dk-clear: 100px; }
+html[data-beta-dock="status"] { --b-dk-clear: 146px; }
+
+@media (max-width: 760px) {
+  /* A centred dock needs the whole bottom edge here, and the 128 px Talk orb
+     would sit on its first items. The dock owns the edge, so the orb, its tip
+     and its panel rise above it. (The phone-width pass may move this to the
+     orb's own rules; it is keyed to the dock so it cannot outlive it.) */
+  html[data-ui="beta"][data-beta-dock] .b-orb { bottom: var(--b-dk-clear); }
+  html[data-ui="beta"][data-beta-dock] .b-orb-tip { bottom: calc(var(--b-dk-clear) + 48px); }
+  html[data-ui="beta"][data-beta-dock] .b-talk:not(.b-talk--anchored) { bottom: calc(var(--b-dk-clear) + 136px); }
+
+  /* The rail becomes a bottom bar: icons, and the current item's name. */
+  .b-dk--rail, .b-dk--rail.b-dk--no-orb { top: auto; left: 50%; bottom: 22px; width: auto; max-width: calc(100vw - 32px); transform: translateX(-50%); flex-direction: row; align-items: center; gap: 4px; padding: 6px; border-radius: var(--b-r-pill); background: rgba(255, 253, 250, .94); box-shadow: var(--b-shadow-dock); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+  .b-dk-rlist { flex-direction: row; gap: 4px; overflow: visible; }
+  .b-dk--rail .b-dk-btn { min-height: 44px; min-width: 44px; padding: 0 14px; justify-content: center; border-radius: var(--b-r-pill); }
+  .b-dk--rail .b-dk-btn:not(.on) { padding: 0; }
+  .b-dk--rail .b-dk-btn:not(.on) .b-dk-rtext, .b-dk--rail .b-dk-crumb, .b-dk--rail .b-dk-acctrow .b-dk-rtext { display: none; }
+  .b-dk--rail > .b-dk-acct { margin: 0 4px 0 0; }
+  .b-dk--rail .b-dk-acctrow, .b-dk--rail .b-dk-acctrow:hover { width: auto; min-width: 0; padding: 0; background: none; }
+  .b-dk--rail .b-dk-acctrow .b-dk-av { width: 36px; height: 36px; margin: 0; font-size: 13px; }
+  .b-dk--rail .acctmenu { left: auto; right: 0; bottom: 44px; }
+}
+
+@media (max-width: 520px) {
+  .b-dk-l-full { display: none; }
+  .b-dk-l-short { display: inline; }
+  .b-dk-bar, .b-dk--rail, .b-dk--rail.b-dk--no-orb, .b-dk-tiles { gap: 2px; padding: 4px; }
+  .b-dk-bar > .b-dk-acct, .b-dk-tiles > .b-dk-acct { margin: 0 2px; }
+  .b-dk-rlist, .b-dk-lane { gap: 2px; }
+  .b-dk-av, .b-dk--rail .b-dk-acctrow .b-dk-av { width: 32px; height: 32px; font-size: 12px; }
+  /* Lens, rail and lane: 36 px icons, a 12 px-padded current item with its short name. */
+  .b-dk--lens .b-dk-btn, .b-dk--rail .b-dk-btn, .b-dk--lane .b-dk-btn { min-width: 36px; width: 36px; height: 36px; min-height: 36px; font-size: 12.5px; }
+  .b-dk--lens .b-dk-btn.on, .b-dk--rail .b-dk-btn.on, .b-dk--lane .b-dk-btn.on { width: auto; padding: 0 12px; }
+  .b-dk-blob { height: 36px; }
+  /* Hub: smaller icons and sphere. */
+  .b-dk--hub .b-dk-btn { width: 36px; height: 36px; }
+  .b-dk-hub { width: 60px; height: 60px; margin: -14px 4px; }
+  .b-dk--hub .b-dk-tag { bottom: 46px; }
+  .b-dk-hub .b-dk-tag { bottom: 70px; }
+  /* Capsule: no keyboard hint on a phone, and the fan becomes a 3-column grid. */
+  .b-dk-kbd { display: none; }
+  .b-dk-fan { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: calc(100vw - 32px); }
+  .b-dk-fan .b-dk-btn { width: auto; min-width: 0; }
+  /* Status: 44 px tiles. */
+  .b-dk--status .b-dk-btn { width: 44px; padding: 7px 2px 5px; }
+  .b-dk-mini { font-size: 9.5px; }
+  /* The guideline dock fits too: tighter items, and a long current name ellipsised. */
+  html[data-ui="beta"][data-beta-dock="guide"] .dock.dock--beta { gap: 2px; padding: 4px; max-width: calc(100vw - 32px); box-sizing: border-box; }
+  html[data-ui="beta"][data-beta-dock="guide"] .dock--beta .dockb { padding: 0 8px; }
+  html[data-ui="beta"][data-beta-dock="guide"] .dock--beta .dockb.on { padding: 0 12px 0 10px; }
+  html[data-ui="beta"][data-beta-dock="guide"] .dock--beta .dockb.on .dockl { max-width: 64px; text-overflow: ellipsis; }
+  html[data-ui="beta"][data-beta-dock="guide"] .dock--beta .dockav { width: 34px; height: 34px; }
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .b-dk-btn, .b-dk-hub, .b-dk-cap, .b-dk-blob.ready, .b-dk-stripe { transition: none; }
+  .b-dk-tag, .b-dk-fan .b-dk-btn, .b-dk-card { animation: none; }
+  .b-dk-hub:hover { transform: none; }
+}
+
+/* ── Settings → Beta UI: the dock picker ─────────────────────────────────── */
+
+.b-dkpick { margin: 0; padding: 0; border: none; min-width: 0; }
+.b-dkpick-legend { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.b-dkpick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr)); gap: 8px; }
+.b-dkpick-opt { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 10px; border-radius: var(--b-r-row); background: var(--b-page); cursor: pointer; transition: background .2s; }
+.b-dkpick-opt:hover { background: var(--b-hover); }
+.b-dkpick-opt.on, .b-dkpick-opt.on:hover { background: var(--b-emphasis); }
+.b-dkpick-opt:has(.b-dkpick-input:focus-visible) { box-shadow: 0 0 0 2px var(--b-card), 0 0 0 4px var(--b-blue); }
+/* The native radio does the work (arrow keys, the group, the checked state); the card is its label. */
+.b-dkpick-input { position: absolute; top: 10px; left: 10px; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
+.b-dkpick-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.b-dkpick-name { font-size: 13.5px; font-weight: 600; color: var(--b-ink); }
+.b-dkpick-board { font: 500 11px var(--b-font-mono); color: var(--b-ink2); }
+.b-dkpick-tag { margin-left: auto; height: 20px; padding: 0 8px; display: flex; align-items: center; align-self: center; border-radius: var(--b-r-pill); background: var(--b-card); color: var(--b-ink2); font-size: 10.5px; font-weight: 600; white-space: nowrap; }
+.b-dkpick-opt.on .b-dkpick-tag { color: var(--b-blue-deep); }
+.b-dkpick-desc { margin: 0; font-size: 12px; line-height: 1.45; color: var(--b-ink2); text-wrap: pretty; }
+
+/* The previews: a window in miniature with the style's dock drawn in shapes. */
+.b-dkpv { position: relative; height: 78px; overflow: hidden; border-radius: var(--b-r-small); background: var(--b-panel); transition: background .2s; }
+.b-dkpick-opt.on .b-dkpv { background: var(--b-card); }
+.b-dkpv i, .b-dkpv b, .b-dkpv u, .b-dkpv s, .b-dkpv em { display: block; flex: none; font-style: normal; text-decoration: none; }
+.b-dkpv-bar { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); display: flex; align-items: center; gap: 3px; padding: 3px; border-radius: var(--b-r-pill); background: var(--b-card); box-shadow: 0 6px 14px -8px rgba(30, 30, 36, .35); }
+.b-dkpick-opt.on .b-dkpv-bar { background: var(--b-page); }
+.b-dkpv-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--b-tertiary); }
+.b-dkpv-on { width: 26px; height: 10px; border-radius: var(--b-r-pill); background: var(--b-ink); }
+.b-dkpv-av { width: 10px; height: 10px; border-radius: 50%; background: var(--b-ink); }
+.b-dkpv-sm { width: 8px; height: 8px; }
+.b-dkpv-lg { width: 13px; height: 13px; }
+.b-dkpv-sphere { width: 22px; height: 22px; margin: -6px 2px; border-radius: 50%; background: radial-gradient(circle at 40% 38%, #b9c8fb, #5c7ff5 55%, #3461f2); box-shadow: 0 0 0 2px var(--b-card); }
+.b-dkpv-tag { position: absolute; bottom: 30px; left: 50%; width: 20px; height: 7px; margin-left: -28px; border-radius: var(--b-r-pill); background: var(--b-ink); }
+.b-dkpv-inkdot { background: var(--b-ink); }
+.b-dkpv-rail { position: absolute; left: 6px; top: 6px; bottom: 6px; width: 46px; display: flex; flex-direction: column; gap: 3px; padding: 4px; box-sizing: border-box; border-radius: 8px; background: var(--b-card); }
+.b-dkpick-opt.on .b-dkpv-rail { background: var(--b-page); }
+.b-dkpv-row { height: 6px; border-radius: 3px; background: var(--b-tertiary); }
+.b-dkpv-row--on { height: 12px; background: var(--b-ink); }
+.b-dkpv-lines { position: absolute; left: 62px; top: 12px; right: 10px; display: flex; flex-direction: column; gap: 5px; }
+.b-dkpv-lines span { height: 6px; border-radius: 3px; background: var(--b-recessed); }
+.b-dkpv-lines span:first-child { width: 60%; height: 9px; }
+.b-dkpv-cap { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); display: flex; align-items: center; gap: 5px; padding: 3px 8px 3px 3px; border-radius: var(--b-r-pill); background: var(--b-ink); }
+.b-dkpv-cap .b-dkpv-sphere { width: 12px; height: 12px; margin: 0; box-shadow: none; }
+.b-dkpv-cap span { width: 30px; height: 5px; border-radius: 3px; background: rgba(249, 247, 244, .62); }
+.b-dkpv-fan { position: absolute; left: 50%; bottom: 32px; transform: translateX(-50%); display: flex; gap: 3px; padding: 3px; border-radius: 6px; background: var(--b-card); opacity: .9; }
+.b-dkpick-opt.on .b-dkpv-fan { background: var(--b-page); }
+.b-dkpv-fan i { width: 10px; height: 10px; border-radius: 3px; background: var(--b-tertiary); }
+.b-dkpv-fan i.b-dkpv-inkdot { background: var(--b-ink); }
+.b-dkpv-stripe { position: absolute; left: 0; right: 0; top: 0; height: 3px; background: #7854ff; }
+.b-dkpv-blob { width: 26px; height: 10px; border-radius: var(--b-r-pill); background: #7854ff; }
+.b-dkpv-card { position: absolute; left: 50%; bottom: 31px; transform: translateX(-50%); width: 48px; height: 9px; border-radius: 4px; background: var(--b-ink); }
+.b-dkpv-tile { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 2px; border-radius: 4px; }
+.b-dkpv-tile i { width: 7px; height: 7px; border-radius: 50%; background: var(--b-tertiary); }
+.b-dkpv-tile s { width: 9px; height: 2px; border-radius: 1px; background: var(--b-tertiary); }
+.b-dkpv-tile--on { background: var(--b-emphasis); }
+.b-dkpv-tile--on i, .b-dkpv-tile--on s { background: var(--b-blue-deep); }
+.b-dkpv-badge { position: relative; }
+.b-dkpv-badge::after { content: ""; position: absolute; top: -2px; right: -3px; width: 4px; height: 4px; border-radius: 50%; background: var(--b-red); }
+@media (prefers-reduced-motion: reduce) { .b-dkpick-opt, .b-dkpv { transition: none; } }
