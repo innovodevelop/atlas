@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { localClient as supabase } from '@/integrations/local/localClient';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -87,7 +87,13 @@ export function useAgentRuns(limit = 10) {
     }
   }, [user, limit]);
 
+  // The run whose steps are on screen. `runSteps` holds one run at a time, so a
+  // reply for a run the user has already left must not overwrite the one they
+  // moved to, and a change to `run_steps` re-reads this run and no other.
+  const stepsRunId = useRef<string | null>(null);
+
   const fetchRunSteps = useCallback(async (runId: string) => {
+    stepsRunId.current = runId;
     try {
       const { data, error } = await supabase
         .from('run_steps')
@@ -96,13 +102,14 @@ export function useAgentRuns(limit = 10) {
         .order('step_index', { ascending: true });
 
       if (error) throw error;
-      setRunSteps(data || []);
+      if (stepsRunId.current === runId) setRunSteps(data || []);
     } catch (error) {
       console.error('Error fetching run steps:', error);
     }
   }, []);
 
-  const cancelRun = useCallback(async (runId: string) => {
+  /** Resolves true once the row is cancelled, false when the write failed (the caller says so). */
+  const cancelRun = useCallback(async (runId: string): Promise<boolean> => {
     try {
       const { error } = await supabase
         .from('runs')
@@ -111,8 +118,10 @@ export function useAgentRuns(limit = 10) {
 
       if (error) throw error;
       await fetchRuns();
+      return true;
     } catch (error) {
       console.error('Error cancelling run:', error);
+      return false;
     }
   }, [fetchRuns]);
 
@@ -144,6 +153,25 @@ export function useAgentRuns(limit = 10) {
       supabase.removeChannel(channel);
     };
   }, [user, fetchRuns]);
+
+  // Steps are written while a run works, often without its `runs` row changing,
+  // so the open run's steps follow their own table. The local channel ignores
+  // filters (every change to the table fires), hence the re-read of one run.
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('run-steps-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'run_steps' }, () => {
+        const runId = stepsRunId.current;
+        if (runId) void fetchRunSteps(runId);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, fetchRunSteps]);
 
   return {
     runs,
