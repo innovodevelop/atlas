@@ -1409,3 +1409,32 @@ CREATE TABLE IF NOT EXISTS dashboard_layout (
 CREATE TRIGGER IF NOT EXISTS trg_dashboard_layout_updated AFTER UPDATE ON dashboard_layout
   FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
   BEGIN UPDATE dashboard_layout SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+
+-- ###########################################################################
+-- # MUSIC — lyrics cache and resume points (Beta Music, Podcast)             #
+-- ###########################################################################
+
+-- LRCLIB answers, so a track's lyrics are asked for once. `found` 0 with no
+-- text is a remembered miss; music.rs asks again after a week.
+CREATE TABLE IF NOT EXISTS music_lyrics_cache (
+  cache_key    TEXT PRIMARY KEY NOT NULL,
+  found        INTEGER NOT NULL DEFAULT 0,
+  instrumental INTEGER NOT NULL DEFAULT 0,
+  synced       TEXT,
+  plain        TEXT,
+  fetched_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+-- Where Atlas's own engine stopped in an episode. Spotify's resume point only
+-- moves for Connect playback, and Atlas drives librespot directly, so this is
+-- the place it keeps on this Mac. `meta` is the webview's record of the item
+-- (title, show, artwork) for Home's Podcast widget. Capped at 300 rows.
+CREATE TABLE IF NOT EXISTS music_resume (
+  item_id     TEXT PRIMARY KEY NOT NULL,
+  uri         TEXT NOT NULL,
+  position_ms INTEGER NOT NULL DEFAULT 0,
+  duration_ms INTEGER NOT NULL DEFAULT 0,
+  meta        TEXT NOT NULL DEFAULT '{}',
+  updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_music_resume_updated ON music_resume(updated_at);

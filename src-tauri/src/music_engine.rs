@@ -8,7 +8,11 @@
 //
 // We drive the Player directly (load/play/pause/seek) rather than via Spotify
 // Connect/Spirc — lower latency, no round trip to control our own device. A
-// small local queue backs next/prev; richer playlist queueing is a follow-up.
+// small local queue backs next/prev; the real queue (a station, a playlist,
+// liked songs) lives in the webview's music queue store, which hands the engine
+// one record at a time. Tracks and podcast episodes both load here: librespot
+// decodes `spotify:episode:` URIs the same way, and `Load` carries a start
+// position so an episode resumes where it was left.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -35,7 +39,8 @@ use crate::music::CLIENT_ID;
 
 /// Commands from the (sync) Tauri command layer to the engine task.
 pub enum EngineCmd {
-    Load(String),
+    /// A track or episode URI and where to start in it, in ms.
+    Load(String, u32),
     Play,
     Pause,
     Next,
@@ -153,8 +158,8 @@ async fn engine_main(
     loop {
         tokio::select! {
             cmd = rx.recv() => match cmd {
-                Some(EngineCmd::Load(uri)) => match SpotifyUri::from_uri(&uri) {
-                    Ok(u) => { queue = vec![u.clone()]; index = 0; player.load(u, true, 0); }
+                Some(EngineCmd::Load(uri, start_ms)) => match SpotifyUri::from_uri(&uri) {
+                    Ok(u) => { queue = vec![u.clone()]; index = 0; player.load(u, true, start_ms); }
                     Err(e) => log::warn!("[music] bad Spotify URI '{uri}': {e:?}"),
                 },
                 Some(EngineCmd::Play) => player.play(),
@@ -204,8 +209,17 @@ async fn engine_main(
                     // Metadata refresh — the webview re-pulls full details.
                     emit_now_playing(&app, playing.load(Ordering::Relaxed), None);
                 }
-                Some(PlayerEvent::Unavailable { .. }) => {
-                    log::warn!("[music] track unavailable");
+                Some(PlayerEvent::Unavailable { track_id, .. }) => {
+                    // Spotify has no audio librespot may decode for this item
+                    // (region, a removed track, an episode hosted elsewhere or
+                    // published as video). Say which, so the webview can stop
+                    // claiming it plays and offer a Connect speaker instead.
+                    log::warn!("[music] unavailable: {track_id}");
+                    playing.store(false, Ordering::Relaxed);
+                    let _ = app.emit(
+                        "music:unavailable",
+                        serde_json::json!({ "uri": track_id.to_string() }),
+                    );
                 }
                 Some(_) => {}
                 None => break,

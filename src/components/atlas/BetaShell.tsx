@@ -23,6 +23,11 @@ import { TalkToAtlas } from './TalkToAtlas';
 // run. Lazy, so the shell's own chunk does not grow by the clock's.
 const ClockRinging = lazy(() => import('./clock/ClockRinging'));
 
+// The music queue, on every screen: Up next keeps advancing, and ducking and
+// Wind down keep working, wherever the user goes after pressing play. Lazy
+// for the same reason as the clock.
+const MusicDriver = lazy(() => import('./music/MusicDriver'));
+
 /** Relative luminance of a CSS colour string, or null when transparent/unparseable. */
 export function luminance(color: string): number | null {
   const m = color.match(/\d+(\.\d+)?/g);
@@ -70,6 +75,7 @@ export function BetaShell({ children }: { children: ReactNode }) {
       <BetaDock />
       <TalkToAtlas />
       <Suspense fallback={null}><ClockRinging /></Suspense>
+      <Suspense fallback={null}><MusicDriver /></Suspense>
     </>
   );
 }
