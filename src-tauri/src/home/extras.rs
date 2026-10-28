@@ -24,7 +24,7 @@
 
 use std::collections::HashMap;
 
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, TimeZone, Timelike, Utc};
 use serde_json::Value;
 
 use super::ha::{domain_of, is_available, kind_of};
@@ -406,7 +406,9 @@ pub fn hour_buckets<Tz: TimeZone>(rows: &Value, tz: &Tz) -> Vec<Option<f64>> {
             _ => None,
         };
         let Some(start) = start else { continue };
-        let hour = start.with_timezone(tz).format("%H").to_string().parse::<usize>().unwrap_or(0);
+        // `hour()` rather than `format("%H")`: formatting needs `Tz::Offset: Display`,
+        // which a bare `TimeZone` bound does not promise.
+        let hour = start.with_timezone(tz).hour() as usize;
         if hour < 24 {
             out[hour] = Some(out[hour].unwrap_or(0.0) + change);
         }
