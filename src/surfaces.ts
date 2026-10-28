@@ -167,6 +167,9 @@ export const SURFACES: readonly SurfaceMeta[] = [
   // Beta phase 3: where the Talk panel's "Open the full answer" lands. Reached
   // by navigation only; the page sends the Workshop UI back to the admin view.
   { path: '/answer', label: 'Answer', icon: 'Sparkles', entry: 'none', mock: false, edition: 'consumer' },
+  // Beta phase 5: study plan, flashcards, tutor and the School Tools — all the
+  // student's own, kept on this Mac. No school feed exists, and the screen says so.
+  { path: '/school', label: 'School', icon: 'GraduationCap', entry: 'menu', mock: false, edition: 'consumer' },
   {
     path: '/atlas-teach',
     label: 'Teach Atlas',
@@ -313,6 +316,7 @@ const CONSUMER_LOADERS: Record<string, Loader> = {
   '/mail': () => import('./pages/atlas/AtlasMail'),
   '/home': () => import('./pages/atlas/AtlasHome'),
   '/answer': () => import('./pages/atlas/BetaAnswer'),
+  '/school': () => import('./pages/atlas/BetaSchool'),
   '/atlas-teach': () => import('./pages/AtlasTeach'),
   '/smart-home': () => import('./pages/atlas/AtlasSmartHome'),
   '/health': () => import('./pages/atlas/AtlasHealth'),
