@@ -42,6 +42,14 @@ mod brain;
 mod system_vitals;
 // The Focus screen's optional "run my Shortcut" (Beta row 12).
 mod focus_mode;
+// School: the Lectio calendar feed and a Moodle (LearnIT) token, both kept in
+// the Keychain and read only from here. See src/school.rs.
+mod school;
+// Money: the local bank store (CSV imports) and the optional read-only
+// GoCardless Bank Account Data link. See src/bank.rs.
+mod bank;
+// Rejseplanen departures (Beta Answer + Transit widget); dormant until an access ID is stored.
+mod transit;
 // System Status's native half: disk sizes, app versions, the Home Assistant
 // check (Beta rows 75, 78, 79).
 mod system_status;
@@ -555,6 +563,20 @@ pub fn run() {
       music::music_seek,
       music::music_load,
       music::music_volume,
+      // Beta Music: Like, Rooms, podcasts, resume points, lyrics.
+      music::music_saved_contains,
+      music::music_save_tracks,
+      music::music_devices,
+      music::music_transfer,
+      music::music_play_on,
+      music::music_remote_pause,
+      music::music_device_volume,
+      music::music_shows,
+      music::music_show_episodes,
+      music::music_resume_get,
+      music::music_resume_set,
+      music::music_resume_recent,
+      music::music_lyrics,
       db::db_info,
       db::db_select,
       db::db_insert,
@@ -619,6 +641,15 @@ pub fn run() {
       home::home_set_autonomy,
       home::home_live_start,
       home::home_live_stop,
+      // The Beta Smart Home's extras (home/beta.rs): history, today's energy,
+      // a camera still on request, automation switches, Home/Away/Night. None
+      // is on the control port — see the header of home/beta.rs.
+      home::beta::home_history,
+      home::beta::home_energy_today,
+      home::beta::home_camera_still,
+      home::beta::home_automation_set,
+      home::beta::home_mode_map,
+      home::beta::home_mode_set,
       // HomeKit over the LAN, Lighthouse only. WITHOUT THESE TWO LINES the
       // HomeKit Lab screen is dead in the one build that compiles the feature:
       // Tauri answers an unregistered command with "Command
@@ -642,6 +673,32 @@ pub fn run() {
       health::health_series,
       health::health_workouts,
       health::health_forget,
+      // School connectors (all `async`: each one is a network round trip).
+      school::school_connections,
+      school::school_lectio_connect,
+      school::school_lectio_fetch,
+      school::school_lectio_disconnect,
+      school::school_moodle_connect,
+      school::school_moodle_call,
+      school::school_moodle_file,
+      school::school_moodle_disconnect,
+      // Money. All `#[tauri::command(async)]`: HTTP to GoCardless and SQLite.
+      // None of them can move money; GoCardless's keys stay in the Keychain.
+      bank::bank_store_transactions,
+      bank::bank_gc_status,
+      bank::bank_gc_set_keys,
+      bank::bank_gc_clear_keys,
+      bank::bank_gc_institutions,
+      bank::bank_gc_link_start,
+      bank::bank_gc_link_refresh,
+      bank::bank_gc_sync,
+      bank::bank_gc_unlink,
+      // Rejseplanen. Async: each one is an HTTPS call or a Keychain read. The
+      // access ID is written by transit_set_key and never returned.
+      transit::transit_status,
+      transit::transit_set_key,
+      transit::transit_find_stops,
+      transit::transit_departures,
     ])
     .setup(|app| {
       // ONE DATABASE, AND THIS LAUNCH'S IDENTITY — both before anything else in
@@ -819,6 +876,8 @@ pub fn run() {
           // Background Gmail sync writes the shared atlas.db too, so it runs
           // in the owner only, for the same reason.
           handle.manage(gmail::GmailAutoSync::spawn(handle.clone()));
+          // Linked banks are read once a day, by the owner only, for the same reason.
+          bank::spawn_daily_sync(handle.clone());
         });
       }
 
