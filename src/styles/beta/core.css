@@ -67,8 +67,8 @@
 .b-core-row-trail.good { color: var(--b-green-deep); }
 .b-core-row .b-btn--row { flex: none; }
 .b-core-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--b-blue); }
-.b-core-dot--error { background: var(--b-red); }
-.b-core-dot--warn { background: #e0a21f; }
+.b-core-dot--e { background: var(--b-red); }
+.b-core-dot--w { background: #e0a21f; }
 .b-core-chip { flex: none; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; background: var(--b-panel); color: var(--b-neutral); }
 .b-core-chip.on { background: var(--b-ink); color: var(--b-on-ink); }
 .b-core-tag { flex: none; height: 22px; padding: 0 9px; display: flex; align-items: center; border-radius: var(--b-r-pill); font-size: 11px; font-weight: 600; white-space: nowrap; }

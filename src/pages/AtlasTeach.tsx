@@ -1048,7 +1048,7 @@ function BetaTeachBody(p: BetaTeachProps) {
             <AtlasIcon name="speaker" size={15} weight={1.8} />
             {p.isMuted ? 'Replies muted' : 'Replies spoken'}
           </button>
-          <button type="button" className="b-teach-ghost" onClick={p.onNewSession} disabled={p.messages.length === 0}>New session</button>
+          <button type="button" className="b-teach-ghost" onClick={p.onNewSession} disabled={p.messages.length === 0 || p.isProcessing}>New session</button>
         </div>
 
         <div ref={logRef} className="b-teach-log" role="log" aria-label="Messages" aria-live="polite">
@@ -1057,7 +1057,9 @@ function BetaTeachBody(p: BetaTeachProps) {
             <div key={i} className={`b-teach-msg ${m.role === 'user' ? 'me' : 'atlas'}`}>{m.content}</div>
           ))}
           {p.liveTranscript ? (
-            <div className="b-teach-msg me live" aria-label="What Atlas is hearing">
+            // The partial transcript changes several times a second; a screen
+            // reader hears the finished turn when it lands in the log instead.
+            <div className="b-teach-msg me live" aria-hidden>
               {p.listeningMode === 'passive' && !p.awake ? <span className="b-teach-wait">(waiting for “Atlas”) </span> : null}
               {p.liveTranscript}
             </div>

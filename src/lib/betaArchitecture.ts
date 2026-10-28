@@ -201,6 +201,62 @@ export function sphereStateColor(state: QuickSphereState): string {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
+/** The hero's isometric stack, top to bottom (phase 3's layers, unchanged). */
+export const HERO_LAYERS = [
+  { label: 'You · voice and screen', tone: 'blue' },
+  { label: 'Wake word · on device', tone: 'blue-soft' },
+  { label: 'Agent and limits', tone: 'paper' },
+  { label: 'Memory · on this Mac', tone: 'paper' },
+  { label: 'Connections', tone: 'sand' },
+  { label: 'Reasoning model · remote', tone: 'ink' },
+] as const;
+
+/** "Running on this Mac · 4 local · 2 remote", counted from the cards below it. */
+export function archEyebrow(local = LOCAL_PARTS.length, remote = REMOTE_SERVICES.length): string {
+  return `Running on this Mac · ${local} local · ${remote} remote`;
+}
+
+/**
+ * The two labels on the dashed line in the trip diagram. The design had the
+ * reply spoken "here, not out there"; the voice is ElevenLabs, so the reply
+ * line says so.
+ */
+export const EDGE = {
+  leaves: { title: 'Leaves: the request', body: 'Your question and the memories Atlas picked. In a voice session, your speech too.' },
+  returns: { title: 'Comes back: the reply', body: 'Text. To speak it, Atlas sends it to ElevenLabs and plays the voice that comes back.' },
+} as const;
+
+export interface MemoryFact {
+  value: string;
+  title: string;
+  body: string;
+}
+
+/**
+ * The three figures under "Three kinds of memory". The count is the brain's
+ * own list (`/memory/list`, the hook Core's Memory tab reads); while it loads,
+ * or outside the desktop app where there is no brain to ask, it is a dash
+ * and the line under it says why rather than showing a zero.
+ */
+export function memoryFacts(
+  memory: { state: 'loading' | 'ready' | 'unavailable' | 'error'; count: number; message?: string | null },
+): MemoryFact[] {
+  const ready = memory.state === 'ready';
+  const keptBody = ready
+    ? 'On this Mac, in one file'
+    : memory.state === 'loading' ? 'Reading the memory file…' : (memory.message || 'The memory file could not be read.');
+  return [
+    { value: ready ? memoryCountLabel(memory.count) : '—', title: 'Memories kept', body: keptBody },
+    { value: 'Up to 10', title: 'Fetched per turn', body: 'Only the ones that look relevant' },
+    { value: '0', title: 'Copies uploaded', body: 'The file itself never leaves' },
+  ];
+}
+
+/** The Sphere section's technical line, from the budgets the engine actually uses. */
+export function sphereTechLine(demoCount: number, miniCount: number): string {
+  return `QuickSphere · veil mode · canvas 2D · ${demoCount.toLocaleString('en-US')} points here, ${miniCount.toLocaleString('en-US')} in a small sphere · one settled frame under reduced motion`;
+}
+
 /** "412", or "500+" once the brain's list limit is reached. */
 export function memoryCountLabel(n: number, cap = 500): string {
   return n >= cap ? `${cap}+` : String(Math.max(0, n));

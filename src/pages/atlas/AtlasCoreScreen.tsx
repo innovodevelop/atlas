@@ -19,7 +19,7 @@ import type { IconName } from '@/components/atlas/icons';
 import { useBetaNavigate } from '@/lib/viewTransitions';
 import {
   QUEUE_STATUSES, agoLabel, coreEscapeStep, coreHeroLine, coreOverviewTiles, coreTabFromHash,
-  coreTabIntro, coreTabStrip, errorDot, indexingRow, researchRunning, researchTag, type ErrorDot, type TagTone,
+  coreTabIntro, coreTabStrip, indexingRow, researchRunning, researchTag, type TagTone,
 } from '@/lib/betaCore';
 import { escapeAction } from '@/lib/betaScreenKeys';
 // Every rule in it is scoped to the Beta classes below, so importing it with
@@ -473,7 +473,7 @@ function BetaCoreOverview({ stats, canOpen, onOpen }: BetaOverviewProps) {
         {(errors ?? []).map((e) => (
           <CoreRow
             key={e.id}
-            dot={errorDot(e.severity)}
+            dot={errorSeverityGlyph(e.severity)}
             title={e.error_message}
             sub={`${e.severity} · ${new Date(e.created_at).toLocaleTimeString()}${e.resolved ? ' · resolved' : ''}`}
           />
@@ -515,7 +515,8 @@ function CoreRow({ title, sub, trail, trailGood, dot, chip, tag, action }: {
   sub?: string;
   trail?: string;
   trailGood?: boolean;
-  dot?: ErrorDot;
+  /** The error log's own severity glyph: error, warning, info. */
+  dot?: ReturnType<typeof errorSeverityGlyph>;
   chip?: { icon: IconName; on: boolean };
   tag?: { label: string; tone: TagTone };
   action?: ReactNode;

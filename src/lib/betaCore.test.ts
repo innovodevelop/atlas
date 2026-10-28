@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   agoLabel, coreEscapeStep, coreHeroLine, coreOverviewTiles, coreTabFromHash, coreTabIntro,
-  coreTabStrip, errorDot, healthTone, indexingRow, researchRunning, researchTag,
+  coreTabStrip, healthTone, indexingRow, researchRunning, researchTag,
 } from './betaCore';
 import { ICON_PATHS } from '@/components/atlas/icons';
 
@@ -118,11 +118,5 @@ describe('the overview', () => {
     expect(indexingRow(1203, new Date(now - 12 * 60_000).toISOString(), now)).toEqual({ title: '1,203 entries', sub: 'Last indexed 12 min ago' });
     expect(indexingRow(1, null, now)).toEqual({ title: '1 entry', sub: 'Indexed' });
     expect(indexingRow(0, null, now)).toEqual({ title: '0 entries', sub: 'Nothing indexed yet' });
-  });
-
-  test('error dots', () => {
-    expect(errorDot('critical')).toBe('error');
-    expect(errorDot('warning')).toBe('warn');
-    expect(errorDot('info')).toBe('info');
   });
 });

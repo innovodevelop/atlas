@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import {
   ARCH_TABS, ENGINE_STATES, LEARNING_STEPS, LOCAL_PARTS, REMOTE_SERVICES, RUNS_WHERE, SPHERE_STATES,
-  TRIP, TRIP_ORDER, archTabFromHash, memoryCountLabel, sphereStateColor, topCategories,
+  TRIP, TRIP_ORDER, EDGE, archEyebrow, archTabFromHash, memoryCountLabel, memoryFacts, sphereStateColor,
+  sphereTechLine, topCategories,
 } from './betaArchitecture';
 import { ICON_PATHS } from '@/components/atlas/icons';
 
@@ -53,5 +54,27 @@ describe('How Atlas works', () => {
     const cats = topCategories({ work: [1, 2, 3], life_events: [1], joys: [1, 2], a: [1], b: [1], c: [1], d: [1], e: [1] }, 3);
     expect(cats).toEqual({ shown: ['work', 'joys', 'a'], more: 5 });
     expect(topCategories({}).shown).toEqual([]);
+  });
+
+  test('the memory count is the brain’s, and never a zero it did not read', () => {
+    expect(memoryFacts({ state: 'ready', count: 412 })[0].value).toBe('412');
+    expect(memoryFacts({ state: 'ready', count: 900 })[0].value).toBe('500+');
+    const loading = memoryFacts({ state: 'loading', count: 0 });
+    expect(loading[0].value).toBe('—');
+    const away = memoryFacts({ state: 'unavailable', count: 0, message: 'Only in the desktop app.' });
+    expect(away[0].value).toBe('—');
+    expect(away[0].body).toBe('Only in the desktop app.');
+    // The orchestrator's recall asks for ten (match_count: 10).
+    expect(loading[1].value).toBe('Up to 10');
+  });
+
+  test('the eyebrow counts the cards it summarises', () => {
+    expect(archEyebrow()).toBe(`Running on this Mac · ${LOCAL_PARTS.length} local · ${REMOTE_SERVICES.length} remote`);
+    expect(archEyebrow(4, 2)).toBe('Running on this Mac · 4 local · 2 remote');
+  });
+
+  test('the trip’s edge says the voice is not made here', () => {
+    expect(EDGE.returns.body).toMatch(/ElevenLabs/);
+    expect(sphereTechLine(20000, 4500)).toContain('20,000 points here, 4,500');
   });
 });

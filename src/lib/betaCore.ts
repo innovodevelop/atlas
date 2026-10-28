@@ -191,12 +191,3 @@ export function indexingRow(count: number, newestIso: string | null | undefined,
   const ago = agoLabel(newestIso, now);
   return { title, sub: ago ? `Last indexed ${ago}` : count > 0 ? 'Indexed' : 'Nothing indexed yet' };
 }
-
-export type ErrorDot = 'error' | 'warn' | 'info';
-
-/** The dot colour for one stored severity (four stored, three drawn). */
-export function errorDot(severity: string): ErrorDot {
-  if (severity === 'error' || severity === 'critical') return 'error';
-  if (severity === 'warning' || severity === 'warn') return 'warn';
-  return 'info';
-}
