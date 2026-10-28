@@ -105,7 +105,11 @@ The cloud is Linux (see CLAUDE.md, "Environment split").
    wire any new routes in `src/App.tsx` (admin pages inside the
    `VITE_ATLAS_EDITION` ternary, never a static import), run every gate plus
    `cargo check`, check in the browser preview, do the phone-width pass, and
-   build the Mac app for review.
+   build the Mac app for review. Rebuild the brain sidecar in that build
+   (`bun run tauri build` runs `bun run build:brain`; anything that reuses
+   `src-tauri/binaries/atlas-brain-*` must run it first): the Browser's page
+   fetch lives in the brain, and a stale binary answers Go with a 404
+   (“not found”).
 
 ## Gates that run in the cloud
 

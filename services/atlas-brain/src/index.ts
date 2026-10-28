@@ -40,6 +40,7 @@ import { createMailDraftHandlers } from "./mailDraft.ts";
 import { createAnswerShapeHandlers } from "./answerShapes.ts";
 import { createConversationHandlers } from "./conversations.ts";
 import { createAdminHandlers } from "./adminRoutes.ts";
+import { createBrowserHandlers } from "./browserRoutes.ts";
 import { RUNNING_FROM_SOURCE } from "./projectRoot.ts";
 import { CLAUDE_PROJECTS_DIR, ingestJsonlSessions } from "./jsonlIngest.ts";
 import { startJsonlWatcher } from "./jsonlWatcher.ts";
@@ -149,6 +150,12 @@ const greeting = createGreetingHandlers({ db: localDb, requireUser, json });
 // Atlas Mail draft composer (Stage 6D): one AI pass per call, reads atlas.db
 // only — never the Cloudflare mail worker, never sends (see mailDraft.ts).
 const mailDraft = createMailDraftHandlers({ db: localDb, requireUser, json });
+
+// The Beta Browser: fetch a page on this Mac (guarded: public http/https only,
+// capped, timed, no scripts) and ask about it. Built WITHOUT the db on purpose:
+// Ask and "On this page" are page-grounded and never write memory (see
+// browserRoutes.ts).
+const browser = createBrowserHandlers({ requireUser, json });
 
 // Beta Answer shapes: /answer/compare is ONE cheap call that restates an
 // answer Atlas already gave as a table; /answer/person reads this Mac's mail
@@ -483,6 +490,9 @@ const server = Bun.serve({
       if (req.method === "POST" && url.pathname === "/research") return await learning.research(req);
       if (req.method === "POST" && url.pathname === "/greeting") return await greeting.greeting(req);
       if (req.method === "POST" && url.pathname === "/mail/draft") return await mailDraft.draft(req);
+      if (req.method === "POST" && url.pathname === "/browser/fetch") return await browser.fetch(req);
+      if (req.method === "POST" && url.pathname === "/browser/ask") return await browser.ask(req);
+      if (req.method === "POST" && url.pathname === "/browser/notice") return await browser.notice(req);
       if (req.method === "POST" && url.pathname === "/memory/maintenance") return await learning.memoryMaintenance(req);
       if (req.method === "POST" && url.pathname === "/memory/list") return await handleMemoryList(req);
       if (req.method === "POST" && url.pathname === "/memory/forget") return await handleMemoryForget(req);
