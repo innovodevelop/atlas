@@ -8,9 +8,15 @@
  * explicit three-step ladder (nudge → the method → the first step set up),
  * one at a time. Threads are kept on this Mac so a problem can be picked up
  * again; nothing is sent anywhere except the turn being asked.
+ *
+ * "What you understood today" (the side panel) is read from the student's own
+ * turns only — the tutor's questions and hints are left out of the prompt —
+ * when they ask for it, or when they leave a problem they worked on today. It
+ * is kept per day and per problem, and only today's is shown.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { nextHintLevel, shortDate, tutorPrompt, tutorTitle, uid, type TutorAsk, type TutorThread, type TutorTurn } from '@/lib/betaSchool';
+import { dayKey, nextHintLevel, shortDate, tutorPrompt, tutorTitle, uid, type TutorAsk, type TutorThread, type TutorTurn, type UnderstoodEntry } from '@/lib/betaSchool';
+import { mergeUnderstood, newStudentTurns, parseUnderstood, understoodPrompt } from '@/lib/betaSchoolAtlas';
 import { updateSchool, useSchool } from '@/lib/betaSchoolStore';
 import { AtlasIcon } from '@/components/atlas/AtlasIcon';
 import { useAsk, type SchoolToast } from './useSchoolHooks';
@@ -27,6 +33,7 @@ export function SchoolTutor({ onToast }: { onToast: SchoolToast }) {
   const [draft, setDraft] = useState('');
   const [pending, setPending] = useState<{ role: 'tutor' | 'hint'; text: string } | null>(null);
   const atlas = useAsk();
+  const summariser = useAsk();
   const scroller = useRef<HTMLDivElement | null>(null);
 
   const thread = activeId ? school.tutor.find((t) => t.id === activeId) ?? null : null;
@@ -104,8 +111,33 @@ export function SchoolTutor({ onToast }: { onToast: SchoolToast }) {
    * read as that problem's answer. The student turn stays, so "Ask Atlas
    * again" picks it up when they come back.
    */
+  const today = dayKey(Date.now());
+  const isToday = (at: number) => dayKey(at) === today;
+  const todays = school.understood.filter((u) => u.day === today);
+  const understood = mergeUnderstood(todays);
+
+  /** Today's student turns in a problem that came after its last summary; empty when there is nothing new. */
+  const unsummarised = (t: TutorThread): TutorTurn[] => {
+    const entry = todays.find((u) => u.threadId === t.id);
+    const fresh = newStudentTurns(t.turns, entry?.at ?? 0, isToday);
+    return fresh.length ? newStudentTurns(t.turns, 0, isToday) : [];
+  };
+
+  const summarise = async (t: TutorThread) => {
+    const turns = unsummarised(t);
+    if (!turns.length || summariser.busy) return;
+    const out = await summariser.ask(understoodPrompt(t.problem, turns));
+    if (out === null) return;
+    const items = parseUnderstood(out);
+    if (!items.length) { onToast('Atlas could not say yet what you showed. Keep going.'); return; }
+    const entry: UnderstoodEntry = { day: today, threadId: t.id, items, at: Date.now() };
+    updateSchool((s) => ({ ...s, understood: [...s.understood.filter((u) => !(u.day === today && u.threadId === t.id)), entry].slice(-400) }));
+  };
+
   const open = (id: string | null) => {
     if (id === activeId) return;
+    // Leaving a problem worked on today sums up what the student showed in it.
+    if (thread && unsummarised(thread).length) void summarise(thread);
     if (atlas.busy) atlas.cancel();
     runSeq.current += 1;
     setPending(null);
@@ -187,6 +219,21 @@ export function SchoolTutor({ onToast }: { onToast: SchoolToast }) {
         <div className="b-sc-note b-sc-note--ink">
           <b>Atlas is your tutor, not your ghostwriter</b>
           <span>It asks questions and gives hints in three steps. It never writes your answer; ask it to and you get the next hint instead.</span>
+        </div>
+        <div className="b-sc-list b-sc-understood" aria-label="What you understood today">
+          <div className="b-sc-list-head">
+            <span className="b-sc-label">What you understood today</span>
+            {thread && unsummarised(thread).length ? (
+              <button type="button" className="b-btn b-btn--card b-btn--row" disabled={summariser.busy} onClick={() => void summarise(thread)}>{summariser.busy ? 'Reading…' : 'Sum up'}</button>
+            ) : null}
+          </div>
+          {understood.map((u) => (
+            <div key={u.text} className="b-sc-understood-row">
+              <span className={u.ok ? 'ok' : ''} aria-label={u.ok ? 'Shown' : 'Not shown yet'}>{u.ok ? '✓' : '·'}</span>{u.text}
+            </div>
+          ))}
+          {!understood.length ? <div className="b-sc-empty">From your own replies only: when you leave a problem you worked on today, or press Sum up, Atlas notes what you showed you understood.</div> : null}
+          {summariser.error ? <p className="b-sc-err" role="alert">{summariser.error}</p> : null}
         </div>
         <div className="b-sc-list">
           <div className="b-sc-list-head">

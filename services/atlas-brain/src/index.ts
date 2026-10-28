@@ -37,6 +37,8 @@ import { createLearningHandlers } from "./learningRoutes.ts";
 import { createProactiveHandlers } from "./proactive.ts";
 import { createGreetingHandlers } from "./greeting.ts";
 import { createMailDraftHandlers } from "./mailDraft.ts";
+import { createAnswerShapeHandlers } from "./answerShapes.ts";
+import { createConversationHandlers } from "./conversations.ts";
 import { createAdminHandlers } from "./adminRoutes.ts";
 import { createBrowserHandlers } from "./browserRoutes.ts";
 import { RUNNING_FROM_SOURCE } from "./projectRoot.ts";
@@ -145,6 +147,15 @@ const mailDraft = createMailDraftHandlers({ db: localDb, requireUser, json });
 // Ask and "On this page" are page-grounded and never write memory (see
 // browserRoutes.ts).
 const browser = createBrowserHandlers({ requireUser, json });
+
+// Beta Answer shapes: /answer/compare is ONE cheap call that restates an
+// answer Atlas already gave as a table; /answer/person reads this Mac's mail
+// and calendar with no model at all (see answerShapes.ts).
+const answerShapes = createAnswerShapeHandlers({ db: localDb, requireUser, json });
+
+// Earlier conversations for Voice and Answer: the words from chat_turns,
+// never the system prompts or tool traffic stored beside them.
+const conversations = createConversationHandlers({ db: localDb, requireUser, json });
 
 // Admin routes: version tracking, agent sessions, design sync, tests. Same
 // requireUser as every other route — these read and write the whole admin
@@ -465,6 +476,10 @@ const server = Bun.serve({
       if (req.method === "POST" && url.pathname === "/memory/list") return await handleMemoryList(req);
       if (req.method === "POST" && url.pathname === "/memory/forget") return await handleMemoryForget(req);
       if (req.method === "POST" && url.pathname === "/memory/erase-all") return await handleMemoryEraseAll(req);
+      if (req.method === "POST" && url.pathname === "/answer/compare") return await answerShapes.compare(req);
+      if (req.method === "POST" && url.pathname === "/answer/person") return await answerShapes.person(req);
+      if (req.method === "POST" && url.pathname === "/conversations/list") return await conversations.list(req);
+      if (req.method === "POST" && url.pathname === "/conversations/get") return await conversations.get(req);
       // Admin routes
       if (url.pathname === "/admin/versions/sync" && req.method === "POST") return admin.syncVersionPlan(req);
       if (url.pathname === "/admin/versions/sync-status" && req.method === "GET") return admin.getPlanSyncStatus(req);

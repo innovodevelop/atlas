@@ -53,6 +53,13 @@ html[data-ui="beta"]:has(.b-en) .dock--beta { display: none; }
 .b-en-sphere-talk { position: absolute; inset: 12%; border-radius: 50%; background: transparent; cursor: pointer; }
 .b-en-sphere-talk:focus-visible { box-shadow: 0 0 0 3px rgba(255, 253, 250, .55); }
 .b-en-aside-text { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 6px; }
+/* The voice pill (left-out row 30): the design's top row, right-aligned —
+   the wordmark beside it is the top bar's. */
+.b-en-aside-top { position: relative; z-index: 2; display: flex; justify-content: flex-end; }
+.b-en-voice { flex: none; display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 13px 0 11px; border-radius: var(--b-r-pill); background: rgba(255, 253, 250, .14); color: var(--b-card); font: inherit; font-size: 12.5px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background .2s; }
+.b-en-voice:hover { background: rgba(255, 253, 250, .22); }
+.b-en-voice:focus-visible { box-shadow: 0 0 0 3px rgba(255, 253, 250, .55); }
+@media (prefers-reduced-motion: reduce) { .b-en-voice { transition: none; } }
 .b-en-kicker { font-size: 11px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase; color: rgba(255, 253, 250, .72); }
 .b-en-line { margin: 0; max-width: 380px; font-size: 13.5px; line-height: 1.55; color: rgba(255, 253, 250, .86); text-wrap: pretty; }
 

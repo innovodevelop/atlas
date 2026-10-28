@@ -52,13 +52,33 @@ export interface WidgetDef {
 }
 
 /** The full views Home can open under its band (components/atlas/home/views/FullView.tsx). */
-export type HomeViewKey = 'weather' | 'calendar' | 'tasks' | 'stocks' | 'email' | 'news' | 'music' | 'focus' | 'fx';
+export type HomeViewKey = 'weather' | 'calendar' | 'tasks' | 'stocks' | 'email' | 'news' | 'music' | 'focus' | 'fx' | 'podcast';
+
+/**
+ * The Money widgets (row 17 of docs/design-sync/2026-10-28-left-out-features.md):
+ * Spend, Budget and Subscriptions, read from the bank store on this Mac. Money
+ * is an admin surface (`/money` in src/surfaces.ts), so a consumer build lists
+ * none of them — a widget must never open a screen its edition cannot route.
+ */
+function moneyWidgets(): WidgetDef[] {
+  // The same comparison as `EDITION` in src/surfaces.ts, written out rather
+  // than imported: surfaces.ts carries every page's loader, and importing it
+  // would pull all of them into this pure module (and the strict typecheck
+  // of src/lib). A direct comparison is also what lets Vite fold it.
+  if (import.meta.env.VITE_ATLAS_EDITION === 'consumer') return [];
+  return [
+    { id: 'spend', label: 'Spend', meta: 'This month by category, from your bank', group: 'Money', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/money' } },
+    { id: 'budget', label: 'Budget', meta: 'Left to spend and your pace this month', group: 'Money', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/money' } },
+    { id: 'subscriptions', label: 'Subscriptions', meta: 'What repeats every month or year', group: 'Money', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'live', opens: { route: '/money' } },
+  ];
+}
 
 /**
  * Every widget Home can show, in the handoff's catalog order. `source` is
- * honest per widget: Energy and Podcast have no source in the app yet and are
- * listed so the editor can say so, not so a fake card can be added. Focus,
- * Up next and Currency came with the Beta's left-out features (package F6).
+ * honest per widget: Energy has no source in the app yet and is listed so
+ * the editor can say so, not so a fake card can be added. Focus, Up next and
+ * Currency came with the Beta's left-out features (package F6), Podcast with
+ * package F4.
  */
 export const WIDGETS: readonly WidgetDef[] = [
   { id: 'weather', label: 'Weather', meta: 'Now, the next hours, sunrise and sunset', group: 'Day', sizes: ['S', 'M', 'L'], defaultSize: 'L', source: 'live', opens: { view: 'weather' } },
@@ -76,11 +96,21 @@ export const WIDGETS: readonly WidgetDef[] = [
   { id: 'steps', label: 'Steps', meta: 'Today and the last seven days', group: 'Body', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/health' } },
   { id: 'sleep', label: 'Sleep', meta: 'Last night, by stage', group: 'Body', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/health' } },
   { id: 'home', label: 'Home', meta: 'Rooms, temperatures, the front door', group: 'Home', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/smart-home' } },
+  // Smart Home (F3): one light, the lights, and the door camera, through Home Assistant.
+  { id: 'lamp', label: 'Lamp', meta: 'A colour light, on or off, with its swatches', group: 'Home', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/smart-home' } },
+  { id: 'lights', label: 'Lights', meta: 'Which lights are on, and all off', group: 'Home', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/smart-home' } },
+  { id: 'bulb', label: 'Bulb', meta: 'One light and its brightness', group: 'Home', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/smart-home' } },
+  { id: 'floorlamp', label: 'Floor lamp', meta: 'The light named a floor lamp', group: 'Home', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/smart-home' } },
+  { id: 'frontdoor', label: 'Front door', meta: 'The door camera and its last motion', group: 'Home', sizes: ['S', 'M', 'L'], defaultSize: 'L', source: 'live', opens: { route: '/smart-home' } },
   { id: 'energy', label: 'Energy', meta: 'No energy meter is connected yet', group: 'Home', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'unwired', opens: { route: '/smart-home' } },
-  { id: 'podcast', label: 'Podcast', meta: 'No podcast source yet', group: 'Media', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'unwired', opens: null },
+  { id: 'podcast', label: 'Podcast', meta: 'Your Spotify shows, where you stopped', group: 'Media', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'live', opens: { view: 'podcast' } },
   { id: 'focus', label: 'Focus', meta: 'A timer that holds Atlas’s notifications', group: 'Day', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'live', opens: { view: 'focus' } },
   { id: 'upnext', label: 'Up next', meta: 'Your next events, with how long until each', group: 'Day', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'live', opens: { view: 'calendar' } },
+  // Left-out row 20: live once the user adds a Rejseplanen access ID (the
+  // face says so until then); opens the Answer screen's departures board.
+  { id: 'transit', label: 'Transit', meta: 'Next departures from your stop, from Rejseplanen (needs an access ID)', group: 'Day', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'live', opens: { route: '/answer' } },
   { id: 'fx', label: 'Currency', meta: 'ECB reference rates for the pair you pick', group: 'Money', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { view: 'fx' } },
+  ...moneyWidgets(),
 ];
 
 export const WIDGET_BY_ID: ReadonlyMap<string, WidgetDef> = new Map(WIDGETS.map((w) => [w.id, w]));

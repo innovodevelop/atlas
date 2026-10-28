@@ -6,7 +6,8 @@
  * what you said, what Atlas said, one line about the state, the controls
  * (Start talking · Stop speaking · Mute · End session), and three asks when
  * resting. Below: this session's turns, typed input, and what went with the
- * last question.
+ * last question, and the earlier conversations this Mac keeps (left-out
+ * row 29; EarlierConversations.tsx), each one readable in place.
  *
  * Everything comes from the voice session (`useVoiceSession`): the live
  * partial transcript is the "you" line while listening, `onFinalTranscript`
@@ -20,6 +21,7 @@ import { useAtlasSettings } from '@/hooks/useAtlasSettings';
 import { useVoiceSession } from '@/hooks/useVoiceSession';
 import { toVoiceSettings } from '@/lib/voiceTuning';
 import { VeilSphere } from '@/components/atlas/VeilSphere';
+import { EarlierConversations } from '@/components/atlas/answer/EarlierConversations';
 import { AtlasIcon } from '@/components/atlas/AtlasIcon';
 import { STATE_COLOUR, onVoiceRequest, publishAtlasState, type AtlasBusState } from '@/lib/atlasStateBus';
 import { setTalkAnchor } from '@/lib/talkBus';
@@ -52,6 +54,8 @@ const BetaVoice = () => {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [typed, setTyped] = useState('');
   const [started, setStarted] = useState<number | null>(null);
+  // Conversations begun after this are this session's, not earlier ones.
+  const [openedAt] = useState(() => Date.now());
   const turnsRef = useRef<HTMLDivElement | null>(null);
   const sphereRef = useRef<HTMLDivElement | null>(null);
   const seq = useRef(0);
@@ -183,6 +187,7 @@ const BetaVoice = () => {
             <div className="b-voice-ctx"><span className="b-voice-tag">Model</span><span>The question goes to the reasoning model; the reply is spoken here</span></div>
             <p className="b-voice-route">Nothing is kept outside this Mac except the question itself. <button type="button" className="b-link" onClick={() => navigate('/atlas-architecture')}>How this works</button></p>
           </div>
+          <EarlierConversations openedAt={openedAt} />
         </aside>
       </div>
     </div>

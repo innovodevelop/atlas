@@ -2,18 +2,30 @@
  * Writing — the School Tools editor (`Atlas School Tools Beta.dc.html`,
  * "Skrivning").
  *
- * A plain editor for the student's own documents, kept on this Mac. Atlas
- * helps from the margin, never in the page: "Ask Atlas" rewrites the selected
- * passage (or the whole text) shorter, clearer or more formal and shows the
- * result as a draft beside the page; it goes into the text only when the
- * student chooses "Use this", and the length card then stops saying that every
- * word is theirs. Margin notes are questions and pointers, never rewrites.
+ * The student's own documents, kept on this Mac, written section by section:
+ * a line that starts with "# " is a heading, and each heading's text is its
+ * own field under it (betaSchoolSections.ts). The document stays one plain
+ * string underneath, so typing "# " on a new line starts a section and
+ * removing a heading joins its text to the section above.
+ *
+ * Atlas helps from the margin, never in the page. "Ask Atlas" rewrites the
+ * selected passage (or the whole text) shorter, clearer or more formal and
+ * shows the result as a draft beside the page; it goes into the text only when
+ * the student chooses "Use this", and the length card then stops saying that
+ * every word is theirs. Margin notes are questions and pointers, never
+ * rewrites, each numbered and anchored to the section it is about: the number
+ * also marks that section, and clicking either one points at the other.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
-  REWRITES, cleanRewrite, lengthState, marginPrompt, parseNotes, rewritePrompt, shortDate, uid, wordCount,
-  type Doc, type RewriteMode,
+  REWRITES, cleanRewrite, lengthState, rewritePrompt, shortDate, uid, wordCount,
+  type Doc, type MarginNote, type RewriteMode,
 } from '@/lib/betaSchool';
+import { anchoredMarginPrompt, parseAnchoredNotes } from '@/lib/betaSchoolAtlas';
+import {
+  appendSection, parseSections, placeNotes, removeHeading, renameHeading, replaceSectionText, sectionsForPrompt,
+  type Section,
+} from '@/lib/betaSchoolSections';
 import { updateSchool, useSchool } from '@/lib/betaSchoolStore';
 import { useAsk, type SchoolToast } from './useSchoolHooks';
 
@@ -28,15 +40,53 @@ const numOrNull = (v: string): number | null => {
   return v.trim() && Number.isFinite(n) && n > 0 ? n : null;
 };
 
+/** How long a pointed-at note or section stays marked. */
+const MARK_MS = 1400;
+
+/** One section's field: it grows with its text instead of scrolling inside a box. */
+function SectionField({ s, onText, onSelect, fieldRef, marked, placeholder }: {
+  s: Section;
+  onText: (v: string) => void;
+  onSelect: (el: HTMLTextAreaElement) => void;
+  fieldRef: (el: HTMLTextAreaElement | null) => void;
+  marked: boolean;
+  placeholder: string;
+}) {
+  const el = useRef<HTMLTextAreaElement | null>(null);
+  useLayoutEffect(() => {
+    const t = el.current;
+    if (!t) return;
+    t.style.height = 'auto';
+    t.style.height = `${t.scrollHeight}px`;
+  }, [s.text]);
+  const read = () => { if (el.current) onSelect(el.current); };
+  return (
+    <textarea
+      ref={(t) => { el.current = t; fieldRef(t); }}
+      className={`b-sc-page-body${marked ? ' marked' : ''}`}
+      value={s.text}
+      placeholder={placeholder}
+      aria-label={s.heading === null ? 'Text' : `Text of ${s.heading || 'untitled section'}`}
+      onChange={(e) => { onText(e.target.value); onSelect(e.target); }}
+      onSelect={read}
+      onKeyUp={read}
+      onMouseUp={read}
+    />
+  );
+}
+
 export function SchoolWriting({ onToast }: { onToast: SchoolToast }) {
   const school = useSchool();
   const docs = useMemo(() => [...school.docs].sort((a, b) => b.updated - a.updated), [school.docs]);
   const [activeId, setActiveId] = useState<string | null>(() => docs[0]?.id ?? null);
   const doc = activeId ? school.docs.find((d) => d.id === activeId) ?? null : null;
-  const body = useRef<HTMLTextAreaElement | null>(null);
+  // The selection as offsets into the whole document, whichever section it is in.
   const [sel, setSel] = useState<{ start: number; end: number }>({ start: 0, end: 0 });
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [notes, setNotes] = useState<string[]>([]);
+  const [markNote, setMarkNote] = useState<string | null>(null);
+  const [markSection, setMarkSection] = useState<number | null>(null);
+  const fields = useRef(new Map<number, HTMLTextAreaElement>());
+  const markTimer = useRef<number | null>(null);
   const rewriter = useAsk();
   const reader = useAsk();
   const { cancel: stopRewrite } = rewriter;
@@ -48,21 +98,16 @@ export function SchoolWriting({ onToast }: { onToast: SchoolToast }) {
     stopRewrite();
     stopReading();
     setDraft(null);
-    setNotes([]);
     setSel({ start: 0, end: 0 });
   }, [activeId, stopRewrite, stopReading]);
+  useEffect(() => () => { if (markTimer.current) window.clearTimeout(markTimer.current); }, []);
 
-  // The page grows with the text instead of scrolling inside a box.
   const text = doc?.body ?? '';
-  useLayoutEffect(() => {
-    const el = body.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight}px`;
-  }, [text, activeId]);
+  const sections = useMemo(() => parseSections(text), [text]);
+  const placed = useMemo(() => placeNotes(doc?.notes ?? [], sections), [doc?.notes, sections]);
 
   const create = () => {
-    const d: Doc = { id: uid('doc'), title: '', body: '', updated: Date.now(), min: null, max: null, atlasEdits: 0 };
+    const d: Doc = { id: uid('doc'), title: '', body: '', updated: Date.now(), min: null, max: null, atlasEdits: 0, notes: [] };
     updateSchool((s) => ({ ...s, docs: [...s.docs, d] }));
     setActiveId(d.id);
   };
@@ -72,9 +117,9 @@ export function SchoolWriting({ onToast }: { onToast: SchoolToast }) {
     onToast(`Deleted “${d.title || 'Untitled'}”`, () => updateSchool((s) => ({ ...s, docs: [...s.docs, d] })));
   };
 
-  const readSelection = () => {
-    const el = body.current;
-    if (el) setSel({ start: el.selectionStart, end: el.selectionEnd });
+  const setBody = (fn: (body: string) => string) => {
+    if (!doc) return;
+    patchDoc(doc.id, (d) => ({ ...d, body: fn(d.body), updated: Date.now() }));
   };
 
   const hasSelection = sel.end > sel.start;
@@ -117,30 +162,64 @@ export function SchoolWriting({ onToast }: { onToast: SchoolToast }) {
     }
   };
 
+  /** Notes are kept with the document, each anchored to its section by heading ('' before the first heading). */
   const askNotes = async () => {
     if (!doc || !text.trim()) return;
-    const out = await reader.ask(marginPrompt(doc.title, text));
+    const id = doc.id;
+    const asked = sections;
+    const out = await reader.ask(anchoredMarginPrompt(doc.title, sectionsForPrompt(asked), asked.length));
     if (out === null) return;
-    const parsed = parseNotes(out);
-    setNotes(parsed);
-    if (!parsed.length) onToast('Nothing to point out right now. Keep writing.');
+    const notes: MarginNote[] = parseAnchoredNotes(out, asked.length).map((n) => {
+      const s = n.section !== null ? asked[n.section - 1] : null;
+      return { id: uid('note'), text: n.text, anchor: s ? s.heading ?? '' : null };
+    });
+    patchDoc(id, (d) => ({ ...d, notes }));
+    if (!notes.length) onToast('Nothing to point out right now. Keep writing.');
+  };
+
+  const dismissNote = (id: string) => {
+    if (!doc) return;
+    const docId = doc.id;
+    const before = doc.notes;
+    patchDoc(docId, (d) => ({ ...d, notes: d.notes.filter((n) => n.id !== id) }));
+    onToast('Note dismissed', () => patchDoc(docId, (d) => ({ ...d, notes: before })));
+  };
+
+  const mark = (note: string | null, section: number | null) => {
+    setMarkNote(note);
+    setMarkSection(section);
+    if (markTimer.current) window.clearTimeout(markTimer.current);
+    markTimer.current = window.setTimeout(() => { setMarkNote(null); setMarkSection(null); }, MARK_MS);
+  };
+
+  /** The note's number in the margin points at its section: the field is focused and marked. */
+  const pointAtSection = (note: MarginNote, section: Section | null) => {
+    mark(note.id, section?.index ?? null);
+    if (section) fields.current.get(section.index)?.focus();
+  };
+
+  /** A number beside a heading points at its note in the margin. */
+  const pointAtNote = (note: MarginNote, section: Section) => {
+    mark(note.id, section.index);
+    document.getElementById(`b-sc-note-${note.id}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   };
 
   if (!doc) {
     return (
       <section className="b-sc-card b-sc-blank" aria-label="Writing">
         <span className="b-sc-h2">Write something of your own</span>
-        <p className="b-sc-muted">A plain page, kept on this Mac. Atlas can rewrite a passage you choose, or leave questions in the margin; it never writes into your text unless you say so.</p>
+        <p className="b-sc-muted">A plain page in sections, kept on this Mac. Atlas can rewrite a passage you choose, or leave questions in the margin; it never writes into your text unless you say so.</p>
         <button type="button" className="b-btn b-btn--primary" onClick={create}>New document</button>
       </section>
     );
   }
 
-  const words = wordCount(text);
+  const words = wordCount(text.replace(/^#{1,3}[ \t]+/gm, ''));
   const state = lengthState(words, doc.min, doc.max);
   const goal = doc.max ?? doc.min;
   const pct = goal ? Math.min(100, Math.round((words / goal) * 100)) : 0;
   const draftLabel = REWRITES.find((r) => r.key === draft?.mode)?.label ?? '';
+  const titled = sections.some((s) => s.heading !== null);
 
   return (
     <div className="b-sc-tools">
@@ -152,17 +231,41 @@ export function SchoolWriting({ onToast }: { onToast: SchoolToast }) {
           aria-label="Title"
           onChange={(e) => { const v = e.target.value; patchDoc(doc.id, (d) => ({ ...d, title: v, updated: Date.now() })); }}
         />
-        <textarea
-          ref={body}
-          className="b-sc-page-body"
-          value={text}
-          placeholder="Start writing. Select a passage to ask Atlas for a shorter, clearer or more formal version of it."
-          aria-label="Text"
-          onChange={(e) => { const v = e.target.value; patchDoc(doc.id, (d) => ({ ...d, body: v, updated: Date.now() })); readSelection(); }}
-          onSelect={readSelection}
-          onKeyUp={readSelection}
-          onMouseUp={readSelection}
-        />
+        {sections.map((s) => {
+          const mine = placed.filter((p) => p.section?.index === s.index);
+          return (
+            <div key={s.index} className="b-sc-sec">
+              {s.heading !== null || (titled && s.text) || mine.length ? (
+                <div className="b-sc-sec-head">
+                  {s.heading !== null ? (
+                    <input
+                      className="b-sc-sec-name"
+                      value={s.heading}
+                      placeholder="Section heading"
+                      aria-label="Section heading"
+                      onChange={(e) => { const v = e.target.value; setBody((b) => renameHeading(b, parseSections(b)[s.index] ?? s, v)); }}
+                    />
+                  ) : <span className="b-sc-sec-name">Before the first heading</span>}
+                  {mine.map((p) => (
+                    <button type="button" key={p.note.id} className={`b-sc-margin-n${markNote === p.note.id ? ' on' : ''}`} aria-label={`Note ${p.n}`} onClick={() => pointAtNote(p.note, s)}>{p.n}</button>
+                  ))}
+                  {s.heading !== null ? (
+                    <button type="button" className="b-sc-x" aria-label={`Remove the heading ${s.heading || 'untitled'}`} title="Remove the heading; its text joins the section above" onClick={() => setBody((b) => removeHeading(b, parseSections(b)[s.index] ?? s))}>×</button>
+                  ) : null}
+                </div>
+              ) : null}
+              <SectionField
+                s={s}
+                marked={markSection === s.index}
+                placeholder={s.index === 0 && !titled ? 'Start writing. A line that starts with “# ” begins a new section.' : 'Write this section.'}
+                fieldRef={(el) => { if (el) fields.current.set(s.index, el); else fields.current.delete(s.index); }}
+                onText={(v) => setBody((b) => replaceSectionText(b, parseSections(b)[s.index] ?? s, v))}
+                onSelect={(el) => setSel({ start: s.textStart + el.selectionStart, end: s.textStart + el.selectionEnd })}
+              />
+            </div>
+          );
+        })}
+        <button type="button" className="b-btn b-btn--ghost b-btn--row b-sc-addsec" onClick={() => setBody((b) => appendSection(b, 'New section'))}>+ Section</button>
       </section>
 
       <aside className="b-sc-side">
@@ -207,15 +310,15 @@ export function SchoolWriting({ onToast }: { onToast: SchoolToast }) {
           {rewriter.error ? <p className="b-sc-err" role="alert">{rewriter.error}</p> : null}
 
           <div className="b-sc-list-head b-sc-list-head--sub">
-            <span className="b-sc-h3">In the margin</span>
-            <button type="button" className="b-btn b-btn--card b-btn--row" disabled={reader.busy || !text.trim()} onClick={() => void askNotes()}>{reader.busy ? 'Reading…' : notes.length ? 'Read again' : 'Ask for notes'}</button>
+            <span className="b-sc-h3">Atlas in the margin</span>
+            <button type="button" className="b-btn b-btn--card b-btn--row" disabled={reader.busy || !text.trim()} onClick={() => void askNotes()}>{reader.busy ? 'Reading…' : placed.length ? 'Read again' : 'Ask for notes'}</button>
           </div>
-          <p className="b-sc-muted">Questions and pointers, never rewrites. They stay here, beside the page.</p>
-          {notes.map((n, i) => (
-            <div key={`${i}-${n.slice(0, 12)}`} className="b-sc-margin">
-              <span className="b-sc-margin-n">{i + 1}</span>
-              <p>{n}</p>
-              <button type="button" className="b-sc-x" aria-label="Dismiss note" onClick={() => setNotes((list) => list.filter((_, j) => j !== i))}>×</button>
+          <p className="b-sc-muted">Questions and pointers, never rewrites. Each is numbered for the section it is about.</p>
+          {placed.map((p) => (
+            <div key={p.note.id} id={`b-sc-note-${p.note.id}`} className={`b-sc-margin${markNote === p.note.id ? ' on' : ''}`}>
+              <button type="button" className="b-sc-margin-n" aria-label={p.section ? `Go to ${p.section.heading || 'the section'}` : `Note ${p.n}`} onClick={() => pointAtSection(p.note, p.section)}>{p.n}</button>
+              <p><small>{p.section ? (p.section.heading === null ? 'Before the first heading' : p.section.heading || 'Untitled section') : 'The whole text'}</small>{p.note.text}</p>
+              <button type="button" className="b-sc-x" aria-label="Dismiss note" onClick={() => dismissNote(p.note.id)}>×</button>
             </div>
           ))}
           {reader.error ? <p className="b-sc-err" role="alert">{reader.error}</p> : null}
