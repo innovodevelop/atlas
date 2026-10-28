@@ -748,6 +748,63 @@ pub fn db_delete(
     Ok(out)
 }
 
+// --------------------------------------------------------------------------
+// The audit trail's own writer (control/audit.rs)
+// --------------------------------------------------------------------------
+
+/// Only the audit tables, and only from Rust.
+///
+/// WHY THESE EXIST. `refuse_audit_write` guards the bodies of `db_insert` and
+/// `db_update`, not just their IPC entry, and control/audit.rs wrote its rows
+/// through those same functions. So from the day the guard landed every
+/// audited control-port write failed closed ("audit write failed: tool_calls is
+/// Atlas's audit trail"), and nothing could be queued for approval or settled
+/// once answered. The webview must stay refused; the app itself must not. These
+/// two are the app's path: crate-private, so no IPC can reach them, and pinned
+/// to `AUDIT_TABLES`, so they cannot become a general unguarded writer.
+fn audit_table(table: &str) -> Result<(), String> {
+    if AUDIT_TABLES.contains(&table) {
+        Ok(())
+    } else {
+        Err(format!("{table} is not an audit table; write it through the generic commands"))
+    }
+}
+
+/// Insert audit rows, past the webview guard. Emits `db:changed` like
+/// `db_insert`, so an approvals card appears without a reload.
+pub(crate) fn audit_insert(
+    app: &tauri::AppHandle,
+    state: &DbState,
+    table: &str,
+    values: Json,
+) -> Result<Json, String> {
+    audit_table(table)?;
+    let out = {
+        let conn = state.conn.lock().map_err(|e| e.to_string())?;
+        insert(&conn, table, &values)?
+    };
+    let _ = app.emit("db:changed", serde_json::json!({ "table": table, "op": "insert" }));
+    Ok(out)
+}
+
+/// Update audit rows, past the webview guard. Same contract as `db_update`:
+/// equality filters, non-empty, and the updated rows back.
+pub(crate) fn audit_update(
+    app: &tauri::AppHandle,
+    state: &DbState,
+    table: &str,
+    filters: Map<String, Json>,
+    patch: Map<String, Json>,
+) -> Result<Json, String> {
+    audit_table(table)?;
+    let out = {
+        let conn = state.conn.lock().map_err(|e| e.to_string())?;
+        update(&conn, table, &filters, &patch)?
+    };
+    let _ = app.emit("db:changed", serde_json::json!({ "table": table, "op": "update" }));
+    Ok(out)
+}
+
 /// Hybrid semantic+lexical memory retrieval (local recall_memories).
 #[tauri::command]
 pub fn memory_recall(
@@ -839,6 +896,40 @@ mod tests {
         assert!(refuse_audit_write("mail_audit_events", "insert").is_ok());
         assert!(refuse_audit_write("mail_audit_events", "update").is_err());
         assert!(refuse_audit_write("mail_audit_events", "delete").is_err());
+    }
+
+    /// The app's own audit writer takes the audit tables and nothing else, so
+    /// it cannot turn into a way around the generic commands' checks.
+    #[test]
+    fn the_audit_writer_takes_only_audit_tables() {
+        for table in AUDIT_TABLES {
+            assert!(audit_table(table).is_ok(), "{table}");
+        }
+        for table in ["user_tasks", "user_notes", "runs", "atlas_secrets"] {
+            assert!(audit_table(table).is_err(), "{table}");
+        }
+    }
+
+    /// What control/audit.rs writes, written through the same core fns the
+    /// audit writer wraps: a run-linked call and its card. This is the write
+    /// the guard used to refuse.
+    #[test]
+    fn an_audit_row_can_carry_its_run() {
+        let db = DbState::open_in_memory().unwrap();
+        let conn = db.conn.lock().unwrap();
+        conn.execute_batch(
+            "INSERT INTO agents (id, user_id, name, system_prompt) VALUES ('a1', 'u1', 'Mail', 'p');
+             INSERT INTO runs (id, user_id, agent_id, goal_text) VALUES ('r1', 'u1', 'a1', 'tidy');",
+        )
+        .unwrap();
+        insert(&conn, "tool_calls", &json!({ "id": "t1", "run_id": "r1", "user_id": "u1", "tool_name": "mail.archive", "status": "awaiting_approval" })).unwrap();
+        insert(&conn, "approvals", &json!({ "id": "ap1", "run_id": "r1", "user_id": "u1", "tool_call_id": "t1", "action_summary": "archive" })).unwrap();
+        let run_id: Option<String> =
+            conn.query_row("SELECT run_id FROM approvals WHERE id = 'ap1'", [], |r| r.get(0)).unwrap();
+        assert_eq!(run_id.as_deref(), Some("r1"));
+        // A run id that names no run is refused by the foreign key, which is
+        // why control/mod.rs checks ownership before it sends one.
+        assert!(insert(&conn, "tool_calls", &json!({ "id": "t2", "run_id": "nope", "user_id": "u1", "tool_name": "x" })).is_err());
     }
 
     #[test]

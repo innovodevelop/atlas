@@ -2,4 +2,6 @@
 # will have compiled files and executables
 /target/
 /gen/schemas
-binaries/
+# No trailing slash: a worktree links binaries to the main checkout's folder,
+# and `binaries/` matches only a directory, so the link itself got committed.
+binaries

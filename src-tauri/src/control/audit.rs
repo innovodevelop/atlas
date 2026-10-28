@@ -374,10 +374,10 @@ pub fn expires_iso(ttl_secs: i64) -> String {
 
 /// Insert one `tool_calls` row and return its id.
 ///
-/// Goes through `db::db_insert` rather than raw rusqlite for one reason beyond
-/// reuse: it emits `db:changed`, which is what the frontend's realtime shim
-/// listens to. Without that event the approvals card would not appear until the
-/// user happened to reload.
+/// Goes through `db::audit_insert` rather than raw rusqlite for one reason
+/// beyond reuse: it emits `db:changed`, which is what the frontend's realtime
+/// shim listens to. Without that event the approvals card would not appear
+/// until the user happened to reload.
 fn insert_tool_call(
     app: &AppHandle,
     ctx: &Ctx,
@@ -385,6 +385,7 @@ fn insert_tool_call(
     redacted_args: &Value,
     status: &str,
     requires_approval: bool,
+    run_id: Option<&str>,
 ) -> Result<String, String> {
     let state = app
         .try_state::<crate::db::DbState>()
@@ -392,12 +393,15 @@ fn insert_tool_call(
 
     let id = uuid::Uuid::new_v4().to_string();
     let args_json = serde_json::to_string(redacted_args).map_err(|e| e.to_string())?;
-    // `run_id` and `step_id` are left NULL. Nothing writes `runs` yet, and the
-    // FK is nullable with ON DELETE SET NULL, so a null is legal and honest —
-    // inventing a run id to fill the column would put a dangling reference in
+    // `run_id` is the agent run that made the call, when one did: the brain's
+    // runner sends it, chat and the digest belong to no run. mod.rs hands it
+    // over only after checking that the run exists and is this caller's, so it
+    // never dangles. `step_id` stays NULL: the brain numbers its own steps, and
+    // inventing a step id to fill the column would put a dangling reference in
     // the one table that is supposed to be trustworthy.
     let row = json!({
         "id": id,
+        "run_id": run_id,
         "user_id": ctx.user_id,
         "tool_name": op.name,
         "args_json": args_json,
@@ -405,7 +409,7 @@ fn insert_tool_call(
         "requires_approval": requires_approval,
         "sandboxed": false,
     });
-    crate::db::db_insert(app.clone(), state, "tool_calls".to_string(), row)?;
+    crate::db::audit_insert(app, state.inner(), "tool_calls", row)?;
     Ok(id)
 }
 
@@ -419,8 +423,9 @@ pub fn record_running(
     ctx: &Ctx,
     op: &Op,
     redacted_args: &Value,
+    run_id: Option<&str>,
 ) -> Result<String, String> {
-    insert_tool_call(app, ctx, op, redacted_args, "running", false)
+    insert_tool_call(app, ctx, op, redacted_args, "running", false, run_id)
 }
 
 /// Close out a dispatched call. Best-effort by necessity — the op has already
@@ -450,10 +455,10 @@ pub fn finish(app: &AppHandle, tool_call_id: &str, outcome: &Result<Value, Strin
 
     let mut filters = Map::new();
     filters.insert("id".into(), json!(tool_call_id));
-    if let Err(e) = crate::db::db_update(
-        app.clone(),
-        state,
-        "tool_calls".to_string(),
+    if let Err(e) = crate::db::audit_update(
+        app,
+        state.inner(),
+        "tool_calls",
         filters,
         patch,
     ) {
@@ -500,8 +505,10 @@ pub fn queue(
     redacted_args: &Value,
     object: Option<&CardObject>,
     reason: &str,
+    run_id: Option<&str>,
 ) -> Result<Queued, String> {
-    let tool_call_id = insert_tool_call(app, ctx, op, redacted_args, "awaiting_approval", true)?;
+    let tool_call_id =
+        insert_tool_call(app, ctx, op, redacted_args, "awaiting_approval", true, run_id)?;
     let action_summary = action_summary(op, redacted_args, object);
     let risk_level = policy::risk_level(op.tier);
     let expires_at = expires_iso(APPROVAL_TTL_SECS);
@@ -512,6 +519,9 @@ pub fn queue(
         .ok_or_else(|| "the local database is not open yet".to_string())?;
     let row = json!({
         "id": approval_id,
+        // The run the card belongs to, so the Agent View can show the question
+        // inside that run's plan. The same checked id as the tool_calls row.
+        "run_id": run_id,
         "user_id": ctx.user_id,
         "tool_call_id": tool_call_id,
         "action_summary": action_summary,
@@ -523,7 +533,7 @@ pub fn queue(
         "reason": sanitize(reason, ARGS_MAX),
         "expires_at": expires_at,
     });
-    if let Err(e) = crate::db::db_insert(app.clone(), state, "approvals".to_string(), row) {
+    if let Err(e) = crate::db::audit_insert(app, state.inner(), "approvals", row) {
         // The tool_call row is already in `awaiting_approval` with nothing that
         // can ever resolve it. Close it out rather than leaving a permanent
         // phantom in the queue view.
@@ -584,10 +594,10 @@ pub fn settle_approval(
     );
     patch.insert("approved_by".into(), json!(approved_by));
     patch.insert("approved_at".into(), json!(now_iso()));
-    let rows = crate::db::db_update(
-        app.clone(),
-        state,
-        "approvals".to_string(),
+    let rows = crate::db::audit_update(
+        app,
+        state.inner(),
+        "approvals",
         filters,
         patch,
     )?;
@@ -610,10 +620,10 @@ pub fn expire_approval(app: &AppHandle, approval_id: &str, reason: &str) -> Resu
     patch.insert("approved_by".into(), json!("system"));
     patch.insert("approved_at".into(), json!(now_iso()));
     patch.insert("reason".into(), json!(reason));
-    let rows = crate::db::db_update(
-        app.clone(),
-        state,
-        "approvals".to_string(),
+    let rows = crate::db::audit_update(
+        app,
+        state.inner(),
+        "approvals",
         filters,
         patch,
     )?;
@@ -630,10 +640,10 @@ pub fn record_rejected(app: &AppHandle, tool_call_id: &str) {
     let mut patch = Map::new();
     patch.insert("status".into(), json!("rejected"));
     patch.insert("completed_at".into(), json!(now_iso()));
-    if let Err(e) = crate::db::db_update(
-        app.clone(),
-        state,
-        "tool_calls".to_string(),
+    if let Err(e) = crate::db::audit_update(
+        app,
+        state.inner(),
+        "tool_calls",
         filters,
         patch,
     ) {
@@ -652,10 +662,10 @@ pub fn record_resumed(app: &AppHandle, tool_call_id: &str) -> Result<(), String>
     filters.insert("id".into(), json!(tool_call_id));
     let mut patch = Map::new();
     patch.insert("status".into(), json!("running"));
-    crate::db::db_update(
-        app.clone(),
-        state,
-        "tool_calls".to_string(),
+    crate::db::audit_update(
+        app,
+        state.inner(),
+        "tool_calls",
         filters,
         patch,
     )?;
@@ -679,6 +689,35 @@ pub fn load_approval(app: &AppHandle, approval_id: &str) -> Result<Option<Value>
         Some(1),
     )?;
     Ok(rows.as_array().and_then(|a| a.first().cloned()))
+}
+
+/// Could this string be a `runs.id`? Ids are uuids the webview or the brain
+/// generated; anything else is not looked up at all.
+pub fn plausible_run_id(id: &str) -> bool {
+    !id.is_empty() && id.len() <= 64 && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+}
+
+/// The caller's run id, if it names a run that belongs to this caller.
+///
+/// The brain's agent runner puts `run_id` in the envelope so the rows a call
+/// writes land under the run that made it. It is a claim off the wire, so it is
+/// checked here rather than trusted: a run id that is malformed, unknown or
+/// another account's is dropped (the call is still audited, just under no
+/// run), never written, because `tool_calls.run_id` and `approvals.run_id` are
+/// foreign keys and a dangling one would fail the audit write and with it the
+/// call.
+pub fn owned_run(app: &AppHandle, user_id: &str, run_id: Option<&str>) -> Option<String> {
+    let run_id = run_id?.trim();
+    if user_id.is_empty() || !plausible_run_id(run_id) {
+        return None;
+    }
+    let state = app.try_state::<crate::db::DbState>()?;
+    let mut filters = Map::new();
+    filters.insert("id".into(), json!(run_id));
+    filters.insert("user_id".into(), json!(user_id));
+    let rows = crate::db::db_select(state, "runs".to_string(), Some(filters), None, None, Some(1)).ok()?;
+    let found = rows.as_array().is_some_and(|a| !a.is_empty());
+    found.then(|| run_id.to_string())
 }
 
 // ---------------------------------------------------------------------------
@@ -861,10 +900,10 @@ fn abandon_tool_call(app: &AppHandle, tool_call_id: &str, from_status: &str) -> 
         "error_message".into(),
         json!("Atlas exited while this call was in flight; its outcome is unknown."),
     );
-    match crate::db::db_update(
-        app.clone(),
-        state,
-        "tool_calls".to_string(),
+    match crate::db::audit_update(
+        app,
+        state.inner(),
+        "tool_calls",
         filters,
         patch,
     ) {
@@ -880,6 +919,17 @@ fn abandon_tool_call(app: &AppHandle, tool_call_id: &str, from_status: &str) -> 
 mod tests {
     use super::*;
     use crate::control::Tier;
+
+    /// A run id off the wire is looked up only when it could be one; prose,
+    /// SQL and paths are dropped before any query is built from them.
+    #[test]
+    fn only_a_plausible_run_id_is_looked_up() {
+        assert!(plausible_run_id("0f8f2a1e-6c9b-4e2a-9a1d-2b7c5e4f0a11"));
+        assert!(plausible_run_id("r1"));
+        for bad in ["", "r1; DROP TABLE runs", "../runs", "r 1", "r1\n", &"a".repeat(65)] {
+            assert!(!plausible_run_id(bad), "{bad:?}");
+        }
+    }
 
     fn fake_op(name: &'static str, tier: Tier, summary_keys: Option<&'static [&'static str]>) -> Op {
         Op {
