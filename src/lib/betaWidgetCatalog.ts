@@ -227,7 +227,7 @@ export const EMPTY_COPY: Record<string, EmptySpec> = {
   sleep: { title: 'No sleep yet', hint: 'Import a Health export and last night shows here, stage by stage.', action: { label: 'Open Health', route: '/health' } },
   home: { title: 'No home hub', hint: 'Connect Home Assistant and your rooms, temperatures and the front door show here.', action: { label: 'Open Smart Home', route: '/smart-home' } },
   energy: { title: 'Not wired yet', hint: 'No energy meter is connected yet; this widget arrives with one.' },
-  podcast: { title: 'Not wired yet', hint: 'There is no podcast source in Atlas yet.' },
+  podcast: { title: 'No episode started', hint: 'Follow a show on Spotify and play an episode through Atlas; where you stopped shows here.' },
   focus: { title: 'No focus yet today', hint: 'Start a 25 or 50 minute session and Atlas holds its own notifications until it ends.' },
   upnext: { title: 'Nothing coming up', hint: 'Your next events show here, with how long until each.', action: { label: 'Block focus time', ask: 'Block an hour of focus time in my calendar this afternoon.' } },
   fx: { title: 'No rate yet', hint: 'Rates are the European Central Bank’s daily reference, fetched through the Mac app with no key.' },

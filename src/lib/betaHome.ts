@@ -52,13 +52,14 @@ export interface WidgetDef {
 }
 
 /** The full views Home can open under its band (components/atlas/home/views/FullView.tsx). */
-export type HomeViewKey = 'weather' | 'calendar' | 'tasks' | 'stocks' | 'email' | 'news' | 'music' | 'focus' | 'fx';
+export type HomeViewKey = 'weather' | 'calendar' | 'tasks' | 'stocks' | 'email' | 'news' | 'music' | 'focus' | 'fx' | 'podcast';
 
 /**
  * Every widget Home can show, in the handoff's catalog order. `source` is
- * honest per widget: Energy and Podcast have no source in the app yet and are
- * listed so the editor can say so, not so a fake card can be added. Focus,
- * Up next and Currency came with the Beta's left-out features (package F6).
+ * honest per widget: Energy has no source in the app yet and is listed so
+ * the editor can say so, not so a fake card can be added. Focus, Up next and
+ * Currency came with the Beta's left-out features (package F6), Podcast with
+ * package F4.
  */
 export const WIDGETS: readonly WidgetDef[] = [
   { id: 'weather', label: 'Weather', meta: 'Now, the next hours, sunrise and sunset', group: 'Day', sizes: ['S', 'M', 'L'], defaultSize: 'L', source: 'live', opens: { view: 'weather' } },
@@ -77,7 +78,7 @@ export const WIDGETS: readonly WidgetDef[] = [
   { id: 'sleep', label: 'Sleep', meta: 'Last night, by stage', group: 'Body', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/health' } },
   { id: 'home', label: 'Home', meta: 'Rooms, temperatures, the front door', group: 'Home', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/smart-home' } },
   { id: 'energy', label: 'Energy', meta: 'No energy meter is connected yet', group: 'Home', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'unwired', opens: { route: '/smart-home' } },
-  { id: 'podcast', label: 'Podcast', meta: 'No podcast source yet', group: 'Media', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'unwired', opens: null },
+  { id: 'podcast', label: 'Podcast', meta: 'Your Spotify shows, where you stopped', group: 'Media', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'live', opens: { view: 'podcast' } },
   { id: 'focus', label: 'Focus', meta: 'A timer that holds Atlas’s notifications', group: 'Day', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'live', opens: { view: 'focus' } },
   { id: 'upnext', label: 'Up next', meta: 'Your next events, with how long until each', group: 'Day', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'live', opens: { view: 'calendar' } },
   { id: 'fx', label: 'Currency', meta: 'ECB reference rates for the pair you pick', group: 'Money', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { view: 'fx' } },

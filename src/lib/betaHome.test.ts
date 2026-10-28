@@ -77,8 +77,8 @@ describe('Beta Home model', () => {
     s = editorReducer(s, { type: 'add', id: 'sleep' });
     expect(s.slots.filter((x) => x.id === 'sleep')).toHaveLength(1);
     // Unwired widgets cannot be added: no fake card.
-    s = editorReducer(s, { type: 'add', id: 'podcast' });
-    expect(s.slots.some((x) => x.id === 'podcast')).toBe(false);
+    s = editorReducer(s, { type: 'add', id: 'focus' });
+    expect(s.slots.some((x) => x.id === 'focus')).toBe(false);
     s = editorReducer(s, { type: 'remove', id: 'inbox' });
     expect(s.slots.some((x) => x.id === 'inbox')).toBe(false);
     s = editorReducer(s, { type: 'layout', layout: 'grid' });
