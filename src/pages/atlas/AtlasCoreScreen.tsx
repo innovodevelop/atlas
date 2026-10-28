@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Sparkles, Brain, Search, AlertTriangle, Activity,
   Database, DownloadCloud, Cpu, CheckCircle2, FileText, BookOpen, Loader, Clock, Radio, Bot, Zap,
@@ -14,6 +14,17 @@ import { errorSeverityGlyph, useAtlasErrorLog } from '@/hooks/useAtlasErrorLog';
 import { EDITION, surfaceByPath } from '@/surfaces';
 import { isBetaUi } from '@/lib/betaFlag';
 import { CoreHero } from '@/components/atlas/BetaScreenHero';
+import { AtlasIcon } from '@/components/atlas/AtlasIcon';
+import type { IconName } from '@/components/atlas/icons';
+import { useBetaNavigate } from '@/lib/viewTransitions';
+import {
+  QUEUE_STATUSES, agoLabel, coreEscapeStep, coreHeroLine, coreOverviewTiles, coreTabFromHash,
+  coreTabIntro, coreTabStrip, errorDot, indexingRow, researchRunning, researchTag, type ErrorDot, type TagTone,
+} from '@/lib/betaCore';
+import { escapeAction } from '@/lib/betaScreenKeys';
+// Every rule in it is scoped to the Beta classes below, so importing it with
+// the flag off changes nothing on the Workshop screen.
+import '@/styles/beta/core.css';
 
 /**
  * Registration data. Mirrored in `src/surfaces.ts`, which is what the router,
@@ -71,10 +82,33 @@ export function visibleTabs(edition: string = EDITION): typeof TABS {
   return TABS.filter((t) => allowed.includes(t.key));
 }
 
+/**
+ * The Beta hero's intro for the three operator tabs. Written here, behind the
+ * edition literal, and not in src/lib/betaCore.ts: Rollup folds `EDITION` to a
+ * constant and drops this object from a consumer build, the same way
+ * AtlasCoreTabs drops the panels themselves, so copy about tabs a consumer
+ * never sees does not ship to one.
+ */
+const ADMIN_TAB_INTROS: Readonly<Record<string, string>> = EDITION === 'admin'
+  ? {
+      live: 'The raw event stream from the brain, as it happens.',
+      agent: 'Agents, the approvals they are waiting on, and every tool call they made.',
+      learning: 'Validation rates and pipeline metrics for what Atlas learns.',
+    }
+  : {};
+
+/**
+ * The screen. The beta_ui flag picks the body once per load (it is read at
+ * boot and a change reloads the window), so the two bodies are two components
+ * rather than one with branches through it: with the flag off the Workshop
+ * component below is the screen exactly as it was.
+ */
+const AtlasCoreScreen = () => (isBetaUi() ? <BetaCoreScreen /> : <WorkshopCoreScreen />);
+
 // Atlas Atlas Core — Intelligence Center (design: Atlas — Atlas Core).
 // Top stats are wired to useAtlasHealth; the overview panels use the design's
 // curated content.
-const AtlasCoreScreen = () => {
+const WorkshopCoreScreen = () => {
   const navigate = useNavigate();
   const [tab, setTab] = useState('overview');
   const tabs = visibleTabs();
@@ -86,16 +120,6 @@ const AtlasCoreScreen = () => {
   return (
     <div className="overlay" data-screen-label="Atlas — Atlas Core">
       <div className="ovwash" />
-      {/* Beta phase 3: the ink orbit-lab hero replaces the header and the orb
-          below (both hidden by beta.css while the flag is on); the body stays. */}
-      {isBetaUi() ? (
-        <CoreHero
-          eyebrow={`Atlas Core · ${(stats?.knowledgeCount ?? 0).toLocaleString()} known · ${stats?.activeResearch ?? 0} researching`}
-          title="Core"
-          intro="What Atlas knows, what it is researching, and how well it is running. All of it on this Mac; none of it leaves without you."
-          state={(stats?.activeResearch ?? 0) > 0 ? 'working' : 'idle'}
-        />
-      ) : null}
       <header className="corehead">
         <Button variant="text" icon={<ArrowLeft className="i16" />} onClick={() => navigate('/')}>Back to Dashboard</Button>
         <div className="fx ac gap12">
@@ -273,6 +297,246 @@ function QRow({ running, title, meta, pct }: { running?: boolean; title: string;
 }
 function ErrRow({ sev, msg, meta }: { sev: 'e' | 'w' | 'i'; msg: string; meta: string }) {
   return <Row lead={<span className={`errsev sev-${sev}`} />} title={msg} meta={meta} />;
+}
+
+// ── Beta (Atlas Core Beta.dc.html) ──────────────────────────────────────────
+//
+// The same tabs, the same edition filter and the same hooks as the Workshop
+// screen above; only the body is drawn the design's way. The open tab lives in
+// the URL hash (`/atlas-core#memory`), which is how Architecture's "See
+// exactly what Atlas remembers" lands on Memory, and a hash naming a tab this
+// edition hides opens Overview. Every tab but Overview is still AtlasCoreTabs'
+// own panel, restyled by core.css inside `.b-core-main`.
+
+function BetaCoreScreen() {
+  const navigate = useBetaNavigate();
+  const routeNavigate = useNavigate();
+  const location = useLocation();
+  const tabs = visibleTabs();
+  const keys = tabs.map((t) => t.key);
+  const shownTab = coreTabFromHash(location.hash, keys) ?? (keys.includes('overview') ? 'overview' : (keys[0] ?? 'overview'));
+  const { stats } = useAtlasHealth();
+  const strip = coreTabStrip(tabs, shownTab);
+  const current = strip.find((t) => t.current);
+  const canOpen = (key: string) => keys.includes(key);
+
+  // Replace, not push: switching tabs is not a place Back should walk through.
+  const openTab = useCallback((key: string) => {
+    routeNavigate(
+      { pathname: location.pathname, search: location.search, hash: key === 'overview' ? '' : `#${key}` },
+      { replace: true },
+    );
+  }, [routeNavigate, location.pathname, location.search]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const act = escapeAction(e);
+      if (act === 'blur') (e.target as HTMLElement).blur();
+      if (act !== 'step') return;
+      if (coreEscapeStep(shownTab) === 'overview') openTab('overview');
+      else navigate('/');
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [shownTab, openTab, navigate]);
+
+  return (
+    <div className="b-core" data-screen-label="Atlas — Atlas Core">
+      <CoreHero
+        eyebrow={`Atlas Core · ${(stats?.knowledgeCount ?? 0).toLocaleString()} known · ${stats?.activeResearch ?? 0} researching`}
+        title="Core"
+        intro={coreTabIntro(shownTab, ADMIN_TAB_INTROS)}
+        state={(stats?.activeResearch ?? 0) > 0 ? 'working' : 'idle'}
+      />
+      <nav className="b-core-tabs" aria-label="Core sections">
+        {strip.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            className={`b-core-tab${t.current ? ' on' : ''}`}
+            aria-current={t.current ? 'page' : undefined}
+            onClick={() => openTab(t.key)}
+          >
+            <AtlasIcon name={t.icon} size={17} weight={1.6} />
+            {t.label}
+            {t.live ? <span className="b-core-tab-live" aria-hidden /> : null}
+            {t.adminNote ? <span className="b-core-tab-admin">Admin</span> : null}
+          </button>
+        ))}
+      </nav>
+      <main className="b-core-main" aria-label={current ? `Core · ${current.label}` : 'Core'}>
+        {shownTab === 'overview'
+          ? <BetaCoreOverview stats={stats} canOpen={canOpen} onOpen={openTab} />
+          : <AtlasCoreTabs tab={shownTab} />}
+      </main>
+    </div>
+  );
+}
+
+interface BetaOverviewProps {
+  stats: ReturnType<typeof useAtlasHealth>['stats'];
+  canOpen: (key: string) => boolean;
+  onOpen: (key: string) => void;
+}
+
+/**
+ * The Beta overview: the ink knowledge card and four tiles, then the four
+ * cards the Workshop overview had — over the same four hooks, so every figure
+ * on it is one the Workshop screen already showed. Pause on a queued row is
+ * the Research tab's own `pauseResearch`.
+ */
+function BetaCoreOverview({ stats, canOpen, onOpen }: BetaOverviewProps) {
+  const { knowledge } = useAtlasKnowledge();
+  const { topics, pauseResearch } = useAtlasResearch();
+  const { errors, failed } = useAtlasErrorLog(4);
+  const now = Date.now();
+
+  const knowledgeCount = stats?.knowledgeCount ?? 0;
+  const recent = (knowledge ?? []).slice(0, 4);
+  const queue = (topics ?? []).filter((t) => QUEUE_STATUSES.includes(t.status)).slice(0, 4);
+  const queued = (topics ?? []).filter((t) => t.status === 'queued').length;
+  const tiles = coreOverviewTiles(stats
+    ? { activeResearch: stats.activeResearch, queued, errorRate: stats.errorRate, healthScore: stats.healthScore }
+    : null);
+  const indexing = indexingRow(knowledgeCount, recent[0]?.created_at, now);
+
+  return (
+    <div className="b-core-grid">
+      <div className="b-core-top">
+        <section className="b-core-know" aria-label="Knowledge">
+          <span className="b-core-know-k">Knowledge</span>
+          <div className="b-core-know-v">
+            <span className="b-core-know-n">{stats ? knowledgeCount.toLocaleString() : '—'}</span>
+            <span className="b-core-know-u">entries indexed</span>
+          </div>
+          <p className="b-core-know-line">{coreHeroLine(stats?.activeResearch ?? 0)}</p>
+          {canOpen('search') || canOpen('research') ? (
+            <div className="b-core-know-actions">
+              {canOpen('search') ? <button type="button" className="b-core-know-btn" onClick={() => onOpen('search')}>Search the brain</button> : null}
+              {canOpen('research') ? <button type="button" className="b-core-know-btn b-core-know-btn--soft" onClick={() => onOpen('research')}>Start research</button> : null}
+            </div>
+          ) : null}
+        </section>
+        <div className="b-core-tiles">
+          {tiles.map((t) => (
+            <div key={t.key} className={`b-core-tile b-core-tile--${t.tone}`}>
+              <span className="b-core-tile-k">{t.label}<AtlasIcon name={t.icon} size={17} weight={1.6} /></span>
+              <span className="b-core-tile-v">{t.value}</span>
+              <span className="b-core-tile-d">{t.detail}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <CoreCard
+        icon="document"
+        title="Recent knowledge"
+        action={canOpen('knowledge') ? { label: 'All knowledge', onClick: () => onOpen('knowledge') } : undefined}
+      >
+        {recent.map((k) => (
+          <CoreRow key={k.id} title={k.topic} sub={`${k.category} · ${(k.relevance_score ?? 0).toFixed(2)} relevance`} trail={agoLabel(k.created_at, now)} />
+        ))}
+        {recent.length === 0 ? <CoreEmpty>Nothing indexed yet.</CoreEmpty> : null}
+      </CoreCard>
+
+      <CoreCard
+        icon="teach"
+        title="Research queue"
+        action={canOpen('research') ? { label: 'Open', onClick: () => onOpen('research') } : undefined}
+      >
+        {queue.map((t) => (
+          <CoreRow
+            key={t.id}
+            chip={{ icon: 'teach', on: researchRunning(t.status) }}
+            title={t.topic}
+            sub={`${(t.sources ?? []).length} ${(t.sources ?? []).length === 1 ? 'source' : 'sources'} read`}
+            tag={researchTag(t.status)}
+            action={
+              <button type="button" className="b-btn b-btn--row" aria-label={`Pause research on ${t.topic}`} onClick={() => void pauseResearch(t.id)}>
+                Pause
+              </button>
+            }
+          />
+        ))}
+        {queue.length === 0 ? <CoreEmpty>Queue is clear.</CoreEmpty> : null}
+      </CoreCard>
+
+      <CoreCard
+        icon="download"
+        title="Indexing"
+        sub="The one figure Atlas actually measures. Throughput and pipeline counts aren’t tracked yet, so they aren’t shown."
+      >
+        <CoreRow title={indexing.title} sub={indexing.sub} trail={knowledgeCount > 0 ? 'Indexed' : undefined} trailGood />
+      </CoreCard>
+
+      <CoreCard icon="warning" title="Recent errors" note="The four newest entries in the error log, resolved or not.">
+        {(errors ?? []).map((e) => (
+          <CoreRow
+            key={e.id}
+            dot={errorDot(e.severity)}
+            title={e.error_message}
+            sub={`${e.severity} · ${new Date(e.created_at).toLocaleTimeString()}${e.resolved ? ' · resolved' : ''}`}
+          />
+        ))}
+        {/* "no errors" and "could not read the log" are different states. */}
+        {errors !== null && errors.length === 0 && !failed ? <CoreEmpty>No errors logged.</CoreEmpty> : null}
+        {failed ? <CoreEmpty error>Could not read the error log.</CoreEmpty> : null}
+      </CoreCard>
+    </div>
+  );
+}
+
+function CoreCard({ icon, title, sub, note, action, children }: {
+  icon: IconName;
+  title: string;
+  sub?: string;
+  note?: string;
+  action?: { label: string; onClick: () => void };
+  children: ReactNode;
+}) {
+  return (
+    <section className="b-core-card" aria-label={title}>
+      <div className="b-core-card-head">
+        <span className="b-core-card-ico"><AtlasIcon name={icon} size={20} weight={1.6} /></span>
+        <div className="b-core-card-titles">
+          <h2 className="b-core-card-title">{title}</h2>
+          {sub ? <p className="b-core-card-sub">{sub}</p> : null}
+        </div>
+        {action ? <button type="button" className="b-core-card-btn" onClick={action.onClick}>{action.label}</button> : null}
+      </div>
+      {children}
+      {note ? <p className="b-core-card-note">{note}</p> : null}
+    </section>
+  );
+}
+
+function CoreRow({ title, sub, trail, trailGood, dot, chip, tag, action }: {
+  title: string;
+  sub?: string;
+  trail?: string;
+  trailGood?: boolean;
+  dot?: ErrorDot;
+  chip?: { icon: IconName; on: boolean };
+  tag?: { label: string; tone: TagTone };
+  action?: ReactNode;
+}) {
+  return (
+    <div className="b-core-row">
+      {dot ? <span className={`b-core-dot b-core-dot--${dot}`} aria-hidden /> : null}
+      {chip ? <span className={`b-core-chip${chip.on ? ' on' : ''}`} aria-hidden><AtlasIcon name={chip.icon} size={16} weight={1.7} /></span> : null}
+      <div className="b-core-row-main">
+        <p className="b-core-row-t">{title}</p>
+        {sub ? <p className="b-core-row-s">{sub}</p> : null}
+      </div>
+      {tag ? <span className={`b-core-tag b-core-tag--${tag.tone}`}>{tag.label}</span> : null}
+      {trail ? <span className={`b-core-row-trail${trailGood ? ' good' : ''}`}>{trail}</span> : null}
+      {action}
+    </div>
+  );
+}
+
+function CoreEmpty({ error, children }: { error?: boolean; children: ReactNode }) {
+  return <p className={`b-core-empty${error ? ' error' : ''}`} role="status">{children}</p>;
 }
 
 export default AtlasCoreScreen;

@@ -34,7 +34,7 @@ export const surface = {
   edition: 'admin' as const,
 };
 
- const AtlasArchitecture = () => {
+ const WorkshopArchitecture = () => {
    const [activeTab, setActiveTab] = useState('overview');
  
    const tabs = [
@@ -50,23 +50,7 @@ export const surface = {
        {/* Background gradient */}
        <div className="fixed inset-0 bg-gradient-to-br from-background via-background to-primary/5 pointer-events-none" />
        
-       {/* Header — or, while the beta_ui flag is on, the Beta's isometric
-           layer-stack hero (phase 3) above the same body. */}
-       {isBetaUi() ? (
-         <ArchitectureHero
-           eyebrow="Running on this Mac · local first"
-           title="How Atlas works"
-           intro="A plain account of where your words go, what stays on this Mac, and what doesn’t."
-           layers={[
-             { label: 'You · voice and screen', tone: 'blue' },
-             { label: 'Wake word · on device', tone: 'blue-soft' },
-             { label: 'Agent and limits', tone: 'paper' },
-             { label: 'Memory · on this Mac', tone: 'paper' },
-             { label: 'Connections', tone: 'sand' },
-             { label: 'Reasoning model · remote', tone: 'ink' },
-           ]}
-         />
-       ) : (
+       {/* Header */}
        <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border/30">
          <div className="max-w-7xl mx-auto px-4 py-4">
            <div className="flex items-center justify-between">
@@ -90,8 +74,7 @@ export const surface = {
            </div>
          </div>
        </header>
-       )}
-
+ 
        <main className="relative max-w-7xl mx-auto px-4 py-8">
          {/* Hero Section */}
          <motion.div 
