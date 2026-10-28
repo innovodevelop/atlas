@@ -280,9 +280,9 @@ export const ATLAS_TOOLS: ToolDecl[] = [
 // ---------------------------------------------------------------------------
 // Desktop tools (the Rust control port)
 //
-// FIVE DOMAIN TOOLS, NOT THIRTY-ONE OPS. The control port exposes 31 ops (20
-// read, 6 write, 3 actuate, 2 approval), and declaring one tool each would be
-// the obvious translation and the wrong one:
+// A FEW DOMAIN TOOLS, NOT ONE PER OP. The control port exposes over thirty
+// ops across the read, write, actuate and approval tiers, and declaring one
+// tool each would be the obvious translation and the wrong one:
 //
 //   - Cost. Thirty-one verbose schemas is several thousand prompt tokens on
 //     EVERY turn, against ~1.5k for five.
@@ -347,6 +347,16 @@ const ATLAS_TOOL_OPS: Record<string, Record<string, string>> = {
     create_event: "events.create",
     add_to_watchlist: "watchlist.add",
   },
+  // A sixth domain, kept apart from atlas_lists because the alarms are not
+  // rows: they live in the webview's clock store. The port's clock.* ops check
+  // the arguments in Rust and ask that store, which answers for itself
+  // (src-tauri/src/control/ops_clock.rs). All three change something, so a
+  // read-only context never sees this tool at all.
+  atlas_clock: {
+    set_alarm: "clock.set_alarm",
+    stop_alarm: "clock.stop_alarm",
+    snooze_alarm: "clock.snooze_alarm",
+  },
 };
 
 /**
@@ -370,6 +380,7 @@ const ATLAS_MUTATING_OPS: ReadonlySet<string> = new Set([
   "watchlist.add",
   "music.play", "music.pause", "music.volume",
   "mail.archive", "mail.mark_read",
+  "clock.set_alarm", "clock.stop_alarm", "clock.snooze_alarm",
 ]);
 
 /**
@@ -403,6 +414,12 @@ const ATLAS_TOOL_DESCRIPTIONS: Record<string, { read: string; write: string }> =
   atlas_lists: {
     read: "Read the user's own tasks, notes, calendar events or stock watchlist from the local database.",
     write: "Read and edit the user's own tasks, notes, calendar events and stock watchlist in the local database. Creating and updating take effect immediately and are recorded; there is no delete here, so removing something is the user's own job.",
+  },
+  // Every action here mutates, so the `read` variant is never chosen; it exists
+  // to keep this record total and says only what the domain is.
+  atlas_clock: {
+    read: "The Clock in Atlas, whose alarms ring on this Mac.",
+    write: "Set an alarm on the Clock in Atlas (\"wake me at seven\"), or stop or snooze the alarm that is ringing right now. Alarms ring on this Mac, only while Atlas is running and the Mac is awake — say so when you set one. Repeat the tool's reply faithfully: when it says nothing is ringing, or that the Clock did not answer, nothing changed.",
   },
 };
 
@@ -491,6 +508,28 @@ const ATLAS_TOOL_PARAMS: Record<string, Record<string, AtlasParam>> = {
     attendees: { for: ["create_event"], schema: { type: "array", items: { type: "string" }, description: "Only for action=create_event. Up to 25 names or addresses." } },
     symbol: { for: ["add_to_watchlist"], schema: { type: "string", description: "Only for action=add_to_watchlist. A ticker such as AAPL or BRK.B." } },
     name: { for: ["add_to_watchlist"], schema: { type: "string", description: "Only for action=add_to_watchlist. The company name, if known." } },
+  },
+  atlas_clock: {
+    time: {
+      for: ["set_alarm"],
+      schema: {
+        type: "string",
+        description: "Required for action=set_alarm. 24-hour HH:MM on the user's own clock: \"wake me at seven\" is 07:00, \"half past seven tonight\" is 19:30. When morning or evening is unclear, ask rather than guess.",
+      },
+    },
+    label: { for: ["set_alarm"], schema: { type: "string", description: "Only for action=set_alarm. Optional short name, up to 60 characters, such as \"Gym\"." } },
+    days: {
+      for: ["set_alarm"],
+      schema: {
+        type: "array",
+        items: { type: "string", enum: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] },
+        description: "Only for action=set_alarm. The weekdays it repeats on; leave it out for a one-off alarm.",
+      },
+    },
+    minutes: {
+      for: ["snooze_alarm"],
+      schema: { type: "number", minimum: 1, maximum: 30, description: "Only for action=snooze_alarm. Minutes to snooze, 1 to 30; nine when left out." },
+    },
   },
 };
 

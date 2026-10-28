@@ -13,7 +13,7 @@
  * caller's `previewCopy` fills the rest. With `preview` undefined nothing
  * here runs and Home draws exactly what it drew before.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { WidgetFace, type FacePreview, type FacePreviewCopy, type FaceProps, type FaceRow, type FaceTone } from './WidgetFace';
 import { AtlasIcon } from '../AtlasIcon';
 import { WIDGET_BY_ID, type WidgetSize } from '@/lib/betaHome';
@@ -32,7 +32,12 @@ import { useNews } from '@/hooks/useNews';
 import { useMusicPlayer } from '@/hooks/useMusicPlayer';
 import { useSmartHome } from '@/hooks/useSmartHome';
 import { useHealth } from '@/hooks/useHealth';
-import { cityTimes } from '@/lib/worldClock';
+import { systemZone } from '@/lib/betaClock';
+import { useClockPrefs } from '@/lib/betaClockStore';
+// The dial faces' rules live with the Clock's; the ringing dialog that also
+// loads this file is lazy, so Home must not count on it having arrived.
+import '@/styles/beta/clock.css';
+import { citiesMeta, countdownFace, countdownTickMs, dialCount, dials, elsewhere } from '@/lib/betaClockWidgets';
 import { WATCHLIST, fmtPct } from '@/pages/atlas/atlasHelpers';
 import { eventTime, focusEvent, focusIn, thenEvents, todaysEvents } from '@/lib/stageFocus';
 
@@ -269,16 +274,85 @@ export function AirWidget(p: WidgetProps) {
   return <Card p={p} face={face} />;
 }
 
+// --- Time: all three read the Clock's own store (src/lib/betaClockStore.ts), so
+// they show the cities, alarms, timer and countdown /clock shows. The store's
+// prefs hook never ticks; each widget keeps its own, slower clock.
+
+/** The zone the Clock reads alarms in: the one it last saved, else this Mac's. */
+const clockZone = (zone: string | null): string => zone ?? systemZone();
+
 export function ClockWidget(p: WidgetProps) {
-  useTick(15000);
-  const rows = cityTimes();
-  const first = rows[0];
+  const prefs = useClockPrefs();
+  const counting = prefs.timer.running || prefs.countdown.running;
+  const now = useTick(counting ? 1000 : 15000);
+  const e = elsewhere(prefs, now, clockZone(prefs.zone));
+  const first = e.cities[0];
+  const stats = [
+    ...(e.alarm ? [{ t: e.alarm.when, s: e.alarm.label, dot: 'var(--b-blue)' }] : []),
+    ...(e.running ? [{ t: e.running.value, s: e.running.label, dot: e.running.over ? 'var(--b-red)' : 'var(--b-green)' }] : []),
+  ];
   const face: Face = {
     label: 'Elsewhere',
-    meta: `${rows.length} cities`,
+    meta: citiesMeta(e.total),
     value: first?.time ?? '—',
-    sub: first ? `${first.city} · ${first.rel}` : undefined,
-    rows: rows.map<FaceRow>((r) => ({ key: r.city, lead: r.time, title: r.city, value: r.rel, valueTone: 'muted' })),
+    delta: first?.diff,
+    deltaTone: 'muted',
+    sub: first ? first.name : 'Add cities on the Clock screen',
+    stats: stats.length ? stats : undefined,
+    rows: e.cities.map<FaceRow>((r) => ({
+      key: r.tz, lead: r.time, title: r.name, sub: r.badge === 'Today' ? undefined : r.badge, value: r.diff, valueTone: 'muted',
+    })),
+  };
+  return <Card p={p} face={face} />;
+}
+
+/** The four hour ticks of `Atlas Widgets Beta.dc.html`'s dial, in its 100-unit box. */
+const DIAL_TICKS: readonly [number, number][] = [[50, 14], [86, 50], [50, 86], [14, 50]];
+
+export function DialsWidget(p: WidgetProps) {
+  const prefs = useClockPrefs();
+  const now = useTick(15000);
+  const list = dials(clockZone(prefs.zone), prefs.cities, now, dialCount(p.size));
+  const cols = p.size === 'S' ? 1 : 3;
+  const px = p.size === 'L' ? 54 : cols === 3 ? 52 : 48;
+  const grid = { '--b-ck-dial-cols': cols, '--b-ck-dial-size': `${px}px` } as CSSProperties;
+  const face: Face = {
+    label: 'Clock dials',
+    meta: citiesMeta(prefs.cities.length),
+    children: (
+      <span className="b-ck-dials" style={grid}>
+        {list.map((d) => (
+          <span key={d.tz} className={`b-ck-dial${d.night ? ' night' : ''}`}>
+            <svg viewBox="0 0 100 100" aria-hidden>
+              <circle className="face" cx="50" cy="50" r="48" />
+              {DIAL_TICKS.map(([x, y]) => <circle key={`${x}-${y}`} className="tick" cx={x} cy={y} r="2.2" />)}
+              <line className="hand" x1="50" y1="50" x2="50" y2="28" strokeWidth="5.5" style={{ transform: `rotate(${d.hourDeg}deg)` }} />
+              <line className="hand" x1="50" y1="50" x2="50" y2="18" strokeWidth="3.2" style={{ transform: `rotate(${d.minuteDeg}deg)` }} />
+              <circle className="hub" cx="50" cy="50" r="3.4" />
+            </svg>
+            <span className="b-ck-dial-name"><b>{d.name}</b><span>{d.time} · {d.diff}</span></span>
+          </span>
+        ))}
+      </span>
+    ),
+  };
+  return <Card p={p} face={face} />;
+}
+
+export function CountdownWidget(p: WidgetProps) {
+  const prefs = useClockPrefs();
+  const c = prefs.countdown;
+  const now = useTick(countdownTickMs(c));
+  const f = countdownFace(c, now, clockZone(prefs.zone));
+  const over = f.state === 'over';
+  const face: Face = {
+    label: 'Countdown',
+    meta: f.state === 'running' || over ? 'Running' : f.state === 'paused' ? 'Paused' : undefined,
+    value: f.value,
+    delta: f.delta || undefined,
+    deltaTone: over ? 'down' : 'blue',
+    sub: f.sub,
+    bar: f.fraction != null ? { fraction: f.fraction, colour: over ? 'var(--b-red)' : 'var(--b-blue)' } : undefined,
   };
   return <Card p={p} face={face} />;
 }
@@ -436,6 +510,8 @@ const BY_ID: Record<string, (p: WidgetProps) => JSX.Element> = {
   briefing: BriefingWidget,
   air: AirWidget,
   clock: ClockWidget,
+  dials: DialsWidget,
+  countdown: CountdownWidget,
   music: MusicWidget,
   activity: ActivityWidget,
   steps: StepsWidget,
