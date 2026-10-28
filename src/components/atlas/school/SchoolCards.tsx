@@ -21,7 +21,12 @@ const NEW_DECK = '__new';
 
 export function SchoolCards({ onToast }: { onToast: SchoolToast }) {
   const school = useSchool();
-  const now = useNow(15_000);
+  // The clock ticks every 15 s; a card added or kept a moment ago is newer
+  // than the last tick, so those actions move it forward themselves. Without
+  // that, "Card added · due now" showed "Nothing due" until the next tick.
+  const tick = useNow(15_000);
+  const [touched, setTouched] = useState(0);
+  const now = Math.max(tick, touched);
   const [deckId, setDeckId] = useState<string | null>(null);
   const [flipped, setFlipped] = useState(false);
   const [target, setTarget] = useState<string>(() => school.decks[0]?.id ?? NEW_DECK);
@@ -96,7 +101,9 @@ export function SchoolCards({ onToast }: { onToast: SchoolToast }) {
   const addCard = () => {
     const id = ensureDeck();
     if (!id || !front.trim() || !back.trim()) return;
-    updateSchool((s) => ({ ...s, cards: [...s.cards, newCard(id, front, back, Date.now())] }));
+    const at = Date.now();
+    updateSchool((s) => ({ ...s, cards: [...s.cards, newCard(id, front, back, at)] }));
+    setTouched(at);
     setFront('');
     setBack('');
     onToast('Card added · due now');
@@ -117,6 +124,7 @@ export function SchoolCards({ onToast }: { onToast: SchoolToast }) {
     const at = Date.now();
     const keep = drafts.filter((d) => ids.includes(d.id));
     updateSchool((s) => ({ ...s, cards: [...s.cards, ...keep.map((d) => newCard(id, d.front, d.back, at))] }));
+    setTouched(at);
     setDrafts((list) => list.filter((d) => !ids.includes(d.id)));
     onToast(`${keep.length} ${keep.length === 1 ? 'card' : 'cards'} added`);
   };
