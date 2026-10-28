@@ -1,0 +1,157 @@
+/* ── Phase 8: the Atlas Core body ─────────────────────────────────────────────
+   Source: Atlas Core Beta.dc.html — the section strip, the linen panel the
+   tabs open into, the ink knowledge card and its four tiles, and the cards
+   with their recessed rows. Values are the design's; colours are the --b-*
+   tokens. Prefix b-core-.
+
+   Two kinds of rule. The b-core-* classes exist only in the Beta markup
+   (AtlasCoreScreen's BetaCoreScreen), so they need no scope. Every other tab
+   is still AtlasCoreTabs' own panel — Panel, Row, Empty, Button and the
+   .field inputs — and those Workshop classes are restyled here only inside
+   html[data-ui="beta"] .b-core-main, so the Workshop screen never sees them. */
+
+.b-core { display: flex; flex-direction: column; gap: var(--b-gap); min-width: 0; }
+.b-core * { box-sizing: border-box; }
+.b-core > :not(.b-hero) { margin: 0 var(--b-pad-page); }
+
+/* The section strip */
+.b-core-tabs { align-self: flex-start; max-width: calc(100% - 2 * var(--b-pad-page)); display: flex; flex-wrap: wrap; gap: 2px; padding: 5px; border-radius: 23px; background: var(--b-panel); }
+.b-core-tab { flex: none; display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 15px 0 12px; border-radius: var(--b-r-pill); background: transparent; color: var(--b-ink2); font-size: 13px; font-weight: 500; white-space: nowrap; cursor: pointer; transition: background .2s, color .2s; }
+.b-core-tab:hover { background: var(--b-hover); color: var(--b-ink); }
+.b-core-tab.on { background: var(--b-card); color: var(--b-ink); font-weight: 600; box-shadow: 0 2px 8px -3px rgba(30, 30, 36, .16); }
+.b-core-tab.on:hover { background: var(--b-card); }
+.b-core-tab-live { width: 6px; height: 6px; border-radius: 50%; background: var(--b-red); animation: b-core-pulse 1.6s ease-in-out infinite; }
+.b-core-tab-admin { font-size: 10.5px; font-weight: 600; color: var(--b-neutral); }
+@keyframes b-core-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7); } }
+
+/* The panel every tab opens into */
+.b-core-main { min-width: 0; border-radius: var(--b-r-hero); background: var(--b-panel); padding: 18px; }
+.b-core-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: min-content; gap: var(--b-gap); align-content: start; }
+
+/* Overview: the ink knowledge card and four tiles */
+.b-core-top { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: var(--b-gap); }
+.b-core-know { min-width: 0; border-radius: var(--b-r-hero); background: var(--b-ink); color: var(--b-on-ink); padding: 24px; display: flex; flex-direction: column; gap: 12px; animation: b-pop .6s var(--b-spring) both; }
+.b-core-know-k { font-size: 11px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--b-on-ink-small); }
+.b-core-know-v { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.b-core-know-n { font-family: var(--b-font-display); font-size: clamp(52px, 6vw, 84px); font-weight: 600; letter-spacing: -.05em; line-height: .9; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.b-core-know-u { font-size: 14px; font-weight: 600; color: var(--b-on-ink-body); padding-bottom: 6px; }
+.b-core-know-line { margin: 0; max-width: 440px; font-size: 13.5px; line-height: 1.55; color: var(--b-on-ink-body); text-wrap: pretty; }
+.b-core-know-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
+.b-core-know-btn { flex: none; white-space: nowrap; height: 36px; padding: 0 16px; border-radius: var(--b-r-pill); background: var(--b-card); color: var(--b-ink); font-size: 13px; font-weight: 600; cursor: pointer; transition: background .2s; }
+.b-core-know-btn:hover { background: var(--b-panel); }
+.b-core-know-btn--soft { background: rgba(249, 247, 244, .12); color: var(--b-on-ink); font-weight: 500; }
+.b-core-know-btn--soft:hover { background: rgba(249, 247, 244, .2); }
+.b-core-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--b-gap); }
+.b-core-tile { min-width: 0; border-radius: var(--b-r-card); background: var(--b-card); padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; animation: b-pop .6s var(--b-spring) both; }
+.b-core-tile-k { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--b-ink2); }
+.b-core-tile-v { font-family: var(--b-font-display); font-size: 36px; font-weight: 600; letter-spacing: -.045em; line-height: 1; color: var(--b-ink); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-core-tile--good .b-core-tile-v { color: var(--b-green-deep); }
+.b-core-tile--bad .b-core-tile-v { color: var(--b-red-deep); }
+.b-core-tile-d { font-size: 12px; color: var(--b-ink2); }
+
+/* Cards and their rows */
+.b-core-card { min-width: 0; border-radius: var(--b-r-card); background: var(--b-card); padding: 20px; display: flex; flex-direction: column; gap: var(--b-gap-row); animation: b-pop .5s var(--b-spring) both; }
+.b-core-card-head { display: flex; align-items: flex-start; gap: 12px; padding-bottom: 8px; }
+.b-core-card-ico { flex: none; display: flex; color: var(--b-ink2); padding-top: 1px; }
+.b-core-card-titles { flex: 1; min-width: 0; }
+.b-core-card-title { margin: 0; font-family: var(--b-font-display); font-size: 16px; font-weight: 600; letter-spacing: -.02em; color: var(--b-ink); }
+.b-core-card-sub { margin: 3px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--b-ink2); text-wrap: pretty; }
+.b-core-card-btn { flex: none; height: 32px; padding: 0 13px; border-radius: var(--b-r-pill); background: transparent; color: var(--b-ink2); font-size: 12.5px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background .2s, color .2s; }
+.b-core-card-btn:hover { background: var(--b-panel); color: var(--b-ink); }
+.b-core-card-note { margin: 6px 2px 0; font-size: 12px; line-height: 1.5; color: var(--b-ink2); text-wrap: pretty; }
+.b-core-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--b-r-row); background: var(--b-page); min-width: 0; }
+.b-core-row-main { flex: 1; min-width: 0; }
+.b-core-row-t { margin: 0; font-size: 13.5px; font-weight: 600; color: var(--b-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-core-row-s { margin: 2px 0 0; font-size: 12px; line-height: 1.45; color: var(--b-ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-core-row-trail { flex: none; font-size: 12px; font-weight: 600; color: var(--b-tertiary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.b-core-row-trail.good { color: var(--b-green-deep); }
+.b-core-row .b-btn--row { flex: none; }
+.b-core-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--b-blue); }
+.b-core-dot--e { background: var(--b-red); }
+.b-core-dot--w { background: #e0a21f; }
+.b-core-chip { flex: none; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; background: var(--b-panel); color: var(--b-neutral); }
+.b-core-chip.on { background: var(--b-ink); color: var(--b-on-ink); }
+.b-core-tag { flex: none; height: 22px; padding: 0 9px; display: flex; align-items: center; border-radius: var(--b-r-pill); font-size: 11px; font-weight: 600; white-space: nowrap; }
+.b-core-tag--blue { background: var(--b-emphasis); color: var(--b-blue-deep); }
+.b-core-tag--neutral { background: var(--b-panel); color: var(--b-ink2); }
+.b-core-tag--muted { background: var(--b-panel); color: var(--b-neutral); }
+.b-core-empty { margin: 0; padding: 22px 16px; border-radius: var(--b-r-inset); background: var(--b-page); text-align: center; font-size: 12.5px; line-height: 1.5; color: var(--b-ink2); text-wrap: pretty; }
+.b-core-empty.error { color: var(--b-red-deep); }
+
+/* ── The other tabs: AtlasCoreTabs' Workshop panels, drawn as Beta cards ──── */
+
+html[data-ui="beta"] .b-core-main .coregrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--b-gap); align-content: start; }
+html[data-ui="beta"] .b-core-main .cpanel { min-width: 0; margin: 0; border-radius: var(--b-r-card); background: var(--b-card); padding: 20px; display: flex; flex-direction: column; gap: var(--b-gap-row); box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; animation: b-pop .5s var(--b-spring) both; }
+html[data-ui="beta"] .b-core-main .gpanel, html[data-ui="beta"] .b-core-main .gpanel2 { border-radius: var(--b-r-inset); background: var(--b-page); box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+html[data-ui="beta"] .b-core-main .cph { margin: 0 0 8px; display: flex; align-items: center; gap: 12px; font-family: var(--b-font-display); font-size: 16px; font-weight: 600; letter-spacing: -.02em; color: var(--b-ink); }
+html[data-ui="beta"] .b-core-main .cph > svg { flex: none; color: var(--b-ink2); }
+html[data-ui="beta"] .b-core-main h3, html[data-ui="beta"] .b-core-main h4 { color: var(--b-ink); }
+html[data-ui="beta"] .b-core-main .row0 { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; border-radius: var(--b-r-row); background: var(--b-page); text-align: left; }
+html[data-ui="beta"] .b-core-main button.row0 { cursor: pointer; transition: background .2s; }
+html[data-ui="beta"] .b-core-main button.row0:hover { background: var(--b-hover); }
+html[data-ui="beta"] .b-core-main button.row0[aria-selected="true"] { background: var(--b-emphasis); }
+html[data-ui="beta"] .b-core-main .row0-lead { color: var(--b-ink2); }
+html[data-ui="beta"] .b-core-main .row0-title { font-size: 13.5px; font-weight: 600; color: var(--b-ink); }
+html[data-ui="beta"] .b-core-main .row0-meta { font-size: 12px; line-height: 1.45; color: var(--b-ink2); }
+html[data-ui="beta"] .b-core-main .row0-trail { gap: 6px; font-size: 12px; color: var(--b-ink2); }
+html[data-ui="beta"] .b-core-main .kbico, html[data-ui="beta"] .b-core-main .flowdot { width: 32px; height: 32px; border-radius: 50%; background: var(--b-panel); color: var(--b-ink2); }
+html[data-ui="beta"] .b-core-main .flowbar, html[data-ui="beta"] .b-core-main .qbar { height: 5px; border-radius: var(--b-r-pill); background: var(--b-hover); }
+html[data-ui="beta"] .b-core-main .flowfill, html[data-ui="beta"] .b-core-main .qfill { border-radius: var(--b-r-pill); background: var(--b-ink); }
+html[data-ui="beta"] .b-core-main .sev-e { background: var(--b-red); }
+html[data-ui="beta"] .b-core-main .sev-w { background: #e0a21f; }
+html[data-ui="beta"] .b-core-main .sev-i { background: var(--b-blue); }
+
+/* Empty states: the recessed well, not the Workshop caption. */
+html[data-ui="beta"] .b-core-main .aempty { gap: 6px; margin: 0; padding: 22px 16px; border-radius: var(--b-r-inset); background: var(--b-page); font-size: 12.5px; line-height: 1.5; color: var(--b-ink2); text-wrap: pretty; }
+html[data-ui="beta"] .b-core-main .aempty-title { margin: 6px 0 2px; font-family: var(--b-font-display); font-size: 16px; font-weight: 600; color: var(--b-ink); }
+html[data-ui="beta"] .b-core-main .aempty-body { font-size: 12.5px; color: var(--b-ink2); }
+html[data-ui="beta"] .b-core-main .aempty-dot { background: var(--b-green); }
+html[data-ui="beta"] .b-core-main .aempty-dot-stale { background: var(--b-neutral); }
+html[data-ui="beta"] .b-core-main .aempty-dot-error { background: var(--b-red); }
+
+/* Inputs: recessed page paper, emphasis on focus (Guidelines §06). */
+html[data-ui="beta"] .b-core-main .field { height: 44px; padding: 0 14px; border: none; border-radius: var(--b-r-row); background: var(--b-page); color: var(--b-ink); font-size: 13.5px; box-shadow: none; transition: background .2s; }
+html[data-ui="beta"] .b-core-main .field:focus { background: var(--b-emphasis); box-shadow: none; }
+html[data-ui="beta"] .b-core-main .field::placeholder { color: var(--b-tertiary); }
+html[data-ui="beta"] .b-core-main textarea.field { height: auto; min-height: 76px; padding: 12px 14px; line-height: 1.5; }
+html[data-ui="beta"] .b-core-main select.field { -webkit-appearance: none; appearance: none; padding-right: 36px; cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--b-ink2) 50%), linear-gradient(135deg, var(--b-ink2) 50%, transparent 50%);
+  background-position: calc(100% - 20px) 52%, calc(100% - 15px) 52%; background-size: 5px 5px; background-repeat: no-repeat; }
+
+/* The atlas-ui Button, on the Beta palette. */
+html[data-ui="beta"] .b-core-main .abtn { height: 36px; padding: 0 16px; border-radius: var(--b-r-pill); font-size: 13px; font-weight: 600; background: var(--b-panel); color: var(--b-ink); }
+html[data-ui="beta"] .b-core-main .abtn:hover:not(:disabled) { background: var(--b-hover); }
+html[data-ui="beta"] .b-core-main .abtn-sm { height: 30px; padding: 0 12px; font-size: 12.5px; }
+html[data-ui="beta"] .b-core-main .abtn-icon { width: 32px; height: 32px; padding: 0; }
+html[data-ui="beta"] .b-core-main .abtn-primary { background: var(--b-blue); color: #fffdfa; }
+html[data-ui="beta"] .b-core-main .abtn-primary:hover:not(:disabled) { background: var(--b-blue-deep); }
+html[data-ui="beta"] .b-core-main .abtn-ink { background: var(--b-ink); color: var(--b-on-ink); }
+html[data-ui="beta"] .b-core-main .abtn-ink:hover:not(:disabled) { background: var(--b-ink-raised); }
+html[data-ui="beta"] .b-core-main .abtn-ghost, html[data-ui="beta"] .b-core-main .abtn-text { background: transparent; color: var(--b-ink2); }
+html[data-ui="beta"] .b-core-main .abtn-ghost:hover:not(:disabled), html[data-ui="beta"] .b-core-main .abtn-text:hover:not(:disabled) { background: var(--b-panel); color: var(--b-ink); }
+html[data-ui="beta"] .b-core-main .abtn-danger { background: var(--b-panel); color: var(--b-red-deep); }
+html[data-ui="beta"] .b-core-main .abtn-danger:hover:not(:disabled) { background: var(--b-destructive-hover); }
+html[data-ui="beta"] .b-core-main code, html[data-ui="beta"] .b-core-main pre { font-family: var(--b-font-mono); font-size: 12px; overflow-wrap: anywhere; white-space: pre-wrap; }
+
+/* ── Width ───────────────────────────────────────────────────────────────── */
+
+@media (max-width: 980px) {
+  .b-core-grid, .b-core-top, html[data-ui="beta"] .b-core-main .coregrid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .b-core > :not(.b-hero) { margin: 0 16px; }
+  .b-core > .b-hero { margin: 14px 16px 0; }
+  .b-core-tabs { max-width: calc(100% - 32px); border-radius: 22px; }
+  .b-core-main { padding: 12px; border-radius: var(--b-r-card); }
+  .b-core-know { padding: 20px; }
+  .b-core-tile { padding: 16px; }
+  .b-core-tile-v { font-size: 30px; }
+  .b-core-card, html[data-ui="beta"] .b-core-main .cpanel { padding: 16px; }
+  .b-core-row { flex-wrap: wrap; }
+  .b-core-row-main { flex-basis: 60%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .b-core-know, .b-core-tile, .b-core-card, .b-core-tab-live, html[data-ui="beta"] .b-core-main .cpanel { animation: none; }
+  .b-core-tab, .b-core-know-btn, .b-core-card-btn { transition: none; }
+}

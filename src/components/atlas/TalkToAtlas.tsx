@@ -16,12 +16,22 @@
  * when there is one"): a screen that renders a band sphere registers it on the
  * talk bus, this orb hides, and the panel opens beside that sphere instead.
  * The same bus carries `openTalk(question)` from a screen's suggested asks.
+ *
+ * Keyboard and screen readers: the panel is a shell layer
+ * (src/hooks/useShellLayer.ts). Opening it puts focus in the message field,
+ * Tab stays inside while it is open, Esc closes it (and only it, when a status
+ * panel is open underneath), and closing hands focus back to whatever opened
+ * it. The streamed answer is not a live region, since a screen reader would
+ * read it token by token; a hidden status line announces the finished answer,
+ * or the error, once.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { VeilSphere } from './VeilSphere';
 import { AtlasIcon } from './AtlasIcon';
 import { screenLabel } from './TopBar';
+import { useShellLayer } from '@/hooks/useShellLayer';
+import { focusables } from '@/lib/shellLayers';
 import { STATE_COLOUR, hasVoiceOwner, publishAtlasState, requestVoice, useAtlasState, type AtlasBusState } from '@/lib/atlasStateBus';
 import { takeTalkRequest, useTalkAnchor, useTalkRequestTick } from '@/lib/talkBus';
 import { askAtlas } from '@/lib/askAtlas';
@@ -42,6 +52,8 @@ const STATE_TEXT: Partial<Record<AtlasBusState, string>> = {
 };
 
 const SOURCE = 'talk';
+const PANEL_ID = 'b-talk-panel';
+const NOTHING = 'I didn’t find anything to say about that.';
 /** How long the answer's `speaking` holds before the sphere rests. */
 const SPEAK_HOLD_MS = 3600;
 
@@ -59,7 +71,12 @@ export function TalkToAtlas() {
   const [answered, setAnswered] = useState(false);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState('');
+  /** What a screen reader hears: the finished answer or the error, once. */
+  const [announce, setAnnounce] = useState('');
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const orbRef = useRef<HTMLButtonElement | null>(null);
+  const openRef = useRef(false);
   const abort = useRef<AbortController | null>(null);
   /** The last complete answer, for the Answer screen. */
   const lastAnswer = useRef<{ question: string; text: string; citations: BrainCitation[] } | null>(null);
@@ -70,12 +87,15 @@ export function TalkToAtlas() {
   const clearRest = () => { if (restTimer.current) { window.clearTimeout(restTimer.current); restTimer.current = null; } };
 
   const show = useCallback(() => {
+    // Already open (a screen's suggested ask): the layer does not re-run its
+    // opening, so put the caret back in the field here.
+    if (openRef.current) window.requestAnimationFrame(() => inputRef.current?.focus());
     setOpen(true);
     setSay('Go ahead, I’m listening.');
     setError(null);
     setAnswered(false);
+    setAnnounce('');
     publishAtlasState('listening', SOURCE);
-    window.setTimeout(() => inputRef.current?.focus(), 50);
   }, []);
 
   const hide = useCallback(() => {
@@ -97,6 +117,7 @@ export function TalkToAtlas() {
     setDraft('');
     setError(null);
     setAnswered(false);
+    setAnnounce('');
     setSay(`“${question}”`);
     setBusy(true);
     publishAtlasState('thinking', SOURCE);
@@ -111,13 +132,16 @@ export function TalkToAtlas() {
         },
       });
       if (ctrl.signal.aborted) return;
-      if (!result.text) setSay('I didn’t find anything to say about that.');
+      if (!result.text) setSay(NOTHING);
       else lastAnswer.current = { question, text: result.text, citations: result.citations };
       setAnswered(!!result.text);
+      setAnnounce(result.text || NOTHING);
       restTimer.current = window.setTimeout(() => publishAtlasState('idle', SOURCE), SPEAK_HOLD_MS);
     } catch (e) {
       if (ctrl.signal.aborted) return;
-      setError(e instanceof Error ? e.message : 'Atlas did not answer.');
+      const message = e instanceof Error ? e.message : 'Atlas did not answer.';
+      setError(message);
+      setAnnounce(message);
       publishAtlasState('alert', SOURCE);
       restTimer.current = window.setTimeout(() => publishAtlasState('idle', SOURCE), SPEAK_HOLD_MS);
     } finally {
@@ -125,22 +149,19 @@ export function TalkToAtlas() {
     }
   }, [busy, screen]);
 
-  // ⌥Space toggles; Esc closes (captured, so the page under it does not also
-  // act on the same Esc).
+  useEffect(() => { openRef.current = open; }, [open]);
+
+  // ⌥Space toggles, from anywhere. Esc belongs to the layer stack
+  // (useShellLayer below), so it closes only the topmost layer.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.altKey && e.code === 'Space') {
-        e.preventDefault();
-        if (open) hide(); else show();
-      } else if (e.key === 'Escape' && open) {
-        e.stopImmediatePropagation();
-        e.preventDefault();
-        hide();
-      }
+      if (!e.altKey || e.code !== 'Space') return;
+      e.preventDefault();
+      if (openRef.current) hide(); else show();
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [open, hide, show]);
+  }, [hide, show]);
 
   useEffect(() => () => { clearRest(); abort.current?.abort(); }, []);
 
@@ -158,6 +179,17 @@ export function TalkToAtlas() {
   // Header-sphere mode: with an anchor on screen the orb hides and the panel
   // sits beside the anchor, clamped to the window.
   const anchor = useTalkAnchor();
+
+  useShellLayer(open, {
+    id: 'talk',
+    ref: panelRef,
+    onClose: hide,
+    initialFocus: () => inputRef.current,
+    // Back to whatever opened it; failing that (a mouse click in WebKit leaves
+    // focus on <body>), the orb, or the button on the page's header sphere.
+    returnFocus: (opener) => opener ?? orbRef.current ?? (anchor ? focusables(anchor)[0] ?? null : null),
+  });
+
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   useLayoutEffect(() => {
     if (!open || !anchor) { setPos(null); return; }
@@ -181,7 +213,17 @@ export function TalkToAtlas() {
     <>
       {!anchor ? (
         <>
-          <button type="button" className="b-orb" aria-label="Talk to Atlas" aria-expanded={open} onClick={() => (open ? hide() : show())}>
+          <button
+            type="button"
+            ref={orbRef}
+            className="b-orb"
+            aria-label="Talk to Atlas"
+            aria-keyshortcuts="Alt+Space"
+            aria-haspopup="dialog"
+            aria-expanded={open}
+            aria-controls={open ? PANEL_ID : undefined}
+            onClick={() => (open ? hide() : show())}
+          >
             <VeilSphere size="orb" bg="transparent" tone={[249, 247, 244]} alpha={0.75} scale={0.44} />
           </button>
           <div className={`b-orb-tip${tipOn ? ' on' : ''}`} aria-hidden="true">
@@ -193,10 +235,18 @@ export function TalkToAtlas() {
       ) : null}
 
       {open ? (
-        <div className={`b-talk${pos ? ' b-talk--anchored' : ''}`} style={pos ?? undefined} role="dialog" aria-label="Talk to Atlas">
+        <div
+          ref={panelRef}
+          id={PANEL_ID}
+          className={`b-talk${pos ? ' b-talk--anchored' : ''}`}
+          style={pos ?? undefined}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Talk to Atlas"
+        >
           <div className="b-talk-stage"><VeilSphere size="panel" ink bg="#1e1e24" /></div>
           <div className="b-talk-state">
-            <span className="b-orb-dot" style={{ background: colour }} />
+            <span className="b-orb-dot" style={{ background: colour }} aria-hidden="true" />
             <span>{STATE_TEXT[state] ?? state}</span>
           </div>
           <p className={`b-talk-say${error ? ' err' : ''}`}>{error ?? say}</p>
@@ -204,7 +254,7 @@ export function TalkToAtlas() {
             <button type="button" className="b-talk-link" onClick={() => { if (lastAnswer.current) setLastAnswer(lastAnswer.current); hide(); navigate('/answer'); }}>Open the full answer →</button>
           ) : null}
           {!busy && !answered ? (
-            <div className="b-talk-chips">
+            <div className="b-talk-chips" role="group" aria-label="Suggested questions">
               {suggestionsFor(screen).map((q) => (
                 <button type="button" key={q} className="b-talk-chip" onClick={() => void ask(q)}>{q}</button>
               ))}
@@ -223,7 +273,7 @@ export function TalkToAtlas() {
             <button
               type="button"
               className="b-talk-mic"
-              aria-label="Use the microphone"
+              aria-label={micOwner ? 'Talk out loud' : 'Microphone: open Home to use it'}
               title={micOwner ? 'Talk out loud' : 'Open Home to use the microphone'}
               disabled={!micOwner}
               onClick={() => { if (requestVoice()) hide(); }}
@@ -234,6 +284,7 @@ export function TalkToAtlas() {
               <AtlasIcon name="send" size={16} />
             </button>
           </div>
+          <p className="b-sr-only" role="status" aria-atomic="true">{announce}</p>
         </div>
       ) : null}
     </>
