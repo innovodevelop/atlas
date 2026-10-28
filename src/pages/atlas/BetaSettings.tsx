@@ -43,6 +43,7 @@ import {
 } from '@/lib/betaSettings';
 import { MODELS, VOICES } from '@/components/atlas-health/VoiceSettingsPanel';
 import { MemoryPrivacyPanel } from '@/components/atlas-health/MemoryPrivacyPanel';
+import { DockStylePicker } from '@/components/atlas/DockStylePicker';
 import { VeilSphere } from '@/components/atlas/VeilSphere';
 import { AtlasIcon } from '@/components/atlas/AtlasIcon';
 import type { IconName } from '@/components/atlas/icons';
@@ -821,6 +822,8 @@ function BetaSection() {
       <Row emphasis icon="sparkle" chip="on" title="Beta UI" sub="On — you are using the redesigned Atlas." subTone="blue">
         <button type="button" className="b-btn b-st-rowb b-st-paper" onClick={back}>Back to the Workshop UI</button>
       </Row>
+      {/* The final dock is chosen here, in the app, rather than in the design file. */}
+      <DockStylePicker />
     </section>
   );
 }
