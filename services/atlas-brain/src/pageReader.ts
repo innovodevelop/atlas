@@ -71,6 +71,26 @@ const BLOCK = new Set([
   "pre", "section", "summary", "table", "tbody", "td", "tfoot", "th", "thead", "tr", "ul", "br", "caption", "center",
 ]);
 
+/*
+ * Page chrome that sites mark only with a class or an id: menus, share bars,
+ * cookie banners, comment threads, "related" rails, a wiki's edit links. The
+ * two lists follow Readability's unlikely-candidate heuristic: a subtree whose
+ * class or id says chrome is skipped, unless it also says content ("main",
+ * "article", "body", …), which keeps a `div.content.sidebar-layout` readable.
+ */
+const CHROME = /-ad-|(^|[\s_-])ads?([\s_-]|$)|banner|breadcrumb|catlinks|combx|comment|community|consent|cookie|cover-wrap|disqus|dropdown|editsection|footer|gdpr|header|legends|menu|modal|navbar|navbox|newsletter|noprint|pager|pagination|popup|promo|related|remark|replies|rss|share|shoutbox|sidebar|skip|skyscraper|social|sponsor|subscribe|supplemental|toolbar|tooltip/i;
+const CONTENT = /and|article|body|column|content|entry|main|post|prose|shadow|story|text/i;
+/** Elements the class test never applies to: the document, the reading roots and inline text. */
+const NEVER_CHROME = new Set(["html", "body", "article", "main", "a", "b", "i", "em", "strong", "code", "pre", "p", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "figcaption"]);
+
+function isChrome(name: string, attrs: Record<string, string>): boolean {
+  // A footnote marker ("[1]") is a link to the references, not reading copy.
+  if (name === "sup" && /(^|\s)reference(\s|$)/i.test(attrs.class ?? "")) return true;
+  if (NEVER_CHROME.has(name)) return false;
+  const marks = `${attrs.class ?? ""} ${attrs.id ?? ""}`.trim();
+  return marks !== "" && CHROME.test(marks) && !CONTENT.test(marks);
+}
+
 /* ── Entities ─────────────────────────────────────────────────────────────── */
 
 const NAMED: Record<string, string> = {
@@ -98,7 +118,7 @@ export function decodeEntities(s: string): string {
 }
 
 function collapse(s: string): string {
-  return s.replace(/[\s ]+/g, " ").trim();
+  return s.replace(/\s+/g, " ").trim();
 }
 
 /* ── Tokenizer ────────────────────────────────────────────────────────────── */
@@ -173,7 +193,10 @@ export function* tokenize(html: string): Generator<Token> {
     const selfClosing = inner.trimEnd().endsWith("/");
     yield { t: "open", name, attrs: parseAttrs(inner), selfClosing };
     i = j + 1;
-    if (RAW_TEXT.has(name) && !selfClosing) {
+    // HTML ignores the slash on a non-void element: `<script src=x />` still
+    // opens a script whose body runs to </script>, and that body is never text.
+    // Only an svg <title/> is really empty.
+    if (RAW_TEXT.has(name) && (!selfClosing || name !== "title")) {
       // Everything up to the matching end tag is text (title) or nothing (script).
       lower ??= html.toLowerCase();
       const close = lower.indexOf(`</${name}`, i);
@@ -222,7 +245,9 @@ export function readPage(html: string, pageUrl: string | null = null): ReaderPag
 
   const collected: Collected[] = [];
   let buf = "";
-  const linkMap = new Map<string, string>();
+  // Every link in reading order, with where it sat, so the links kept are the
+  // ones in the copy the reader chose (not the site's header and footer).
+  const found: Array<{ href: string; text: string; inArticle: boolean; inMain: boolean }> = [];
   let link: { href: string | null; text: string } | null = null;
 
   const has = (name: string) => stack.includes(name);
@@ -293,7 +318,7 @@ export function readPage(html: string, pageUrl: string | null = null): ReaderPag
       const role = (attrs.role ?? "").toLowerCase();
       const skipByRole = role === "navigation" || role === "banner" || role === "contentinfo" || role === "complementary" || role === "search" || role === "dialog";
       if (SKIP.has(name)) skipDepth++;
-      else if (hidden || skipByRole) { skipDepth++; stack.push(name, "[skip]"); continue; }
+      else if (hidden || skipByRole || isChrome(name, attrs)) { skipDepth++; stack.push(name, "[skip]"); continue; }
       stack.push(name);
       if (role === "main") stack.push("[role=main]");
       if (name === "a" && skipDepth === 0) link = { href: attrs.href ? resolveHref(attrs.href, base) : null, text: "" };
@@ -304,7 +329,9 @@ export function readPage(html: string, pageUrl: string | null = null): ReaderPag
     if (name === "title") { if (inTitle) { inTitle = false; titleDone = true; } continue; }
     if (name === "a" && link) {
       const text = collapse(link.text);
-      if (link.href && text && !linkMap.has(link.href) && linkMap.size < MAX_LINKS) linkMap.set(link.href, text.slice(0, 160));
+      if (link.href && text && found.length < MAX_LINKS * 8) {
+        found.push({ href: link.href, text: text.slice(0, 160), inArticle: has("article"), inMain: has("main") || has("[role=main]") });
+      }
       link = null;
     }
     if (!stack.includes(name)) continue;
@@ -321,15 +348,25 @@ export function readPage(html: string, pageUrl: string | null = null): ReaderPag
   const textOf = (bs: Collected[]) => bs.reduce((n, b) => n + b.text.length, 0);
   const inArticle = collected.filter((b) => b.inArticle);
   const inMain = collected.filter((b) => b.inMain);
-  const chosen = textOf(inArticle) >= 280 ? inArticle : textOf(inMain) >= 280 ? inMain : collected;
-
-  const cleanTitle = collapse(decodeEntities(title)) || collapse(meta["og:title"] ?? "") ||
-    chosen.find((b) => b.kind === "heading")?.text || (base ? base.host : "Untitled page");
+  const region: "article" | "main" | "all" = textOf(inArticle) >= 280 ? "article" : textOf(inMain) >= 280 ? "main" : "all";
+  const chosen = region === "article" ? inArticle : region === "main" ? inMain : collected;
+  const linkMap = new Map<string, string>();
+  for (const l of found) {
+    if (region === "article" && !l.inArticle) continue;
+    if (region === "main" && !l.inMain) continue;
+    if (!linkMap.has(l.href) && linkMap.size < MAX_LINKS) linkMap.set(l.href, l.text);
+  }
 
   let blocks: ReaderBlock[] = chosen.map(({ kind, text, level }) => (level ? { kind, text, level } : { kind, text }));
-  // The page's own h1 usually repeats the title; the reader shows the title once.
+  const docTitle = collapse(decodeEntities(title));
+  const ogTitle = collapse(meta["og:title"] ?? "");
+  // The page's own first heading usually repeats the title, and without the
+  // " - Site name" a <title> carries; when it does, it IS the title, and the
+  // reader shows it once.
   const first = blocks.find((b) => b.kind === "heading");
-  if (first && sameText(first.text, cleanTitle)) blocks = blocks.filter((b) => b !== first);
+  const headingIsTitle = !!first && [ogTitle, docTitle].some((t) => t && sameTitle(first.text, t));
+  const cleanTitle = headingIsTitle && first ? first.text : ogTitle || docTitle || first?.text || (base ? base.host : "Untitled page");
+  if (first && (headingIsTitle || first.text === cleanTitle)) blocks = blocks.filter((b) => b !== first);
   // Drop a block that only repeats the one before it (sticky headers, share bars).
   blocks = blocks.filter((b, k) => k === 0 || b.text !== blocks[k - 1].text);
 
@@ -357,11 +394,17 @@ export function readPage(html: string, pageUrl: string | null = null): ReaderPag
   };
 }
 
-function sameText(a: string, b: string): boolean {
+/**
+ * A heading is the title when it is the title, or the title before a site
+ * suffix ("Heat pump" in "Heat pump - Wikipedia", "Bun" in "Bun | Docs").
+ */
+export function sameTitle(heading: string, title: string): boolean {
   const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-  const x = norm(a);
-  const y = norm(b);
-  return x === y || (x.length > 12 && y.startsWith(x));
+  if (!norm(heading)) return false;
+  if (norm(heading) === norm(title)) return true;
+  const h = heading.trim().toLowerCase();
+  const t = title.trim().toLowerCase();
+  return h.length >= 3 && t.startsWith(h) && /^\s*[-|–—·:•»/]/.test(t.slice(h.length));
 }
 
 /** Plain text (text/plain): blank lines separate paragraphs. */

@@ -1,7 +1,10 @@
 /* ── Phase 5: Browser ─────────────────────────────────────────────────────────
    Source: design/current/design_handoff_atlas_beta/Atlas Browser Beta.dc.html —
-   the hero bar with its sphere, the sample strip, the tab rail, the page, "On
-   this page", and the ink omnibox floating over them. The design carries its
+   the hero bar with its sphere, the strip under it, the tab rail, the page, "On
+   this page", and the ink omnibox floating over them. The page is a fetched
+   page's text drawn as reader blocks (headings, paragraphs, lists, quotes,
+   captions, code) in the design's article type; no remote image or style ever
+   reaches it. The design carries its
    styles inline; the values below are those values, named, on the --b-* tokens
    from src/styles/beta.css. Flat and borderless: depth comes from the paper
    scale, plus the two soft shadows the design draws under the hero bar and
@@ -44,14 +47,12 @@ html[data-ui="beta"] .beta-page:has(> .b-br) { padding-bottom: 0; }
 .b-br .b-br-home { flex: none; height: 44px; padding: 0 14px; display: flex; align-items: center; border-radius: var(--b-r-pill); background: var(--b-panel); color: var(--b-ink); font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background .2s; }
 .b-br-home:hover { background: var(--b-hover); }
 
-/* ---- The sample strip ---------------------------------------------------- */
+/* ---- The strip: what happens on this Mac ---------------------------------- */
 
 .b-br-note { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px 12px 10px 16px; border-radius: 18px; background: var(--b-emphasis); }
 .b-br-note p { flex: 1; min-width: min(240px, 100%); margin: 0; font-size: 12.5px; line-height: 1.5; text-wrap: pretty; }
-.b-br .b-br-note-btn { flex: none; height: 30px; padding: 0 12px; border-radius: var(--b-r-pill); background: var(--b-card); color: var(--b-blue-deep); font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background .2s; }
-.b-br-note-btn:hover { background: #fff; }
+.b-br .b-br-note-warn { flex-basis: 100%; color: var(--b-red-deep); font-weight: 600; }
 .b-br-stamp { flex: none; height: 22px; padding: 0 9px; display: inline-flex; align-items: center; border-radius: var(--b-r-pill); background: var(--b-blue); color: #fff; font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
-.b-br-stamp--page { background: var(--b-emphasis); color: var(--b-blue-deep); }
 
 /* ---- Tabs: the rail (wide) and the strip (narrow) ------------------------ */
 
@@ -75,9 +76,12 @@ html[data-ui="beta"] .beta-page:has(> .b-br) { padding-bottom: 0; }
 .b-br-tab-text span { margin-top: 1px; font-size: 11px; color: var(--b-neutral); }
 .b-br-rail-empty { margin: 0; padding: 14px 10px; border-radius: var(--b-r-row); background: var(--b-page); font-size: 12px; line-height: 1.5; color: var(--b-ink2); }
 .b-br-kept-label { padding: 14px 6px 6px; }
-.b-br-kept { flex: none; padding: 9px 10px; border-radius: var(--b-r-small); background: var(--b-page); }
+.b-br-kept { flex: none; display: flex; align-items: center; border-radius: var(--b-r-small); background: var(--b-page); transition: background .2s; }
+.b-br-kept:hover { background: var(--b-card); }
+.b-br .b-br-kept-hit { flex: 1; min-width: 0; padding: 9px 4px 9px 10px; background: transparent; color: var(--b-ink); text-align: left; cursor: pointer; }
 .b-br-kept p { margin: 0; font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .b-br-kept p + p { margin-top: 1px; font-size: 11px; font-weight: 400; color: var(--b-neutral); }
+.b-br-kept .b-br-x { width: 24px; height: 24px; }
 .b-br-kept-none { margin: 0; padding: 10px; font-size: 12px; color: var(--b-neutral); }
 
 /* Below 1100px the design drops the rail; the strip keeps the tabs reachable. */
@@ -104,35 +108,55 @@ html[data-ui="beta"] .beta-page:has(> .b-br) { padding-bottom: 0; }
 .b-br .b-br-addr { flex: 1; min-width: 0; height: 34px; padding: 0 12px; display: flex; align-items: center; gap: 8px; border-radius: var(--b-r-pill); background: var(--b-page); color: var(--b-ink2); font-family: var(--b-font-mono); font-size: 12px; text-align: left; cursor: text; transition: background .2s; }
 .b-br-addr:hover { background: var(--b-hover); }
 .b-br-addr svg { flex: none; }
+/* A page that came over plain http says so where the lock would be. */
+.b-br-addr-flag { flex: none; height: 18px; padding: 0 6px; display: inline-flex; align-items: center; border-radius: var(--b-r-pill); background: var(--b-br-warn-fill); color: var(--b-br-warn-ink); font-family: var(--b-font-ui); font-size: 10.5px; font-weight: 600; }
 .b-br-addr span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .b-br .b-br-tool { flex: none; height: 34px; padding: 0 13px; border-radius: var(--b-r-pill); background: var(--b-panel); color: var(--b-ink); font-size: 12.5px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background .2s, color .2s; }
 .b-br-tool:hover { background: var(--b-hover); }
 .b-br-tool--reader.on { background: var(--b-ink); color: var(--b-on-ink); }
+.b-br-tool--keep.on { background: var(--b-emphasis); color: var(--b-blue-deep); }
 .b-br-tool--atlas.on { background: var(--b-blue); color: var(--b-card); }
 .b-br-tool--atlas.on:hover { background: var(--b-blue-deep); }
 
 .b-br-article { max-width: 860px; margin: 0 auto; padding: 12px clamp(20px, 4vw, 48px) 140px; display: flex; flex-direction: column; gap: 16px; transition: max-width .3s var(--b-spring); }
 .b-br-article.reader { max-width: 640px; }
 .b-br-byline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; color: var(--b-neutral); }
-.b-br-h1 { margin: 0; font-family: var(--b-font-display); font-size: clamp(28px, 3vw, 40px); font-weight: 500; letter-spacing: -.03em; line-height: 1.12; text-wrap: pretty; }
-.b-br-stand { margin: 0; font-size: 17px; line-height: 1.55; color: var(--b-ink2); text-wrap: pretty; }
-.b-br-p { margin: 0; font-size: 15.5px; line-height: 1.7; text-wrap: pretty; }
+.b-br-h1 { margin: 0; font-family: var(--b-font-display); font-size: clamp(28px, 3vw, 40px); font-weight: 500; letter-spacing: -.03em; line-height: 1.12; text-wrap: pretty; overflow-wrap: anywhere; }
+/* A page's own headings sit a step under the title, in the same display face. */
+.b-br-h2, .b-br-h3 { margin: 10px 0 -4px; font-family: var(--b-font-display); font-weight: 600; letter-spacing: -.02em; line-height: 1.25; text-wrap: pretty; overflow-wrap: anywhere; }
+.b-br-h2 { font-size: 22px; }
+.b-br-h3 { font-size: 18px; }
+.b-br-p { margin: 0; font-size: 15.5px; line-height: 1.7; text-wrap: pretty; overflow-wrap: anywhere; }
+.b-br-ul { margin: 0; padding: 0 0 0 20px; display: flex; flex-direction: column; gap: 6px; }
+.b-br-li { font-size: 15.5px; line-height: 1.6; text-wrap: pretty; overflow-wrap: anywhere; }
+.b-br-li::marker { color: var(--b-neutral); }
+.b-br-quote { margin: 0; padding: 12px 16px; border-radius: var(--b-r-inset); background: var(--b-page); font-size: 16px; line-height: 1.6; color: var(--b-ink2); text-wrap: pretty; overflow-wrap: anywhere; }
+.b-br-cap { margin: -6px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--b-ink2); overflow-wrap: anywhere; }
+/* Code keeps its lines; it scrolls inside its own box, never the page. */
+.b-br-code { margin: 0; max-width: 100%; padding: 12px 14px; overflow-x: auto; border-radius: var(--b-r-inset); background: var(--b-page); font-family: var(--b-font-mono); font-size: 12.5px; line-height: 1.55; white-space: pre; box-sizing: border-box; }
 /* The design reads in upright Newsreader; the app bundles only its italic
    (public/fonts/fonts.css), so the reader takes the Mac's own serif, New York. */
-.b-br-article.reader .b-br-h1, .b-br-article.reader .b-br-stand, .b-br-article.reader .b-br-p { font-family: ui-serif, 'New York', Georgia, serif; }
-.b-br-article.reader .b-br-p { font-size: 19px; }
-.b-br-article.reader .b-br-stand { font-size: 20px; }
-.b-br-fig { margin: 4px 0; display: flex; flex-direction: column; gap: 8px; }
-/* A plate with a caption, not a chart: the sample has no series behind it. */
-.b-br-fig-plate { height: clamp(140px, 22vw, 240px); border-radius: var(--b-r-inset); background: linear-gradient(150deg, var(--b-panel), var(--b-recessed)); }
-.b-br-fig-plate.slate { background: linear-gradient(160deg, var(--b-ink-raised), var(--b-ink)); }
-.b-br-fig figcaption { font-size: 12.5px; line-height: 1.5; color: var(--b-ink2); }
-.b-br-end { margin: 8px 0 0; font-size: 12.5px; color: var(--b-neutral); }
+.b-br-article.reader :is(.b-br-h1, .b-br-h2, .b-br-h3, .b-br-p, .b-br-li, .b-br-quote) { font-family: ui-serif, 'New York', Georgia, serif; }
+.b-br-article.reader :is(.b-br-p, .b-br-li) { font-size: 19px; }
+.b-br-article.reader .b-br-quote { font-size: 19px; }
+.b-br-empty-copy { color: var(--b-ink2); }
+/* Links on the page: each opens as a new tab, through Go. */
+.b-br-links { margin-top: 12px; display: flex; flex-direction: column; gap: 2px; }
+.b-br-links > .b-br-label { margin: 0 0 6px; }
+.b-br-links > .b-btn { align-self: flex-start; margin-top: 6px; }
+.b-br .b-br-link { display: flex; align-items: baseline; gap: 10px; min-width: 0; padding: 8px 10px; border-radius: var(--b-r-row); background: transparent; color: var(--b-ink); text-align: left; cursor: pointer; transition: background .2s; }
+.b-br-link:hover { background: var(--b-panel); }
+.b-br-link > span:first-child { flex: 1; min-width: 0; font-size: 13.5px; color: var(--b-blue-deep); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.b-br-link > span:last-child { flex: none; max-width: 40%; font-size: 11.5px; color: var(--b-neutral); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.b-br-end { margin: 8px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--b-neutral); }
+.b-br-end-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.b-br .b-br-end-actions .b-btn, .b-br .b-br-none .b-btn, .b-br .b-br-links > .b-btn, .b-br .b-br-side-none .b-btn { font-size: 12.5px; font-weight: 600; }
 .b-br-hit { background: var(--b-br-hit); color: var(--b-ink); border-radius: 3px; box-shadow: 0 0 0 2px var(--b-br-hit); }
 .b-br-hit.on { background: var(--b-br-hit-on); box-shadow: 0 0 0 2px var(--b-br-hit-on); }
 .b-br-none { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 80px 24px 140px; text-align: center; }
 .b-br-none b { font-family: var(--b-font-display); font-size: 20px; font-weight: 600; letter-spacing: -.025em; }
 .b-br-none span { max-width: 380px; font-size: 13px; line-height: 1.55; color: var(--b-ink2); text-wrap: pretty; }
+.b-br-none .b-btn { margin-top: 8px; }
 
 /* ---- On this page -------------------------------------------------------- */
 
@@ -169,7 +193,9 @@ html[data-ui="beta"] .beta-page:has(> .b-br) { padding-bottom: 0; }
 .b-br-tag[data-kind="quote"] { background: var(--b-panel); color: var(--b-ink2); }
 .b-br-tag[data-kind="link"] { background: var(--b-green-fill); color: var(--b-green-deep); }
 .b-br-tag[data-kind="warn"] { background: var(--b-br-warn-fill); color: var(--b-br-warn-ink); }
-.b-br-side-none { flex: none; margin: 0; padding: 18px 14px; border-radius: var(--b-r-row); background: var(--b-page); font-size: 12.5px; line-height: 1.5; color: var(--b-ink2); text-align: center; }
+.b-br-side-none { flex: none; margin: 0; padding: 18px 14px; border-radius: var(--b-r-row); background: var(--b-page); font-size: 12.5px; line-height: 1.5; color: var(--b-ink2); text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.b-br-side-none .b-btn:disabled { opacity: .6; cursor: default; transform: none; }
+.b-br-notes-basis { padding: 2px 4px; }
 
 /* ---- The omnibox --------------------------------------------------------- */
 
@@ -179,6 +205,7 @@ html[data-ui="beta"] .beta-page:has(> .b-br) { padding-bottom: 0; }
 .b-br-suggest button:hover { background: var(--b-panel); }
 .b-br-suggest button > span:first-child { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .b-br-suggest button > span:last-child { flex: none; font-size: 11px; color: var(--b-neutral); white-space: nowrap; }
+.b-br-suggest .b-br-suggest-clear > span:first-child { color: var(--b-ink2); }
 .b-br-omni { display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: var(--b-r-pill); background: var(--b-ink); box-shadow: 0 24px 54px -22px rgba(30, 30, 36, .55); transition: box-shadow .2s; }
 /* The keyboard ring sits on the pill, not on the bare input inside it. */
 .b-br-omni:focus-within { box-shadow: 0 0 0 3px rgba(52, 97, 242, .28), 0 24px 54px -22px rgba(30, 30, 36, .55); }
@@ -215,9 +242,11 @@ html[data-ui="beta"] .b-br-in:focus-visible { box-shadow: none; }
   .b-br-count-l { display: none; }
   .b-br .b-br-home { height: 38px; padding: 0 12px; }
   .b-br-tools { padding: 10px; gap: 6px; }
-  .b-br .b-br-tool { padding: 0 11px; }
+  .b-br .b-br-tool { padding: 0 10px; }
+  .b-br-h2 { font-size: 20px; }
+  .b-br-link > span:last-child { display: none; }
   .b-br-mode kbd { display: none; }
-  /* The stamp still says "Sample"; the full line is in the title. */
+  /* Two lines of the strip; the whole sentence is in its title. */
   .b-br-note { padding: 10px 10px 10px 12px; gap: 8px 10px; }
   .b-br-note p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .b-br-omni-wrap { width: calc(100% - 20px); bottom: 10px; }

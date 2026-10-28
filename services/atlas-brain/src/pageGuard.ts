@@ -10,7 +10,8 @@
  *   - http: and https: only. file:, data:, javascript:, ftp: and every other
  *     scheme are refused before anything is resolved.
  *   - No user:password@ in the address (it hides the real host from a reader
- *     and is never needed to read a public page).
+ *     and is never needed to read a public page), and none of the ports
+ *     browsers refuse (mail, SSH, IRC, …).
  *   - Hostnames that are local by name are refused without a lookup:
  *     localhost and *.localhost, *.local (Bonjour), *.internal, *.home.arpa,
  *     *.lan, and single-label names (resolved through the LAN's search domain).
@@ -68,6 +69,9 @@ export function checkUrl(url: URL): { ok: true; url: URL } | GuardRefusal {
   if (url.username || url.password) {
     return { ok: false, reason: "bad-address", message: "Addresses with a user name or password in them aren’t opened." };
   }
+  if (url.port && BAD_PORTS.has(Number(url.port))) {
+    return { ok: false, reason: "bad-address", message: `Port ${url.port} belongs to mail, file sharing or another service, not web pages, so Atlas doesn’t open it.` };
+  }
   const host = bareHost(url.hostname);
   if (!host) return { ok: false, reason: "bad-address", message: "That address has no host." };
   if (isLocalName(host)) {
@@ -78,6 +82,18 @@ export function checkUrl(url: URL): { ok: true; url: URL } | GuardRefusal {
   }
   return { ok: true, url };
 }
+
+/**
+ * The Fetch standard's "bad ports": SMTP, SSH, IRC and the rest, which every
+ * browser refuses to send an HTTP request to. A page link is not a way to talk
+ * to a mail server, here either.
+ */
+const BAD_PORTS = new Set([
+  1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53, 69, 77, 79, 87, 95, 101, 102, 103, 104, 109, 110,
+  111, 113, 115, 117, 119, 123, 135, 137, 139, 143, 161, 179, 389, 427, 465, 512, 513, 514, 515, 526, 530, 531, 532,
+  540, 548, 554, 556, 563, 587, 601, 636, 989, 990, 993, 995, 1719, 1720, 1723, 2049, 3659, 4045, 4190, 5060, 5061,
+  6000, 6566, 6665, 6666, 6667, 6668, 6669, 6679, 6697, 10080,
+]);
 
 /** `[::1]` → `::1`; lower case; no trailing dot. */
 export function bareHost(hostname: string): string {

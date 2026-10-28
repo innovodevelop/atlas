@@ -44,6 +44,7 @@ export type FetchFailure =
   | "too-many-redirects"
   | "http-status"
   | "not-a-page"
+  | "certificate"
   | "network";
 
 export type FetchOutcome =
@@ -136,7 +137,9 @@ function getOnce(url: URL, deps: FetchDeps, signal: AbortSignal, maxBytes: numbe
       const all = typeof options === "object" && options !== null && (options as { all?: boolean }).all;
       guardedResolve(hostname, deps).then(
         (addrs) => {
-          if (all) cb(null, addrs);
+          // A copy: Bun's socket consumes the list it is handed as it tries
+          // each address, and the checked list must stay what was checked.
+          if (all) cb(null, addrs.map((a) => ({ ...a })));
           else cb(null, addrs[0].address, addrs[0].family);
         },
         (e) => cb(e),
@@ -220,6 +223,12 @@ function getOnce(url: URL, deps: FetchDeps, signal: AbortSignal, maxBytes: numbe
   });
 }
 
+/** A TLS failure: self-signed, expired, wrong name, untrusted root. Exported for its test. */
+export function isCertificateError(e: unknown): boolean {
+  const code = typeof e === "object" && e !== null ? String((e as { code?: unknown }).code ?? "") : "";
+  return /CERT|TLS|SSL|SIGNATURE/i.test(code);
+}
+
 /** HTML and plain text are pages; a PDF, an image or a zip is not something the reader can show. */
 export function isReadableType(contentType: string): boolean {
   const t = contentType.split(";")[0].trim().toLowerCase();
@@ -261,6 +270,9 @@ export async function fetchPage(input: string, deps: FetchDeps = {}): Promise<Fe
         if (e instanceof GuardError) return { ok: false, reason: e.reason, message: e.message, url: url.href };
         if (controller.signal.aborted) {
           return { ok: false, reason: "timeout", message: `${url.host} took too long to answer.`, url: url.href };
+        }
+        if (isCertificateError(e)) {
+          return { ok: false, reason: "certificate", message: `${url.host} didn’t prove who it is (its security certificate isn’t valid), so Atlas didn’t read it.`, url: url.href };
         }
         return { ok: false, reason: "network", message: `Atlas couldn’t reach ${url.host}.`, url: url.href };
       }
