@@ -3,7 +3,8 @@
 // For any mailbox that speaks IMAP (iCloud, Fastmail, Yahoo, a work or hosting
 // provider's server). Read-only, like gmail.rs: the inbox is opened with
 // EXAMINE, never SELECT, so the server cannot even mark a message seen, and
-// only envelope metadata (sender, subject, date, Message-ID) is fetched.
+// only envelope metadata (sender, subject, date, Message-ID) is fetched. The
+// one write is the user's own Archive click in Mail (archive_message below).
 //
 // The server settings and password live in ONE Keychain item per mailbox
 // (service `atlas-imap`), never in atlas.db or the JS layer. Only implicit TLS
@@ -31,6 +32,7 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::db::DbState;
+use crate::mail_archive::Refusal;
 
 const ID_PREFIX: &str = "imap:";
 const CURSOR_PREFIX: &str = "u:";
@@ -603,6 +605,148 @@ fn decode_q(payload: &str) -> Option<Vec<u8>> {
 }
 
 // ---------------------------------------------------------------------------
+// Archive (Mail's Archive action, the one write this module makes)
+//
+// Sync stays read-only (EXAMINE). Archive is the user's own click in Mail: it
+// SELECTs the inbox and MOVEs one message (RFC 6851) to the server's Archive
+// folder, the one flagged \Archive (RFC 6154) or else one plainly named
+// Archive. A server with neither gets nothing moved, and Mail says so; Atlas
+// does not create folders in someone's mailbox. A server without MOVE is
+// refused the same way rather than emulated with COPY + \Deleted + EXPUNGE,
+// which would also expunge anything else the user had marked deleted.
+// ---------------------------------------------------------------------------
+
+/// One folder from LIST: its name, its attributes (as the server wrote them,
+/// e.g. "\\Archive") and its hierarchy delimiter.
+struct Folder {
+    name: String,
+    attributes: Vec<String>,
+    delimiter: Option<String>,
+}
+
+/// The folder archived mail goes to: the special-use \Archive one first, then
+/// one whose last path segment is "Archive" or "Archives" (any case).
+fn pick_archive_folder(folders: &[Folder]) -> Option<String> {
+    let flagged = folders.iter().find(|f| {
+        f.attributes
+            .iter()
+            .any(|a| a.trim_start_matches('\\').eq_ignore_ascii_case("archive"))
+    });
+    let named = || {
+        folders.iter().find(|f| {
+            let leaf = match f.delimiter.as_deref().filter(|d| !d.is_empty()) {
+                Some(d) => f.name.rsplit(d).next().unwrap_or(&f.name),
+                None => f.name.as_str(),
+            };
+            leaf.eq_ignore_ascii_case("archive") || leaf.eq_ignore_ascii_case("archives")
+        })
+    };
+    flagged.or_else(named).map(|f| f.name.clone())
+}
+
+fn list_folders(session: &mut Session) -> Result<Vec<Folder>, String> {
+    let names = session
+        .list(Some(""), Some("*"))
+        .map_err(|e| format!("Could not list the mailbox's folders: {e}"))?;
+    Ok(names
+        .iter()
+        .map(|n| Folder {
+            name: n.name().to_string(),
+            attributes: n
+                .attributes()
+                .iter()
+                .filter_map(|a| match a {
+                    imap::types::NameAttribute::Custom(s) => Some(s.to_string()),
+                    _ => None,
+                })
+                .collect(),
+            delimiter: n.delimiter().map(str::to_string),
+        })
+        .collect())
+}
+
+/// A Message-ID as an IMAP quoted string, for SEARCH HEADER. None for one that
+/// could break out of the quotes (a line break); quotes and backslashes are
+/// escaped.
+fn quoted_header_value(v: &str) -> Option<String> {
+    if v.is_empty() || v.contains(['\r', '\n']) {
+        return None;
+    }
+    Some(format!("\"{}\"", v.replace('\\', "\\\\").replace('"', "\\\"")))
+}
+
+/// The UIDVALIDITY and UID in a stored provider id ("<validity>:<uid>").
+fn parse_provider_id(id: &str) -> Option<(u32, u32)> {
+    let (validity, uid) = id.split_once(':')?;
+    Some((validity.parse().ok()?, uid.parse().ok()?))
+}
+
+/// Move one inbox message to the Archive folder. Returns the folder's name,
+/// which Undo needs to find it again.
+pub(crate) fn archive_message(account_id: &str, provider_message_id: &str) -> Result<String, Refusal> {
+    let settings = load_settings(account_id).ok_or_else(|| Refusal::Failed(NO_CREDENTIALS.to_string()))?;
+    let (validity, uid) = parse_provider_id(provider_message_id).ok_or(Refusal::Gone)?;
+    let mut session = open_session(&settings).map_err(Refusal::Failed)?;
+    let result = (|| -> Result<String, Refusal> {
+        let folder = pick_archive_folder(&list_folders(&mut session).map_err(Refusal::Failed)?).ok_or(Refusal::NoArchiveFolder)?;
+        let inbox = session
+            .select("INBOX")
+            .map_err(|e| Refusal::Failed(format!("Could not open the inbox: {e}")))?;
+        // The server renumbered the inbox since the sync: this UID may now be
+        // a different message, so nothing is moved.
+        if inbox.uid_validity != Some(validity) {
+            return Err(Refusal::Gone);
+        }
+        if session.uid_search(format!("UID {uid}")).map_err(|e| Refusal::Failed(format!("Could not search the inbox: {e}")))?.is_empty() {
+            return Err(Refusal::Gone);
+        }
+        session
+            .uid_mv(uid.to_string(), &folder)
+            .map_err(|e| Refusal::Failed(format!("The server would not move it to {folder} ({e}). Archive it in your mail app instead.")))?;
+        Ok(folder)
+    })();
+    logout(session);
+    result
+}
+
+/// Move a message Atlas archived back to the inbox, found in `folder` by its
+/// Message-ID (its UID there is new). Returns the provider id it now has in
+/// the inbox, so the stored row keeps naming it and the next sync does not
+/// store it a second time.
+pub(crate) fn restore_message(account_id: &str, folder: Option<&str>, message_id: Option<&str>) -> Result<String, Refusal> {
+    let folder = folder.ok_or_else(|| Refusal::Failed("Atlas does not know which folder it went to. Move it back in your mail app.".to_string()))?;
+    let search = message_id
+        .and_then(quoted_header_value)
+        .map(|q| format!("HEADER Message-ID {q}"))
+        .ok_or_else(|| Refusal::Failed("This message has no Message-ID to find it by. Move it back in your mail app.".to_string()))?;
+    let settings = load_settings(account_id).ok_or_else(|| Refusal::Failed(NO_CREDENTIALS.to_string()))?;
+    let mut session = open_session(&settings).map_err(Refusal::Failed)?;
+    let result = (|| -> Result<String, Refusal> {
+        session
+            .select(folder)
+            .map_err(|e| Refusal::Failed(format!("Could not open {folder}: {e}")))?;
+        let found = session
+            .uid_search(&search)
+            .map_err(|e| Refusal::Failed(format!("Could not search {folder}: {e}")))?;
+        let uid = found.into_iter().max().ok_or(Refusal::Gone)?;
+        session
+            .uid_mv(uid.to_string(), "INBOX")
+            .map_err(|e| Refusal::Failed(format!("The server would not move it back ({e}).")))?;
+        let inbox = session
+            .select("INBOX")
+            .map_err(|e| Refusal::Failed(format!("Could not open the inbox: {e}")))?;
+        let validity = inbox.uid_validity.ok_or(Refusal::Gone)?;
+        let back = session
+            .uid_search(&search)
+            .map_err(|e| Refusal::Failed(format!("Could not search the inbox: {e}")))?;
+        let uid = back.into_iter().max().ok_or(Refusal::Gone)?;
+        Ok(format!("{validity}:{uid}"))
+    })();
+    logout(session);
+    result
+}
+
+// ---------------------------------------------------------------------------
 // Background sync
 // ---------------------------------------------------------------------------
 
@@ -658,6 +802,37 @@ mod tests {
 
     fn uids(v: &[u32]) -> HashSet<u32> {
         v.iter().copied().collect()
+    }
+
+    fn folder(name: &str, attributes: &[&str], delimiter: Option<&str>) -> Folder {
+        Folder {
+            name: name.to_string(),
+            attributes: attributes.iter().map(|a| a.to_string()).collect(),
+            delimiter: delimiter.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn the_special_use_archive_folder_wins_over_a_named_one() {
+        let folders = [
+            folder("INBOX", &[], Some("/")),
+            folder("Archive", &[], Some("/")),
+            folder("Old mail", &["\\Archive"], Some("/")),
+        ];
+        assert_eq!(pick_archive_folder(&folders), Some("Old mail".to_string()));
+        assert_eq!(pick_archive_folder(&folders[..2]), Some("Archive".to_string()));
+        assert_eq!(pick_archive_folder(&[folder("INBOX.Archives", &[], Some("."))]), Some("INBOX.Archives".to_string()));
+        assert_eq!(pick_archive_folder(&[folder("INBOX", &[], Some("/")), folder("Sent", &["\\Sent"], Some("/"))]), None);
+    }
+
+    #[test]
+    fn a_message_id_is_quoted_for_search_and_line_breaks_are_refused() {
+        assert_eq!(quoted_header_value("<a@b>"), Some("\"<a@b>\"".to_string()));
+        assert_eq!(quoted_header_value("<a\"b@c>"), Some("\"<a\\\"b@c>\"".to_string()));
+        assert_eq!(quoted_header_value("<a@b>\r\nX DELETE INBOX"), None);
+        assert_eq!(quoted_header_value(""), None);
+        assert_eq!(parse_provider_id("42:7"), Some((42, 7)));
+        assert_eq!(parse_provider_id("x:7"), None);
     }
 
     #[test]

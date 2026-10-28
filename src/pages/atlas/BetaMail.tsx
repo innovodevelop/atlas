@@ -10,12 +10,20 @@
  *
  * Keys (the design's, plus the Workshop ones that still make sense):
  *   j / k  move   ·  Enter open   ·  Esc back out, step by step
- *   r reply · h snooze · e done · c write · a needs approval · u undo send · / search
+ *   r reply · h snooze · e archive · c write · a needs approval · u undo send · / search
+ *
+ * The connected mailboxes (Gmail, Outlook, IMAP) sit under the threads in
+ * Inbox and Archive (MailboxList), where Archive moves a message at the
+ * provider. A mailbox finishing a connect or a disconnect, here or anywhere
+ * else, shows as a toast (useMailboxToasts).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useAtlasMail, type UseAtlasMail } from '@/hooks/useAtlasMail';
+import { useMailIntelligence } from '@/hooks/useMailIntelligence';
+import { useMailboxArchive } from '@/hooks/useMailboxArchive';
+import { useMailboxToasts } from '@/hooks/useMailboxToasts';
 import { MAIL_AUDIT_ACTIONS, type MailThreadStatus } from '@/types/mail';
 import { MailNotices } from '@/components/atlas-ui/mail/MailNotices';
 import { MailRulesEditor } from '@/components/atlas-ui/mail/MailRulesEditor';
@@ -24,6 +32,7 @@ import { MailLanes } from '@/components/atlas/mail/MailLanes';
 import { MailList } from '@/components/atlas/mail/MailList';
 import { MailReader } from '@/components/atlas/mail/MailReader';
 import { BetaCompose } from '@/components/atlas/mail/BetaCompose';
+import { MailboxList } from '@/components/atlas/mail/MailboxList';
 import { VeilSphere } from '@/components/atlas/VeilSphere';
 import { AtlasIcon } from '@/components/atlas/AtlasIcon';
 import { LANES, laneCount, mailGreeting } from '@/lib/betaMail';
@@ -31,6 +40,7 @@ import { setTalkAnchor } from '@/lib/talkBus';
 import { useBetaNavigate } from '@/lib/viewTransitions';
 import { isTyping } from './atlasHelpers';
 import '@/styles/mail.css';
+import '@/styles/beta/mail.css';
 
 type Layout = 'wide' | 'mid' | 'narrow' | 'stacked';
 
@@ -51,7 +61,9 @@ const BetaMail = () => {
   const navigate = useBetaNavigate();
   const plainNavigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const mail: UseAtlasMail = useAtlasMail();
+  const mail: UseAtlasMail = useAtlasMail({ archiveLane: true });
+  const boxes = useMailboxArchive();
+  const intel = useMailIntelligence();
   const layout = useLayout();
   const stacked = layout === 'stacked';
   const showSide = layout === 'wide' || layout === 'mid';
@@ -100,6 +112,21 @@ const BetaMail = () => {
   }, []);
   useEffect(() => () => { if (toastTimer.current) window.clearTimeout(toastTimer.current); }, []);
 
+  const say = useCallback((text: string) => showToast({ text }), [showToast]);
+  useMailboxToasts(intel.accounts, intel.isLoading, say);
+
+  // A "Reconnect … to archive" sign-in that failed reports through the mail
+  // hook's error, which only the next attempt clears; dismissing hides that one.
+  const [hiddenSignInError, setHiddenSignInError] = useState<string | null>(null);
+  const signInError = intel.error && intel.error !== hiddenSignInError ? intel.error : null;
+  // Reconnecting a mailbox that is already active leaves the account list as
+  // it was, so no "Mailbox connected" toast says the sign-in worked; this does.
+  const wasConnecting = useRef(false);
+  useEffect(() => {
+    if (wasConnecting.current && !intel.isConnecting && !intel.error) say('Signed in again. Try Archive once more.');
+    wasConnecting.current = intel.isConnecting;
+  }, [intel.isConnecting, intel.error, say]);
+
   const snippets = useMemo(() => {
     const out: Record<string, string> = {};
     for (const m of mail.messages) {
@@ -132,14 +159,32 @@ const BetaMail = () => {
     else if (status === 'triage' && (prev === 'handled' || prev === 'snooze' || prev === 'handoff')) showToast({ text: 'Back in Needs you' });
   }, [mail, thread, showToast]);
 
-  const snooze = useCallback((until: string, label: string) => {
+  const snooze = useCallback((until: string, label: string, watch?: string) => {
     if (!thread) return;
     const prev = thread.status;
     const id = thread.id;
     setSnoozeOpen(false);
-    void mail.snooze(id, until);
+    // The hook reports a failure through its notices; the catch only keeps it from being unhandled.
+    mail.snooze(id, until, watch ?? null).catch(() => {});
     showToast({ text: `Snoozed · ${label.split(' · ')[0]}`, undo: () => void mail.setStatus(id, prev) });
   }, [mail, thread, showToast]);
+
+  const archiveThread = useCallback(() => {
+    if (!thread || mail.archivedIds.has(thread.id)) return;
+    const id = thread.id;
+    // The design moves on to the next row, as Done does in every mail client.
+    mail.selectRelative(1);
+    mail.archive(id).then(
+      () => showToast({ text: 'Archived', undo: () => void mail.unarchive(id) }),
+      () => {},
+    );
+  }, [mail, thread, showToast]);
+
+  const archiveMessage = useCallback((messageId: string, archive: boolean) => {
+    void boxes.setArchived(messageId, archive).then((res) => {
+      if (res?.ok) showToast({ text: archive ? 'Archived' : 'Back in the inbox', undo: () => void boxes.setArchived(messageId, !archive) });
+    });
+  }, [boxes, showToast]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -156,7 +201,7 @@ const BetaMail = () => {
           else if (selectedThreadId) mail.selectThread(null);
           else navigate('/');
           break;
-        case 'e': if (selectedThreadId) setStatus('handled'); break;
+        case 'e': if (selectedThreadId) archiveThread(); break;
         case 'a': if (selectedThreadId) setStatus('approve'); break;
         case 'h': if (selectedThreadId) setSnoozeOpen((v) => !v); break;
         case 'r': if (selectedThreadId) setReplyRequest((n) => n + 1); break;
@@ -168,7 +213,15 @@ const BetaMail = () => {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [mail, selectedThreadId, setStatus, composing, rulesOpen, snoozeOpen, navigate]);
+  }, [mail, selectedThreadId, setStatus, archiveThread, composing, rulesOpen, snoozeOpen, navigate]);
+
+  // The connected mailboxes' rows belong to Inbox and Archive only, and only
+  // to the unfiltered lane: search and the account filter work on threads.
+  const boxRows = mail.query.trim() || mail.mailbox ? [] : mail.view === 'inbox' ? boxes.inbox : mail.view === 'archive' ? boxes.archived : [];
+  const laneCounts = useMemo(
+    () => ({ ...mail.counts, inbox: (mail.counts.inbox ?? 0) + boxes.inbox.length, archive: (mail.counts.archive ?? 0) + boxes.archived.length }),
+    [mail.counts, boxes.inbox.length, boxes.archived.length],
+  );
 
   const { greeting, subline, handledN } = mailGreeting(mail.counts);
   const eyebrow = `${mail.account ? '1 account' : 'No account'} · ${handledN} handled${mail.lastSyncedAt ? ` · synced ${fullTime(mail.lastSyncedAt)}` : ''}`;
@@ -197,12 +250,18 @@ const BetaMail = () => {
         </div>
       </header>
 
-      <MailNotices error={mail.error} warning={mail.warning} onDismissError={mail.dismissError} onDismissWarning={mail.dismissWarning} lastSyncedAt={mail.lastSyncedAt} />
+      <MailNotices
+        error={mail.error ?? boxes.error ?? signInError}
+        warning={mail.warning}
+        onDismissError={() => { mail.dismissError(); boxes.dismissError(); setHiddenSignInError(intel.error); }}
+        onDismissWarning={mail.dismissWarning}
+        lastSyncedAt={mail.lastSyncedAt}
+      />
 
       {!showSide ? (
         <div className="b-mail-lanechips nosb" role="tablist" aria-label="Mail lanes">
           {LANES.map((l) => {
-            const n = laneCount(mail.counts, l.view);
+            const n = laneCount(laneCounts, l.view);
             const on = mail.view === l.view;
             return <button type="button" key={l.view} role="tab" aria-selected={on} className={`b-chip${on ? ' on' : ''}`} onClick={() => mail.setView(l.view)}>{l.label}{n ? <span className="b-num"> {n}</span> : null}</button>;
           })}
@@ -214,7 +273,7 @@ const BetaMail = () => {
         {showSide ? (
           <MailLanes
             view={mail.view}
-            counts={mail.counts}
+            counts={laneCounts}
             account={mail.account}
             mailbox={mail.mailbox}
             handledInMailbox={mail.counts.handled ?? 0}
@@ -240,6 +299,18 @@ const BetaMail = () => {
             onSync={() => void mail.sync()}
             onClearMailbox={() => mail.setMailbox(null)}
             onClearQuery={() => mail.setQuery('')}
+            extra={boxRows.length ? (
+              <MailboxList
+                mode={mail.view === 'archive' ? 'archive' : 'inbox'}
+                rows={boxRows}
+                refusals={boxes.refusals}
+                working={boxes.working}
+                connecting={intel.isConnecting}
+                onArchive={archiveMessage}
+                onReconnect={(provider) => void intel.connect(provider, { archive: true })}
+              />
+            ) : null}
+            extraCount={boxRows.length}
           />
         ) : null}
         {!stacked || thread ? (
@@ -254,10 +325,13 @@ const BetaMail = () => {
               pendingSend={mail.pendingSend}
               busy={mail.syncing}
               snoozeOpen={snoozeOpen}
+              watch={mail.watches[thread.id] ?? null}
+              archived={mail.archivedIds.has(thread.id)}
               replyRequest={replyRequest}
               stacked={stacked}
               onBack={() => mail.selectThread(null)}
               onStatus={setStatus}
+              onArchive={archiveThread}
               onToggleSnooze={() => setSnoozeOpen((v) => !v)}
               onSnooze={snooze}
               onDraft={(opts) => mail.draft(thread.id, opts)}

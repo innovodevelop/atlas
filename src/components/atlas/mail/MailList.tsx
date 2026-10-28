@@ -3,6 +3,7 @@
  * lane's title and meaning, All/Unread, and one row per thread with the
  * status chip and the account it came through.
  */
+import type { ReactNode } from 'react';
 import { LANE_BY_VIEW, STATUS_CHIP } from '@/lib/betaMail';
 import { displayName, senderDomain, shortTime } from '@/components/atlas-ui/mail/mailFormat';
 import type { MailAccount, MailEmptyReason, MailThread, MailView } from '@/types/mail';
@@ -23,6 +24,10 @@ export interface MailListProps {
   onSync: () => void;
   onClearMailbox: () => void;
   onClearQuery: () => void;
+  /** Rows from the connected mailboxes (MailboxList), listed under the threads in Inbox and Archive. */
+  extra?: ReactNode;
+  /** How many rows `extra` holds: a lane with only those is not empty. */
+  extraCount?: number;
 }
 
 /** Who the row is from: the first participant that is not our own mailbox. */
@@ -50,7 +55,11 @@ export function MailList(p: MailListProps) {
   const q = p.query.trim();
   const title = q ? 'Search' : p.mailbox ? p.mailbox : lane?.label ?? 'Mail';
   const meta = q ? `${rows.length} ${rows.length === 1 ? 'result' : 'results'} for “${q}”` : p.mailbox ? 'Everything in this account' : lane?.desc ?? '';
-  const empty = p.emptyReason ? emptyCopy(p.emptyReason, p.view) : rows.length === 0 && p.unreadOnly ? { title: 'Nothing unread', body: 'Everything here has been opened.' } : null;
+  // A lane whose only rows are connected-mailbox ones is not empty; "Not
+  // synced yet" would read as if those rows were not there. Unread has no
+  // meaning for them (a scan stores no read state), so the filter hides them.
+  const others = p.unreadOnly ? 0 : p.extraCount ?? 0;
+  const empty = others > 0 ? null : p.emptyReason ? emptyCopy(p.emptyReason, p.view) : rows.length === 0 && p.unreadOnly ? { title: 'Nothing unread', body: 'Everything here has been opened.' } : null;
   const acctDot = p.account?.colour ?? 'var(--b-blue)';
   const acctName = p.account?.email_address.split('@')[0] ?? '';
 
@@ -86,6 +95,7 @@ export function MailList(p: MailListProps) {
             </button>
           );
         })}
+        {p.unreadOnly ? null : p.extra}
         {empty ? (
           <div className="b-mail-empty">
             <span className="b-mail-empty-t">{empty.title}</span>

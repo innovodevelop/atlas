@@ -1,7 +1,8 @@
 # Gmail — one-time setup
 
 Atlas reads your Gmail inbox **read-only** (scope `gmail.readonly`: it cannot
-send, delete, label or modify mail) and keeps what it reads on this Mac.
+send, delete, label or modify mail) and keeps what it reads on this Mac. The
+one opt-in exception is Archive from Mail, below.
 
 **Decision (Phase 7b):** consumer mail stays **local-only**. OAuth, token
 storage and sync all happen on-device in the Tauri app (`src-tauri/src/gmail.rs`,
@@ -100,6 +101,28 @@ tab shows whether the mailbox connected. Back in Atlas, use **Scan now** to sync
   security assessment.
 - Gmail sign-in has not yet been run end to end against a real Google
   account; the first real connect is the verification step.
+
+## Archive from Mail (opt-in, all three providers)
+
+The Beta Mail's Archive action moves a connected-mailbox message out of the
+inbox at the provider (`src-tauri/src/mail_archive.rs`): Gmail removes the
+INBOX label, Outlook moves it to the Archive folder, IMAP moves it to the
+server's Archive folder (the `\Archive` special-use one, else one named
+Archive; Atlas never creates one, and a server without MOVE is refused). Undo
+moves it back. Nothing is deleted.
+
+Mailboxes connect read-only, so the first Archive on a Gmail or Outlook
+mailbox answers "Reconnect <account> to archive": a sign-in that also asks for
+`gmail.modify` (Google) or `Mail.ReadWrite` (Microsoft). For that to work:
+
+- Google: add `https://www.googleapis.com/auth/gmail.modify` to the OAuth
+  consent screen's scopes (it is a restricted scope too, same verification
+  note as above).
+- Microsoft: add the delegated `Mail.ReadWrite` permission to the app
+  registration (no admin consent needed for personal mailboxes; a work tenant
+  may require it).
+
+IMAP needs nothing extra: the stored login can already move mail.
 
 ## Custom IMAP mailboxes
 

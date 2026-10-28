@@ -726,7 +726,10 @@ enum WakePlan {
 
 fn plan_wake(t: &Snoozed, now: chrono::DateTime<Utc>) -> WakePlan {
     let due = t.snoozed_until.as_deref().and_then(parse_instant).is_some_and(|u| u <= now);
-    if t.status == "snooze" && due {
+    // A watched thread the worker already flipped to triage is due as well:
+    // past its fallback date, whoever replied, it belongs in Needs you, and
+    // reading the reply first could only send it back to sleep for nothing.
+    if due && (t.status == "snooze" || (t.status == "triage" && t.watch.is_some())) {
         return WakePlan::Due;
     }
     if t.watch.is_none() {
@@ -1479,6 +1482,9 @@ mod tests {
         assert_eq!(plan_wake(&snoozed("snooze", Some("2026-10-29T09:00:00+01:00"), None, None), now), WakePlan::Nothing);
         // The fallback date applies to a watched snooze too.
         assert_eq!(plan_wake(&snoozed("snooze", Some("2026-10-28T10:00:00Z"), None, Some("dana@x.com")), now), WakePlan::Due);
+        // Flipped by someone else's reply after the fallback passed: due, not read.
+        let flipped = snoozed("triage", Some("2026-10-28T10:00:00Z"), Some("2026-10-29T07:00:00Z"), Some("dana@x.com"));
+        assert_eq!(plan_wake(&flipped, now), WakePlan::Due);
     }
 
     #[test]

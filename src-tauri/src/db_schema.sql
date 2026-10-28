@@ -1472,3 +1472,21 @@ CREATE TABLE IF NOT EXISTS mail_alert_threads (
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   PRIMARY KEY (user_id, thread_key)
 );
+
+-- Archive at the provider, for the mailboxes the user connected (Gmail,
+-- Outlook, IMAP). One row per stored message the user archived from Mail:
+-- the provider has already moved it out of its inbox (Gmail drops the INBOX
+-- label, Outlook moves it to Archive, IMAP moves it to the server's Archive
+-- folder) by the time the row is written, so the row is what the Archive lane
+-- lists and what Undo reverses. `folder` is the IMAP folder it went to, so
+-- Undo knows where to look; NULL for Gmail and Outlook. Disconnecting the
+-- mailbox cascades through mail_messages and forgets these with it.
+-- mail_archive.rs is the only writer.
+CREATE TABLE IF NOT EXISTS mail_archived_messages (
+  message_id  TEXT PRIMARY KEY REFERENCES mail_messages(id) ON DELETE CASCADE,
+  user_id     TEXT NOT NULL,
+  account_id  TEXT NOT NULL,
+  folder      TEXT,
+  archived_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_mail_archived_messages_user ON mail_archived_messages(user_id, archived_at DESC);

@@ -1,0 +1,18 @@
+/* ── Mail: the connected mailboxes in Inbox and Archive ────────────────────────
+   Source: design/current/design_handoff_atlas_beta/Atlas Mail Beta.dc.html —
+   its rows ("Every account, newest first") and its round Archive button, for
+   the Gmail / Outlook / IMAP messages the scans stored. The rest of the Beta
+   Mail lives in src/styles/beta.css; this file only adds what MailboxList
+   draws, with the same --b-* tokens. Borderless; nothing here scrolls sideways
+   at 375 px (every text line ellipsises, the button never shrinks). */
+
+.b-mail-boxes { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+.b-mail-boxes-h { padding: 6px 16px 2px; }
+.b-mail-box { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 12px 12px 16px; border-radius: 18px; background: var(--b-page); color: var(--b-ink); }
+.b-mail-box-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.b-mail-box .b-mail-row-acct i { background: var(--b-ink2); }
+.b-mail-box-act { flex: none; border: none; }
+.b-mail-box-act:disabled { opacity: .5; cursor: default; }
+.b-mail-box-note { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 14px; background: var(--b-panel); font-size: 12.5px; line-height: 1.45; color: var(--b-ink2); }
+.b-mail-box-note span { flex: 1 1 200px; min-width: 0; }
+.b-mail-box-note button { border: none; }
