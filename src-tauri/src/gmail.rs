@@ -2,7 +2,10 @@
 //
 // OAuth, token storage, sync and analysis all happen on-device. Nothing
 // mail-related touches Cloudflare or any cloud service. Scope is gmail.readonly:
-// Atlas cannot send, delete, label or modify mail.
+// Atlas cannot send, delete, label or modify mail. The one exception is opt-in:
+// a mailbox reconnected from Mail's "Reconnect <account> to archive" also
+// grants gmail.modify, and Atlas uses it for exactly one thing, the Archive
+// action the user takes in Mail (set_in_inbox). It still cannot send or delete.
 //
 // The OAuth flow is RFC 8252 (native app): PKCE plus a LOOPBACK redirect
 // (oauth::Loopback, http://127.0.0.1:<random port>), not the atlas:// deep
@@ -33,9 +36,14 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::db::DbState;
+use crate::mail_archive::Refusal;
 use crate::oauth;
 
 const GMAIL_SCOPE: &str = "https://www.googleapis.com/auth/gmail.readonly";
+/// What Archive needs on top of read-only: label changes (Gmail's archive is
+/// "remove the INBOX label"). Asked for only when the user reconnects a
+/// mailbox to archive from Mail.
+const GMAIL_ARCHIVE_SCOPE: &str = "https://www.googleapis.com/auth/gmail.modify";
 const GOOGLE_AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 const GOOGLE_REVOKE_URL: &str = "https://oauth2.googleapis.com/revoke";
@@ -171,7 +179,9 @@ fn google_client() -> Result<GoogleClient, String> {
     }
 }
 
-fn build_authorize_url(client: &GoogleClient, redirect_uri: &str, challenge: &str, state: &str) -> String {
+/// The consent URL for `scope`: read-only normally, read-only plus
+/// gmail.modify when the user reconnects a mailbox to archive from Mail.
+fn build_authorize_url(client: &GoogleClient, redirect_uri: &str, challenge: &str, state: &str, scope: &str) -> String {
     format!(
         "{GOOGLE_AUTH_URL}?{}",
         form(&[
@@ -181,7 +191,7 @@ fn build_authorize_url(client: &GoogleClient, redirect_uri: &str, challenge: &st
             ("code_challenge_method", "S256"),
             ("code_challenge", challenge),
             ("state", state),
-            ("scope", GMAIL_SCOPE),
+            ("scope", scope),
             ("access_type", "offline"),
             ("prompt", "consent"),
         ])
@@ -284,6 +294,60 @@ fn gmail_get(token: &str, path: &str) -> Result<Value, String> {
     }
 }
 
+/// Whether a grant's scope list can archive: gmail.modify, or full mail
+/// access ("https://mail.google.com/") granted some other way.
+fn grants_archive(scopes: &str) -> bool {
+    scopes.split_whitespace().any(|s| s == GMAIL_ARCHIVE_SCOPE || s == "https://mail.google.com/")
+}
+
+/// Archive one message (`in_inbox` false) or put it back (true). Gmail's
+/// Archive is removing the INBOX label, so Undo is adding it again; the
+/// message itself, its other labels and its id stay as they were.
+///
+/// Google's refresh response lists the scopes the stored grant carries, so a
+/// read-only grant is refused here, before any request to the mailbox, with
+/// the answer the user can act on (reconnect to archive) instead of a 403.
+pub(crate) fn set_in_inbox(account_id: &str, provider_message_id: &str, in_inbox: bool) -> Result<(), Refusal> {
+    let refresh_token = crate::secrets::gmail_refresh_token(account_id).ok_or(Refusal::NeedsScope)?;
+    let client = google_client().map_err(Refusal::Failed)?;
+    let body = form(&[
+        ("grant_type", "refresh_token"),
+        ("refresh_token", &refresh_token),
+        ("client_id", &client.id),
+        ("client_secret", &client.secret),
+    ]);
+    // A revoked or expired grant needs the same reconnect.
+    let granted = post_token(&body).map_err(|e| {
+        if e.contains("invalid_grant") {
+            Refusal::NeedsScope
+        } else {
+            Refusal::Failed(e)
+        }
+    })?;
+    if !grants_archive(granted["scope"].as_str().unwrap_or("")) {
+        return Err(Refusal::NeedsScope);
+    }
+    let access = granted["access_token"]
+        .as_str()
+        .ok_or_else(|| Refusal::Failed("Google did not return an access token.".to_string()))?;
+    let change = if in_inbox {
+        json!({ "addLabelIds": ["INBOX"] })
+    } else {
+        json!({ "removeLabelIds": ["INBOX"] })
+    };
+    match crate::http::agent()
+        .post(&format!("{GMAIL_API}/messages/{}/modify", urlencoding(provider_message_id)))
+        .set("Authorization", &format!("Bearer {access}"))
+        .send_json(change)
+    {
+        Ok(_) => Ok(()),
+        Err(ureq::Error::Status(401 | 403, _)) => Err(Refusal::NeedsScope),
+        Err(ureq::Error::Status(404, _)) => Err(Refusal::Gone),
+        Err(ureq::Error::Status(code, _)) => Err(Refusal::Failed(format!("Gmail API error ({code})."))),
+        Err(e) => Err(Refusal::Failed(format!("Could not reach Gmail API: {e}"))),
+    }
+}
+
 /// Best-effort revoke of a refresh token at Google.
 fn revoke(token: &str) {
     let _ = crate::http::agent()
@@ -301,13 +365,16 @@ fn revoke(token: &str) {
 /// consent URL plus the flow id (the OAuth state, which is in the URL anyway).
 /// Every gmail:status event carries the flow it is about, so a hook instance
 /// only reacts to the flow it started.
-/// JS calls with `{ provider: 'gmail', userId: '<id>' }`.
+/// JS calls with `{ provider: 'gmail', userId: '<id>' }`, plus `archive: true`
+/// when Mail's "Reconnect <account> to archive" starts it: that sign-in also
+/// asks Google for gmail.modify, and Google's consent screen says so.
 #[tauri::command(async)]
 pub fn gmail_connect(
     app: AppHandle,
     state: State<'_, GmailState>,
     user_id: String,
     provider: Option<String>,
+    archive: Option<bool>,
 ) -> Result<Value, String> {
     let _ = provider;
     let client = google_client()?;
@@ -316,7 +383,12 @@ pub fn gmail_connect(
     let redirect_uri = loopback.redirect_uri();
     let (verifier, challenge) = oauth::generate_pkce();
     let flow = uuid::Uuid::new_v4().simple().to_string();
-    let url = build_authorize_url(&client, &redirect_uri, &challenge, &flow);
+    let scope = if archive.unwrap_or(false) {
+        format!("{GMAIL_SCOPE} {GMAIL_ARCHIVE_SCOPE}")
+    } else {
+        GMAIL_SCOPE.to_string()
+    };
+    let url = build_authorize_url(&client, &redirect_uri, &challenge, &flow, &scope);
 
     state.register(&flow, GmailOAuthPending { verifier, user_id, redirect_uri, started: Instant::now() });
 
@@ -558,7 +630,12 @@ fn sync_and_record(
     user_id: &str,
     limit: Option<u32>,
 ) -> Result<Value, String> {
+    let since = crate::mail_flags::mark();
     let result = sync_account(app, db, gmail, account_id, user_id, limit);
+    // Bills and deadlines in what this sync brought in (Settings → Mail → Alerts).
+    if result.is_ok() {
+        crate::mail_flags::after_sync(app, db, user_id, account_id, &since);
+    }
     if let Err(e) = &result {
         {
             let conn = db.conn.lock().unwrap();
@@ -1357,6 +1434,14 @@ mod tests {
         collect_added_ids(&page, &mut ids, &mut seen);
         collect_added_ids(&json!({}), &mut ids, &mut seen);
         assert_eq!(ids, ["a", "b", "c"]);
+    }
+
+    #[test]
+    fn only_a_modify_or_full_grant_can_archive() {
+        assert!(!grants_archive(GMAIL_SCOPE));
+        assert!(grants_archive(&format!("{GMAIL_SCOPE} {GMAIL_ARCHIVE_SCOPE}")));
+        assert!(grants_archive("https://mail.google.com/"));
+        assert!(!grants_archive(""));
     }
 
     #[test]
