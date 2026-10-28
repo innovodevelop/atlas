@@ -542,6 +542,7 @@ async function recorded(
 export interface ProviderProbe {
   lane: "anthropic" | "bedrock" | null;
   ok: boolean;
+  /** How long the check took, failed or not; null when nothing was sent (no key, not probed). */
   latencyMs: number | null;
   /** A short sentence for the row: what was checked and what came back. */
   detail: string;
@@ -596,7 +597,10 @@ export async function probeAIProvider(
     return {
       lane: config.provider === "anthropic" || config.provider === "bedrock" ? config.provider : null,
       ok: false,
-      latencyMs: null,
+      // The time it took to fail (the whole wait, on a timeout): the health
+      // route ran this probe inside its request, and System Status takes it
+      // out of the brain's round trip, which it would otherwise be blamed on.
+      latencyMs: elapsed(),
       detail: timedOut ? `No answer within ${Math.round(timeoutMs / 1000)} s` : "Not reachable from this Mac",
       error: clip(e instanceof Error ? e.message : String(e), 120),
     };

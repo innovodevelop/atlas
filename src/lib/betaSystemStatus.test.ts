@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import {
   MAX_SAMPLE_AGE_MS, PROBE_HISTORY_KEY, _resetProbeHistory, agoText, barsOf, batteryColour, batteryState, bytesText, countToday, deviceIcon, deviceLine,
-  eventTime, getProbeHistory, homeAssistantService, latencyText, macLine, mailService, modelCallsTile, parseHistory, pushSample, recentEvents,
+  eventTime, getProbeHistory, homeAssistantService, latencyText, macLine, mailService, modelCallsTile, parseHistory, probeTime, pushSample, recentEvents,
   recordProbe, ringOffset, serviceDesc, serviceDown, serviceMeta, sphereStateFor, storageBars, subscribeProbeHistory, summarise, uptimeText,
   valueText, versionMessage, versionUptime, withRoundTrip, type MailAccountRow, type ProbeService, type StorageReport,
 } from './betaSystemStatus';
@@ -163,6 +163,29 @@ describe('probe history store', () => {
     recordProbe([ok('atlas-brain', 20)], 6000);
     expect(getProbeHistory()['atlas-brain'].map((s) => s.latency)).toEqual([10, 20]);
   });
+  test('the AI provider is one bar per probe, however many polls repeat it from the brain’s cache', () => {
+    const probedAt = Date.parse('2026-10-28T09:00:00Z');
+    const ai = (latency_ms: number, last_check: string, cached: boolean): ProbeService =>
+      ({ name: 'ai-provider', status: 'healthy', latency_ms, last_check, detail: 'Claude first-party · key accepted', cached });
+    // The probe runs in the first poll and arrives a few ms after it finished…
+    recordProbe([ok('atlas-brain', 5), ai(300, '2026-10-28T09:00:00Z', false)], probedAt + 20);
+    // …and the next polls carry the same probe from the cache.
+    recordProbe([ok('atlas-brain', 6), ai(300, '2026-10-28T09:00:00Z', true)], probedAt + 10_020);
+    recordProbe([ok('atlas-brain', 7), ai(300, '2026-10-28T09:00:00Z', true)], probedAt + 20_020);
+    expect(getProbeHistory()['ai-provider']).toEqual([{ at: probedAt, latency: 300, ok: true }]);
+    expect(getProbeHistory()['atlas-brain'].length).toBe(3);
+    // A minute later the brain probes again: a second bar.
+    recordProbe([ok('atlas-brain', 8), ai(280, '2026-10-28T09:01:00Z', false)], probedAt + 60_030);
+    expect(getProbeHistory()['ai-provider'].map((s) => s.latency)).toEqual([300, 280]);
+  });
+  test('a cached answer seen first is keyed on its probe time, and recorded once', () => {
+    const cached: ProbeService = { name: 'ai-provider', status: 'healthy', latency_ms: 300, last_check: '2026-10-28T09:00:00Z', cached: true };
+    recordProbe([cached], Date.parse('2026-10-28T09:00:30Z'));
+    recordProbe([cached], Date.parse('2026-10-28T09:00:40Z'));
+    expect(getProbeHistory()['ai-provider']).toEqual([{ at: Date.parse('2026-10-28T09:00:00Z'), latency: 300, ok: true }]);
+    expect(probeTime({ ...cached, last_check: 'not a date' }, 42)).toBe(42);
+    expect(probeTime(ok('atlas-brain'), 42)).toBe(42);
+  });
   test('each record is a new snapshot', () => {
     const a = getProbeHistory();
     recordProbe([ok('atlas-brain')]);
@@ -194,7 +217,7 @@ describe('on this Mac', () => {
     database: { bytes: 600_000_000, wal_bytes: 4_000_000 },
     parts: { memory: 412_000_000, mail: 120_000_000, audit: 88_000_000, other: 1_000 },
     parts_error: null,
-    models: { bytes: 1_900_000_000, source: 'sidecars' },
+    models: { bytes: 1_900_000_000, source: 'build' },
     measured_at: '2026-10-28T09:00:00.000Z',
     ...over,
   });
@@ -210,7 +233,9 @@ describe('on this Mac', () => {
     expect(bars.map((b) => b.v)).toEqual(['600 MB', '412 MB', '88 MB', '120 MB', '1.9 GB']);
     expect(bars[4].w).toBe('100%');
     expect(bars[0].w).toBe('32%');
-    expect(bars[4].title).toContain('sidecars');
+    // Model files, wherever they were counted; the sidecars only carry them.
+    expect(bars[4].title).toContain('model files, as counted when this build was made');
+    expect(storageBars(report({ models: { bytes: 1, source: 'checkout' } }))[4].title).toContain('model files of this checkout');
   });
   test('a figure that could not be measured is left out, not drawn as zero', () => {
     const bars = storageBars(report({ parts: null, parts_error: 'no such table: dbstat', models: null }));
@@ -311,6 +336,17 @@ describe('local services', () => {
     expect(serviceDesc(ai)).toBe('Claude first-party · key accepted');
     expect(withRoundTrip([ok('atlas-brain', 0), ai], 400)[0].latency_ms).toBe(400);
     expect(withRoundTrip([ok('atlas-brain', 0), { ...ai, cached: false }], 400)[0].latency_ms).toBe(100);
+  });
+  test('a provider probe that timed out in this request does not land on the brain', () => {
+    // providerProbe.ts's row for a probe that waited out its 5 s: down, with the wait as its latency.
+    const timedOut: ProbeService = {
+      name: 'ai-provider', status: 'down', latency_ms: 5003, last_check: '2026-10-28T09:00:05Z',
+      error: 'The operation timed out.', detail: 'No answer within 5 s', cached: false,
+    };
+    const out = withRoundTrip([ok('atlas-brain', 0), ok('voice-gateway', 4), timedOut], 5019);
+    expect(out[0].latency_ms).toBe(12);
+    expect(valueText(out[0])).toBe('12 ms');
+    expect(valueText(out[2])).toBe('down');
   });
   test('ago', () => {
     expect(agoText(null, NOW)).toBe('never');

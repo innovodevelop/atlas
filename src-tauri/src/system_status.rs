@@ -3,7 +3,8 @@
 //   storage     How much of this Mac Atlas takes, in bytes: atlas.db on disk,
 //               how much of it is memory, the mail cache and the audit trail
 //               (SQLite's own page accounting, the `dbstat` table the bundled
-//               SQLite is compiled with), and the on-device models.
+//               SQLite is compiled with), and the on-device models (their
+//               model files, not the sidecars that carry them).
 //   versions    Which version of this app ran when, recorded once per launch,
 //               so the screen can say "up for 14 days since the last update"
 //               and list installs and updates under Recently.
@@ -180,28 +181,74 @@ fn dir_bytes(dir: &Path) -> u64 {
         .sum()
 }
 
-/// The models Atlas runs on this Mac, and where they were measured.
+/// The `.onnx` files directly in `dir` (the wake-word folder also holds a
+/// README and a licence, which are not models).
+fn onnx_bytes(dir: &Path) -> u64 {
+    let Ok(entries) = fs::read_dir(dir) else { return 0 };
+    entries
+        .flatten()
+        .filter(|e| e.path().extension().is_some_and(|x| x == "onnx"))
+        .map(|e| file_bytes(&e.path()))
+        .sum()
+}
+
+/// The sidecars that carry models, and the folder of a checkout each one's
+/// models are compiled from. scripts/gen-sidecar-manifest.ts counts the same
+/// folders into the manifest (`model_bytes`) when the sidecars are built.
+const MODEL_SIDECARS: [(&str, &str); 2] = [
+    ("atlas-brain", "services/atlas-brain/models"),
+    ("atlas-voice-gateway", "services/voice-gateway/models"),
+];
+
+/// Where the wake-word models live in a checkout. In a build they are part of
+/// the webview's assets inside the executable, counted by build.rs.
+const WAKE_WORD_DIR: &str = "public/models";
+
+/// The bytes of the wake-word models compiled into this executable.
+fn wake_word_model_bytes() -> u64 {
+    env!("ATLAS_WAKE_WORD_MODEL_BYTES").parse().unwrap_or(0)
+}
+
+/// The sidecars' model bytes as the build's manifest counted them. None when
+/// any sidecar has no count: half a figure would read as the whole.
+pub fn manifest_model_bytes(manifest_raw: &str) -> Option<u64> {
+    let v: Value = serde_json::from_str(manifest_raw).ok()?;
+    MODEL_SIDECARS.iter().map(|(name, _)| v.get(name)?.get("model_bytes")?.as_u64()).sum()
+}
+
+/// The models Atlas runs on this Mac — the brain's multilingual-e5 embedder,
+/// the voice gateway's VAD and the wake word — in bytes, and where the figure
+/// comes from. Model files only: a sidecar binary is a Bun runtime and app code
+/// as well, so its size is not its models' size.
 ///
-/// In the installed app the models are compiled INTO the two sidecars (the
-/// brain carries the multilingual-e5 embedder, the voice gateway its VAD), so
-/// the sidecar binaries are what they weigh on disk. From a source checkout
-/// (`tauri dev`, no sidecars beside the executable) the model folders are
-/// measured instead. Neither found: no figure, rather than a zero.
-fn models_on_disk() -> Option<(u64, &'static str)> {
-    let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
-    let sidecars: Vec<PathBuf> = ["atlas-brain", "atlas-voice-gateway"].iter().map(|n| exe_dir.join(n)).collect();
-    if sidecars.iter().any(|p| p.is_file()) {
-        return Some((sidecars.iter().map(|p| file_bytes(p)).sum(), "sidecars"));
+/// Beside the installed sidecars the models are inside them and cannot be
+/// measured apart, so the figure is what the build counted (the manifest, plus
+/// the wake word build.rs counted). From a source checkout the model folders
+/// are measured. Neither: no figure, rather than a zero, and the reason.
+fn models_on_disk() -> Result<(u64, &'static str), String> {
+    let exe_dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(Path::to_path_buf))
+        .ok_or("could not tell where the app runs from")?;
+    let beside = MODEL_SIDECARS.iter().any(|(name, _)| exe_dir.join(name).is_file());
+    if beside {
+        if let Some(bytes) = manifest_model_bytes(crate::integrity::EMBEDDED_MANIFEST) {
+            return Ok((bytes + wake_word_model_bytes(), "build"));
+        }
     }
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent()?;
-    let dirs: Vec<PathBuf> = ["services/atlas-brain/models", "services/voice-gateway/models", "public/models"]
-        .iter()
-        .map(|d| root.join(d))
-        .collect();
-    if dirs.iter().any(|d| d.is_dir()) {
-        return Some((dirs.iter().map(|d| dir_bytes(d)).sum(), "checkout"));
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().map(Path::to_path_buf);
+    if let Some(root) = root {
+        let dirs: Vec<PathBuf> = MODEL_SIDECARS.iter().map(|(_, d)| root.join(d)).collect();
+        if dirs.iter().any(|d| d.is_dir()) {
+            let bytes: u64 = dirs.iter().map(|d| dir_bytes(d)).sum::<u64>() + onnx_bytes(&root.join(WAKE_WORD_DIR));
+            return Ok((bytes, "checkout"));
+        }
     }
-    None
+    Err(if beside {
+        "this build did not count its models when it was made".into()
+    } else {
+        "no model files were found to measure".into()
+    })
 }
 
 /// Bytes on disk, per the design's "On this Mac" rows. Read once per visit and
@@ -226,13 +273,17 @@ pub fn system_storage(state: State<'_, DbState>) -> Result<Value, String> {
         Ok(tables) => (Some(split_parts(&tables)), None),
         Err(e) => (None, Some(e.to_string())),
     };
-    let models = models_on_disk();
+    let (models, models_error) = match models_on_disk() {
+        Ok((bytes, source)) => (Some(json!({ "bytes": bytes, "source": source })), None),
+        Err(reason) => (None, Some(reason)),
+    };
 
     Ok(json!({
         "database": { "bytes": main_bytes + wal_bytes, "wal_bytes": wal_bytes },
         "parts": parts.map(|p| json!({ "memory": p.memory, "mail": p.mail, "audit": p.audit, "other": p.other })),
         "parts_error": pages_error,
-        "models": models.map(|(bytes, source)| json!({ "bytes": bytes, "source": source })),
+        "models": models,
+        "models_error": models_error,
         "measured_at": now_iso(),
     }))
 }
@@ -341,6 +392,33 @@ mod tests {
         assert_eq!(category("chat_turns"), "other");
         let parts = split_parts(&[("mail_messages".into(), 4096), ("tool_calls".into(), 1024), ("ai_memory".into(), 2048), ("x".into(), 8)]);
         assert_eq!(parts, Parts { memory: 2048, mail: 4096, audit: 1024, other: 8 });
+    }
+
+    #[test]
+    fn models_are_the_model_bytes_the_build_counted_not_the_sidecars() {
+        // On this Mac the brain binary is ~372 MB, ~282 MB of it the embedder.
+        let manifest = r#"{
+            "atlas-brain": { "sha256": "ab", "size": 372153952, "model_bytes": 295739000 },
+            "atlas-voice-gateway": { "sha256": "cd", "size": 101092960, "model_bytes": 2327000 }
+        }"#;
+        assert_eq!(manifest_model_bytes(manifest), Some(295739000 + 2327000));
+        // A manifest from before the count, or with one sidecar uncounted: no figure.
+        assert_eq!(manifest_model_bytes(r#"{ "atlas-brain": { "sha256": "ab", "size": 1 }, "atlas-voice-gateway": { "sha256": "cd", "size": 1, "model_bytes": 5 } }"#), None);
+        assert_eq!(manifest_model_bytes("{}"), None);
+        assert_eq!(manifest_model_bytes("not json"), None);
+    }
+
+    #[test]
+    fn the_wake_word_folder_counts_its_models_not_its_readme() {
+        let dir = std::env::temp_dir().join(format!("atlas-onnx-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("hey_atlas.onnx"), vec![0u8; 300]).unwrap();
+        fs::write(dir.join("speech_embedding.onnx"), vec![0u8; 200]).unwrap();
+        fs::write(dir.join("README.md"), vec![0u8; 5000]).unwrap();
+        assert_eq!(onnx_bytes(&dir), 500);
+        fs::remove_dir_all(&dir).unwrap();
+        // build.rs counted the repo's own wake-word models into this binary.
+        assert!(wake_word_model_bytes() > 0);
     }
 
     #[test]

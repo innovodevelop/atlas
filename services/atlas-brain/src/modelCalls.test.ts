@@ -342,7 +342,27 @@ describe("provider probe", () => {
       expect(ok.latencyMs).not.toBeNull();
       expect(await probeAIProvider(answer(401))).toMatchObject({ ok: false, detail: "Claude first-party · key refused", error: "HTTP 401" });
       const thrown = await probeAIProvider((async () => { throw new Error("offline"); }) as unknown as typeof fetch);
-      expect(thrown).toMatchObject({ ok: false, latencyMs: null, detail: "Not reachable from this Mac", error: "offline" });
+      expect(thrown).toMatchObject({ ok: false, detail: "Not reachable from this Mac", error: "offline" });
+      expect(thrown.latencyMs).not.toBeNull();
+    });
+  });
+
+  test("a probe that times out reports the wait it took, so the brain is not blamed for it", async () => {
+    // A provider that never answers: the fetch only ends when the probe's own timeout aborts it.
+    const silent = ((_url: string, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(init.signal!.reason), { once: true });
+      })) as unknown as typeof fetch;
+    await withEnv({ ATLAS_AI_PROVIDER: undefined, ANTHROPIC_API_KEY: "test-key" }, async () => {
+      const p = await probeAIProvider(silent, 60);
+      expect(p).toMatchObject({ lane: "anthropic", ok: false });
+      expect(p.detail).toStartWith("No answer within");
+      expect(p.latencyMs!).toBeGreaterThanOrEqual(50);
+      const row = aiProviderService({ probe: p, at: 0, cached: false });
+      expect(row).toMatchObject({ status: "down", cached: false });
+      // Run in this request and not cached, so System Status takes it out of
+      // the round trip (withRoundTrip, src/lib/betaSystemStatus.ts).
+      expect(row.latency_ms).toBe(p.latencyMs);
     });
   });
 

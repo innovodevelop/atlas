@@ -34,7 +34,7 @@ export interface ProbeService {
 }
 
 export interface ProbeSample {
-  /** `Date.now()` when the probe was recorded. */
+  /** When the probe ran, in `Date.now()` time (see `probeTime`). */
   at: number;
   latency: number | null;
   ok: boolean;
@@ -85,8 +85,9 @@ export function valueText(s: ProbeService): string {
  * the page measures the round trip of the health call and this swaps it in.
  * The brain probes the other services inside that same request, one after
  * the other, so their time is taken back out: what is left is the brain's own.
- * A probe answered from the brain's cache was not run in this request and is
- * not taken out.
+ * A probe that failed still took its time (one that timed out, the whole
+ * wait) and is taken out like any other. A probe answered from the brain's
+ * cache was not run in this request and is not taken out.
  */
 export function withRoundTrip(services: readonly ProbeService[], roundTripMs: number | null): ProbeService[] {
   if (roundTripMs == null) return [...services];
@@ -312,7 +313,7 @@ export function barsOf(samples: readonly ProbeSample[], slots = MAX_SAMPLES): Ba
 export function samplesCaption(n: number): string {
   if (n <= 0) return 'No checks yet.';
   if (n === 1) return 'One check so far; the bars fill in as this screen keeps checking.';
-  return `Latency from the last ${n} checks, kept on this Mac across reloads. The brain is checked every 10 s while this screen is open.`;
+  return `Latency from the last ${n} checks, kept on this Mac across reloads. The brain is checked every 10 s while this screen is open, the AI provider once a minute.`;
 }
 
 // ---- The probe history store -------------------------------------------------
@@ -372,12 +373,26 @@ function persist(): void {
 }
 
 /**
+ * When the check behind `s` ran. A service the brain may answer from its cache
+ * says so (`cached`, true or false: the AI provider, probed at most once a
+ * minute while the health route is polled every 10 s), and is keyed on its own
+ * probe time, so one probe handed out to six polls is one bar. Every other
+ * service is checked in the request that carried it: when that answer arrived.
+ */
+export function probeTime(s: ProbeService, arrivedAt: number): number {
+  if (s.cached === undefined) return arrivedAt;
+  const probed = Date.parse(s.last_check);
+  return Number.isFinite(probed) ? probed : arrivedAt;
+}
+
+/**
  * Records one check of some services. A check is identified per service by
- * when it arrived, so the same answer handed in twice — React's development
- * double effects, or the page remounting over the cached answer — stays one
- * bar, and nothing older than a service's newest bar can slip in behind it.
- * Services are checked on different clocks (the brain every 10 s, Home
- * Assistant every minute), which is why the guard is per service.
+ * when it ran (`probeTime`), so the same answer handed in twice — React's
+ * development double effects, the page remounting over the cached answer, or
+ * the brain repeating its cached AI probe — stays one bar, and nothing older
+ * than a service's newest bar can slip in behind it. Services are checked on
+ * different clocks (the brain every 10 s, the AI provider and Home Assistant
+ * every minute), which is why the guard is per service.
  */
 export function recordProbe(services: readonly ProbeService[], at = Date.now()): void {
   ensureLoaded();
@@ -385,9 +400,10 @@ export function recordProbe(services: readonly ProbeService[], at = Date.now()):
   let changed = false;
   for (const s of services) {
     if (s.idle) continue;
-    if (at <= (lastAt[s.name] ?? -Infinity)) continue;
-    lastAt[s.name] = at;
-    next[s.name] = pushSample(history[s.name] ?? [], { at, latency: s.latency_ms, ok: !serviceDown(s) });
+    const t = probeTime(s, at);
+    if (t <= (lastAt[s.name] ?? -Infinity)) continue;
+    lastAt[s.name] = t;
+    next[s.name] = pushSample(history[s.name] ?? [], { at: t, latency: s.latency_ms, ok: !serviceDown(s) });
     changed = true;
   }
   if (!changed) return;
@@ -467,7 +483,15 @@ export interface StorageReport {
   database: { bytes: number; wal_bytes: number };
   parts: { memory: number; mail: number; audit: number; other: number } | null;
   parts_error: string | null;
-  models: { bytes: number; source: 'sidecars' | 'checkout' } | null;
+  /**
+   * The model files: the brain's embedder, the voice gateway's VAD and the
+   * wake word — never the sidecar binaries that carry the first two. `build`:
+   * as counted when this build was made (inside the sidecars they cannot be
+   * measured apart); `checkout`: the model folders, measured now.
+   */
+  models: { bytes: number; source: 'build' | 'checkout' } | null;
+  /** Why there is no models figure. */
+  models_error?: string | null;
   measured_at: string;
 }
 
@@ -501,7 +525,9 @@ export function storageBars(r: StorageReport): StoreBar[] {
   if (r.models) {
     rows.push({
       k: 'Models on device', b: r.models.bytes, c: '#b6a8ff',
-      title: r.models.source === 'sidecars' ? 'The brain and voice sidecars, which carry the embedder and the voice models' : 'The model folders of this checkout',
+      title: r.models.source === 'build'
+        ? 'The embedder, voice-activity and wake-word model files, as counted when this build was made · the brain and voice sidecars carry them'
+        : 'The embedder, voice-activity and wake-word model files of this checkout',
     });
   }
   const max = Math.max(1, ...rows.map((x) => x.b));

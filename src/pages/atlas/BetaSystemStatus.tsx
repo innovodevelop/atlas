@@ -209,8 +209,10 @@ const BetaSystemStatus = () => {
   }, [navigate]);
 
   // The brain's answer carries one probe per service; the sparklines need the
-  // run of them. Every answer is recorded once, keyed on when it arrived; the
-  // local checks (mail, Home Assistant) run on their own clocks and record theirs.
+  // run of them. Every answer is recorded once, keyed on when it arrived — the
+  // AI provider on when it was probed, since the brain repeats that probe from
+  // its cache for a minute; the local checks (mail, Home Assistant) run on
+  // their own clocks and record theirs.
   const health = healthQ.data ?? null;
   const brainServices = useMemo(() => (health ? withRoundTrip(health.services, health.roundtrip_ms) : null), [health]);
   const mail = useMemo(() => (mailQ.data ? mailService(mailQ.data, new Date(mailQ.dataUpdatedAt)) : null), [mailQ.data, mailQ.dataUpdatedAt]);
@@ -386,7 +388,7 @@ const BetaSystemStatus = () => {
                   </div>
                 ))}
                 {storageQ.data?.parts_error ? <span className="b-ss-mac-empty">Memory, mail and the audit trail could not be split out: {storageQ.data.parts_error}</span> : null}
-                {storageQ.data && !storageQ.data.models ? <span className="b-ss-mac-empty">No model files were found beside the app to measure.</span> : null}
+                {storageQ.data && !storageQ.data.models ? <span className="b-ss-mac-empty">Models on device not counted: {storageQ.data.models_error ?? 'no model files were found to measure'}.</span> : null}
               </>
             ) : (
               <span className="b-ss-mac-empty">Measuring…</span>
