@@ -6,6 +6,7 @@
 // test below exercises the real guard on the real request path: a refusal here
 // is a request that never reached the server, and the tests count the hits.
 import { afterAll, describe, expect, test } from "bun:test";
+import net from "node:net";
 import zlib from "node:zlib";
 import { fetchPage, guardedResolve, decodeBody, isCertificateError, isReadableType, USER_AGENT, type FetchDeps, type ResolvedAddress } from "./pageFetch.ts";
 
@@ -196,6 +197,84 @@ describe("fetchPage", () => {
       expect(r.reason).toBe("dns");
       expect(r.message).toContain("nowhere.example");
     }
+  });
+});
+
+// A raw TCP server that streams a large body as fast as the socket takes it,
+// counting what it managed to write on each connection. Bun.serve buffers a
+// streamed body on its own side, so only a socket-level count shows whether
+// the client really stopped reading.
+describe("a body Atlas does not read", () => {
+  const CHUNK = 64 * 1024;
+  const TOTAL = 64 * 1024 * 1024;
+  // What the sockets may still take in while the close goes out: a few chunks,
+  // where draining the body would write tens of megabytes.
+  const SLACK = 16 * CHUNK;
+  interface Conn { path: string; sent: number; closed: boolean }
+  const conns: Conn[] = [];
+  const block = Buffer.alloc(CHUNK, 65);
+  const raw = net.createServer((sock) => {
+    const c: Conn = { path: "", sent: 0, closed: false };
+    conns.push(c);
+    let head = "";
+    sock.on("data", (d: Buffer) => {
+      if (c.path) return;
+      head += d.toString("latin1");
+      if (!head.includes("\r\n\r\n")) return;
+      c.path = head.split(" ")[1] ?? "/";
+      if (c.path === "/page") {
+        sock.end("HTTP/1.1 200 OK\r\ncontent-type: text/html\r\ncontent-length: 9\r\nconnection: close\r\n\r\n<p>hi</p>");
+        return;
+      }
+      sock.write(c.path === "/moved"
+        ? `HTTP/1.1 302 Found\r\nlocation: /page\r\ncontent-type: text/html\r\ncontent-length: ${TOTAL}\r\n\r\n`
+        : `HTTP/1.1 200 OK\r\ncontent-type: application/pdf\r\ncontent-length: ${TOTAL}\r\n\r\n`);
+      const pump = () => {
+        while (c.sent < TOTAL && !c.closed) {
+          c.sent += CHUNK;
+          if (!sock.write(block)) { sock.once("drain", pump); return; }
+        }
+        if (c.sent >= TOTAL) sock.end();
+      };
+      pump();
+    });
+    const done = () => { c.closed = true; };
+    sock.on("end", done);
+    sock.on("close", done);
+    sock.on("error", done);
+  });
+  const listening = new Promise<number>((resolve) => raw.listen(0, "127.0.0.1", () => resolve((raw.address() as net.AddressInfo).port)));
+  afterAll(() => { raw.close(); });
+
+  /** Fetch, then watch the connection: how much the server wrote after fetchPage returned. */
+  async function after(path: string) {
+    const port = await listening;
+    const from = conns.length;
+    const r = await fetchPage(`http://public.test:${port}${path}`, deps());
+    const c = conns[from];
+    const atReturn = c.sent;
+    for (let i = 0; i < 40 && !c.closed; i++) await Bun.sleep(25);
+    await Bun.sleep(100);
+    return { r, c, atReturn };
+  }
+
+  test("a large PDF is cut off at its headers, not downloaded in the background", async () => {
+    const { r, c, atReturn } = await after("/huge.pdf");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe("not-a-page");
+    expect(c.closed).toBe(true);
+    expect(c.sent - atReturn).toBeLessThanOrEqual(SLACK);
+    expect(c.sent).toBeLessThan(TOTAL / 4);
+  });
+
+  test("a redirect's body is cut off too, and the redirect is still followed", async () => {
+    const { r, c, atReturn } = await after("/moved");
+    if (!r.ok) throw new Error(r.message);
+    expect(r.body).toBe("<p>hi</p>");
+    expect(r.redirects).toBe(1);
+    expect(c.closed).toBe(true);
+    expect(c.sent - atReturn).toBeLessThanOrEqual(SLACK);
+    expect(c.sent).toBeLessThan(TOTAL / 4);
   });
 });
 

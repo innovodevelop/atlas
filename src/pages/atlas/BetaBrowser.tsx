@@ -31,9 +31,9 @@ import {
   ASK_PROMPTS, MAX_TABS, MODE_COPY, NOTICE_LINE, answerBasis, askFailed, askWithoutPage, bylineFor, clearHistory,
   closeTab as closeTabIn, dayLabel, displayAddress, endLine, externalUrl, fetchedLabel, findCountLabel, findMatches,
   goSuggestions, groupBlocks, heroLine, hostOf, initialFor, isKept, markFor, modeForShortcut, nextMode, notAnAddress,
-  notOpened, notesBasis, openKept, openPage, pageTexts, removeKept, segmentsFor, selectTab as selectTabIn, selectedTab, setNotes,
-  stepCursor, tabCountLabel, toggleKeep, tooManyTabs,
-  type BrowserMode, type BrowserRefusal, type GoRow, type PageCopy, type ReaderBlock,
+  notOpened, notesBasis, onScreen, openKept, openPage, pageTexts, panelRefusal, refusalOnScreen, removeKept, segmentsFor,
+  selectTab as selectTabIn, selectedTab, setNotes, stepCursor, tabCountLabel, toggleKeep, tooManyTabs,
+  type BrowserMode, type GoRow, type PageCopy, type PanelRefusal, type PageRef, type ReaderBlock,
 } from '@/lib/betaBrowser';
 import { flushBrowser, getBrowser, updateBrowser, useBrowserSaveFailed, useBrowserState } from '@/lib/betaBrowserStore';
 import { askAboutPage, failed, fetchPageCopy, noticeOnPage } from '@/lib/betaBrowserApi';
@@ -69,6 +69,19 @@ interface Answer {
 
 let answerSeq = 0;
 
+/** An "On this page" read in flight, by tab and page: each clears only its own. */
+const noticeKey = (page: PageRef) => `${page.tabId} ${page.url}`;
+
+/**
+ * True when a page would need a tab of its own and MAX_TABS are open. A tab
+ * closed while its page loaded counts as a new one: openPage adds it.
+ */
+function noRoomFor(replaceTabId: string | null): boolean {
+  const { tabs } = getBrowser();
+  const intoOpenTab = replaceTabId !== null && tabs.some((t) => t.id === replaceTabId);
+  return !intoOpenTab && tabs.length >= MAX_TABS;
+}
+
 const BetaBrowser = () => {
   const navigate = useBetaNavigate();
   const browser = useBrowserState();
@@ -82,13 +95,17 @@ const BetaBrowser = () => {
   const [side, setSide] = useState(() => typeof window === 'undefined' || window.innerWidth >= NARROW);
   // Open while the omnibox has focus, closed by a submit until the next keystroke.
   const [suggestOpen, setSuggestOpen] = useState(false);
-  const [refusal, setRefusal] = useState<BrowserRefusal | null>(null);
+  // The panel's refusal. One from Ask or "On this page" is about its page and
+  // shows only while that page is on screen (refusalOnScreen), as answers do.
+  const [held, setHeld] = useState<PanelRefusal | null>(null);
   const [answers, setAnswers] = useState<Answer[]>([]);
   // The fetch in flight: the address, and the tab it loads into (null: a new tab).
   const [pending, setPending] = useState<{ href: string; replaceTabId: string | null } | null>(null);
   // Set while the address bar is being edited: Go then loads into that tab.
   const [goTarget, setGoTarget] = useState<string | null>(null);
-  const [noticing, setNoticing] = useState<string | null>(null);
+  // "On this page" reads in flight (noticeKey); the ref guards, the state draws.
+  const [noticing, setNoticing] = useState<ReadonlySet<string>>(() => new Set());
+  const noticeFlight = useRef(new Set<string>());
   const [allLinks, setAllLinks] = useState(false);
   const [sphereEl, setSphereEl] = useState<HTMLDivElement | null>(null);
   const omniRef = useRef<HTMLInputElement>(null);
@@ -99,6 +116,7 @@ const BetaBrowser = () => {
   const tabs = browser.tabs;
   const tab = selectedTab(browser);
   const page = tab?.page ?? null;
+  const refusal = refusalOnScreen(held, browser);
   const now = new Date();
 
   // The hero sphere is this screen's talk entry point.
@@ -161,24 +179,27 @@ const BetaBrowser = () => {
   const go = useCallback(async (input: string, replaceTabId: string | null) => {
     setSuggestOpen(false);
     const href = externalUrl(input);
-    if (!href) { setRefusal(notAnAddress(input)); setSide(true); return; }
-    if (!replaceTabId && getBrowser().tabs.length >= MAX_TABS) { setRefusal(tooManyTabs()); setSide(true); return; }
+    if (!href) { setHeld(panelRefusal(notAnAddress(input))); setSide(true); return; }
+    if (noRoomFor(replaceTabId)) { setHeld(panelRefusal(tooManyTabs())); setSide(true); return; }
     fetchCtl.current?.abort();
     const ctl = new AbortController();
     fetchCtl.current = ctl;
-    setRefusal(null);
+    setHeld(null);
     setPending({ href, replaceTabId });
     const res = await fetchPageCopy(href, ctl.signal);
     if (ctl.signal.aborted) return;
     fetchCtl.current = null;
     setPending(null);
     if (failed(res)) {
-      setRefusal(notOpened(href, res.message, res.reason));
+      setHeld(panelRefusal(notOpened(href, res.message, res.reason)));
       setSide(true);
       return;
     }
+    // Checked again: a kept page may have taken the last tab while this one
+    // loaded, or the tab it was loading into may have been closed.
+    if (noRoomFor(replaceTabId)) { setHeld(panelRefusal(tooManyTabs())); setSide(true); return; }
     updateBrowser((s) => openPage(s, res.page, { replaceTabId, now: new Date() }));
-    setRefusal(null);
+    setHeld(null);
   }, []);
 
   const stopLoading = useCallback(() => {
@@ -191,11 +212,12 @@ const BetaBrowser = () => {
   const ask = useCallback(async (question: string) => {
     setSide(true);
     const t = selectedTab(getBrowser());
-    if (!t?.page) { setRefusal(askWithoutPage(question, !!t)); return; }
+    if (!t?.page) { setHeld(panelRefusal(askWithoutPage(question, !!t), t ? { tabId: t.id, url: t.url } : null)); return; }
     answerSeq += 1;
     const id = `a${answerSeq}`;
     const tabId = t.id;
-    setRefusal(null);
+    const about: PageRef = { tabId, url: t.url };
+    setHeld(null);
     setAnswers((a) => [{ id, tabId, url: t.url, question, body: null, basis: '' }, ...a]);
     const ctl = new AbortController();
     inflight.current.add(ctl);
@@ -204,7 +226,8 @@ const BetaBrowser = () => {
     if (ctl.signal.aborted) return;
     if (failed(res)) {
       setAnswers((a) => a.filter((x) => x.id !== id));
-      setRefusal(askFailed(question, res.message));
+      // Said only where it was asked: a page the user has left keeps its own panel.
+      if (onScreen(getBrowser(), about)) setHeld(panelRefusal(askFailed(question, res.message), about));
       return;
     }
     setAnswers((a) => a.map((x) => (x.id === id ? { ...x, body: res.answer, basis: answerBasis(res.provider, res.partial) } : x)));
@@ -214,15 +237,24 @@ const BetaBrowser = () => {
   const readThisPage = useCallback(async () => {
     const t = selectedTab(getBrowser());
     if (!t?.page) return;
-    setNoticing(t.id);
-    setRefusal(null);
+    const about: PageRef = { tabId: t.id, url: t.url };
+    const key = noticeKey(about);
+    const flight = noticeFlight.current;
+    if (flight.has(key)) return;
+    flight.add(key);
+    setNoticing(new Set(flight));
+    setHeld(null);
     const ctl = new AbortController();
     inflight.current.add(ctl);
     const res = await noticeOnPage({ url: t.url, title: t.title, text: pageTexts(t.page).join('\n\n') }, new Date(), ctl.signal);
     inflight.current.delete(ctl);
     if (ctl.signal.aborted) return;
-    setNoticing(null);
-    if (failed(res)) { setRefusal(askFailed(null, res.message)); return; }
+    flight.delete(key);
+    setNoticing(new Set(flight));
+    if (failed(res)) {
+      if (onScreen(getBrowser(), about)) setHeld(panelRefusal(askFailed(null, res.message), about));
+      return;
+    }
     updateBrowser((s) => setNotes(s, t.id, res.notes, t.url));
   }, []);
 
@@ -233,11 +265,14 @@ const BetaBrowser = () => {
     setSuggestOpen(false);
     setTyped('');
     setGoTarget(null);
-    setRefusal(null);
+    setHeld(null);
     if (row.source === 'tab') { updateBrowser((s) => selectTabIn(s, row.ref, new Date())); return; }
     if (row.source === 'kept') {
       const next = openKept(getBrowser(), row.ref, new Date());
-      if (next) { updateBrowser(() => next); return; }
+      // No room for its own tab: with the address bar being edited it loads
+      // into that tab, as Go would; otherwise the panel says why not.
+      if (next === 'too-many-tabs' && !target) { setHeld(panelRefusal(tooManyTabs())); setSide(true); return; }
+      if (typeof next !== 'string') { updateBrowser(() => next); return; }
     }
     void go(row.url, target);
   }, [go, goTarget]);
@@ -289,25 +324,27 @@ const BetaBrowser = () => {
 
   const selectTab = useCallback((id: string) => {
     updateBrowser((s) => selectTabIn(s, id, new Date()));
-    setRefusal(null);
+    setHeld(null);
     setCursor(0);
   }, []);
   const closeTab = useCallback((id: string) => {
     updateBrowser((s) => closeTabIn(s, id));
     setAnswers((a) => a.filter((x) => x.tabId !== id));
-    setRefusal(null);
+    setHeld(null);
   }, []);
   const openKeptPage = useCallback((keptId: string, url: string) => {
-    setRefusal(null);
+    setHeld(null);
     const next = openKept(getBrowser(), keptId, new Date());
-    if (next) updateBrowser(() => next);
-    else void go(url, null);
+    if (next === 'too-many-tabs') { setHeld(panelRefusal(tooManyTabs())); setSide(true); return; }
+    if (next === 'no-copy') void go(url, null);
+    else updateBrowser(() => next);
   }, [go]);
 
   const tabAnswers = answers.filter((a) => !!tab && a.tabId === tab.id && a.url === tab.url);
   const copy = MODE_COPY[mode];
   const kept = tab ? isKept(browser, tab.url) : false;
   const loadingHere = pending && (pending.replaceTabId === null || pending.replaceTabId === tab?.id);
+  const readingHere = !!tab && noticing.has(noticeKey({ tabId: tab.id, url: tab.url }));
 
   return (
     <div className="b-br" data-screen-label="Beta — Browser">
@@ -454,7 +491,7 @@ const BetaBrowser = () => {
               <div className="b-br-card b-br-refuse" role="status">
                 <div className="b-br-card-head">
                   <p>{refusal.title}</p>
-                  <button type="button" className="b-br-dismiss" aria-label="Dismiss" onClick={() => setRefusal(null)}>
+                  <button type="button" className="b-br-dismiss" aria-label="Dismiss" onClick={() => setHeld(null)}>
                     <AtlasIcon name="close" size={12} weight={2} />
                   </button>
                 </div>
@@ -466,10 +503,10 @@ const BetaBrowser = () => {
                     </button>
                   ) : null}
                   {refusal.kind === 'not-address' ? (
-                    <button type="button" className="b-btn b-btn--tinted b-btn--row" onClick={() => { const t = refusal.typed; setRefusal(null); focusOmni('ask', t); }}>Ask instead</button>
+                    <button type="button" className="b-btn b-btn--tinted b-btn--row" onClick={() => { const t = refusal.typed; setHeld(null); focusOmni('ask', t); }}>Ask instead</button>
                   ) : null}
                   {refusal.kind === 'no-answer' && refusal.question ? (
-                    <button type="button" className="b-btn b-btn--tinted b-btn--row" onClick={() => { const q = refusal.question; setRefusal(null); if (q) openTalk(q); }}>Ask Atlas in Talk</button>
+                    <button type="button" className="b-btn b-btn--tinted b-btn--row" onClick={() => { const q = refusal.question; setHeld(null); if (q) openTalk(q); }}>Ask Atlas in Talk</button>
                   ) : null}
                 </div>
               </div>
@@ -489,8 +526,8 @@ const BetaBrowser = () => {
             ) : page && tab ? (
               <div className="b-br-side-none">
                 <span>Not read yet. Atlas notices things on a page when you ask: it sends the page’s text to your AI provider, and saves nothing to memory.</span>
-                <button type="button" className="b-btn b-btn--primary b-btn--row" disabled={noticing === tab.id} onClick={() => void readThisPage()}>
-                  {noticing === tab.id ? 'Reading…' : 'Read this page'}
+                <button type="button" className="b-btn b-btn--primary b-btn--row" disabled={readingHere} onClick={() => void readThisPage()}>
+                  {readingHere ? 'Reading…' : 'Read this page'}
                 </button>
               </div>
             ) : (

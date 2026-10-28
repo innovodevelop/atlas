@@ -2,7 +2,7 @@
 // fetched page and the screen, so the tests that matter most are the ones that
 // prove what never comes through: scripts, styles, hidden text, chrome.
 import { describe, expect, test } from "bun:test";
-import { decodeEntities, readPage, readPlainText, sameTitle, tokenize, MAX_LINKS } from "./pageReader.ts";
+import { decodeEntities, readPage, readPlainText, sameTitle, tokenize, MAX_DEPTH, MAX_LINKS } from "./pageReader.ts";
 
 const ARTICLE = `<!doctype html>
 <html lang="en-GB">
@@ -163,5 +163,53 @@ describe("pieces", () => {
     const p = readPlainText("First para\nstill first.\n\nSecond.", "https://a.example/notes.txt");
     expect(p.title).toBe("notes.txt");
     expect(p.blocks.map((b) => b.text)).toEqual(["First para still first.", "Second."]);
+  });
+});
+
+// readPage runs inside the /browser/fetch request, so a page that leaves
+// thousands of tags open must not hold the brain's event loop.
+describe("deep and broken nesting", () => {
+  test("300k nested, never-closed <div>s read in well under a second", () => {
+    const html = "<div>a".repeat(300_000);
+    const t0 = performance.now();
+    const p = readPage(html, "https://deep.example/");
+    expect(performance.now() - t0).toBeLessThan(1000);
+    // Every "a" is its own block, and repeats collapse to one.
+    expect(p.blocks).toEqual([{ kind: "paragraph", text: "a" }]);
+  });
+
+  test("other open-ended shapes stay linear too: cells, lists, quotes, links", () => {
+    for (const html of [
+      "<table><tr>" + "<td>x".repeat(200_000),
+      "<ul>" + "<li>x<ul>".repeat(150_000),
+      "<blockquote>q".repeat(200_000),
+      '<div role="main">m'.repeat(100_000),
+      '<a href="/x">l'.repeat(150_000),
+    ]) {
+      const t0 = performance.now();
+      readPage(html, "https://deep.example/");
+      expect([html.slice(0, 20), performance.now() - t0 < 1000]).toEqual([html.slice(0, 20), true]);
+    }
+  });
+
+  test(`past ${MAX_DEPTH} levels elements read as text, and their end tags close only themselves`, () => {
+    const filler = "Body text long enough to make the article the reading copy on its own, ".repeat(5);
+    const html = `<body><article><h1>Deep</h1>${"<div>".repeat(MAX_DEPTH + 50)}<h3>Way down</h3><p>${filler}</p>${"</div>".repeat(MAX_DEPTH + 50)}`
+      + `<li>After the deep part, still inside the article.</li></article><div>Outside the article.</div></body>`;
+    const p = readPage(html, "https://deep.example/");
+    const texts = p.blocks.map((b) => b.text);
+    // Too deep to nest, so the heading reads as a paragraph...
+    expect(p.blocks.find((b) => b.text === "Way down")?.kind).toBe("paragraph");
+    expect(texts).toContain(filler.trim());
+    // ...but the stack comes back intact: the item is still in the article,
+    // and what follows the article is still outside it.
+    expect(p.blocks.find((b) => b.text.startsWith("After the deep part"))?.kind).toBe("item");
+    expect(texts).not.toContain("Outside the article.");
+  });
+
+  test("a skipped subtree still closes after deep nesting inside it", () => {
+    const html = `<article><nav>${"<div>".repeat(MAX_DEPTH + 10)}menu${"</div>".repeat(MAX_DEPTH + 10)}</nav><p>${"Readable. ".repeat(40)}</p></article>`;
+    const p = readPage(html);
+    expect(p.blocks.map((b) => b.text)).toEqual(["Readable. ".repeat(40).trim()]);
   });
 });

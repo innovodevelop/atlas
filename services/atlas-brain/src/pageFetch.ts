@@ -10,7 +10,9 @@
  *     to — never resolved again behind the check's back (DNS rebinding).
  *   - At most MAX_REDIRECTS redirects, followed by hand, each one re-checked.
  *   - A 2 MB cap counted while the body streams (after decompression, so a
- *     small gzip cannot expand past it); reading stops at the cap.
+ *     small gzip cannot expand past it); reading stops at the cap. A body
+ *     that is not read at all (a redirect's, an error's, a PDF's) is cut off
+ *     at its headers, never drained.
  *   - One deadline for the whole fetch, redirects included.
  *   - A plain user agent that says what this is. No cookies are sent or kept,
  *     no referrer, no credentials.
@@ -33,7 +35,8 @@ import { checkResolved, checkUrl, isIpLiteral, bareHost, isPrivateAddress, parse
 export const MAX_BYTES = 2 * 1024 * 1024;
 export const MAX_REDIRECTS = 5;
 export const TIMEOUT_MS = 15_000;
-export const USER_AGENT = "Atlas/1.0 (reader; +https://helloatlas.app)";
+/** The project's own domain, as music.rs's LRCLIB agent names it; no made-up version. */
+export const USER_AGENT = "Atlas (reader; +https://helloatlas.dk)";
 
 export type FetchFailure =
   | "bad-address"
@@ -168,15 +171,19 @@ function getOnce(url: URL, deps: FetchDeps, signal: AbortSignal, maxBytes: numbe
         const status = res.statusCode ?? 0;
         const location = typeof res.headers.location === "string" ? res.headers.location : null;
         const contentType = String(res.headers["content-type"] ?? "");
+        // A body Atlas will not read is cut off, never drained: draining would
+        // go on after fetchPage has returned and its deadline is cleared, past
+        // the cap, so one link to an ISO would download all of it. With
+        // `agent: false` there is no socket to keep for reuse anyway.
         if (status >= 300 && status < 400 && location) {
-          res.resume();
           settled = true;
+          res.destroy();
           resolve({ status, location, contentType, body: "", bytes: 0, truncated: false });
           return;
         }
         if (status < 200 || status >= 300 || !isReadableType(contentType)) {
-          res.resume();
           settled = true;
+          res.destroy();
           resolve({ status, location: null, contentType, body: "", bytes: 0, truncated: false });
           return;
         }

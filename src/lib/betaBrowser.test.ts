@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  EMPTY_BROWSER, MAX_HISTORY, answerBasis, askFailed, askWithoutPage, bylineFor, capCopy, clearHistory, closeTab,
+  EMPTY_BROWSER, MAX_HISTORY, MAX_TABS, answerBasis, askFailed, askWithoutPage, bylineFor, capCopy, clearHistory, closeTab,
   copySize, displayAddress, endLine, externalUrl, findCountLabel, findMatches, fitToBudget, goSuggestions, groupBlocks,
   heroLine, hostOf, initialFor, isKept, markFor, modeForShortcut, nextMode, notAnAddress, notOpened, notesBasis,
-  openKept, openPage, pageTexts, parseBrowser, parseCopy, parseNotes, providerName, removeKept, segmentsFor, selectTab,
+  onScreen, openKept, openPage, pageTexts, panelRefusal, parseBrowser, parseCopy, parseNotes, providerName, refusalOnScreen,
+  removeKept, segmentsFor, selectTab,
   selectedTab, setNotes, stepCursor, tabCountLabel, toggleKeep, tooManyTabs, visitedLabel,
   type BrowserState, type PageCopy,
 } from './betaBrowser';
@@ -163,18 +164,61 @@ describe('the session', () => {
     expect(s.kept[0].page?.blocks.length).toBe(5);
     // Already open: selects that tab rather than opening a second.
     const again = openKept(s, keptId, NOW);
-    expect(again?.tabs).toHaveLength(1);
+    if (typeof again === 'string') throw new Error(again);
+    expect(again.tabs).toHaveLength(1);
     // Closed: opens a new tab from the kept copy.
     s = closeTab(s, tabId);
     const reopened = openKept(s, keptId, NOW);
-    expect(reopened?.tabs).toHaveLength(1);
-    expect(reopened?.tabs[0].page?.url).toBe('https://a.example/');
+    if (typeof reopened === 'string') throw new Error(reopened);
+    expect(reopened.tabs).toHaveLength(1);
+    expect(reopened.tabs[0].page?.url).toBe('https://a.example/');
     // No copy kept: the caller has to fetch.
-    expect(openKept({ ...s, kept: [{ ...s.kept[0], page: null }] }, keptId, NOW)).toBeNull();
+    expect(openKept({ ...s, kept: [{ ...s.kept[0], page: null }] }, keptId, NOW)).toBe('no-copy');
+    expect(openKept(s, 'gone', NOW)).toBe('no-copy');
     // Let go.
     expect(removeKept(s, keptId).kept).toEqual([]);
     const t2 = openPage(s, copy('https://a.example/'), { now: NOW });
     expect(isKept(toggleKeep(t2, t2.tabs[0].id, NOW), 'https://a.example/')).toBe(false);
+  });
+
+  test('a kept page never opens a tab past MAX_TABS, but still selects the tab showing it', () => {
+    let s: BrowserState = EMPTY_BROWSER;
+    for (let i = 0; i < MAX_TABS; i++) s = openPage(s, copy(`https://a.example/${i}`), { now: NOW });
+    s = toggleKeep(s, s.tabs[3].id, NOW);
+    const shown = s.kept[0];
+    s = { ...s, kept: [{ id: 'k-closed', url: 'https://kept.example/', title: 'Kept', host: 'kept.example', keptAt: NOW.toISOString(), page: copy('https://kept.example/') }, shown] };
+    expect(openKept(s, 'k-closed', NOW)).toBe('too-many-tabs');
+    const selected = openKept(s, shown.id, NOW);
+    if (typeof selected === 'string') throw new Error(selected);
+    expect(selected.tabs).toHaveLength(MAX_TABS);
+    expect(selected.selectedId).toBe(s.tabs[3].id);
+    // One closed, there is room again.
+    const room = openKept(closeTab(s, s.tabs[0].id), 'k-closed', NOW);
+    if (typeof room === 'string') throw new Error(room);
+    expect(room.tabs).toHaveLength(MAX_TABS);
+    expect(selectedTab(room)?.url).toBe('https://kept.example/');
+  });
+
+  test('a refusal about a page shows only while that tab shows that page', () => {
+    let s = openPage(EMPTY_BROWSER, copy('https://a.example/'), { now: NOW });
+    s = openPage(s, copy('https://b.example/'), { now: NOW });
+    const [a, b] = s.tabs;
+    const about = { tabId: a.id, url: a.url };
+    const failed = panelRefusal(askFailed(null, 'The provider didn’t answer.'), about);
+    // B is on screen: A's failure is not shown there.
+    expect(onScreen(s, about)).toBe(false);
+    expect(refusalOnScreen(failed, s)).toBeNull();
+    // Back on A it shows...
+    const onA = selectTab(s, a.id, NOW);
+    expect(refusalOnScreen(failed, onA)).toEqual(failed.refusal);
+    // ...but not once A has gone on to another page.
+    const moved = openPage(onA, copy('https://c.example/'), { replaceTabId: a.id, now: NOW });
+    expect(refusalOnScreen(failed, moved)).toBeNull();
+    // Go's refusals are about what was typed, and show on any page.
+    const typed = panelRefusal(notAnAddress('is it noisy'));
+    expect(refusalOnScreen(typed, s)).toEqual(typed.refusal);
+    expect(refusalOnScreen(typed, selectTab(s, b.id, NOW))).toEqual(typed.refusal);
+    expect(refusalOnScreen(null, s)).toBeNull();
   });
 
   test('notes are kept with their tab', () => {
@@ -242,6 +286,16 @@ describe('storage', () => {
     expect(s.tabs[0].page?.links).toEqual([]);
     expect(s.history).toHaveLength(1);
     expect(s.kept[0].page).toBeNull();
+  });
+
+  test('a store past MAX_TABS keeps the first tabs, and selects one of them', () => {
+    const tabs = Array.from({ length: MAX_TABS + 2 }, (_, i) => ({ id: `t${i}`, url: `https://a.example/${i}` }));
+    const past = parseBrowser(JSON.stringify({ tabs, selectedId: `t${MAX_TABS + 1}` }));
+    expect(past.tabs).toHaveLength(MAX_TABS);
+    expect(past.selectedId).toBe('t0');
+    expect(selectedTab(past)?.id).toBe('t0');
+    const within = parseBrowser(JSON.stringify({ tabs, selectedId: `t${MAX_TABS - 1}` }));
+    expect(within.selectedId).toBe(`t${MAX_TABS - 1}`);
   });
 
   test('parseCopy and parseNotes refuse what is not one', () => {

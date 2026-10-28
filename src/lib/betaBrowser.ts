@@ -210,13 +210,23 @@ export function openPage(state: BrowserState, page: PageCopy, opts: { replaceTab
   return { ...state, tabs, selectedId: tab.id, history: recordVisit(state.history, copy.url, copy.title, at) };
 }
 
-/** Opens a kept page from its copy: selects the tab already showing it, or opens one. Null when it has no copy to show. */
-export function openKept(state: BrowserState, keptId: string, now: Date): BrowserState | null {
+/**
+ * Why a kept page did not open from its copy: it has none (or is gone), so the
+ * caller fetches it; or MAX_TABS are open, so the caller says so (tooManyTabs).
+ */
+export type KeptRefusal = 'no-copy' | 'too-many-tabs';
+
+/**
+ * Opens a kept page from its copy: selects the tab already showing it, or opens
+ * one — never past MAX_TABS, the cap Go keeps too.
+ */
+export function openKept(state: BrowserState, keptId: string, now: Date): BrowserState | KeptRefusal {
   const k = state.kept.find((x) => x.id === keptId);
-  if (!k) return null;
+  if (!k) return 'no-copy';
   const open = state.tabs.find((t) => t.url === k.url);
   if (open) return selectTab(state, open.id, now);
-  if (!k.page) return null;
+  if (!k.page) return 'no-copy';
+  if (state.tabs.length >= MAX_TABS) return 'too-many-tabs';
   return openPage(state, k.page, { now });
 }
 
@@ -411,10 +421,13 @@ export function parseBrowser(raw: string | null): BrowserState {
       kept.push({ id, url, title: str(k.title) || hostOf(url), host: hostOf(url), keptAt: str(k.keptAt) ?? new Date(0).toISOString(), page: parseCopy(k.page) });
     }
   }
+  // The cap first, then the selection from what is left: a selected tab past
+  // the cap would leave the screen with tabs open and none of them shown.
+  const capped = tabs.slice(0, MAX_TABS);
   const selected = str(v.selectedId);
   return {
-    tabs: tabs.slice(0, MAX_TABS),
-    selectedId: tabs.some((t) => t.id === selected) ? selected : tabs[0]?.id ?? null,
+    tabs: capped,
+    selectedId: capped.some((t) => t.id === selected) ? selected : capped[0]?.id ?? null,
     history: history.slice(0, MAX_HISTORY),
     kept: kept.slice(0, MAX_KEPT),
   };
@@ -741,4 +754,37 @@ export function askWithoutPage(question: string, hasTab: boolean): BrowserRefusa
 /** The brain answered with an error; its sentence is the body. */
 export function askFailed(question: string | null, message: string): BrowserRefusal {
   return { kind: 'no-answer', title: question ? 'No answer from this page' : 'Atlas couldn’t read this page', body: message, question };
+}
+
+/** One page in one tab: what Ask and "On this page" answer about. */
+export interface PageRef {
+  tabId: string;
+  url: string;
+}
+
+/**
+ * A refusal as the panel holds it. One from Ask or "On this page" is `about`
+ * one page and shows only while that tab shows that page, as answers do, so
+ * a failure that arrives after the user moved on never lands on a page it has
+ * nothing to do with. Go's refusals are about what was typed: `about` is null.
+ */
+export interface PanelRefusal {
+  refusal: BrowserRefusal;
+  about: PageRef | null;
+}
+
+export function panelRefusal(refusal: BrowserRefusal, about: PageRef | null = null): PanelRefusal {
+  return { refusal, about };
+}
+
+/** Whether `page` is the one on screen: its tab is selected and still shows that address. */
+export function onScreen(state: BrowserState, page: PageRef): boolean {
+  const t = selectedTab(state);
+  return !!t && t.id === page.tabId && t.url === page.url;
+}
+
+/** The refusal the panel shows now, if any. */
+export function refusalOnScreen(held: PanelRefusal | null, state: BrowserState): BrowserRefusal | null {
+  if (!held) return null;
+  return !held.about || onScreen(state, held.about) ? held.refusal : null;
 }

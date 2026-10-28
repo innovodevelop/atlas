@@ -14,6 +14,9 @@
  * aside, forms, svg, …) and prefers the page's <article>, then <main>, when
  * those hold enough text. Entities are decoded; whitespace collapses.
  *
+ * It runs inside the /browser/fetch request, so it stays linear in the page:
+ * no step walks the open elements, and nesting past MAX_DEPTH reads as text.
+ *
  * Pure: a string in, data out. Tested in pageReader.test.ts.
  */
 
@@ -207,6 +210,77 @@ export function* tokenize(html: string): Generator<Token> {
   }
 }
 
+/* ── Open elements ────────────────────────────────────────────────────────── */
+
+/**
+ * How deep elements nest before further ones are read as plain text: they
+ * neither nest nor skip nor give the text a kind, and their end tags close
+ * only themselves. Browsers stop nesting at about 512; real pages sit far
+ * below this, and a page that leaves thousands of tags open (old tables,
+ * unclosed <div>s, a <p> under an inline element) is held to it.
+ */
+export const MAX_DEPTH = 256;
+
+/** The elements a block's kind comes from; the innermost open one wins. */
+const KIND_GIVERS = new Set(["h1", "h2", "h3", "h4", "h5", "h6", "figcaption", "caption", "pre", "li", "dd", "dt", "blockquote", "q"]);
+
+/**
+ * The open elements, innermost last, with every question the reader asks of
+ * them answered without walking them: is one of this name open, where is the
+ * innermost one, which open element gives the text its kind. Walking the stack
+ * per token made deep unclosed nesting quadratic (80k unclosed <div>s held the
+ * brain's event loop for half a minute), and readPage runs inside a request.
+ */
+class OpenElements {
+  private readonly names: string[] = [];
+  /** Per name, the positions it is open at, innermost last. */
+  private readonly at = new Map<string, number[]>();
+  /** The positions of open KIND_GIVERS, innermost last. */
+  private readonly kinds: number[] = [];
+
+  get depth(): number {
+    return this.names.length;
+  }
+
+  top(): string | undefined {
+    return this.names[this.names.length - 1];
+  }
+
+  lastIndexOf(name: string): number {
+    const p = this.at.get(name);
+    return p && p.length ? p[p.length - 1] : -1;
+  }
+
+  has(name: string): boolean {
+    return this.lastIndexOf(name) !== -1;
+  }
+
+  push(name: string): void {
+    const i = this.names.length;
+    this.names.push(name);
+    const p = this.at.get(name);
+    if (p) p.push(i);
+    else this.at.set(name, [i]);
+    if (KIND_GIVERS.has(name)) this.kinds.push(i);
+  }
+
+  /** The innermost open element that gives text its kind, or null. */
+  kindGiver(): string | null {
+    return this.kinds.length ? this.names[this.kinds[this.kinds.length - 1]] : null;
+  }
+
+  /** Closes everything from position `from` up, innermost first, handing each name to `closed`. */
+  truncate(from: number, closed: (name: string) => void): void {
+    for (let k = this.names.length - 1; k >= from; k--) {
+      const s = this.names[k];
+      closed(s);
+      this.at.get(s)?.pop();
+    }
+    this.names.length = from;
+    while (this.kinds.length && this.kinds[this.kinds.length - 1] >= from) this.kinds.pop();
+  }
+}
+
 /* ── Blocks ───────────────────────────────────────────────────────────────── */
 
 interface Collected extends ReaderBlock {
@@ -235,7 +309,9 @@ export function readPage(html: string, pageUrl: string | null = null): ReaderPag
   let base: URL | null = null;
   try { base = pageUrl ? new URL(pageUrl) : null; } catch { base = null; }
 
-  const stack: string[] = [];
+  const open = new OpenElements();
+  // Elements opened past MAX_DEPTH, by name: their end tags close only them.
+  const overflow = new Map<string, number>();
   let skipDepth = 0;
   let title = "";
   let inTitle = false;
@@ -249,34 +325,34 @@ export function readPage(html: string, pageUrl: string | null = null): ReaderPag
   // ones in the copy the reader chose (not the site's header and footer).
   const found: Array<{ href: string; text: string; inArticle: boolean; inMain: boolean }> = [];
   let link: { href: string | null; text: string } | null = null;
+  const startLink = (attrs: Record<string, string>) => ({ href: attrs.href ? resolveHref(attrs.href, base) : null, text: "" });
 
-  const has = (name: string) => stack.includes(name);
+  const has = (name: string) => open.has(name);
+  const mainOpen = () => has("main") || has("[role=main]");
   const kindNow = (): { kind: ReaderBlockKind; level?: number } => {
-    for (let k = stack.length - 1; k >= 0; k--) {
-      const s = stack[k];
-      if (/^h[1-6]$/.test(s)) return { kind: "heading", level: Number(s[1]) };
-      if (s === "figcaption" || s === "caption") return { kind: "caption" };
-      if (s === "pre") return { kind: "code" };
-      if (s === "li" || s === "dd" || s === "dt") return has("blockquote") ? { kind: "quote" } : { kind: "item" };
-      if (s === "blockquote" || s === "q") return { kind: "quote" };
-    }
-    return { kind: "paragraph" };
+    const s = open.kindGiver();
+    if (s === null) return { kind: "paragraph" };
+    if (/^h[1-6]$/.test(s)) return { kind: "heading", level: Number(s[1]) };
+    if (s === "figcaption" || s === "caption") return { kind: "caption" };
+    if (s === "pre") return { kind: "code" };
+    if (s === "li" || s === "dd" || s === "dt") return has("blockquote") ? { kind: "quote" } : { kind: "item" };
+    return { kind: "quote" };
   };
   const flush = () => {
     const text = collapse(buf);
     buf = "";
     if (!text) return;
     const { kind, level } = kindNow();
-    collected.push({ kind, text, ...(level ? { level } : {}), inArticle: has("article"), inMain: has("main") || stack.some((s) => s === "[role=main]") });
+    collected.push({ kind, text, ...(level ? { level } : {}), inArticle: has("article"), inMain: mainOpen() });
   };
+  const closed = (s: string) => { if (SKIP.has(s) || s === "[skip]") skipDepth--; };
   const pop = (name: string) => {
-    const at = stack.lastIndexOf(name);
+    const at = open.lastIndexOf(name);
     if (at === -1) return false;
-    for (let k = stack.length - 1; k >= at; k--) {
-      const s = stack[k];
-      if (SKIP.has(s) || s === "[skip]") skipDepth--;
-    }
-    stack.length = at;
+    open.truncate(at, closed);
+    // Whatever was opened past MAX_DEPTH sat inside what just closed: the
+    // stack cannot grow while any of it is open.
+    overflow.clear();
     return true;
   };
 
@@ -311,17 +387,24 @@ export function readPage(html: string, pageUrl: string | null = null): ReaderPag
       // A body that opens while <head> is still open ends the head, as browsers do.
       if (name === "body") pop("head");
       // Implicit ends: a new <p> or <li> closes the open one, as browsers do.
-      if (name === "p" && stack[stack.length - 1] === "p") { flush(); pop("p"); }
-      if (name === "li") { const li = stack.lastIndexOf("li"); const list = Math.max(stack.lastIndexOf("ul"), stack.lastIndexOf("ol")); if (li > list) { flush(); pop("li"); } }
+      if (name === "p" && open.top() === "p") { flush(); pop("p"); }
+      if (name === "li") { const li = open.lastIndexOf("li"); const list = Math.max(open.lastIndexOf("ul"), open.lastIndexOf("ol")); if (li > list) { flush(); pop("li"); } }
       if (BLOCK.has(name) && skipDepth === 0) flush();
+      if (open.depth >= MAX_DEPTH) {
+        // Too deep to nest: read as plain text, counted so its end tag closes
+        // only itself and not an open element of the same name further out.
+        overflow.set(name, (overflow.get(name) ?? 0) + 1);
+        if (name === "a" && skipDepth === 0) link = startLink(attrs);
+        continue;
+      }
       const hidden = "hidden" in attrs || attrs["aria-hidden"] === "true" || /display\s*:\s*none/i.test(attrs.style ?? "");
       const role = (attrs.role ?? "").toLowerCase();
       const skipByRole = role === "navigation" || role === "banner" || role === "contentinfo" || role === "complementary" || role === "search" || role === "dialog";
       if (SKIP.has(name)) skipDepth++;
-      else if (hidden || skipByRole || isChrome(name, attrs)) { skipDepth++; stack.push(name, "[skip]"); continue; }
-      stack.push(name);
-      if (role === "main") stack.push("[role=main]");
-      if (name === "a" && skipDepth === 0) link = { href: attrs.href ? resolveHref(attrs.href, base) : null, text: "" };
+      else if (hidden || skipByRole || isChrome(name, attrs)) { skipDepth++; open.push(name); open.push("[skip]"); continue; }
+      open.push(name);
+      if (role === "main") open.push("[role=main]");
+      if (name === "a" && skipDepth === 0) link = startLink(attrs);
       continue;
     }
     // close
@@ -330,16 +413,20 @@ export function readPage(html: string, pageUrl: string | null = null): ReaderPag
     if (name === "a" && link) {
       const text = collapse(link.text);
       if (link.href && text && found.length < MAX_LINKS * 8) {
-        found.push({ href: link.href, text: text.slice(0, 160), inArticle: has("article"), inMain: has("main") || has("[role=main]") });
+        found.push({ href: link.href, text: text.slice(0, 160), inArticle: has("article"), inMain: mainOpen() });
       }
       link = null;
     }
-    if (!stack.includes(name)) continue;
+    const deep = overflow.get(name);
+    if (deep) {
+      overflow.set(name, deep - 1);
+      if (BLOCK.has(name) && skipDepth === 0) flush();
+      continue;
+    }
+    if (!has(name)) continue;
     if (BLOCK.has(name) && skipDepth === 0) flush();
-    // A [skip] marker sits right above the element it hides.
-    const at = stack.lastIndexOf(name);
-    if (stack[at + 1] === "[skip]") { pop(name); continue; }
-    if (stack[at + 1] === "[role=main]") { stack.splice(at + 1, 1); }
+    // Closing the element closes everything inside it, the [skip] or
+    // [role=main] marker that sits right above it included.
     pop(name);
   }
   flush();
