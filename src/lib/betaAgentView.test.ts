@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  APPROVALS_CARD_ID, ago, approvalsCard, clock, countLive, defaultCardId, logFromApprovals, logFromRun,
-  logFromSession, milestoneText, orderCards, planFromApprovals, planFromRun, planFromSession, runCard,
-  runState, runTitle, sessionCard, sessionState, shortPath, summarize, toolKind, truncate,
+  APPROVALS_CARD_ID, ago, approvalsCard, brainError, clock, countLive, defaultCardId, describeStop, logFromApprovals, logFromRun,
+  logFromSession, milestoneText, orderCards, pauseNote, planFromApprovals, planFromRun, planFromSession, planFromSteps, readPlan, runCard,
+  runState, runTitle, runUndone, sessionCard, sessionState, shortPath, summarize, toolKind, truncate, undoPreview,
   type AgentLike, type ApprovalLike, type RunLike, type RunStepLike, type SessionEventLike, type SessionLike, type ToolCallLike,
 } from './betaAgentView';
 
@@ -95,8 +95,8 @@ describe('runs', () => {
     expect(c.goal).toBe('');
     expect(c.sub).toBe('Working');
   });
-  test('the plan is the steps in order, then the pending approval against this run', () => {
-    const plan = planFromRun(
+  test('without a plan, the steps in order stand in, then the pending approval against this run', () => {
+    const plan = planFromSteps(
       [step({ id: 's2', step_index: 1, kind: 'tool_call', finished_at: null, input_json: { tool: 'mail.archive' } }), step()],
       [approval(), approval({ id: 'ap2', run_id: 'other' }), approval({ id: 'ap3', status: 'approved' })],
       'r1',
@@ -228,5 +228,156 @@ describe('the list', () => {
     const cards = [runCard(run({ id: 'done', status: 'completed' }), agent, 0, NOW), sessionCard(session(), NOW)];
     expect(defaultCardId(cards)).toBe('session:sess-1');
     expect(defaultCardId([])).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The brain runner's plan, pause, stop and undo (left-out rows 85–88).
+// ---------------------------------------------------------------------------
+
+const PLAN = {
+  source: 'model',
+  written_at: '2026-10-28T09:02:05Z',
+  steps: [
+    { title: 'Read the trip note', detail: 'Dates and who joins', status: 'done', started_at: '2026-10-28T09:02:06Z', finished_at: '2026-10-28T09:03:00Z', summary: '1–5 Nov is free.' },
+    { title: 'Archive the old invoice', detail: '', status: 'now', started_at: '2026-10-28T09:03:01Z' },
+    { title: 'Add it to the calendar', detail: 'With reminders', status: 'todo' },
+  ],
+};
+
+describe('a run with a plan', () => {
+  test('the plan is read whether localClient parsed it or left it text, and junk is no plan', () => {
+    expect(readPlan(PLAN)?.map((s) => s.status)).toEqual(['done', 'now', 'todo']);
+    expect(readPlan(JSON.stringify(PLAN))?.[0]).toMatchObject({ title: 'Read the trip note', summary: '1–5 Nov is free.', finishedAt: '2026-10-28T09:03:00Z' });
+    expect(readPlan({ steps: [{ title: 'x', status: 'exploded' }] })?.[0].status).toBe('todo');
+    for (const junk of [null, undefined, '', 'not json', {}, { steps: 'no' }, { steps: [{}] }]) expect(readPlan(junk)).toBeNull();
+  });
+  test('progress is measured as steps finished of steps planned', () => {
+    const c = runCard(run({ plan_json: PLAN }), agent, 0, NOW);
+    expect(c.measured).toEqual({ done: 1, total: 3 });
+    expect(c.progress).toBeCloseTo(1 / 3);
+    expect(c.when).toBe('1/3');
+    expect(c.canPause).toBe(true);
+    expect(c.canStop).toBe(true);
+    // Without a plan nothing is measured, and the bar sweeps instead.
+    expect(runCard(run(), agent, 0, NOW)).toMatchObject({ measured: null, progress: null, when: '8m' });
+  });
+  test('paused is its own state, and outranks a waiting question', () => {
+    expect(runState('running', '2026-10-28T09:05:00Z')).toBe('paused');
+    expect(runState('cancelled', '2026-10-28T09:05:00Z')).toBe('stopped');
+    const c = runCard(run({ paused_at: '2026-10-28T09:05:00Z', plan_json: PLAN }), agent, 1, NOW);
+    expect(c.state).toBe('paused');
+    expect(c.sub).toBe('Paused · Inbox triage');
+    expect(c.canPause).toBe(true);
+    // The eyebrow counts what is running, as the design does.
+    expect(countLive([c, runCard(run({ id: 'r2' }), agent, 0, NOW)])).toBe(1);
+  });
+  test('the plan column is the planned steps, with a question right after the step that asked it', () => {
+    const steps = [
+      step({ id: 'tc', step_index: 2, kind: 'tool_call', input_json: { plan_step: 1, op: 'mail.archive', args: { thread_id: 'th' } }, output_json: { ok: true, result: { status: 'awaiting_approval', approval_id: 'ap1' } } }),
+    ];
+    const plan = planFromRun(run({ plan_json: PLAN }), steps, [approval(), approval({ id: 'other', run_id: 'r9' })]);
+    expect(plan.map((p) => p.title)).toEqual(['Read the trip note', 'Archive the old invoice', 'Archive "Invoice 4411"', 'Add it to the calendar']);
+    expect(plan.map((p) => p.mark)).toEqual(['done', 'now', 'now', 'todo']);
+    expect(plan[0].detail).toBe('1–5 Nov is free.');
+    expect(plan[1].time).toBe('now');
+    expect(plan[2].approvalId).toBe('ap1');
+    expect(plan[3].detail).toBe('With reminders');
+    expect(plan[3].time).toBe('');
+  });
+  test('a question with no recorded step sits after the last step that started', () => {
+    const plan = planFromRun(run({ plan_json: PLAN }), [], [approval()]);
+    expect(plan.map((p) => p.approvalId ?? p.title)).toEqual(['Read the trip note', 'Archive the old invoice', 'ap1', 'Add it to the calendar']);
+  });
+  test('a step cut short by a stop says so', () => {
+    const stopped = { ...PLAN, steps: [{ ...PLAN.steps[1], status: 'stopped', finished_at: '2026-10-28T09:04:00Z' }] };
+    expect(planFromRun(run({ plan_json: stopped }), [], [])[0]).toMatchObject({ mark: 'todo', detail: 'Stopped before it finished.' });
+  });
+  test('the pause line says whether a step is still finishing', () => {
+    const plan = planFromRun(run({ plan_json: PLAN }), [], [approval()]);
+    expect(pauseNote(plan)).toBe('Pausing after “Archive the old invoice”. Nothing new starts until you resume.');
+    const between = planFromRun(run({ plan_json: { ...PLAN, steps: [PLAN.steps[0], { ...PLAN.steps[2] }] } }), [], [approval()]);
+    expect(pauseNote(between)).toBe('Paused before step 2. Resume carries on from there.');
+  });
+  test('the log reads what the runner records, and keeps only the queued calls from Rust', () => {
+    const steps = [
+      step({ id: 'p', kind: 'planning', output_json: { steps: 3, source: 'model' } }),
+      step({ id: 'c', step_index: 1, kind: 'tool_call', started_at: '2026-10-28T09:03:00Z', input_json: { plan_step: 0, op: 'tasks.create', args: { title: 'Dentist' } }, output_json: { ok: true, result: {} } }),
+      step({ id: 'q', step_index: 2, kind: 'tool_call', started_at: '2026-10-28T09:03:10Z', input_json: { plan_step: 1, op: 'mail.archive', args: {} }, output_json: { ok: true, result: { status: 'awaiting_approval' } } }),
+      step({ id: 'x', step_index: 3, kind: 'tool_call', started_at: '2026-10-28T09:03:20Z', input_json: { op: 'tasks.update', args: {} }, output_json: { ok: false, error: 'no such task' } }),
+      step({ id: 'r', step_index: 4, kind: 'response', started_at: '2026-10-28T09:03:30Z', output_json: { text: 'Added the dentist task.' } }),
+      step({ id: 'u', step_index: 5, kind: 'tool_call', started_at: '2026-10-28T09:03:40Z', input_json: { undo_of: 'c', op: 'undo', label: 'Created the task “Dentist”' }, output_json: { ok: true, message: 'Removed.' } }),
+    ];
+    const tc = (over: Partial<ToolCallLike>): ToolCallLike => ({ id: 't1', run_id: 'r1', tool_name: 'tasks.create', args_json: {}, status: 'completed', error_message: null, created_at: '2026-10-28T09:03:01Z', ...over });
+    const log = logFromRun(steps, [tc({}), tc({ id: 't2', tool_name: 'mail.archive', requires_approval: 1, status: 'completed', created_at: '2026-10-28T09:05:00Z' })], 'r1', true);
+    expect(log.map((l) => l.id)).toEqual(['tool:t2', 'step:u', 'step:r', 'step:x', 'step:q', 'step:c', 'step:p']);
+    expect(log.map((l) => l.message)).toEqual([
+      'mail.archive() · completed',
+      'Undo · Created the task “Dentist” · Removed.',
+      'Added the dentist task.',
+      'tasks.update() · no such task',
+      'mail.archive() · waiting for you',
+      'tasks.create({"title":"Dentist"}) · ok',
+      'Plan · 3 steps',
+    ]);
+    expect(log.map((l) => l.kind)).toEqual(['tool', 'write', 'write', 'error', 'tool', 'tool', 'think']);
+  });
+});
+
+describe('stop and undo', () => {
+  const call = (id: string, index: number, undo: unknown, input: Record<string, unknown> = { op: 'tasks.create' }) =>
+    step({ id, step_index: index, kind: 'tool_call', input_json: input, output_json: { ok: true, undo } });
+  test('the confirmation lists what comes back, newest first, and what cannot', () => {
+    const steps = [
+      call('a', 1, { label: 'Created the task “Dentist”', action: { kind: 'delete', table: 'user_tasks', id: 't1' } }),
+      call('b', 2, { label: 'Started playback', action: null, reason: 'Playback cannot be put back the way it was.' }),
+      call('c', 3, { label: 'Edited the note “Trip”', action: { kind: 'restore', table: 'user_notes', id: 'n1', values: { title: 'Trip' } } }),
+      call('d', 4, { label: 'Archive “Invoice”', action: null, reason: 'Ran outside.', approval_id: 'ap-yes' }),
+      call('e', 5, { label: 'Archive “Other”', action: null, reason: 'Ran outside.', approval_id: 'ap1' }),
+      step({ id: 'plain', step_index: 6, kind: 'tool_call', input_json: { op: 'tasks.list' }, output_json: { ok: true } }),
+    ];
+    const p = undoPreview(steps, [approval({ id: 'ap-yes', status: 'approved' }), approval()], 'r1');
+    expect(p.undoable).toEqual(['Edited the note “Trip”', 'Created the task “Dentist”']);
+    expect(p.cannot).toEqual([
+      { label: 'Archive “Invoice”', reason: 'Ran outside.' },
+      { label: 'Started playback', reason: 'Playback cannot be put back the way it was.' },
+    ]);
+    expect(p.questions).toBe(1);
+  });
+  test('what an undo already took back is not offered twice', () => {
+    const steps = [
+      call('a', 1, { label: 'Created the task “Dentist”', action: { kind: 'delete', table: 'user_tasks', id: 't1' } }),
+      step({ id: 'u', step_index: 2, kind: 'tool_call', input_json: { undo_of: 'a', op: 'undo' }, output_json: { ok: true, message: 'Removed.' } }),
+    ];
+    expect(undoPreview(steps, [], 'r1').undoable).toEqual([]);
+    expect(runUndone(steps)).toBe(true);
+    expect(runUndone([steps[0]])).toBe(false);
+  });
+  test('what the stop did, in one sentence', () => {
+    expect(describeStop({ stopped: true, approvalsClosed: 0 })).toBe('Stopped. Nothing was undone.');
+    expect(describeStop({ stopped: true, approvalsClosed: 2, undo: 'after-step' }))
+      .toBe('Stopped. 2 waiting questions were skipped; nothing in them ran. The step in progress finishes first; its undo runs right after.');
+    expect(describeStop({ stopped: false, approvalsClosed: 0, undo: { undone: [{ label: 'a' }, { label: 'b' }], failed: [{ label: 'c', message: 'It no longer exists.' }], cannot: [{ label: 'd' }] } }))
+      .toBe('It had already ended. Undid 2 steps. 1 could not be undone: c (It no longer exists.). 1 can’t be undone.');
+    expect(describeStop({ stopped: true, approvalsClosed: 1, undo: { undone: [], failed: [], cannot: [] } }))
+      .toBe('Stopped. 1 waiting question was skipped; nothing in it ran. Nothing needed undoing.');
+  });
+  test('the brain\'s error body is read out of a thrown admin call', () => {
+    expect(brainError(new Error('{"error":"Only a run that is still going can be paused."}'))).toBe('Only a run that is still going can be paused.');
+    expect(brainError(new Error('Atlas brain is not running.'))).toBe('Atlas brain is not running.');
+    expect(brainError('')).toBe('Atlas did not answer.');
+  });
+});
+
+describe('stopping a session', () => {
+  test('CI and self-repair have a stop; Claude Code says where to stop it', () => {
+    expect(sessionCard(session({ session_type: 'ci-pipeline' }), NOW)).toMatchObject({ canStop: true, stopNote: null, canPause: false });
+    expect(sessionCard(session({ session_type: 'autonomous' }), NOW).canStop).toBe(true);
+    const cc = sessionCard(session(), NOW);
+    expect(cc.canStop).toBe(false);
+    expect(cc.stopNote).toContain('Stop it in the terminal or app where it runs');
+    // An ended session has nothing to stop and nothing to say about it.
+    expect(sessionCard(session({ session_type: 'ci-pipeline', status: 'completed' }), NOW)).toMatchObject({ canStop: false, stopNote: null });
+    expect(sessionCard(session({ status: 'completed' }), NOW).stopNote).toBeNull();
   });
 });

@@ -352,7 +352,13 @@ CREATE TABLE IF NOT EXISTS runs (
   error_message    TEXT,
   started_at       TEXT,
   finished_at      TEXT,
-  created_at       TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  created_at       TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  -- Set while the user has paused the run; the brain's runner waits between
+  -- steps until it is cleared. A column, not a status value: changing the
+  -- CHECK above means rebuilding the table, which would cascade-delete every
+  -- run's steps and approvals. The brain adds it to databases made before it
+  -- (services/atlas-brain/src/agentRunner.ts, ensureAgentRunSchema).
+  paused_at        TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_runs_user_created ON runs(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_runs_status ON runs(status);

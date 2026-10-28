@@ -49,13 +49,47 @@ interface RepairDeps {
   db: Database;
   sessionId: string;
   complete?: (system: string, user: string) => Promise<string | null>;
+  runTests?: (signal: AbortSignal) => Promise<{ passed: boolean; output: string }>;
+}
+
+// ---------------------------------------------------------------------------
+// Stopping a repair (Beta Agent View, left-out row 88)
+//
+// A repair runs in this process, so this process can stop it: each running
+// pipeline registers an AbortController under its session id, the pipeline
+// checks it between stages and after every model call, and the test stage
+// kills its child process when it fires. A stopped repair ends `cancelled`,
+// and nothing it was still doing may move the session out of that state.
+// ---------------------------------------------------------------------------
+
+const RUNNING = new Map<string, AbortController>();
+
+class RepairStopped extends Error {
+  constructor() {
+    super("Stopped by the user");
+  }
+}
+
+/** True while this process is working the repair behind this session. */
+export function repairRunning(sessionId: string): boolean {
+  return RUNNING.has(sessionId);
+}
+
+/** Ask a running repair to stop. False when this process is not running it. */
+export function stopRepair(sessionId: string): boolean {
+  const controller = RUNNING.get(sessionId);
+  if (!controller) return false;
+  controller.abort();
+  return true;
 }
 
 function updateSession(db: Database, sessionId: string, fields: Record<string, unknown>): void {
   const meta = db.prepare(`SELECT metadata FROM atlas_agent_sessions WHERE id = ?`).get(sessionId) as { metadata: string } | null;
   const existing = meta ? JSON.parse(meta.metadata) : {};
   const merged = { ...existing, ...fields };
-  db.prepare(`UPDATE atlas_agent_sessions SET metadata = ?, status = ? WHERE id = ?`)
+  // Never out of `cancelled`: a stage that was mid-flight when the user
+  // stopped the repair must not report it active again.
+  db.prepare(`UPDATE atlas_agent_sessions SET metadata = ?, status = ? WHERE id = ? AND status != 'cancelled'`)
     .run(JSON.stringify(merged), fields.pipeline_status as string ?? "active", sessionId);
 }
 
@@ -114,7 +148,7 @@ function parseFileAndLine(stackTrace: string | null, errorMessage: string): { fi
   return null;
 }
 
-async function runTests(): Promise<{ passed: boolean; output: string }> {
+async function runTests(signal: AbortSignal): Promise<{ passed: boolean; output: string }> {
   try {
     const proc = Bun.spawn(["bun", "run", "ci:quick"], {
       cwd: PROJECT_ROOT,
@@ -123,8 +157,11 @@ async function runTests(): Promise<{ passed: boolean; output: string }> {
     });
 
     const timeout = setTimeout(() => proc.kill(), TEST_TIMEOUT_MS);
+    const onAbort = () => proc.kill();
+    signal.addEventListener("abort", onAbort, { once: true });
     await proc.exited;
     clearTimeout(timeout);
+    signal.removeEventListener("abort", onAbort);
 
     const stdout = await new Response(proc.stdout).text();
     const stderr = await new Response(proc.stderr).text();
@@ -136,11 +173,48 @@ async function runTests(): Promise<{ passed: boolean; output: string }> {
   }
 }
 
+/**
+ * Record a stopped repair. Idempotent: the stop route marks the session
+ * `cancelled` the moment the user asks, and the pipeline lands here once it
+ * notices.
+ */
+export function markRepairStopped(db: Database, sessionId: string): void {
+  const row = db.prepare(`SELECT metadata, status FROM atlas_agent_sessions WHERE id = ?`).get(sessionId) as { metadata: string; status: string } | null;
+  if (!row) return;
+  let meta: Record<string, unknown> = {};
+  try { meta = JSON.parse(row.metadata || "{}"); } catch { /* keep {} */ }
+  const already = row.status === "cancelled" && meta.pipeline_stage === "stopped";
+  db.prepare(`UPDATE atlas_agent_sessions SET status = 'cancelled', ended_at = COALESCE(ended_at, ?), metadata = ? WHERE id = ?`)
+    .run(new Date().toISOString(), JSON.stringify({ ...meta, pipeline_status: "cancelled", pipeline_stage: "stopped" }), sessionId);
+  if (!already) insertEvent(db, sessionId, "milestone", { stage: "stopped", reason: "Stopped by the user." });
+}
+
 export async function executeRepair(error: RepairContext, deps: RepairDeps): Promise<RepairResult> {
+  const { db, sessionId } = deps;
+  const controller = new AbortController();
+  RUNNING.set(sessionId, controller);
+  try {
+    return await runPipeline(error, deps, controller.signal);
+  } catch (e) {
+    if (!(e instanceof RepairStopped)) throw e;
+    markRepairStopped(db, sessionId);
+    return { status: "rejected", diagnosis: "Stopped by the user before the repair finished.", proposedFix: null, affectedFiles: [], testResult: null, testPassed: false };
+  } finally {
+    if (RUNNING.get(sessionId) === controller) RUNNING.delete(sessionId);
+  }
+}
+
+async function runPipeline(error: RepairContext, deps: RepairDeps, signal: AbortSignal): Promise<RepairResult> {
   const { db, sessionId, complete } = deps;
   const startTime = Date.now();
 
+  // Checked after every await as well as between stages: a stop that lands
+  // during a model call must not let the next stage write anything.
+  const checkStopped = () => {
+    if (signal.aborted) throw new RepairStopped();
+  };
   const checkTimeout = () => {
+    checkStopped();
     if (Date.now() - startTime > REPAIR_WALL_CLOCK_MS) {
       throw new Error("Repair pipeline timed out");
     }
@@ -187,6 +261,7 @@ Format as structured text, not JSON.`;
     auditPrompt,
     complete,
   );
+  checkStopped();
 
   if (!diagnosis) {
     updateSession(db, sessionId, { pipeline_status: "failed", pipeline_stage: "audit_failed" });
@@ -230,6 +305,7 @@ Output the diff or NO_FIX:`;
     proposePrompt,
     complete,
   );
+  checkStopped();
 
   if (!proposal || proposal.startsWith("NO_FIX")) {
     const reason = proposal?.replace("NO_FIX:", "").trim() ?? "Could not generate fix";
@@ -248,7 +324,8 @@ Output the diff or NO_FIX:`;
   checkTimeout();
   insertEvent(db, sessionId, "milestone", { stage: "test_start" });
 
-  const testResult = await runTests();
+  const testResult = await (deps.runTests ?? runTests)(signal);
+  checkStopped();
   insertEvent(db, sessionId, "milestone", {
     stage: "test_complete",
     passed: testResult.passed,
@@ -284,7 +361,7 @@ Output the diff or NO_FIX:`;
     affected_files: result.affectedFiles,
   });
 
-  db.prepare(`UPDATE atlas_agent_sessions SET status = 'completed', ended_at = ? WHERE id = ?`)
+  db.prepare(`UPDATE atlas_agent_sessions SET status = 'completed', ended_at = ? WHERE id = ? AND status != 'cancelled'`)
     .run(new Date().toISOString(), sessionId);
 
   insertEvent(db, sessionId, "milestone", { stage: "pipeline_complete", status: finalStatus });

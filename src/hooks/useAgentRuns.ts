@@ -14,10 +14,22 @@ export interface AgentRun {
   tokens_planner: number;
   tokens_worker: number;
   tokens_reasoner: number;
+  /** The brain runner's plan, every step with its status (agentRunner.ts `RunPlan`). */
+  plan_json?: unknown;
+  /** Set while the run is paused; absent on a database the brain has not migrated yet. */
+  paused_at?: string | null;
   agent?: {
     name: string;
   };
 }
+
+/**
+ * How often runs are re-read while one is live. The brain's runner writes
+ * through bun:sqlite, which emits no `db:changed`, so without this a working
+ * run would look frozen until something else touched the tables.
+ */
+export const LIVE_RUN_POLL_MS = 4_000;
+const LIVE_STATUSES = new Set(['pending', 'planning', 'running', 'verifying']);
 
 export interface RunStep {
   id: string;
@@ -128,6 +140,21 @@ export function useAgentRuns(limit = 10) {
   useEffect(() => {
     fetchRuns();
   }, [fetchRuns]);
+
+  // While any run is live, follow it: the runs (status, plan progress, pause)
+  // and the open run's steps. Skipped while the window is hidden; nothing is
+  // polled once every run has ended.
+  const anyLive = runs.some((r) => LIVE_STATUSES.has(r.status));
+  useEffect(() => {
+    if (!user || !anyLive) return;
+    const t = window.setInterval(() => {
+      if (document.hidden) return;
+      void fetchRuns();
+      const runId = stepsRunId.current;
+      if (runId) void fetchRunSteps(runId);
+    }, LIVE_RUN_POLL_MS);
+    return () => window.clearInterval(t);
+  }, [user, anyLive, fetchRuns, fetchRunSteps]);
 
   // Subscribe to realtime updates
   useEffect(() => {

@@ -5,29 +5,34 @@
  * The run list on the left, the raised hero with the sphere, the plan and the
  * live log. Three real sources fill it (the reading is in lib/betaAgentView.ts):
  * the agent tables (`useAgentRuns`, `useAgents`, `useToolCalls`) give runs
- * their goal, limit, steps and the one real stop call (`cancelRun`); the
- * brain's admin tables (`useAgentSessions`, `useAgentEvents` — the same calls
- * the Workshop page makes) give Claude Code, CI and self-repair sessions their
- * event stream, polled fast while a session is live because the brain has no
- * push channel for them; and `useApprovals` gives the queue of actions the
- * control port holds for the user, answered inline through `approval_resolve`.
+ * their goal, limit, the plan the brain's runner wrote before the first step
+ * (so progress is done/total) and the steps taken; the brain's admin tables
+ * (`useAgentSessions`, `useAgentEvents` — the same calls the Workshop page
+ * makes) give Claude Code, CI and self-repair sessions their event stream,
+ * polled fast while a session is live because the brain has no push channel
+ * for them; and `useApprovals` gives the queue of actions the control port
+ * holds for the user, answered inline through `approval_resolve`. A call an
+ * agent run made carries the run's id, so its question shows inside the run's
+ * plan, right after the step that asked it.
  *
- * What the design shows and this screen does not: Pause/Resume (no source has
- * a pause call — `runs.status` has no paused value and sessions cannot be
- * paused from here) and the "undo" half of "Stop and undo" (cancelling a run
- * flips its row; nothing can reverse a step already taken). Both are left out
- * rather than drawn dead.
+ * The run controls are the brain's (services/atlas-brain/src/agentRoutes.ts):
+ * Pause holds the run between steps and Resume carries on from the next one;
+ * "Stop and undo" first lists what will be taken back and what cannot be,
+ * then — on one confirmation — answers the run's open questions "no", stops
+ * it and runs the recorded inverses newest first. A live CI pipeline or
+ * self-repair has a Stop of its own; a Claude Code session says where to stop
+ * it instead, because Atlas only reads its transcript.
  *
  * The hero sphere is the screen's Talk to Atlas entry (registered as the talk
  * anchor, so the corner orb steps aside); clicking it opens the panel.
  *
- * Keys: Esc → Home (or closes a Skip confirm) · J/K move through the list,
+ * Keys: Esc → Home (or closes a confirm) · J/K move through the list,
  * and ↑/↓ do too while focus is in it (elsewhere they keep scrolling the page).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { useAgentEvents, useAgentSessions, useIngestSessions, useSyncCiRuns } from '@/hooks/useAgentView';
+import { agentRunControls, useAgentEvents, useAgentSessions, useIngestSessions, useStopSession, useSyncCiRuns } from '@/hooks/useAgentView';
 import { useAgentRuns } from '@/hooks/useAgentRuns';
 import { useAgents } from '@/hooks/useAgents';
 import { useApprovals, describeOutcome } from '@/hooks/useApprovals';
@@ -37,8 +42,9 @@ import { AtlasIcon } from '@/components/atlas/AtlasIcon';
 import { useBetaNavigate } from '@/lib/viewTransitions';
 import { openTalk, setTalkAnchor } from '@/lib/talkBus';
 import {
-  KIND_COLOUR, STATE_META, approvalsCard, countLive, defaultCardId, isLive, logFromApprovals,
-  logFromRun, logFromSession, orderCards, planFromApprovals, planFromRun, planFromSession, runCard, sessionCard,
+  KIND_COLOUR, SESSION_STOP, STATE_META, approvalsCard, brainError, countLive, defaultCardId, describeStop, isLive,
+  logFromApprovals, logFromRun, logFromSession, orderCards, pauseNote, planFromApprovals, planFromRun, planFromSession,
+  runCard, runUndone, sessionCard, undoPreview,
   type LogLine, type PlanStep, type RunCard,
 } from '@/lib/betaAgentView';
 import { isTyping } from './atlasHelpers';
@@ -49,6 +55,8 @@ const LIVE_MS = 5_000;
 /** The run list while any session is active. */
 const LIST_LIVE_MS = 10_000;
 
+type Busy = 'pause' | 'resume' | 'stop' | null;
+
 const BetaAgentView = () => {
   const navigate = useBetaNavigate();
   const plainNavigate = useNavigate();
@@ -56,9 +64,11 @@ const BetaAgentView = () => {
 
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [rejecting, setRejecting] = useState<string | null>(null);
-  const [stopping, setStopping] = useState(false);
-  /** The run whose cancel write failed, so the hero can say it is still running. */
-  const [stopFailed, setStopFailed] = useState<string | null>(null);
+  /** The run or session whose stop is being confirmed. */
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [busy, setBusy] = useState<Busy>(null);
+  /** What the last control did or why it failed, kept with the card it was for. */
+  const [notice, setNotice] = useState<{ cardId: string; text: string; error: boolean } | null>(null);
   const [sphereEl, setSphereEl] = useState<HTMLButtonElement | null>(null);
   const listRef = useRef<HTMLElement | null>(null);
   // Relative labels ("4m") age; a slow tick keeps them honest without refetching anything.
@@ -72,12 +82,13 @@ const BetaAgentView = () => {
   }, []);
 
   // ---- Sources ---------------------------------------------------------------
-  const { runs, runSteps, isLoading: runsLoading, fetchRuns, fetchRunSteps, cancelRun } = useAgentRuns(20);
+  const { runs, runSteps, isLoading: runsLoading, fetchRuns, fetchRunSteps } = useAgentRuns(20);
   const { agents } = useAgents();
   const { toolCalls } = useToolCalls(60);
   const { approvals, approveRequest, rejectRequest, outcomes, dismissOutcome, resolvingId, fetchApprovals } = useApprovals();
   const ingest = useIngestSessions();
   const syncCi = useSyncCiRuns();
+  const stopSession = useStopSession();
 
   const pending = useMemo(() => approvals.filter((a) => a.status === 'pending'), [approvals]);
   const pendingByRun = useMemo(() => {
@@ -102,14 +113,15 @@ const BetaAgentView = () => {
   const selectedId = pickedId && cards.some((c) => c.id === pickedId) ? pickedId : defaultCardId(cards);
   const card: RunCard | null = cards.find((c) => c.id === selectedId) ?? null;
   const run = card?.kind === 'run' ? runs.find((r) => r.id === card.sourceId) ?? null : null;
-  const sessionId = card?.kind === 'session' ? card.sourceId : null;
+  const session = card?.kind === 'session' ? sessions.find((s) => s.id === card.sourceId) ?? null : null;
+  const sessionId = session?.id ?? null;
   const live = !!card && isLive(card.state);
 
   const { events, isLoading: eventsLoading } = useAgentEvents(sessionId, { refetchMs: live ? LIVE_MS : undefined });
 
   // Steps are fetched per run: on opening it, and again when its status moves
   // (a finished run settles its last step). New steps between those arrive
-  // through the hook's own `run_steps` subscription.
+  // through the hook's own `run_steps` subscription and its live polling.
   const runId = run?.id ?? null;
   const runStatus = run?.status ?? null;
   useEffect(() => { if (runId) void fetchRunSteps(runId); }, [runId, runStatus, fetchRunSteps]);
@@ -118,14 +130,14 @@ const BetaAgentView = () => {
   // ---- The columns -----------------------------------------------------------------
   const plan: PlanStep[] = useMemo(() => {
     if (!card) return [];
-    if (card.kind === 'run' && run) return planFromRun(stepsHere, approvals, run.id);
+    if (card.kind === 'run' && run) return planFromRun(run, stepsHere, approvals);
     if (card.kind === 'session') return planFromSession(events);
     return planFromApprovals(pending);
   }, [card, run, stepsHere, approvals, events, pending]);
 
   const log: LogLine[] = useMemo(() => {
     if (!card) return [];
-    if (card.kind === 'run' && run) return logFromRun(stepsHere, toolCalls, run.id);
+    if (card.kind === 'run' && run) return logFromRun(stepsHere, toolCalls, run.id, card.measured != null);
     if (card.kind === 'session') return logFromSession(events);
     return logFromApprovals(approvals);
   }, [card, run, stepsHere, toolCalls, events, approvals]);
@@ -138,16 +150,57 @@ const BetaAgentView = () => {
     return [];
   }, [card, outcomes, approvals]);
 
+  const preview = useMemo(() => (run ? undoPreview(stepsHere, approvals, run.id) : null), [run, stepsHere, approvals]);
+  const undone = useMemo(() => runUndone(stepsHere), [stepsHere]);
+
   // ---- Actions -----------------------------------------------------------------------
-  const stop = useCallback(async () => {
-    if (!run || stopping) return;
-    setStopping(true);
-    setStopFailed(null);
+  const refreshRun = useCallback(async (id: string) => {
+    await Promise.all([fetchRuns(), fetchRunSteps(id), fetchApprovals()]);
+  }, [fetchRuns, fetchRunSteps, fetchApprovals]);
+
+  const togglePause = useCallback(async () => {
+    if (!run || !card || busy) return;
+    const resuming = card.state === 'paused';
+    setBusy(resuming ? 'resume' : 'pause');
+    setNotice(null);
     try {
-      const ok = await cancelRun(run.id);
-      if (!ok) setStopFailed(run.id);
-    } finally { setStopping(false); }
-  }, [run, stopping, cancelRun]);
+      await (resuming ? agentRunControls.resume(run.id) : agentRunControls.pause(run.id));
+      await fetchRuns();
+    } catch (e) {
+      setNotice({ cardId: card.id, text: brainError(e), error: true });
+    } finally { setBusy(null); }
+  }, [run, card, busy, fetchRuns]);
+
+  const stopRun = useCallback(async (undo: boolean) => {
+    if (!run || !card || busy) return;
+    setBusy('stop');
+    setNotice(null);
+    try {
+      // Answer the run's open questions "no" first, through the one path that
+      // also drops Rust's held payload; the brain closes any that remain.
+      for (const a of pending) if (a.run_id === run.id) await rejectRequest(a.id);
+      const result = await agentRunControls.stop(run.id, { undo });
+      setNotice({ cardId: card.id, text: describeStop(result), error: false });
+      setConfirming(null);
+    } catch (e) {
+      setNotice({ cardId: card.id, text: brainError(e), error: true });
+    } finally {
+      setBusy(null);
+      void refreshRun(run.id);
+    }
+  }, [run, card, busy, pending, rejectRequest, refreshRun]);
+
+  const stopThisSession = useCallback(() => {
+    if (!session || !card) return;
+    setNotice(null);
+    stopSession.mutate(session.id, {
+      onSuccess: (r) => {
+        setConfirming(null);
+        setNotice({ cardId: card.id, text: r.outcome === 'cancel-requested' ? 'GitHub was asked to cancel the run.' : 'Stopped.', error: false });
+      },
+      onError: (e) => setNotice({ cardId: card.id, text: brainError(e), error: true }),
+    });
+  }, [session, card, stopSession]);
 
   const skip = useCallback((approvalId: string) => {
     // Refusing throws the queued action away, so it takes a second click (as the Workshop does).
@@ -178,7 +231,9 @@ const BetaAgentView = () => {
       };
       switch (e.key) {
         case 'Escape':
-          if (rejecting) setRejecting(null); else navigate('/');
+          if (confirming) setConfirming(null);
+          else if (rejecting) setRejecting(null);
+          else navigate('/');
           break;
         case 'j': move(i + 1); break;
         case 'k': move(i - 1); break;
@@ -189,27 +244,38 @@ const BetaAgentView = () => {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [cards, selectedId, rejecting, navigate]);
+  }, [cards, selectedId, rejecting, confirming, navigate]);
 
-  useEffect(() => { setRejecting(null); }, [selectedId]);
+  useEffect(() => { setRejecting(null); setConfirming(null); }, [selectedId]);
+  // A card that stops being live has nothing left to confirm a stop for.
+  useEffect(() => { if (!live) setConfirming(null); }, [live]);
 
   // ---- Render ------------------------------------------------------------------------
   const loading = authLoading || (runsLoading && sessionsLoading);
   const meta = card ? STATE_META[card.state] : null;
-  const planDone = plan.filter((p) => p.mark === 'done' || p.mark === 'failed').length;
+  const statusLabel = card?.kind === 'run' && card.state === 'stopped' && undone ? 'Stopped · undone' : meta?.label;
   const planTitle = !card ? 'Plan'
-    : card.kind === 'run' ? `Plan · ${planDone} of ${plan.length} step${plan.length === 1 ? '' : 's'}`
+    : card.kind === 'run'
+      ? (card.measured
+        ? `Plan · ${card.measured.done} of ${card.measured.total} step${card.measured.total === 1 ? '' : 's'}`
+        : `Steps · ${plan.filter((p) => !p.approvalId).length}`)
       : card.kind === 'session' ? `Milestones · ${plan.length}`
         : `Needs your answer · ${plan.length}`;
   const logTitle = !card ? 'What Atlas is doing' : card.kind === 'approvals' ? 'Answered' : live ? 'What Atlas is doing' : 'What Atlas did';
   const planEmpty = !card ? 'Pick a run to see its plan.'
-    : card.kind === 'run' ? (live ? 'No steps recorded yet.' : 'This run recorded no steps.')
+    : card.kind === 'run'
+      ? (!live ? 'This run recorded no steps.'
+        : run?.status === 'pending' ? 'Waiting for the brain to pick this run up. It plans before the first step.'
+          : run?.status === 'planning' ? 'Atlas is writing the plan.' : 'No steps recorded yet.')
       : card.kind === 'session' ? 'No milestones yet — the log has the detail.'
         : 'Nothing waiting on you.';
   const logEmpty = !card ? 'Pick a run to follow it.'
     : card.kind === 'session' ? (eventsLoading ? 'Reading…' : live ? 'Nothing logged yet. New events arrive as the transcript is written.' : 'This session logged nothing.')
       : card.kind === 'run' ? 'Nothing logged for this run.'
         : 'No approvals answered yet.';
+  const noticeHere = notice && card && notice.cardId === card.id ? notice : null;
+  const stepInFlight = plan.some((p) => p.mark === 'now' && !p.approvalId);
+  const sessionStop = session ? SESSION_STOP[session.session_type] : undefined;
 
   return (
     <div className="b-ag" data-beta-tone="ink" data-screen-label="Beta — Agent View">
@@ -235,7 +301,7 @@ const BetaAgentView = () => {
         {!loading && !cards.length ? (
           <div className="b-ag-aside-empty">
             <b>Nothing running</b>
-            <span>Agent runs, Claude Code sessions and CI pipelines appear here. Sessions arrive from the brain's transcript watcher and from Sync; runs need an agent to be executed.</span>
+            <span>Agent runs, Claude Code sessions and CI pipelines appear here. Sessions arrive from the brain's transcript watcher and from Sync; a run starts when a schedule's Run now asks for one.</span>
           </div>
         ) : null}
         {loading ? <p className="b-ag-note">Reading…</p> : null}
@@ -258,17 +324,27 @@ const BetaAgentView = () => {
           <div className="b-ag-hero-text">
             <span className="b-ag-status" style={{ color: meta?.fg ?? 'var(--b-on-ink-body)' }}>
               <i className={`b-ag-dot${meta?.pulse ? ' pulse' : ''}`} style={{ background: meta?.dot ?? 'var(--b-tertiary)' }} />
-              {meta?.label ?? (loading ? 'Reading' : 'Nothing running')}
+              {statusLabel ?? (loading ? 'Reading' : 'Nothing running')}
             </span>
             <h1 className="b-ag-h1">{card?.title ?? (loading ? '…' : 'Atlas is idle')}</h1>
             {card ? (card.goal ? <p className="b-ag-goal">{card.goal}</p> : null)
               : !loading ? <p className="b-ag-goal">No agent run, Claude Code session or pipeline is being tracked right now. Sync pulls in the latest transcripts and CI runs.</p> : null}
-            {run && stopFailed === run.id && isLive(card?.state ?? 'done') ? <p className="b-ag-err" role="alert">The run could not be stopped. It is still marked as running.</p> : null}
+            {card?.state === 'paused' && card.kind === 'run' ? <p className="b-ag-hint">{pauseNote(plan)}</p> : null}
+            {card?.stopNote ? <p className="b-ag-hint">{card.stopNote}</p> : null}
             {card ? (
               <div className="b-ag-actions">
-                {card.canStop && run ? (
-                  <button type="button" className="b-ag-act b-ag-act--stop" disabled={stopping} onClick={() => void stop()} title="Marks the run cancelled">
-                    <AtlasIcon name="close" size={15} weight={1.9} />{stopping ? 'Stopping…' : 'Stop run'}
+                {card.canPause && run ? (
+                  <button type="button" className="b-ag-act b-ag-act--primary" disabled={!!busy} onClick={() => void togglePause()}
+                    title={card.state === 'paused' ? 'Carries on from the next step' : 'Waits before the next step; the step in progress finishes first'}>
+                    <AtlasIcon name={card.state === 'paused' ? 'play' : 'pause'} size={15} weight={1.9} />
+                    {busy === 'pause' ? 'Pausing…' : busy === 'resume' ? 'Resuming…' : card.state === 'paused' ? 'Resume' : 'Pause'}
+                  </button>
+                ) : null}
+                {card.canStop && (run || sessionStop) && confirming !== card.id ? (
+                  <button type="button" className="b-ag-act b-ag-act--stop" disabled={!!busy || stopSession.isPending}
+                    onClick={() => { setNotice(null); setConfirming(card.id); }}
+                    title={run ? 'Shows what will be undone before anything stops' : sessionStop?.title}>
+                    <AtlasIcon name="close" size={15} weight={1.9} />{run ? 'Stop and undo' : 'Stop'}
                   </button>
                 ) : null}
                 {card.limit ? <span className="b-ag-chip">{card.kind === 'run' ? `Limit · ${card.limit}` : card.limit}</span> : null}
@@ -276,6 +352,52 @@ const BetaAgentView = () => {
                 {card.kind === 'approvals' ? <span className="b-ag-chip">{pending.length ? `${pending.length} to answer` : 'All answered'}</span> : null}
               </div>
             ) : null}
+
+            {card && confirming === card.id && run && preview ? (
+              <div className="b-ag-confirm" role="group" aria-label="Stop and undo">
+                <b className="b-ag-confirm-t">{preview.undoable.length ? 'Stop this run and take back what it did?' : 'Stop this run?'}</b>
+                {preview.undoable.length ? (
+                  <>
+                    <span className="b-ag-confirm-h">Will be undone, newest first</span>
+                    <ul className="b-ag-confirm-list">{preview.undoable.map((l, i) => <li key={`u${i}`}>{l}</li>)}</ul>
+                  </>
+                ) : <p className="b-ag-confirm-p">Nothing it has done so far has an undo.</p>}
+                {preview.cannot.length ? (
+                  <>
+                    <span className="b-ag-confirm-h">Can’t be undone</span>
+                    <ul className="b-ag-confirm-list cannot">{preview.cannot.map((c, i) => <li key={`c${i}`}>{c.label}<span>{c.reason}</span></li>)}</ul>
+                  </>
+                ) : null}
+                {preview.questions ? <p className="b-ag-confirm-p">{preview.questions} question{preview.questions === 1 ? '' : 's'} waiting on you will be skipped. Nothing in {preview.questions === 1 ? 'it' : 'them'} ran.</p> : null}
+                {stepInFlight ? <p className="b-ag-confirm-p">The step in progress is stopped from making further changes; what it already did is undone with the rest.</p> : null}
+                <div className="b-ag-actions">
+                  <button type="button" className="b-ag-act b-ag-act--danger" disabled={!!busy} onClick={() => void stopRun(true)}>
+                    {busy === 'stop' ? 'Stopping…' : preview.undoable.length ? `Stop and undo ${preview.undoable.length}` : 'Stop'}
+                  </button>
+                  {preview.undoable.length ? <button type="button" className="b-ag-act b-ag-act--stop" disabled={!!busy} onClick={() => void stopRun(false)}>Stop, keep changes</button> : null}
+                  <button type="button" className="b-ag-act b-ag-act--quiet" disabled={!!busy} onClick={() => setConfirming(null)}>Keep running</button>
+                </div>
+              </div>
+            ) : null}
+
+            {card && confirming === card.id && session && sessionStop ? (
+              <div className="b-ag-confirm" role="group" aria-label="Stop session">
+                <b className="b-ag-confirm-t">{session.session_type === 'ci-pipeline' ? 'Cancel this CI run?' : 'Stop this repair?'}</b>
+                <p className="b-ag-confirm-p">
+                  {session.session_type === 'ci-pipeline'
+                    ? 'Atlas asks GitHub to cancel the workflow run with your gh login. That request leaves the Mac; what the run already did stays done.'
+                    : 'The repair stops after the stage in progress. It never applies its fix to your code, so there is nothing to undo.'}
+                </p>
+                <div className="b-ag-actions">
+                  <button type="button" className="b-ag-act b-ag-act--danger" disabled={stopSession.isPending} onClick={stopThisSession}>
+                    {stopSession.isPending ? 'Stopping…' : session.session_type === 'ci-pipeline' ? 'Cancel the run' : 'Stop'}
+                  </button>
+                  <button type="button" className="b-ag-act b-ag-act--quiet" disabled={stopSession.isPending} onClick={() => setConfirming(null)}>Keep running</button>
+                </div>
+              </div>
+            ) : null}
+
+            {noticeHere ? <p className={noticeHere.error ? 'b-ag-err' : 'b-ag-hint'} role={noticeHere.error ? 'alert' : 'status'}>{noticeHere.text}</p> : null}
           </div>
         </section>
 
@@ -283,21 +405,22 @@ const BetaAgentView = () => {
           <section className="b-ag-plan" aria-label="Plan">
             <span className="b-ag-col-h">{planTitle}</span>
             {plan.map((s, i) => {
-              const busy = !!s.approvalId && resolvingId === s.approvalId;
-              const confirming = !!s.approvalId && rejecting === s.approvalId;
+              const answering = !!s.approvalId && resolvingId === s.approvalId;
+              const confirmSkip = !!s.approvalId && rejecting === s.approvalId;
+              const number = plan.slice(0, i + 1).filter((p) => !p.approvalId).length;
               return (
-                <div key={s.id} className={`b-ag-step ${s.mark}`}>
-                  <span className="b-ag-mark">{s.mark === 'done' ? '✓' : s.mark === 'failed' ? '!' : String(i + 1)}</span>
+                <div key={s.id} className={`b-ag-step ${s.mark}${s.approvalId ? ' ask' : ''}`}>
+                  <span className="b-ag-mark">{s.mark === 'done' ? '✓' : s.mark === 'failed' ? '!' : s.approvalId ? '?' : String(number)}</span>
                   <span className="b-ag-step-text">
                     <span className="b-ag-step-t">{s.title}</span>
                     {s.detail ? <span className="b-ag-step-d">{s.detail}</span> : null}
                     {s.approvalId ? (
                       <span className="b-ag-approve">
-                        {!confirming ? <button type="button" className="yes" disabled={busy} onClick={() => void approveRequest(s.approvalId!)}>{busy ? 'Running…' : 'Approve'}</button> : null}
-                        <button type="button" className={`no${confirming ? ' confirm' : ''}`} disabled={busy} onClick={() => skip(s.approvalId!)}>
-                          {confirming ? (busy ? 'Skipping…' : 'Skip — it will not run') : 'Skip this step'}
+                        {!confirmSkip ? <button type="button" className="yes" disabled={answering} onClick={() => void approveRequest(s.approvalId!)}>{answering ? 'Running…' : 'Approve'}</button> : null}
+                        <button type="button" className={`no${confirmSkip ? ' confirm' : ''}`} disabled={answering} onClick={() => skip(s.approvalId!)}>
+                          {confirmSkip ? (answering ? 'Skipping…' : 'Skip — it will not run') : 'Skip this step'}
                         </button>
-                        {confirming ? <button type="button" className="no" disabled={busy} onClick={() => setRejecting(null)}>Keep waiting</button> : null}
+                        {confirmSkip ? <button type="button" className="no" disabled={answering} onClick={() => setRejecting(null)}>Keep waiting</button> : null}
                       </span>
                     ) : null}
                   </span>
