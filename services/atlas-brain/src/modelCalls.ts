@@ -78,6 +78,12 @@ export interface ModelPrice {
  * (claudeAdapter.ts tiers on first-party, bedrockAdapter.ts profiles on
  * Bedrock), keyed by "family major.minor" so a first-party id and a Bedrock
  * profile of the same model share one row.
+ *
+ * The second group is no tier's default, but the Keychain's per-tier Bedrock
+ * overrides (`bedrock_model_*`, forwarded by lib.rs) can point a tier at any
+ * profile, so the current models are priced too. Haiku 5.5 is left out on
+ * purpose: its price depends on the prompt's length, which one rate per model
+ * cannot state, so its calls are stored with no cost rather than a wrong one.
  */
 export const MODEL_PRICES: Readonly<Record<string, ModelPrice>> = {
   "haiku 4.5": { input: 1, output: 5, cacheRead: 0.1, cacheWrite: 1.25 },
@@ -87,6 +93,11 @@ export const MODEL_PRICES: Readonly<Record<string, ModelPrice>> = {
   "opus 4.8": { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
   "opus 5": { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
   "fable 5": { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
+
+  "opus 4.7": { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+  "opus 5.5": { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5 },
+  "sonnet 5.5": { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
+  "fable 5.1": { input: 10, output: 50, cacheRead: 0.25, cacheWrite: 12.5 },
 };
 
 /**

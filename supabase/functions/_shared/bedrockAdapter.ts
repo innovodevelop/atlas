@@ -389,7 +389,7 @@ export function bedrockEventStreamToOpenAI(
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
       while (true) {
-        const { done: streamDone, value } = await reader.read();
+        const { done: streamDone, value } = await tally.read(reader);
         if (streamDone) {
           tally.end();
           controller.enqueue(done());

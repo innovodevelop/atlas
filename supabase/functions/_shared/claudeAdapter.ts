@@ -468,6 +468,17 @@ export function createStreamTally(onEnd?: StreamEndHook) {
     if (typeof r.cache_read_input_tokens === "number") outcome.cacheReadTokens = r.cache_read_input_tokens;
     if (typeof r.cache_creation_input_tokens === "number") outcome.cacheWriteTokens = r.cache_creation_input_tokens;
   };
+  const end = (error: string | null = null) => {
+    if (ended) return;
+    ended = true;
+    outcome.error = error;
+    // A recording hook must never be able to break the answer it records.
+    try {
+      onEnd?.({ ...outcome });
+    } catch (e) {
+      console.error("[claudeAdapter] stream end hook failed:", e);
+    }
+  };
   return {
     observe(event: Record<string, any>) {
       if (event.type === "message_start") take(event.message?.usage);
@@ -480,15 +491,20 @@ export function createStreamTally(onEnd?: StreamEndHook) {
         if (outcome.outputTokens == null && typeof metrics.outputTokenCount === "number") outcome.outputTokens = metrics.outputTokenCount;
       }
     },
-    end(error: string | null = null) {
-      if (ended) return;
-      ended = true;
-      outcome.error = error;
-      // A recording hook must never be able to break the answer it records.
+    end,
+    /**
+     * The upstream's next chunk. When the connection drops mid-answer the read
+     * rejects, the translator's pull rejects with it, and neither end above is
+     * reached — so the call would vanish from the record. It ends here as a
+     * failure first, and the error still reaches the reader unchanged.
+     */
+    async read<T>(reader: ReadableStreamDefaultReader<T>): Promise<ReadableStreamReadResult<T>> {
       try {
-        onEnd?.({ ...outcome });
+        return await reader.read();
       } catch (e) {
-        console.error("[claudeAdapter] stream end hook failed:", e);
+        const message = e instanceof Error ? e.message : String(e);
+        end(message.length > 300 ? `${message.slice(0, 299)}…` : message || "the stream broke off");
+        throw e;
       }
     },
   };
@@ -525,7 +541,7 @@ export function anthropicSSEToOpenAI(
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
       while (true) {
-        const { done, value } = await reader.read();
+        const { done, value } = await tally.read(reader);
         if (done) {
           tally.end();
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));

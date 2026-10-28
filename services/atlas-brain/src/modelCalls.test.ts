@@ -79,6 +79,17 @@ describe("prices", () => {
     expect(priceOf("claude-opus-9")).toBeNull();
   });
 
+  test("a profile a Keychain override points at is priced as its own model", () => {
+    expect(priceKey("eu.anthropic.claude-opus-5-5")).toBe("opus 5.5");
+    expect(priceOf("eu.anthropic.claude-opus-5-5")).toMatchObject({ input: 4, output: 20 });
+    expect(priceOf("claude-fable-5-1")?.cacheRead).toBe(0.25);
+    // Fable 5.1 is not Fable 5: the minor version picks the row.
+    expect(priceOf("claude-fable-5")?.cacheRead).toBe(1);
+    // Priced by prompt length, so no single rate: stored without a cost.
+    expect(priceOf("claude-haiku-5-5")).toBeNull();
+    expect(estimateCost("claude-haiku-5-5", { inputTokens: 10, outputTokens: 10, cacheReadTokens: null, cacheWriteTokens: null })).toBeNull();
+  });
+
   test("cost adds the uncached input, the output and both cache sides", () => {
     // Sonnet 5: $2 in, $10 out, $0.20 cache read, $2.50 cache write per MTok.
     const cost = estimateCost("claude-sonnet-5", { inputTokens: 1_000_000, outputTokens: 100_000, cacheReadTokens: 500_000, cacheWriteTokens: 200_000 });
@@ -239,6 +250,32 @@ describe("gateway recording", () => {
     expect(seen.length).toBe(1);
     expect(seen[0]).toMatchObject({ lane: "anthropic", model: "claude-haiku-4-5", stream: true, ok: true, inputTokens: 20, outputTokens: 9 });
     expect(seen[0].durationMs).not.toBeNull();
+  });
+
+  test("a stream whose connection drops mid-answer is a failed call, and the reader still sees the error", async () => {
+    const enc = new TextEncoder();
+    const start = { type: "message_start", message: { usage: { input_tokens: 30, output_tokens: 1 } } };
+    const delta = { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "Hel" } };
+    globalThis.fetch = (async () => {
+      let sent = false;
+      return new Response(new ReadableStream<Uint8Array>({
+        pull(c) {
+          if (sent) {
+            c.error(new Error("socket hang up"));
+            return;
+          }
+          sent = true;
+          c.enqueue(enc.encode(`data: ${JSON.stringify(start)}\n\ndata: ${JSON.stringify(delta)}\n\n`));
+        },
+      }), { status: 200, headers: { "content-type": "text/event-stream" } });
+    }) as unknown as typeof fetch;
+
+    await withEnv(firstParty, async () => {
+      const res = await aiChatCompletion({ model: "claude-sonnet-5", messages: [{ role: "user", content: "hi" }], stream: true });
+      await expect(res.text()).rejects.toThrow("socket hang up");
+    });
+    expect(seen.length).toBe(1);
+    expect(seen[0]).toMatchObject({ lane: "anthropic", stream: true, status: 200, ok: false, error: "socket hang up", inputTokens: 30 });
   });
 
   test("an error answer is a failed call with its status", async () => {
