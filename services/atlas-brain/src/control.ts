@@ -62,6 +62,13 @@ export interface CallOpts {
    */
   userToken?: string;
   profile?: ControlProfile;
+  /**
+   * The agent run this call belongs to (`runs.id`), when an agent run makes
+   * it. Rust writes it onto the `tool_calls` row and, for a queued call, onto
+   * the `approvals` row, so the Agent View can show the question inside the
+   * run's plan. Omitted by chat and the digest, which belong to no run.
+   */
+  runId?: string;
 }
 
 export interface ControlClient {
@@ -273,6 +280,7 @@ export function createControlClient(env: Record<string, string | undefined> = pr
       if (opts.userId) envelope.user_id = opts.userId;
       if (opts.userToken) envelope.user_token = opts.userToken;
       if (opts.profile) envelope.profile = opts.profile;
+      if (opts.runId) envelope.run_id = opts.runId;
       return request("POST", "/v1/invoke", envelope, opts.deadline);
     },
   };
