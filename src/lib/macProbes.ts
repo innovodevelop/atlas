@@ -242,6 +242,35 @@ export function wifiHeadline(w: WifiState | null): string {
   return w.ssid ? `Connected to ${w.ssid}` : 'Connected';
 }
 
+/** The current network card's line: "Connected · WPA3 Personal · 5 GHz". */
+export function currentNetworkLine(w: WifiState): string {
+  return ['Connected', w.security ?? w.link?.security ?? null, w.link?.band ?? null].filter(Boolean).join(' · ');
+}
+
+/**
+ * The line under a known network. What the last scan saw of it when macOS
+ * named it; otherwise "Not in range" only when the scan could have named it
+ * (no network in range was hidden), and "Saved on this Mac" when it could not.
+ */
+export function knownNetworkLine(name: string, w: WifiState): string {
+  const seen = w.nearby?.find((n) => n.name === name);
+  if (seen) return [signalWord(seen.signal) ?? 'In range', seen.security ?? 'Open', seen.band].filter(Boolean).join(' · ');
+  if (w.nearby && w.hiddenNearby === 0) return 'Not in range';
+  return 'Saved on this Mac';
+}
+
+/** Named networks in range that this Mac does not already know, strongest first. */
+export function otherNetworks(w: WifiState): NearbyNetwork[] {
+  const known = new Set(w.known);
+  return (w.nearby ?? []).filter((n) => !known.has(n.name) && n.name !== w.ssid);
+}
+
+/** "Secured · Good · 2.4 GHz" / "Open · Weak · 5 GHz", for a network Atlas has not joined. */
+export function otherNetworkLine(n: NearbyNetwork): string {
+  const lock = n.security && n.security !== 'Open' ? 'Secured' : 'Open';
+  return [lock, signalWord(n.signal), n.band].filter(Boolean).join(' · ');
+}
+
 /* ── Bluetooth ──────────────────────────────────────────────────────────── */
 
 /** Mirrors `BluetoothReadout` in mac_controls.rs. */
@@ -452,6 +481,57 @@ export function gigabytes(bytes: number | null, binary = false): string {
   return gb >= 10 ? `${Math.round(gb).toLocaleString('en-US')} GB` : `${gb.toFixed(1).replace(/\.0$/, '')} GB`;
 }
 
+/** A byte count in GB without the unit, one decimal under 100 as the design writes memory: 18.2, 36, 588, "1,000". */
+function gbNumber(bytes: number, binary: boolean): string {
+  const gb = bytes / (binary ? 1024 ** 3 : 1e9);
+  return gb >= 100 ? Math.round(gb).toLocaleString('en-US') : gb.toFixed(1).replace(/\.0$/, '');
+}
+
+/** "18.2 of 36 GB", "588 of 1,000 GB": the meters' used-of-total line, always in GB as the design draws it. */
+export function usedOf(used: number | null, total: number | null, binary = false): string | null {
+  if (used == null || total == null || total <= 0) return null;
+  return `${gbNumber(used, binary)} of ${gbNumber(total, binary)} GB`;
+}
+
+export type MeterTone = 'ink' | 'green' | 'blue' | 'red';
+
+export interface MeterLine {
+  /** The row's line, e.g. "23% in use · Atlas uses 6%". */
+  sub: string;
+  /** 0–100. */
+  pct: number;
+  tone: MeterTone;
+}
+
+const PRESSURE_WORD: Record<NonNullable<MacState['pressure']>, string> = { normal: 'normal', warn: 'elevated', critical: 'critical' };
+
+/**
+ * The Devices card's three meters, each null when its tool did not answer:
+ * the processor (all of it, and Atlas's share), memory in use with macOS's
+ * pressure level (green while normal, as Activity Monitor colours it), and
+ * the data volume.
+ */
+export function macMeters(m: MacState): { processor: MeterLine | null; memory: MeterLine | null; storage: MeterLine | null } {
+  const processor = m.cpuPct == null ? null : {
+    sub: `${m.cpuPct}% in use${m.atlasCpuPct != null ? ` · Atlas uses ${m.atlasCpuPct}%` : ''}`,
+    pct: m.cpuPct,
+    tone: 'ink' as const,
+  };
+  const memLine = usedOf(m.memoryUsedBytes, m.memoryBytes, true);
+  const memory = memLine == null || m.memoryUsedBytes == null || m.memoryBytes == null ? null : {
+    sub: `${memLine}${m.pressure ? ` · pressure ${PRESSURE_WORD[m.pressure]}` : ''}`,
+    pct: Math.min(100, (m.memoryUsedBytes / m.memoryBytes) * 100),
+    tone: (m.pressure == null || m.pressure === 'normal' ? 'green' : 'red') as MeterTone,
+  };
+  const diskLine = usedOf(m.diskUsedBytes, m.diskTotalBytes);
+  const storage = diskLine == null || m.diskUsedBytes == null || m.diskTotalBytes == null ? null : {
+    sub: diskLine,
+    pct: Math.min(100, (m.diskUsedBytes / m.diskTotalBytes) * 100),
+    tone: (m.diskUsedBytes / m.diskTotalBytes >= 0.95 ? 'red' : 'ink') as MeterTone,
+  };
+  return { processor, memory, storage };
+}
+
 /** "up 6 days", "up 3 hours", "up 12 minutes". */
 export function uptimeLabel(bootedAt: number | null, nowMs: number): string | null {
   if (bootedAt == null) return null;
@@ -582,7 +662,8 @@ export function parseBattery(raw: BatteryRaw): BatteryState {
 export interface HistoryBar {
   /** 0–100, or null for an hour with no sample. */
   percent: number | null;
-  tone: 'battery' | 'charging' | 'now' | 'empty';
+  /** `power`: plugged in (charging, or full on the adapter). */
+  tone: 'battery' | 'power' | 'now' | 'empty';
   /** The bar's tooltip: "68% · 2 PM". */
   title: string;
 }
@@ -593,9 +674,9 @@ function hourLabel(ms: number): string {
 
 /**
  * The 24-hour chart: one bar per hour ending now, each the last sample taken
- * in that hour. Charging hours are green, the current hour is blue, an hour
- * with no sample (Atlas was closed, the Mac asleep) is an empty slot rather
- * than a guess.
+ * in that hour. Hours on the adapter are green, the current hour is blue, an
+ * hour with no sample (Atlas was closed, the Mac asleep) is an empty slot
+ * rather than a guess.
  */
 export function historyBars(samples: readonly BatterySample[], nowMs: number): { bars: HistoryBar[]; startLabel: string; midLabel: string } {
   const HOUR = 3_600_000;
@@ -611,7 +692,8 @@ export function historyBars(samples: readonly BatterySample[], nowMs: number): {
   const bars = slots.map((s, i): HistoryBar => {
     const at = hourLabel(start + (i + 1) * HOUR);
     if (!s) return { percent: null, tone: 'empty', title: `No reading · ${at}` };
-    return { percent: s.percent, tone: i === 23 ? 'now' : s.charging ? 'charging' : 'battery', title: `${s.percent}% · ${at}` };
+    const tone = i === 23 ? 'now' : s.on_power || s.charging ? 'power' : 'battery';
+    return { percent: s.percent, tone, title: `${s.percent}%${s.charging ? ', charging' : s.on_power ? ', plugged in' : ''} · ${at}` };
   });
   const startDate = new Date(start);
   const yesterday = startDate.getDate() !== new Date(nowMs).getDate();

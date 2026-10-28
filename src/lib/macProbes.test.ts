@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  appName, energyRows, familyOf, gigabytes, historyBars, parseBattery, parseBluetooth, parseBootTime, parseChannel, parseDf, parseLowPowerMode,
-  parseMac, parsePreferred, parseProcesses, parseRouter, parseSignal, parseVmStat, parseWifi, parseWifiPower, rateLabel, securityLabel,
-  signalLine, signalWord, uptimeLabel, wifiHeadline, type BatteryRaw, type MacRaw, type WifiRaw,
+  appName, currentNetworkLine, energyRows, familyOf, gigabytes, historyBars, knownNetworkLine, macMeters, otherNetworkLine, otherNetworks,
+  parseBattery, parseBluetooth, parseBootTime, parseChannel, parseDf, parseLowPowerMode, parseMac, parsePreferred, parseProcesses, parseRouter,
+  parseSignal, parseVmStat, parseWifi, parseWifiPower, rateLabel, securityLabel, signalLine, signalWord, uptimeLabel, usedOf, wifiHeadline,
+  type BatteryRaw, type MacRaw, type WifiRaw,
 } from './macProbes';
 
 // Shaped like the real tools' output on macOS 26/27, with made-up names and
@@ -111,6 +112,50 @@ describe('Wi-Fi', () => {
     expect(wifiHeadline({ ...off, power: true })).toBe('On · not connected');
     expect(wifiHeadline(null)).toBe('Checking…');
   });
+
+  test('the current, known and other networks as the cards say them', () => {
+    const w = parseWifi(WIFI);
+    expect(currentNetworkLine(w)).toBe('Connected · WPA3 Personal · 5 GHz');
+    // Seen by the scan: what it saw. Not seen, and nothing in range was hidden: not in range.
+    expect(knownNetworkLine('Linden-Studio', w)).toBe('Good · WPA2 Personal · 5 GHz');
+    expect(knownNetworkLine('Café Ritual', { ...w, hiddenNearby: 0 })).toBe('Not in range');
+    // A hidden network in range could be it, and before a scan nothing is known.
+    expect(knownNetworkLine('Café Ritual', w)).toBe('Saved on this Mac');
+    expect(knownNetworkLine('Café Ritual', { ...w, nearby: null })).toBe('Saved on this Mac');
+    expect(otherNetworks(w).map((n) => n.name)).toEqual(['Sutter Guest']);
+    expect(otherNetworkLine(otherNetworks(w)[0])).toBe('Open · Weak · 2.4 GHz');
+    expect(otherNetworkLine({ name: 'x', security: 'WPA2 Personal', band: null, signal: null })).toBe('Secured');
+  });
+
+  test('this Mac’s own output on macOS 27: every name hidden, the link still read', () => {
+    // Recorded from `ipconfig getsummary en0` and `system_profiler SPAirPortDataType -json`
+    // on the Mac this was built on (addresses changed), where Atlas has no Location Services access.
+    const profiler = JSON.stringify({
+      SPAirPortDataType: [{
+        spairport_airport_interfaces: [
+          {
+            _name: 'en0',
+            spairport_current_network_information: {
+              _name: '<redacted>', spairport_network_channel: '64 (5GHz, 80MHz)', spairport_network_phymode: '802.11ac', spairport_network_rate: 585,
+              spairport_security_mode: 'spairport_security_mode_wpa2_personal', spairport_signal_noise: '-61 dBm / -95 dBm',
+            },
+            spairport_airport_other_local_wireless_networks: Array.from({ length: 6 }, (_, i) => ({
+              _name: '<redacted>', spairport_network_channel: `${i + 1} (2GHz, 20MHz)`, spairport_security_mode: 'spairport_security_mode_wpa2_personal',
+            })),
+          },
+          { _name: 'awdl0', spairport_current_network_information: { spairport_network_type: 'spairport_network_type_station' } },
+        ],
+      }],
+    });
+    const summary = '<dictionary> {\n  BSSID : <redacted>\n  ConnectionID : 9\n  InterfaceType : WiFi\n  LinkStatusActive : TRUE\n  NetworkID : <redacted>\n  SSID : <redacted>\n  Security : WPA2_PSK\n}';
+    const w = parseWifi({ device: 'en0', power: 'Wi-Fi Power (en0): On', summary, ip: '10.0.0.183\n', route: '    gateway: 10.0.0.1\n', preferred: 'Preferred networks on en0:\n\tHome Net\n\tPhone Hotspot\n', profiler });
+    expect(w).toMatchObject({ power: true, connected: true, ssid: null, nameHidden: true, security: 'WPA2 Personal', ip: '10.0.0.183', router: '10.0.0.1', hiddenNearby: 6 });
+    expect(w.link).toMatchObject({ signal: -61, rateMbps: 585, band: '5 GHz' });
+    expect(w.nearby).toEqual([]);
+    expect(otherNetworks(w)).toEqual([]);
+    expect(knownNetworkLine('Home Net', w)).toBe('Saved on this Mac');
+    expect(signalLine(w.link!.signal)).toBe('Good · −61 dBm');
+  });
 });
 
 const BT_JSON = JSON.stringify({
@@ -209,6 +254,24 @@ describe('This Mac', () => {
     expect(uptimeLabel(1792882133 - 30, now)).toBe('up 1 minute');
     expect(uptimeLabel(null, now)).toBeNull();
   });
+
+  test('the three meters as the Devices card draws them', () => {
+    expect(usedOf(19.5e9, 1e12)).toBe('19.5 of 1,000 GB');
+    expect(usedOf(18.2 * 1024 ** 3, 36 * 1024 ** 3, true)).toBe('18.2 of 36 GB');
+    expect(usedOf(null, 1e12)).toBeNull();
+    const m = parseMac(MAC);
+    const { processor, memory, storage } = macMeters(m);
+    expect(processor).toEqual({ sub: '19% in use · Atlas uses 7%', pct: 19, tone: 'ink' });
+    // Pressure level 2 is macOS's warning: said, and the meter turns red.
+    expect(memory!.sub).toBe(`${usedOf(m.memoryUsedBytes, m.memoryBytes, true)} · pressure elevated`);
+    expect(memory!.tone).toBe('red');
+    expect(macMeters({ ...m, pressure: 'normal' }).memory!.tone).toBe('green');
+    expect(storage!.sub).toBe('466 of 494 GB');
+    expect(storage!.pct).toBeCloseTo(94.2, 1);
+    expect(storage!.tone).toBe('ink');
+    expect(macMeters({ ...m, diskUsedBytes: 0.96e12, diskTotalBytes: 1e12 }).storage!.tone).toBe('red');
+    expect(macMeters({ ...m, cpuPct: null, memoryUsedBytes: null, diskTotalBytes: null })).toEqual({ processor: null, memory: null, storage: null });
+  });
 });
 
 describe('Battery', () => {
@@ -255,7 +318,7 @@ describe('Battery', () => {
     expect(bars).toHaveLength(24);
     expect(bars[0]).toMatchObject({ percent: 100, tone: 'battery' });
     // Two samples in one hour: the later one.
-    expect(bars[13]).toMatchObject({ percent: 74, tone: 'charging' });
+    expect(bars[13]).toMatchObject({ percent: 74, tone: 'power' });
     expect(bars[23]).toMatchObject({ percent: 68, tone: 'now' });
     expect(bars[5]).toMatchObject({ percent: null, tone: 'empty' });
     expect(bars.filter((b) => b.percent != null)).toHaveLength(3);

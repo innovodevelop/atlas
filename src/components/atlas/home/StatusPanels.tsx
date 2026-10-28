@@ -170,8 +170,9 @@ function BluetoothPanel({ vitals }: { vitals: SystemVitalsState }) {
       {error ? <p className="b-sp-note" role="alert">{error}</p> : null}
       {on && bt?.connected.length ? (
         <div className="b-sp-list">
-          {bt.connected.map((d) => (
-            <span className="b-row" key={d.name}>
+          {bt.connected.map((d, i) => (
+            // Two devices can share a name (two pairs of AirPods called the same).
+            <span className="b-row" key={`${d.name}-${i}`}>
               <span className="b-row-chip"><AtlasIcon name={kindOf(d.kind)} size={15} weight={1.8} /></span>
               <span className="b-sp-row-text"><b>{d.name}</b><span>{d.kind ?? 'Bluetooth device'}</span></span>
               {d.battery_percent != null ? <span className="b-num b-sp-row-val">{d.battery_percent}%</span> : null}
@@ -230,8 +231,8 @@ function DevicesPanel({ vitals }: { vitals: SystemVitalsState }) {
           <span className="b-row-chip"><AtlasIcon name="mac" size={15} weight={1.8} /></span>
           <span className="b-sp-row-text"><b>This Mac</b><span>{wifi?.connected ? (wifi.ssid ? `On ${wifi.ssid}` : 'On Wi-Fi') : 'Offline'}{battery ? ` · ${battery.percent}%` : ''}</span></span>
         </span>
-        {(bt?.connected ?? []).map((d) => (
-          <span className="b-row" key={d.name}>
+        {(bt?.connected ?? []).map((d, i) => (
+          <span className="b-row" key={`${d.name}-${i}`}>
             <span className="b-row-chip"><AtlasIcon name={kindOf(d.kind)} size={15} weight={1.8} /></span>
             <span className="b-sp-row-text"><b>{d.name}</b><span>{d.kind ?? 'Bluetooth'}</span></span>
             {d.battery_percent != null ? <span className="b-num b-sp-row-val">{d.battery_percent}%</span> : null}

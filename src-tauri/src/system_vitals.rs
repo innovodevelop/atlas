@@ -209,6 +209,16 @@ fn refresh_bluetooth_in_background() {
     });
 }
 
+/// Mark the cached Bluetooth answer stale, so the next `system_vitals` reads
+/// it again. Settings and the status panels call this (mac_controls.rs) after
+/// switching Bluetooth, so the top bar does not show the old state for half a
+/// minute.
+pub fn forget_bluetooth() {
+    if let Ok(mut c) = bt_cache().lock() {
+        c.at = None;
+    }
+}
+
 /// The top bar's data. Quick fields now; Bluetooth from the cache, refreshed
 /// in the background when older than CACHE_SECS.
 #[tauri::command]

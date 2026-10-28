@@ -5,7 +5,8 @@
 // too — the gateway delegates to /chat-with-memory) and hands it to the
 // orchestrator as `rememberShared`. Off, the orchestrator stops saving facts
 // and conversation summaries on its own and stores only what the user
-// explicitly asks it to remember (see the gates in orchestrator.ts).
+// explicitly asks it to remember (see the gates in orchestrator.ts), and
+// memory maintenance stops deriving style insights (learningRoutes.ts).
 //
 // No row, or a database that predates the table (a brain run standalone
 // against an old atlas.db), means the default: on. A read error must never

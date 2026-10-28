@@ -7,11 +7,13 @@
 //
 // THE SPLIT. The READ commands here run a fixed list of macOS tools and hand
 // their text back unparsed; the parsing lives in src/lib/macProbes.ts, where
-// it is unit-tested on real tool output with `bun test`. Two exceptions trim
+// it is unit-tested on real tool output with `bun test`. Three exceptions trim
 // in Rust before anything crosses to the webview, because the raw output
 // carries identifiers the screens never show: the hardware profile (serial
-// number, hardware UUID) is cut down to the model's name, and the battery's
-// ioreg dump (serial numbers, 16 KB of it) to the capacity lines. The WRITE
+// number, hardware UUID) is cut down to the model's name, the Bluetooth
+// profile (every AirPods' serial numbers and firmware) to each device's name,
+// address, kind and battery, and the battery's ioreg dump (serial numbers,
+// 16 KB of it) to the capacity numbers. The WRITE
 // commands take user input, so they validate it here, in Rust, before any
 // tool sees it, and pass every value as its own argument — there is no shell
 // anywhere in this file, and nothing a user types is ever interpreted by one.
@@ -27,6 +29,16 @@
 // Services access, which Atlas does not request. The preferred-network list is
 // not redacted, so known networks keep their names; the network in use and
 // the ones in range usually do not. The screens say so rather than guess.
+//
+// NO DISCONNECT. `networksetup` can join and forget but not leave a network.
+// CoreWLAN's public `disassociate` does leave it, without an administrator —
+// and macOS rejoins the same known network about a second later (seen on
+// macOS 27.2: a new connection id and a fresh DHCP lease, same address). The
+// Wi-Fi menu's own Disconnect holds because it also pauses auto-join, through
+// private API. A Disconnect here would be a reconnect, so there is none; the
+// lasting ways to leave a network, Forget and turning Wi-Fi off, are here.
+// Per-network auto-join and "ask to join" have no tool either — CoreWLAN
+// commits those only with an administrator's authorization — so they stay out.
 //
 // BLUETOOTH. macOS has no command-line tool for Bluetooth power or
 // connections. IOBluetooth bindings are not in Cargo.lock, so the switches use
@@ -263,11 +275,16 @@ pub fn wifi_join(ssid: String, password: Option<String>) -> Result<(), String> {
 }
 
 /// Remove a network from the preferred list, so this Mac stops joining it.
+/// macOS can be set to want an administrator for this ("Require
+/// administrator authorization" in Wi-Fi's advanced settings), in which case
+/// the tool's own refusal comes back with where to do it instead.
 #[tauri::command(async)]
 pub fn wifi_forget(ssid: String) -> Result<(), String> {
     validate_ssid(&ssid)?;
     let device = wifi_device();
-    act("networksetup", &["-removepreferredwirelessnetwork", &device, &ssid], None).map(|_| ())
+    act("networksetup", &["-removepreferredwirelessnetwork", &device, &ssid], None)
+        .map(|_| ())
+        .map_err(|e| format!("{e} System Settings → Wi-Fi can forget it with an administrator's password."))
 }
 
 // --- Bluetooth -------------------------------------------------------------------
@@ -284,11 +301,65 @@ fn blueutil() -> Option<&'static str> {
 pub struct BluetoothReadout {
     /// The blueutil binary in use, or None when it is not installed.
     pub blueutil: Option<String>,
-    /// `system_profiler SPBluetoothDataType -json`: power, connected and
-    /// paired-but-not-connected devices, with addresses.
+    /// `system_profiler SPBluetoothDataType -json`, trimmed by
+    /// `bluetooth_trim`: power, connected and paired-but-not-connected
+    /// devices, with addresses.
     pub profiler: String,
     /// `blueutil --power`: "1" or "0".
     pub power: Option<String>,
+}
+
+/// The device fields the Bluetooth section draws. Everything else the profile
+/// prints — serial numbers of each AirPod and its case, firmware, vendor and
+/// product ids — stays in Rust.
+const BT_DEVICE_KEYS: [&str; 7] = [
+    "device_address",
+    "device_minorType",
+    "device_batteryLevelMain",
+    "device_batteryLevel",
+    "device_batteryLevelLeft",
+    "device_batteryLevelRight",
+    "device_batteryLevelCase",
+];
+
+/// `system_profiler SPBluetoothDataType -json`, cut down to the controller's
+/// state and, per device, the BT_DEVICE_KEYS — in the same shape, so the
+/// webview's parser reads it as it would the whole profile. "" when the
+/// profile could not be read.
+pub fn bluetooth_trim(json: &str) -> String {
+    use serde_json::{json, Map, Value};
+    let Ok(v) = serde_json::from_str::<Value>(json) else {
+        return String::new();
+    };
+    let Some(entry) = v.get("SPBluetoothDataType").and_then(Value::as_array).and_then(|a| a.first()) else {
+        return String::new();
+    };
+    let mut out = Map::new();
+    if let Some(state) = entry.get("controller_properties").and_then(|c| c.get("controller_state")) {
+        out.insert("controller_properties".into(), json!({ "controller_state": state }));
+    }
+    for list in ["device_connected", "device_not_connected"] {
+        let Some(items) = entry.get(list).and_then(Value::as_array) else {
+            continue;
+        };
+        let trimmed: Vec<Value> = items
+            .iter()
+            .filter_map(Value::as_object)
+            .map(|devices| {
+                let mut named = Map::new();
+                for (name, props) in devices {
+                    let kept: Map<String, Value> = BT_DEVICE_KEYS
+                        .iter()
+                        .filter_map(|k| props.get(*k).map(|val| ((*k).to_string(), val.clone())))
+                        .collect();
+                    named.insert(name.clone(), Value::Object(kept));
+                }
+                Value::Object(named)
+            })
+            .collect();
+        out.insert(list.into(), Value::Array(trimmed));
+    }
+    json!({ "SPBluetoothDataType": [Value::Object(out)] }).to_string()
 }
 
 /// The Bluetooth section's read. `devices: false` skips the slow device list
@@ -300,7 +371,7 @@ pub fn bluetooth_read(devices: Option<bool>) -> Result<BluetoothReadout, String>
     Ok(BluetoothReadout {
         blueutil: tool.map(str::to_string),
         profiler: if devices.unwrap_or(true) {
-            read("system_profiler", &["SPBluetoothDataType", "-json"])
+            bluetooth_trim(&read("system_profiler", &["SPBluetoothDataType", "-json"]))
         } else {
             String::new()
         },
@@ -314,10 +385,14 @@ fn require_blueutil() -> Result<&'static str, String> {
     })
 }
 
+/// After a switch, the top bar's Bluetooth answer (cached thirty seconds in
+/// system_vitals.rs) is stale; dropping it makes the next poll read again.
 #[tauri::command(async)]
 pub fn bluetooth_set_power(on: bool) -> Result<(), String> {
     let tool = require_blueutil()?;
-    act(tool, &["--power", if on { "1" } else { "0" }], None).map(|_| ())
+    act(tool, &["--power", if on { "1" } else { "0" }], None)?;
+    crate::system_vitals::forget_bluetooth();
+    Ok(())
 }
 
 /// Connect or disconnect a paired device, by address.
@@ -326,7 +401,9 @@ pub fn bluetooth_device(address: String, connect: bool) -> Result<(), String> {
     validate_bt_address(&address)?;
     let tool = require_blueutil()?;
     let flag = if connect { "--connect" } else { "--disconnect" };
-    act(tool, &[flag, &address], None).map(|_| ())
+    act(tool, &[flag, &address], None)?;
+    crate::system_vitals::forget_bluetooth();
+    Ok(())
 }
 
 // --- This Mac ---------------------------------------------------------------------
@@ -447,25 +524,33 @@ pub struct BatteryReadout {
     pub history: Vec<BatterySample>,
 }
 
-/// The keys the battery health card reads. ioreg prints them at the top level
-/// ("CycleCount" = 164) and, on recent macOS, inside the "BatteryData"
-/// dictionary ("DesignCapacity"=6249), so a line is kept when it names one.
+/// The numbers the battery health card reads. ioreg prints them at the top
+/// level ("CycleCount" = 164) and, on recent macOS, inside the one-line
+/// "BatteryData" dictionary ("DesignCapacity"=6249), which also holds other
+/// identifiers — so the numbers are picked out, never whole lines.
 const BATTERY_KEYS: [&str; 6] = [
-    "\"CycleCount\"",
-    "\"DesignCapacity\"",
-    "\"AppleRawMaxCapacity\"",
-    "\"NominalChargeCapacity\"",
-    "\"MaxCapacity\"",
-    "\"DesignCycleCount9C\"",
+    "CycleCount",
+    "DesignCapacity",
+    "AppleRawMaxCapacity",
+    "NominalChargeCapacity",
+    "MaxCapacity",
+    "DesignCycleCount9C",
 ];
 
-/// The lines of the ioreg dump that carry a capacity key — and nothing else,
-/// so no serial number crosses to the webview.
+/// One `"Key" = N` line per capacity number the dump has (the first of each),
+/// and nothing else, so no serial number crosses to the webview. The quotes
+/// keep `"MaxCapacity"` from matching inside `"AppleRawMaxCapacity"`.
 pub fn battery_capacity_lines(ioreg: &str) -> String {
-    ioreg
-        .lines()
-        .filter(|l| !l.contains("Serial") && BATTERY_KEYS.iter().any(|k| l.contains(k)))
-        .map(str::trim)
+    BATTERY_KEYS
+        .iter()
+        .filter_map(|key| {
+            let quoted = format!("\"{key}\"");
+            ioreg.match_indices(quoted.as_str()).find_map(|(at, _)| {
+                let rest = ioreg[at + quoted.len()..].trim_start().strip_prefix('=')?.trim_start();
+                let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+                (!digits.is_empty()).then(|| format!("\"{key}\" = {digits}"))
+            })
+        })
         .collect::<Vec<_>>()
         .join("\n")
 }
@@ -657,12 +742,31 @@ mod tests {
         let ioreg = "  |   \"ExternalConnected\" = Yes\n  |   \"MaxCapacity\" = 100\n  |   \"CycleCount\" = 164\n  |   \"Serial\" = \"ABC\"\n  |   \"BatteryData\" = {\"AppleRawMaxCapacity\"=5926,\"DesignCapacity\"=6249}\n";
         let kept = battery_capacity_lines(ioreg);
         assert!(kept.contains("\"CycleCount\" = 164"));
-        assert!(kept.contains("\"DesignCapacity\"=6249"));
-        assert!(!kept.contains("Serial") && !kept.contains("ExternalConnected"));
+        assert!(kept.contains("\"DesignCapacity\" = 6249"));
+        assert!(kept.contains("\"AppleRawMaxCapacity\" = 5926"));
+        assert!(kept.contains("\"MaxCapacity\" = 100"));
+        assert!(!kept.contains("Serial") && !kept.contains("ExternalConnected") && !kept.contains("ABC"));
+        // A serial inside BatteryData no longer costs the line its numbers.
+        let nested = "  |   \"BatteryData\" = {\"Serial\"=\"F5D1\",\"DesignCapacity\"=4382}\n";
+        assert_eq!(battery_capacity_lines(nested), "\"DesignCapacity\" = 4382");
         let power = r#"{"SPPowerDataType":[{"_name":"spbattery_information","sppower_battery_health_info":{"sppower_battery_cycle_count":164,"sppower_battery_health":"Good","sppower_battery_health_maximum_capacity":"100 %"}},{"_name":"sppower_information"}]}"#;
         let health = battery_health_json(power);
         assert!(health.contains("\"sppower_battery_health\":\"Good\""));
         assert_eq!(battery_health_json(r#"{"SPPowerDataType":[{"_name":"sppower_information"}]}"#), "");
+    }
+
+    #[test]
+    fn bluetooth_profile_keeps_only_what_the_screen_draws() {
+        let json = r#"{"SPBluetoothDataType":[{"controller_properties":{"controller_state":"attrib_on","controller_address":"AA:BB:CC:00:11:22"},
+            "device_connected":[{"Magic Trackpad":{"device_address":"F0:B3:EC:01:02:03","device_minorType":"Trackpad","device_batteryLevelMain":"64%","device_serialNumber":"XYZ"}}],
+            "device_not_connected":[{"AirPods Pro":{"device_address":"A4:83:E7:12:34:56","device_minorType":"Headphones","device_serialNumberLeft":"H6PF","device_firmwareVersion":"4E71"}}]}]}"#;
+        let trimmed = bluetooth_trim(json);
+        assert!(trimmed.contains("\"controller_state\":\"attrib_on\""));
+        assert!(trimmed.contains("\"device_batteryLevelMain\":\"64%\""));
+        assert!(trimmed.contains("\"A4:83:E7:12:34:56\"") && trimmed.contains("\"Headphones\""));
+        assert!(!trimmed.contains("serial") && !trimmed.contains("XYZ") && !trimmed.contains("4E71"));
+        assert!(!trimmed.contains("controller_address"));
+        assert_eq!(bluetooth_trim(""), "");
     }
 
     #[test]
