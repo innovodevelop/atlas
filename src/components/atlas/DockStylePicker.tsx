@@ -1,5 +1,5 @@
 /**
- * Settings → Beta UI → Dock: the dock explorations as a choice in the app.
+ * Settings → Beta UI → Dock style: the dock explorations as a choice in the app.
  *
  * One native radio per style, so the group, arrow keys and the checked state
  * are the browser's and a screen reader hears "Lens, radio button, 2 of 7".
@@ -96,8 +96,12 @@ export function DockStylePicker() {
   const chosen = useDockStyle();
   const name = useId();
   return (
-    <fieldset className="b-dkpick">
+    <fieldset className="b-dkpick" aria-describedby={`${name}-sub`}>
       <legend className="b-dkpick-legend">Dock style</legend>
+      <p className="b-dkpick-sub" id={`${name}-sub`}>
+        The guideline dock and the six directions from the Dock Explorations, all live. The dock changes the moment you
+        pick one, so try each across a few screens; the choice is kept on this Mac until the final dock is decided.
+      </p>
       <div className="b-dkpick-grid">
         {DOCK_STYLE_META.map((m) => {
           const on = m.id === chosen;

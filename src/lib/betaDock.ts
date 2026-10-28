@@ -102,18 +102,28 @@ export function createDockStyleStore(storage: () => DockStorage | null): DockSty
   };
 }
 
-const store = createDockStyleStore(() => {
-  if (typeof window === 'undefined') return null;
-  return window.localStorage;
-});
+// `window.localStorage` itself can throw (blocked storage); the store calls
+// this inside its try, so the getter is safe to touch here.
+const store = createDockStyleStore(() => (typeof window === 'undefined' ? null : window.localStorage));
 
-export const getDockStyle = (): DockStyle => store.get();
+/**
+ * In this window the store is the channel: Settings and the dock share the
+ * module, so `set` re-renders the dock at once. Another window of the app
+ * only sees localStorage change, so every subscriber also listens for the
+ * `storage` event (it never fires in the window that wrote).
+ */
+function subscribeDockStyle(fn: () => void): () => void {
+  const off = store.subscribe(fn);
+  const onStorage = (e: StorageEvent) => { if (e.key === DOCK_STYLE_KEY || e.key === null) store.reload(); };
+  window.addEventListener('storage', onStorage);
+  return () => { off(); window.removeEventListener('storage', onStorage); };
+}
+
 export const setDockStyle = (style: DockStyle): void => store.set(style);
-export const reloadDockStyle = (): void => store.reload();
 
-/** The chosen style; re-renders the moment Settings changes it. */
+/** The chosen style; re-renders the moment Settings (here or in another window) changes it. */
 export function useDockStyle(): DockStyle {
-  return useSyncExternalStore(store.subscribe, store.get, store.get);
+  return useSyncExternalStore(subscribeDockStyle, store.get, store.get);
 }
 
 /* ── Destinations ────────────────────────────────────────────────────────── */

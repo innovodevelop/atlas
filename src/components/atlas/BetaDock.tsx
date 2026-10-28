@@ -36,8 +36,8 @@ import { STATE_LABEL, useAtlasState, type AtlasBusState } from '@/lib/atlasState
 import { useTalkAnchor } from '@/lib/talkBus';
 import type { RGB } from '@/lib/quickSphere';
 import {
-  DOCK_DESTINATIONS, DOCK_SPHERE, DOCK_STYLE_KEY, badgeCount, badgeText, crumbLine, currentDockId, hubSides, itemName,
-  mergeNotes, reloadDockStyle, statusMini, stepIndex, useDockNotes, useDockStyle, voiceNote,
+  DOCK_DESTINATIONS, DOCK_SPHERE, badgeCount, badgeText, crumbLine, currentDockId, hubSides, itemName,
+  mergeNotes, statusMini, stepIndex, useDockNotes, useDockStyle, voiceNote,
   type DockDestination, type DockDestinationId, type DockNotes,
 } from '@/lib/betaDock';
 import '@/styles/beta/dock.css';
@@ -178,7 +178,7 @@ function HubDock({ dests, current, go, account }: StyleProps) {
           type="button"
           data-dk-item
           className={`b-dk-hub${hubOn ? ' on' : ''}`}
-          title={`${hub.label}: talk to Atlas`}
+          title={hub.label}
           aria-label={hub.label}
           aria-current={hubOn ? 'page' : undefined}
           onClick={() => go(hub)}
@@ -464,13 +464,6 @@ export function BetaDock() {
   // With a header sphere registered the bottom-left orb is gone, and the rail can run to the bottom.
   const orb = !useTalkAnchor();
   const current = currentDockId(pathname);
-
-  // Settings in another window of the app changed the choice.
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => { if (e.key === DOCK_STYLE_KEY || e.key === null) reloadDockStyle(); };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
-  }, []);
 
   // The style on <html>: the rail's page gutter and the orb's place at phone
   // width key off it (dock.css). Set before paint, so switching to the rail

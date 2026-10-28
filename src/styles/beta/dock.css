@@ -200,17 +200,22 @@ html[data-beta-dock="status"] { --b-dk-clear: 146px; }
 
 /* ── Reduced motion ──────────────────────────────────────────────────────── */
 
+/* `html .b-dk …` outranks every per-style rule above (`.b-dk--lens .b-dk-btn`
+   and the like): a media query adds no specificity, so a bare `.b-dk-btn`
+   here would lose to them and the lens, hub, lane and fan would still move. */
 @media (prefers-reduced-motion: reduce) {
-  .b-dk-btn, .b-dk-hub, .b-dk-cap, .b-dk-blob.ready, .b-dk-stripe { transition: none; }
-  .b-dk-tag, .b-dk-fan .b-dk-btn, .b-dk-card { animation: none; }
-  .b-dk-hub:hover { transform: none; }
+  html .b-dk .b-dk-btn, html .b-dk .b-dk-hub, html .b-dk .b-dk-cap, html .b-dk .b-dk-blob.ready, html .b-dk-stripe { transition: none; }
+  html .b-dk .b-dk-tag, html .b-dk .b-dk-fan .b-dk-btn, html .b-dk .b-dk-card { animation: none; }
+  html .b-dk .b-dk-hub:hover { transform: none; }
 }
 
 /* ── Settings → Beta UI: the dock picker ─────────────────────────────────── */
 
-.b-dkpick { margin: 0; padding: 0; border: none; min-width: 0; }
-.b-dkpick-legend { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.b-dkpick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr)); gap: 8px; }
+/* It sits in the Interface card under the Beta UI row, headed like that row. */
+.b-dkpick { margin: 14px 0 0; padding: 0; border: none; min-width: 0; }
+.b-dkpick-legend { float: left; width: 100%; padding: 0; font-size: 13.5px; font-weight: 600; color: var(--b-ink); }
+.b-dkpick-sub { clear: both; margin: 0; padding-top: 2px; font-size: 12.5px; line-height: 1.45; color: var(--b-ink2); text-wrap: pretty; }
+.b-dkpick-grid { margin-top: 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr)); gap: 8px; }
 .b-dkpick-opt { position: relative; display: flex; flex-direction: column; gap: 10px; padding: 10px; border-radius: var(--b-r-row); background: var(--b-page); cursor: pointer; transition: background .2s; }
 .b-dkpick-opt:hover { background: var(--b-hover); }
 .b-dkpick-opt.on, .b-dkpick-opt.on:hover { background: var(--b-emphasis); }
