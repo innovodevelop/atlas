@@ -1,0 +1,188 @@
+/* ── Beta phase 4: Music ───────────────────────────────────────────────────────
+   Source: design/current/design_handoff_atlas_beta/Atlas Music Beta.dc.html —
+   the ink listening room: the raised hero (sphere in the back link, the Spotify
+   chip, the cover with the disc behind it, title, ribbon, transport, output
+   volume), the aside (Up next / Search) and the station row. The design carries
+   its styles inline; the values below are those values, named with the --b-*
+   tokens. Every class is prefixed b-mu-. */
+
+/* The whole page is ink, and it scrolls itself on a wide window (the design's
+   height:100vh / overflow:hidden), so the shell's dock padding comes off. */
+html[data-ui="beta"] .beta-page:has(> .b-mu) { padding-bottom: 0; background: var(--b-ink); }
+
+.b-mu { height: calc(100vh - var(--b-topbar)); display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: var(--b-gap); padding: 20px 20px 84px; box-sizing: border-box; background: var(--b-ink); color: var(--b-on-ink); font-family: var(--b-font-ui); -webkit-font-smoothing: antialiased; overflow: hidden; }
+.b-mu-grid { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: var(--b-gap); }
+
+/* Hero */
+.b-mu-hero { view-transition-name: hero; min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: 22px; padding: clamp(20px, 3vw, 36px); border-radius: 36px; background: var(--b-ink-raised); overflow: hidden; animation: b-pop .6s var(--b-spring) both; }
+.b-mu-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+/* The design draws the sphere and the label as one link back to Home. Here
+   they are two controls in the same place: the sphere is this screen's talk
+   entry point (it registers as the Talk anchor, which hides the orb), and the
+   label is the way back. */
+.b-mu-id { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.b-mu-back { display: flex; align-items: center; gap: 12px; padding: 0; background: none; cursor: pointer; text-align: left; font: inherit; font-size: 11px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase; color: var(--b-on-ink-small); transition: color .2s; min-width: 0; }
+.b-mu-back:hover { color: var(--b-on-ink); }
+.b-mu-back-sphere { position: relative; width: 56px; height: 56px; flex: none; margin: -10px 0 -10px -10px; padding: 0; border-radius: 50%; overflow: hidden; background: none; cursor: pointer; }
+.b-mu-back-text { display: flex; flex-direction: column; min-width: 0; }
+.b-mu-back-text span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-mu-back-text span:last-child { margin-top: 3px; font-size: 12px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--b-on-ink-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-mu-chip { display: flex; flex: none; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border-radius: var(--b-r-pill); background: rgba(249, 247, 244, .08); font-size: 12px; font-weight: 600; white-space: nowrap; }
+/* Spotify's own mark on the source chip, not a palette value; grey when the account is not connected. */
+.b-mu-chip i { width: 7px; height: 7px; border-radius: 50%; background: #1ed760; }
+.b-mu-chip.off i { background: var(--b-tertiary); }
+
+.b-mu-stage { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: clamp(20px, 3vw, 44px); align-items: center; }
+.b-mu-coverwrap { position: relative; width: 100%; max-width: min(52vh, 460px); aspect-ratio: 1; justify-self: center; }
+.b-mu-disc { position: absolute; inset: 4% -6% 4% 6%; border-radius: 50%; background: #16161b; animation: b-mu-spin 6s linear infinite; animation-play-state: paused; }
+.b-mu-disc.spinning { animation-play-state: running; }
+.b-mu-disc span:first-child { position: absolute; inset: 34%; border-radius: 50%; }
+.b-mu-disc span:last-child { position: absolute; inset: 47%; border-radius: 50%; background: var(--b-ink); }
+@keyframes b-mu-spin { to { transform: rotate(360deg); } }
+.b-mu-cover { position: absolute; inset: 0; border-radius: var(--b-r-hero); background: var(--b-ink); overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 40px 80px -40px rgba(0, 0, 0, .6); animation: b-mu-pop .5s var(--b-spring) both; }
+.b-mu-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.b-mu-cover .b-mu-cover-empty { color: var(--b-on-ink-small); }
+@keyframes b-mu-pop { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+.b-mu-text { min-width: 0; max-height: 100%; overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column; gap: clamp(12px, 2vh, 18px); }
+.b-mu-text::-webkit-scrollbar { display: none; }
+.b-mu-album { display: block; font-size: 13px; font-weight: 600; color: var(--b-on-ink-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The design sizes the title by width alone; on a short window that pushed the
+   volume row out of the hero, so the height caps it too, and very long titles
+   stop at three lines. */
+.b-mu-title { margin: 8px 0 0; font-family: var(--b-font-display); font-size: clamp(36px, min(5vw, 8vh), 84px); font-weight: 500; letter-spacing: -.055em; line-height: .95; text-wrap: balance; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; padding-bottom: .06em; animation: b-mu-pop .45s var(--b-spring) both; }
+.b-mu-artist { display: block; margin-top: 10px; font-size: 18px; font-weight: 500; color: var(--b-on-ink-body); }
+
+/* The ribbon: a canvas the page paints per frame (musicWave), 60 bars. */
+.b-mu-ribbon { display: flex; flex-direction: column; gap: 8px; }
+.b-mu-wave { display: block; width: 100%; height: 56px; padding: 0; background: none; cursor: default; }
+.b-mu-wave.live { cursor: pointer; }
+.b-mu-wave canvas { display: block; width: 100%; height: 100%; }
+.b-mu-times { display: flex; justify-content: space-between; font-family: var(--b-font-mono); font-size: 12px; color: var(--b-on-ink-small); font-variant-numeric: tabular-nums; }
+
+.b-mu-transport { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.b-mu-tbtn { display: flex; align-items: center; justify-content: center; border-radius: 50%; color: var(--b-on-ink); cursor: pointer; transition: background .2s, transform .2s, opacity .2s; padding: 0; }
+.b-mu-tbtn:disabled { opacity: .38; cursor: default; }
+.b-mu-tbtn--sm { width: 44px; height: 44px; background: transparent; }
+.b-mu-tbtn--sm:hover:not(:disabled) { background: rgba(249, 247, 244, .08); }
+.b-mu-tbtn--sm.on { background: var(--b-blue); }
+.b-mu-tbtn--sm.on:hover:not(:disabled) { background: var(--b-blue-deep); }
+.b-mu-tbtn--md { width: 56px; height: 56px; background: rgba(249, 247, 244, .08); }
+.b-mu-tbtn--md:hover:not(:disabled) { background: rgba(249, 247, 244, .14); }
+.b-mu-tbtn--md.flip svg { transform: scaleX(-1); }
+.b-mu-tbtn--play { width: 80px; height: 80px; background: var(--b-on-ink); color: var(--b-ink); }
+.b-mu-tbtn--play:hover:not(:disabled) { transform: scale(1.05); }
+
+/* The design's duck row carries the one output control Atlas has: its own volume. */
+.b-mu-volrow { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 18px; background: rgba(249, 247, 244, .06); }
+.b-mu-volrow > svg { flex: none; color: var(--b-on-ink-body); }
+.b-mu-volrow > span:first-of-type { flex: 1; min-width: 0; font-size: 13px; line-height: 1.45; color: var(--b-on-ink-body); }
+.b-mu-volrow.off > span:first-of-type { color: var(--b-on-ink-small); }
+.b-mu-volrow input[type=range] { -webkit-appearance: none; appearance: none; flex: 0 1 180px; min-width: 90px; height: 6px; margin: 0; border-radius: var(--b-r-pill); background: rgba(249, 247, 244, .14); outline: none; cursor: pointer; }
+.b-mu-volrow input[type=range]:disabled { cursor: default; opacity: .4; }
+.b-mu-volrow input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--b-on-ink); cursor: pointer; }
+.b-mu-volrow input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border: none; border-radius: 50%; background: var(--b-on-ink); cursor: pointer; }
+.b-mu-volrow .b-mu-volval { flex: none; width: 38px; text-align: right; font-family: var(--b-font-mono); font-size: 12px; color: var(--b-on-ink-small); }
+
+.b-mu-err { margin: 0; font-size: 13px; color: #ff9a9a; }
+.b-mu-note { margin: 0; font-size: 13px; line-height: 1.5; color: var(--b-on-ink-small); }
+
+/* The gate: when Atlas cannot play at all, this stands where the record would. */
+.b-mu-gate { display: flex; flex-direction: column; gap: 14px; }
+.b-mu-gate .b-mu-title { font-size: clamp(32px, 3.6vw, 56px); }
+.b-mu-gate p { margin: 0; font-size: 15px; line-height: 1.6; color: var(--b-on-ink-body); text-wrap: pretty; max-width: 48ch; }
+.b-mu-gate p b { font-weight: 600; color: var(--b-on-ink); }
+.b-mu-gate-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.b-mu-btn { height: 40px; padding: 0 18px; display: inline-flex; align-items: center; gap: 8px; border-radius: var(--b-r-pill); background: var(--b-on-ink); color: var(--b-ink); font-size: 13.5px; font-weight: 600; cursor: pointer; transition: background .2s, transform .15s; white-space: nowrap; }
+.b-mu-btn:hover:not(:disabled) { transform: translateY(-1px); }
+.b-mu-btn:disabled { opacity: .5; cursor: default; }
+.b-mu-btn--quiet { background: rgba(249, 247, 244, .08); color: var(--b-on-ink); }
+.b-mu-btn--quiet:hover:not(:disabled) { background: rgba(249, 247, 244, .14); }
+.b-mu-btn--blue { background: var(--b-blue); color: var(--b-card); }
+.b-mu-btn--blue:hover:not(:disabled) { background: var(--b-blue-deep); }
+
+/* Aside */
+.b-mu-aside { min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 36px; background: var(--b-ink-raised); animation: b-pop .6s var(--b-spring) both; }
+.b-mu-tabs { flex: none; display: flex; gap: 2px; padding: 4px; border-radius: var(--b-r-pill); background: rgba(249, 247, 244, .06); }
+.b-mu-tabs button { flex: 1; height: 38px; padding: 0 10px; border-radius: var(--b-r-pill); background: transparent; color: var(--b-on-ink); font-size: 13px; font-weight: 600; cursor: pointer; transition: background .2s, color .2s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-mu-tabs button.on { background: var(--b-on-ink); color: var(--b-ink); }
+.b-mu-tabs button .b-num { font-weight: 500; opacity: .7; margin-left: 4px; }
+.b-mu-listhead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 6px 12px 2px; font-size: 12px; color: var(--b-on-ink-small); }
+.b-mu-listhead b { font-weight: 600; color: var(--b-on-ink-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-mu-listhead span { font-family: var(--b-font-mono); white-space: nowrap; }
+/* Positioned, so a row's offsetTop is measured from the list when the page keeps the playing row in view. */
+.b-mu-list { position: relative; flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.b-mu-loadmore { align-self: center; margin: 6px 0 4px; flex: none; }
+.b-mu-row { width: 100%; text-align: left; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 18px; background: transparent; color: var(--b-on-ink); cursor: pointer; transition: background .2s; }
+.b-mu-row:hover:not(:disabled) { background: rgba(249, 247, 244, .08); }
+.b-mu-row.on { background: rgba(249, 247, 244, .1); }
+.b-mu-row:disabled { cursor: default; }
+.b-mu-thumb { flex: none; position: relative; width: 48px; height: 48px; border-radius: var(--b-r-small); background: rgba(249, 247, 244, .08); overflow: hidden; display: flex; align-items: center; justify-content: center; color: var(--b-on-ink-small); }
+.b-mu-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.b-mu-row-text { flex: 1; min-width: 0; }
+.b-mu-row-text b { display: block; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-mu-row-text span { display: block; margin-top: 2px; font-size: 12.5px; color: var(--b-on-ink-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-mu-row-right { flex: none; font-family: var(--b-font-mono); font-size: 12px; color: var(--b-on-ink-small); font-variant-numeric: tabular-nums; }
+.b-mu-row.on .b-mu-row-right { color: #8fa9ff; }
+.b-mu-group { padding: 10px 12px 4px; font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--b-on-ink-small); }
+.b-mu-empty { margin: 4px; padding: 22px 18px; border-radius: 18px; background: rgba(249, 247, 244, .04); text-align: center; font-size: 13px; line-height: 1.5; color: var(--b-on-ink-small); text-wrap: pretty; }
+.b-mu-empty b { display: block; margin-bottom: 4px; font-size: 14px; font-weight: 600; color: var(--b-on-ink-body); }
+.b-mu-search { flex: none; display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 14px; border-radius: var(--b-r-row); background: rgba(249, 247, 244, .06); color: var(--b-on-ink-small); transition: background .2s; }
+.b-mu-search:focus-within { background: rgba(249, 247, 244, .1); }
+.b-mu-search input { flex: 1; min-width: 0; height: 100%; background: none; color: var(--b-on-ink); font-size: 13.5px; }
+.b-mu-search input::placeholder { color: var(--b-on-ink-small); }
+.b-mu-search kbd { font-family: var(--b-font-mono); font-size: 11px; padding: 2px 6px; border-radius: 6px; background: rgba(249, 247, 244, .08); }
+.b-mu-search button { display: flex; padding: 0; background: none; color: inherit; cursor: pointer; }
+
+/* Stations */
+.b-mu-stations { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 8px; }
+.b-mu-station { text-align: left; display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: var(--b-r-card); background: var(--b-ink-raised); color: var(--b-on-ink); cursor: pointer; transition: background .2s; min-width: 0; }
+.b-mu-station:hover:not(:disabled) { background: #2d2d35; }
+.b-mu-station.on { background: var(--b-on-ink); color: var(--b-ink); }
+.b-mu-station:disabled { cursor: default; opacity: .6; }
+.b-mu-swatch { flex: none; width: 44px; height: 44px; border-radius: var(--b-r-row); background: rgba(249, 247, 244, .08); overflow: hidden; display: flex; align-items: center; justify-content: center; color: var(--b-on-ink-body); }
+.b-mu-station.on .b-mu-swatch { background: var(--b-panel); color: var(--b-ink2); }
+.b-mu-swatch img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.b-mu-swatch--blue { background: var(--b-blue); color: var(--b-card); }
+.b-mu-station.on .b-mu-swatch--blue { background: var(--b-blue); color: var(--b-card); }
+.b-mu-station-text { min-width: 0; }
+.b-mu-station-text b { display: block; font-size: 14.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-mu-station-text span { display: block; margin-top: 2px; font-size: 12px; color: var(--b-on-ink-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-mu-station.on .b-mu-station-text span { color: var(--b-ink2); }
+.b-mu-station--more { justify-content: center; font-size: 13px; font-weight: 600; color: var(--b-on-ink-body); }
+
+/* Narrower or shorter windows: the aside drops under the hero and the page scrolls as a page. */
+@media (max-width: 1100px), (max-height: 680px) {
+  .b-mu { height: auto; min-height: calc(100vh - var(--b-topbar)); overflow: visible; }
+  .b-mu-grid { grid-template-columns: minmax(0, 1fr); }
+  .b-mu-aside { min-height: 320px; }
+  .b-mu-list { max-height: 440px; }
+}
+@media (max-width: 900px) {
+  .b-mu-stage { grid-template-columns: minmax(0, 1fr); }
+  .b-mu-coverwrap { max-width: min(60vw, 360px); }
+}
+@media (max-width: 640px) {
+  .b-mu { padding: 12px 12px 84px; }
+  .b-mu-hero { padding: 18px; border-radius: var(--b-r-band); }
+  .b-mu-aside { border-radius: var(--b-r-band); }
+  .b-mu-chip span { display: none; }
+  .b-mu-coverwrap { max-width: 100%; }
+  .b-mu-disc { inset: 4% 0 4% 0; }
+  .b-mu-volrow input[type=range] { flex: 1 1 120px; }
+}
+/* A phone: the five transport buttons have to share ~315px without wrapping. */
+@media (max-width: 420px) {
+  .b-mu-transport { flex-wrap: nowrap; gap: 6px; justify-content: space-between; }
+  .b-mu-tbtn--sm { width: 40px; height: 40px; }
+  .b-mu-tbtn--md { width: 48px; height: 48px; }
+  .b-mu-tbtn--play { width: 64px; height: 64px; }
+  .b-mu-volrow { flex-wrap: wrap; }
+  .b-mu-volrow > span:first-of-type { flex-basis: calc(100% - 30px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .b-mu-hero, .b-mu-aside, .b-mu-cover, .b-mu-title { animation: none; }
+  .b-mu-disc { animation: none; }
+  .b-mu-tbtn, .b-mu-row, .b-mu-station, .b-mu-btn, .b-mu-back { transition: none; }
+}

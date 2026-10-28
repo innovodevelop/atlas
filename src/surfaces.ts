@@ -196,6 +196,16 @@ export const SURFACES: readonly SurfaceMeta[] = [
     mock: false,
     edition: 'consumer',
   },
+  {
+    path: '/music',
+    label: 'Music',
+    icon: 'Music',
+    entry: 'menu',
+    // Beta phase 4: the listening room. Everything on it is the user's own
+    // Spotify account through `useMusicPlayer`; with no account it says so.
+    mock: false,
+    edition: 'consumer',
+  },
   { path: '/onboarding', label: 'Onboarding', icon: 'ShieldCheck', entry: 'menu', mock: false, edition: 'consumer' },
   {
     path: '/settings',
@@ -316,6 +326,7 @@ const CONSUMER_LOADERS: Record<string, Loader> = {
   '/atlas-teach': () => import('./pages/AtlasTeach'),
   '/smart-home': () => import('./pages/atlas/AtlasSmartHome'),
   '/health': () => import('./pages/atlas/AtlasHealth'),
+  '/music': () => import('./pages/atlas/BetaMusic'),
   '/onboarding': () => import('./pages/atlas/AtlasOnboarding'),
   '/settings': () => import('./pages/atlas/AtlasSettingsRoute'),
   '/auth': () => import('./pages/Auth'),
