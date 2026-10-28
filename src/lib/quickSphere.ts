@@ -179,10 +179,6 @@ function loop(now: number) {
 }
 function wake() { if (!pump && typeof requestAnimationFrame === 'function') pump = requestAnimationFrame(loop); }
 
-export function reducedMotion(): boolean {
-  return typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-}
-
 /* What every sphere's run decision reads (src/lib/spherePause.ts).
    `windowActive` is pushed in by the Beta shell, which owns the
    useWindowActivity hook; the other two are read here and kept current by
@@ -201,9 +197,10 @@ function recheckPaused() {
 }
 function onStorage(e: StorageEvent) { if (e.key === null || e.key === SPHERE_PAUSED_KEY) recheckPaused(); }
 // A same-document write sends no storage event. The pause switch is flipped
-// with a click (Space and Enter on a button are clicks too), so read the key
-// once after each click; the timeout lets the click's own handler, and the
-// React commit it causes, write first.
+// with a click (Space and Enter on a native button are clicks too), so read
+// the key once after each click; the timeout lets the click's own handler, and
+// the React commit it causes, write first. The keyup covers a custom
+// role="switch" that toggles on its own key handler and sends no click.
 function onClick() {
   if (!recheckTimer) recheckTimer = window.setTimeout(() => { recheckTimer = 0; recheckPaused(); }, 0);
 }
@@ -537,6 +534,8 @@ export function mount(canvas: HTMLCanvasElement, opts: Partial<QuickSphereOpts>)
       const prev = inst.run, next = sphereRun(inputs, inst.vis);
       inst.run = next;
       if (next === 'animate') {
+        // The loop paints from its next frame; a still frame owed is moot.
+        if (stillReq) { cancelAnimationFrame(stillReq); stillReq = 0; }
         if (prev !== 'animate') { last = 0; wake(); checkBudget(); }
         return;
       }

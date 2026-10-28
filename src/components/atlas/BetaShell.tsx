@@ -61,7 +61,7 @@ export function measureTone(root: Element | null): 'paper' | 'ink' {
 const MAIN_ID = 'beta-main';
 
 /** What the status line says after a route change. */
-export function routeAnnouncement(pathname: string): string {
+function routeAnnouncement(pathname: string): string {
   return `${screenLabel(pathname)} screen`;
 }
 
