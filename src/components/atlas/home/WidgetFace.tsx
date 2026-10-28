@@ -8,11 +8,35 @@
  * (§04 Widget grid). The slots below are the design's flourishes; a widget
  * passes the ones it has data for and the face lays them out in the order
  * the design uses.
+ *
+ * `preview` forces one of the four non-default states from
+ * `Atlas Widgets Beta.dc.html` — a skeleton, the attention row, the empty
+ * face, the offline row over dimmed content — for the widget catalog and
+ * sheet. Left undefined (as Home leaves it) the face is exactly the live one.
+ * The preview classes live in src/styles/beta/widgetCatalog.css, imported
+ * here so a forced state draws correctly wherever the face is used.
  */
 import type { ReactNode } from 'react';
 import { SPANS, type WidgetSize } from '@/lib/betaHome';
+import { skeletonBars, type PreviewState } from '@/lib/betaWidgetCatalog';
+import { AtlasIcon } from '../AtlasIcon';
+import type { IconName } from '../icons';
+import '@/styles/beta/widgetCatalog.css';
 
 export type FaceTone = 'paper' | 'linen' | 'sand' | 'sky' | 'ink' | 'slate' | 'emphasis';
+
+export type FacePreview = PreviewState;
+
+export interface FacePreviewAction { label: string; onClick: () => void }
+
+/** The copy the forced states need; the adapters fill what they can read live, the caller the rest. */
+export interface FacePreviewCopy {
+  /** The one row the attention state adds. `muted` says the rule does not hold right now. */
+  attention?: { text: string; tone?: 'blue' | 'red' | 'muted'; icon?: IconName; action?: FacePreviewAction };
+  empty?: { title: string; hint?: string; action?: FacePreviewAction };
+  /** After "Offline ·". `dim: false` keeps the content at full strength (local sources). */
+  offline?: { text: string; dim?: boolean };
+}
 
 export interface FaceRow {
   key: string;
@@ -72,11 +96,17 @@ export interface FaceProps {
   className?: string;
   /** Entrance stagger in ms. */
   delay?: number;
+  /** Force a non-default state (catalog and sheet only). */
+  preview?: FacePreview;
+  previewCopy?: FacePreviewCopy;
 }
 
 const TONE_CLASS: Record<FaceTone, string> = {
   paper: '', linen: 'bw--linen', sand: 'bw--sand', sky: 'bw--sky', ink: 'bw--ink', slate: 'bw--slate', emphasis: 'bw--emphasis',
 };
+
+/** The empty face's ghost chart: the design's bar heights, %. */
+const GHOST = [34, 58, 22, 72, 44, 62, 28];
 
 export function WidgetFace(p: FaceProps) {
   const [cols, rows] = SPANS[p.size];
@@ -86,16 +116,63 @@ export function WidgetFace(p: FaceProps) {
   const nRows = big ? (p.rows?.length ?? 0) : 0;
   const rowsShown = p.rows?.slice(0, Math.min(nRows, 4)) ?? [];
   const dark = p.tone === 'ink' || p.tone === 'slate';
+  const pv = p.preview;
+  const offline = pv === 'offline' ? (p.previewCopy?.offline ?? { text: 'showing the last reading' }) : null;
+  const shell = {
+    className: [
+      'bw', `bw--${p.size.toLowerCase()}`, TONE_CLASS[p.tone ?? 'paper'], p.onOpen && pv !== 'loading' ? 'clickable' : '', p.className ?? '',
+      pv ? `b-wc-pv b-wc-pv--${pv}` : '', offline && offline.dim !== false ? 'b-wc-pv--dim' : '',
+    ].filter(Boolean).join(' '),
+    style: { gridColumn: `span ${cols}`, gridRow: `span ${rows}`, animationDelay: `${p.delay ?? 0}ms` },
+    'data-widget': p.label,
+  };
+
+  // Loading: the shell in its own tone and nothing else, so no number shows before it is real.
+  if (pv === 'loading') {
+    return (
+      <div {...shell} aria-busy="true" aria-label={`${p.label}, loading`}>
+        <span className="b-wc-pv-sk" aria-hidden>
+          {skeletonBars(p.size).map((b, i) => <span key={i} style={{ width: `${b.w}%`, height: b.h }} />)}
+        </span>
+      </div>
+    );
+  }
+
+  // Empty: the label, what comes next, and one action when there is a real one.
+  if (pv === 'empty') {
+    const e = p.previewCopy?.empty ?? { title: 'No data yet', hint: 'Connect a source to begin.' };
+    return (
+      <div {...shell}>
+        <div className="bw-head"><span className="bw-label">{p.label}</span></div>
+        <div className={`b-wc-pv-empty${big ? ' tall' : ''}`}>
+          {big ? <span className="b-wc-pv-ghost" aria-hidden>{GHOST.slice(0, cols >= 6 ? 7 : 5).map((h, i) => <span key={i} style={{ height: `${h}%` }} />)}</span> : null}
+          <span className="b-wc-pv-empty-text">
+            <span className="b-wc-pv-empty-t">{e.title}</span>
+            {big && e.hint ? <span className="b-wc-pv-empty-h">{e.hint}</span> : null}
+          </span>
+          {e.action ? (
+            <button type="button" className="b-wc-pv-empty-a" onClick={(ev) => { ev.stopPropagation(); e.action?.onClick(); }}>{e.action.label}</button>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  // Attention and offline each add one row under the label; nothing else on the card moves.
+  const alert = pv === 'attention'
+    ? (p.previewCopy?.attention ?? { text: 'Nothing to flag now', tone: 'muted' as const })
+    : offline
+      ? { text: `Offline · ${offline.text}`, tone: offline.dim === false ? 'muted' as const : 'red' as const, icon: 'offline' as IconName, action: undefined }
+      : null;
+  const alertIcon: IconName = alert?.icon ?? (alert?.tone === 'muted' ? 'info' : 'sparkle');
   return (
     <div
-      className={['bw', `bw--${p.size.toLowerCase()}`, TONE_CLASS[p.tone ?? 'paper'], p.onOpen ? 'clickable' : '', p.className ?? ''].filter(Boolean).join(' ')}
-      style={{ gridColumn: `span ${cols}`, gridRow: `span ${rows}`, animationDelay: `${p.delay ?? 0}ms` }}
+      {...shell}
       role={p.onOpen ? 'button' : undefined}
       tabIndex={p.onOpen ? 0 : undefined}
       onClick={p.onOpen}
       onKeyDown={p.onOpen ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); p.onOpen?.(); } } : undefined}
       title={p.onOpen ? 'Open' : undefined}
-      data-widget={p.label}
     >
       {p.bleed ? <div className="bw-bleed" aria-hidden>{p.bleed}</div> : null}
       <div className="bw-head">
@@ -103,6 +180,15 @@ export function WidgetFace(p: FaceProps) {
         {p.sample ? <span className="sampleB" title={p.sample}>Sample</span> : null}
         {showMeta ? <span className="bw-meta">{p.meta}</span> : null}
       </div>
+      {alert ? (
+        <span className={`b-wc-pv-alert b-wc-pv-alert--${alert.tone ?? 'blue'}`} role="status" title={alert.text}>
+          <i aria-hidden><AtlasIcon name={alertIcon} size={12} weight={2.2} /></i>
+          <span>{alert.text}</span>
+          {alert.action ? (
+            <button type="button" onClick={(ev) => { ev.stopPropagation(); alert.action?.onClick(); }}>{alert.action.label}</button>
+          ) : null}
+        </span>
+      ) : null}
       {p.children}
       {hasHero ? (
         <div className={`bw-hero${big ? '' : ' bw-hero--compact'}`}>

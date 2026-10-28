@@ -6,11 +6,22 @@
  * widget with no source says so on its face and the Edit Home catalogue marks
  * it "Soon"; a widget showing a labelled sample carries the Sample stamp; no
  * control is decorative — the tick, the add line, the music buttons all act.
+ *
+ * `preview` (the widget catalog and sheet) forces a face state. The six core
+ * widgets then read what that state should say from their own live data —
+ * the overdue task, the meeting about to start, the last mail sync — and the
+ * caller's `previewCopy` fills the rest. With `preview` undefined nothing
+ * here runs and Home draws exactly what it drew before.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { WidgetFace, type FaceProps, type FaceRow, type FaceTone } from './WidgetFace';
+import { WidgetFace, type FacePreview, type FacePreviewCopy, type FaceProps, type FaceRow, type FaceTone } from './WidgetFace';
 import { AtlasIcon } from '../AtlasIcon';
 import { WIDGET_BY_ID, type WidgetSize } from '@/lib/betaHome';
+import {
+  briefingAttention, inboxAttention, mailOffline, tasksAttention, todayAttention, watchAttention, weatherAttention,
+  type AttentionCopy,
+} from '@/lib/betaWidgetCatalog';
+import { openExternal } from '@/components/atlas-ui/answerViews/openExternal';
 import { useWeather } from '@/hooks/useWeather';
 import { useCalendarEvents } from '@/hooks/useCalendarEvents';
 import { useTasks } from '@/hooks/useTasks';
@@ -32,13 +43,35 @@ export interface WidgetProps {
   open?: () => void;
   /** Home setting "Surface": Paper and Ink override each widget's own tone. */
   forceTone?: FaceTone;
+  /** Force a face state; the catalog and sheet only. */
+  preview?: FacePreview;
+  /** The copy for that state the widget cannot read for itself (empty copy and its action, idle attention, offline). */
+  previewCopy?: FacePreviewCopy;
 }
 
-type Face = Omit<FaceProps, 'size' | 'delay' | 'onOpen'>;
+/** `previewCopy` here is the adapter's live part; the caller's copy fills what it leaves out. */
+type Face = Omit<FaceProps, 'size' | 'delay' | 'onOpen' | 'preview'>;
 
 function Card({ p, face, tone }: { p: WidgetProps; face: Face; tone?: FaceTone }) {
-  return <WidgetFace {...face} tone={p.forceTone ?? tone ?? face.tone} size={p.size} delay={p.delay} onOpen={p.open} />;
+  const copy = p.preview
+    ? {
+        attention: face.previewCopy?.attention ?? p.previewCopy?.attention,
+        empty: face.previewCopy?.empty ?? p.previewCopy?.empty,
+        offline: face.previewCopy?.offline ?? p.previewCopy?.offline,
+      }
+    : undefined;
+  return <WidgetFace {...face} tone={p.forceTone ?? tone ?? face.tone} size={p.size} delay={p.delay} onOpen={p.open} preview={p.preview} previewCopy={copy} />;
 }
+
+/** A live attention reading as the face's row; a meeting link becomes Join. */
+function attentionRow(a: AttentionCopy | null): FacePreviewCopy['attention'] {
+  if (!a) return undefined;
+  const link = a.join;
+  return { text: a.text, tone: a.tone, icon: a.icon, action: link ? { label: 'Join', onClick: () => void openExternal(link) } : undefined };
+}
+
+/** A live offline line (it knows the real age); stale content dims. */
+const offlineRow = (text: string | null): FacePreviewCopy['offline'] => (text ? { text, dim: true } : undefined);
 
 const num = (s: string | undefined): number | null => {
   if (!s) return null;
@@ -79,6 +112,7 @@ export function WeatherWidget(p: WidgetProps) {
     rows: (weather.daily ?? []).slice(0, 3).map<FaceRow>((d) => ({ key: d.day, lead: d.day, title: d.icon.replace(/-/g, ' '), value: `${Math.round(d.high)}° / ${Math.round(d.low)}°`, valueTone: 'ink' })),
     foot: [{ t: weather.sunrise, s: 'Sunrise' }, { t: weather.sunset, s: 'Sunset' }, { t: `${weather.humidity}%`, s: 'Humidity' }, { t: `${Math.round(weather.windSpeed)}`, s: 'Wind' }],
     bleed: sunny ? <span className="bw-glow" /> : null,
+    previewCopy: p.preview ? { attention: attentionRow(weatherAttention(hourly)) } : undefined,
   };
   return <Card p={p} face={face} tone="sky" />;
 }
@@ -97,6 +131,7 @@ export function TodayWidget(p: WidgetProps) {
     deltaTone: 'blue',
     sub: focus ? focus.title : 'Nothing scheduled today',
     rows: then.map<FaceRow>((e) => ({ key: e.id, lead: eventTime(e), title: e.title, sub: e.location ?? undefined })),
+    previewCopy: p.preview ? { attention: attentionRow(todayAttention(focus, now)) } : undefined,
   };
   return <Card p={p} face={face} />;
 }
@@ -138,6 +173,7 @@ export function TasksWidget(p: WidgetProps) {
         onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
       />
     ),
+    previewCopy: p.preview ? { attention: attentionRow(tasksAttention(tasks, Date.now())) } : undefined,
   };
   return <Card p={p} face={face} />;
 }
@@ -150,7 +186,7 @@ const initials = (addr: string | null): string => {
 };
 
 export function InboxWidget(p: WidgetProps) {
-  const { messages, alerts, isConnected } = useMailIntelligence();
+  const { messages, alerts, accounts, isConnected } = useMailIntelligence();
   const needs = alerts.filter((a) => !a.acknowledged);
   const top = useMemo(() => [...messages].sort((a, b) => b.importance - a.importance).slice(0, 3), [messages]);
   const face: Face = {
@@ -163,6 +199,7 @@ export function InboxWidget(p: WidgetProps) {
       pill: m.category === 'important' || m.category === 'bills' ? { text: m.category === 'bills' ? 'Bill' : 'Important', tone: 'high' } : undefined,
     })),
     note: needs[0] ? needs[0].title : undefined,
+    previewCopy: p.preview ? { attention: attentionRow(inboxAttention(alerts)), offline: offlineRow(mailOffline(accounts, Date.now())) } : undefined,
   };
   return <Card p={p} face={face} />;
 }
@@ -178,6 +215,7 @@ export function BriefingWidget(p: WidgetProps) {
       <span className="bw-lede"><span className="bw-lede-t">{lead.title}</span><span className="bw-lede-s">{lead.source} · {lead.time}</span></span>
     ) : <span className="bw-lede"><span className="bw-lede-s">No headlines yet.</span></span>,
     rows: news.slice(1, 4).map<FaceRow>((n) => ({ key: n.id, leadKind: 'dot', dotOn: n.trending, title: n.title, sub: n.source })),
+    previewCopy: p.preview ? { attention: attentionRow(briefingAttention(news)) } : undefined,
   };
   return <Card p={p} face={face} tone="linen" />;
 }
@@ -204,6 +242,7 @@ export function WatchWidget(p: WidgetProps) {
       key: s.symbol, lead: s.symbol, title: s.name, value: s.price.toFixed(2), valueTone: toneOf(s.changePercent), sub: fmtPct(s.changePercent),
     })),
     kv: indices.slice(0, 4).map((i) => ({ t: fmtPct(i.changePercent), s: i.label, c: i.changePercent >= 0 ? 'var(--b-green-deep)' : 'var(--b-red-deep)' })),
+    previewCopy: p.preview ? { attention: attentionRow(watchAttention(stocks)) } : undefined,
   };
   return <Card p={p} face={face} />;
 }
