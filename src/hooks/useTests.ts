@@ -49,6 +49,22 @@ export function useTestRuns(suiteId: string | null) {
   return { runs: data ?? [], isLoading, error: error as Error | null };
 }
 
+/**
+ * GET /admin/tests/runs with no suite — the newest 50 runs across every
+ * suite, for the Beta dev tools' durations and log tails. Each row carries
+ * up to 20 KB of output, so this does not poll: the page refetches it when a
+ * run it was watching finishes.
+ */
+export function useRecentTestRuns() {
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['admin', 'test-runs-recent'],
+    queryFn: () => adminGet<TestRunRow[]>('/admin/tests/runs'),
+    staleTime: 10_000,
+    ...ADMIN_QUERY_OPTIONS,
+  });
+  return { runs: data ?? [], isLoading, error: error as Error | null, refetch };
+}
+
 /** POST /admin/tests/run/:suiteId — fires a suite off via runTest's CI_JOBS allowlist. */
 export function useRunTest() {
   const qc = useQueryClient();
