@@ -146,12 +146,12 @@ describe('the surface registry covers every page, exactly once', () => {
     }
   });
 
-  test('the count is the count — 28 pages, 28 entries', () => {
+  test('the count is the count — 29 pages, 29 entries', () => {
     // A bare number so that ADDING a page without registering it, or removing
     // one without unregistering it, fails here even if some other assertion is
     // relaxed later. Bump it deliberately when a real surface is added.
-    expect(PARSED.length).toBe(28);
-    expect(SURFACES.length).toBe(28);
+    expect(PARSED.length).toBe(29);
+    expect(SURFACES.length).toBe(29);
   });
 });
 
@@ -212,7 +212,7 @@ describe('the consumer/admin split', () => {
     const of = (e: string) => SURFACES.filter((s) => s.edition === e).map((s) => s.path).sort();
     expect(of('consumer')).toEqual([
       '/', '/answer', '/atlas-core', '/atlas-teach', '/auth', '/clock', '/health', '/home',
-      '/mail', '/music', '/onboarding', '/permissions', '/settings', '/smart-home',
+      '/mail', '/music', '/onboarding', '/permissions', '/school', '/settings', '/smart-home',
     ].sort());
     expect(of('admin')).toEqual([
       '/agent-view', '/answer-views', '/atlas-architecture', '/atlas-sphere',

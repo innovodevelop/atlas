@@ -170,6 +170,9 @@ export const SURFACES: readonly SurfaceMeta[] = [
   // Beta phase 4: timer, countdown, alarms and world clocks — local features,
   // nothing sampled. Linked from the menu and from Home's "Elsewhere" widget.
   { path: '/clock', label: 'Clock', icon: 'Clock', entry: 'menu', mock: false, edition: 'consumer' },
+  // Beta phase 5: study plan, flashcards, tutor and the School Tools — all the
+  // student's own, kept on this Mac. No school feed exists, and the screen says so.
+  { path: '/school', label: 'School', icon: 'GraduationCap', entry: 'menu', mock: false, edition: 'consumer' },
   {
     path: '/atlas-teach',
     label: 'Teach Atlas',
@@ -327,6 +330,7 @@ const CONSUMER_LOADERS: Record<string, Loader> = {
   '/home': () => import('./pages/atlas/AtlasHome'),
   '/answer': () => import('./pages/atlas/BetaAnswer'),
   '/clock': () => import('./pages/atlas/BetaClock'),
+  '/school': () => import('./pages/atlas/BetaSchool'),
   '/atlas-teach': () => import('./pages/AtlasTeach'),
   '/smart-home': () => import('./pages/atlas/AtlasSmartHome'),
   '/health': () => import('./pages/atlas/AtlasHealth'),
