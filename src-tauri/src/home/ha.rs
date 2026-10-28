@@ -24,7 +24,7 @@ use std::collections::HashMap;
 use serde_json::{json, Value};
 
 use super::extras::{self, DeviceDetail, HubEntityPull, PullExtras, Registry};
-use super::{BridgeInfo, BridgeKind, BridgePull, DevicePull, HomeAdapter, HomeError, RoomPull, ScenePull};
+use super::{BridgeInfo, BridgeKind, BridgePull, DevicePull, HomeAdapter, HomeError, ScenePull};
 use crate::home::ws::WsClient;
 
 /// The HA entity domains Atlas renders. Anything else — `automation`, `script`,
@@ -364,39 +364,6 @@ impl HomeAssistant {
 /// The largest still Atlas will accept from a camera. A 4K JPEG is a few
 /// megabytes; anything past this is not a still.
 pub const CAMERA_STILL_MAX_BYTES: usize = 8 * 1024 * 1024;
-
-/// Split the two registry payloads into rooms and an entity→area index.
-pub fn parse_registry(areas: &Value, entities: &Value) -> (Vec<RoomPull>, HashMap<String, String>) {
-    let rooms = areas
-        .as_array()
-        .map(|list| {
-            list.iter()
-                .filter_map(|a| {
-                    Some(RoomPull {
-                        external_id: a["area_id"].as_str()?.to_string(),
-                        name: a["name"].as_str()?.to_string(),
-                    })
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-
-    let index = entities
-        .as_array()
-        .map(|list| {
-            list.iter()
-                .filter_map(|e| {
-                    Some((
-                        e["entity_id"].as_str()?.to_string(),
-                        e["area_id"].as_str()?.to_string(),
-                    ))
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-
-    (rooms, index)
-}
 
 /// Never let a bridge's own body reach the user or the model.
 ///
@@ -1338,7 +1305,8 @@ mod tests {
             { "entity_id": "light.arc", "area_id": "living" },
             { "entity_id": "light.loose", "area_id": Value::Null },
         ]);
-        let (rooms, index) = parse_registry(&areas, &entities);
+        // No device registry: an entity's own area is the only way into a room.
+        let (rooms, index, _) = extras::parse_registry_full(&areas, &entities, &Value::Null);
         assert_eq!(rooms.len(), 1);
         assert_eq!(rooms[0].name, "Living room");
         assert_eq!(index.get("light.arc").map(String::as_str), Some("living"));
