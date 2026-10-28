@@ -40,6 +40,22 @@ export interface WakeMsg {
 /** Manual activation (mic button) — same as wake. */
 export interface ActivateMsg {
   type: "activate";
+  /**
+   * Push to talk: the user is holding a key. The turn keeps listening through
+   * pauses — the VAD's end of speech does not close it — until `end_speech`,
+   * or for one minute at most (pttHold.ts). A key released before this was
+   * sent is sent as this followed at once by `end_speech`.
+   */
+  hold?: boolean;
+}
+
+/**
+ * Push to talk: the key was released. Close the utterance and answer it. One
+ * that finds the session idle cancels the hold of the activation that follows
+ * it (pttHold.ts).
+ */
+export interface EndSpeechMsg {
+  type: "end_speech";
 }
 
 /**
@@ -69,6 +85,7 @@ export type ClientMsg =
   | HelloMsg
   | WakeMsg
   | ActivateMsg
+  | EndSpeechMsg
   | BargeInReportMsg
   | CancelMsg
   | TextQueryMsg;

@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>(function(){window.addEventListener("unhandledrejection",function(e){var m=String(e.reason&&e.reason.message||e.reason);if(/Transition was aborted|ViewTransition/.test(m))e.preventDefault()});var top=false;try{top=window.self===window.top}catch(e){}var s=document.createElement("style");if(top){s.textContent="@view-transition{navigation:auto}";}else{s.textContent="html{animation:atlas-in .45s cubic-bezier(.22,1,.36,1) both}html.atlas-out{transition:opacity .22s ease,transform .22s ease;opacity:0;transform:scale(.988)}@keyframes atlas-in{from{opacity:0;transform:scale(1.012)}}";document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a||e.defaultPrevented||e.metaKey||e.ctrlKey||a.target)return;var h=a.getAttribute("href");if(!/\.dc\.html/.test(h)||/^https?:/.test(h))return;if(h.split("#")[0]===""||location.pathname.endsWith(encodeURI(h.split("#")[0]))&&h.indexOf("#")>0)return;e.preventDefault();document.documentElement.classList.add("atlas-out");setTimeout(function(){location.href=h},210)},true);}document.head.appendChild(s)})();</script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script>window.addEventListener("pagereveal",function(e){var t=e.viewTransition;if(t){["ready","finished","updateCallbackDone"].forEach(function(p){t[p]&&t[p].catch(function(){})})}});window.addEventListener("unhandledrejection",function(e){if(/Transition was aborted|ViewTransition/.test(String(e.reason&&e.reason.message||e.reason)))e.preventDefault()});</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+::view-transition-group(*){animation-duration:.55s;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+::view-transition-old(root){animation:.4s cubic-bezier(.22,1,.36,1) both vt-out}
+::view-transition-new(root){animation:.55s cubic-bezier(.22,1,.36,1) both vt-in}
+@keyframes vt-out{to{opacity:0;transform:scale(.985)}}
+@keyframes vt-in{from{opacity:0;transform:scale(1.015)}}
+*{box-sizing:border-box}
+body{margin:0;background:#f9f7f4}
+button,input,textarea{border:none;font:inherit;background:none;color:inherit}
+a{color:#3461f2;text-decoration:none}a:hover{color:#2748bd}
+::selection{background:#e8d8c2}
+::placeholder{color:#b6b1aa}
+.nosb{scrollbar-width:none}.nosb::-webkit-scrollbar{display:none}
+@keyframes bpop{from{opacity:0;transform:translateY(14px) scale(.986)}to{opacity:1;transform:none}}
+@keyframes bdot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
+@keyframes caret{0%,100%{opacity:1}50%{opacity:0}}
+</style>
+<script src="atlas-quickstart-sphere.js"></script>
+</helmet>
+
+<div data-screen-label="{{ screenLabel }}" style="min-height:100vh;display:grid;grid-template-columns:{{ cols }};background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased">
+
+<aside style="position:relative;min-height:{{ asideMin }};background:#3461f2;color:#fffdfa;display:flex;flex-direction:column;justify-content:space-between;padding:32px;overflow:hidden">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;position:relative;z-index:2"><span style="font-family:'Hanken Grotesk',sans-serif;font-size:20px;font-weight:600;letter-spacing:-.03em">Atlas</span>
+<button onClick="{{ toggleVoice }}" aria-label="{{ voiceAria }}" title="{{ voiceTitle }}" style="border:none;flex:none;white-space:nowrap;display:flex;align-items:center;gap:7px;height:34px;padding:0 13px 0 11px;border-radius:9999px;background:rgba(255,253,250,.14);color:#fffdfa;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer" style-hover="background:rgba(255,253,250,.22)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="{{ voiceIco }}"></path></svg>{{ voiceLabel }}</button></div>
+<div style="position:relative;flex:1;display:flex;align-items:center;justify-content:center;min-height:220px"><div style="position:relative;width:min(420px,80%);aspect-ratio:1"><canvas ref="{{ sphereRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas></div></div>
+<div style="position:relative;z-index:2;display:flex;flex-direction:column;gap:6px"><span style="font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,253,250,.72)">{{ asideKicker }}</span><p style="margin:0;max-width:380px;font-size:13.5px;line-height:1.55;color:rgba(255,253,250,.86);text-wrap:pretty">{{ asideLine }}</p></div>
+</aside>
+
+<main class="nosb" style="min-width:0;display:flex;flex-direction:column;padding:clamp(24px,4vw,56px);gap:24px;overflow-y:auto">
+<sc-if value="{{ showSteps }}" hint-placeholder-val="{{ false }}">
+<ol aria-label="Onboarding progress" style="list-style:none;margin:0;padding:0;display:flex;gap:6px">
+<sc-for list="{{ steps }}" as="s" hint-placeholder-count="3"><li aria-current="{{ s.cur }}" style="flex:1;display:flex;flex-direction:column;gap:6px"><span style="height:4px;border-radius:9999px;background:{{ s.bar }};transition:background .3s"></span><span style="font-size:11.5px;font-weight:600;color:{{ s.fg }}">{{ s.l }}</span></li></sc-for>
+</ol>
+</sc-if>
+
+<div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:22px;max-width:560px;width:100%;margin:0 auto">
+<div style="display:flex;flex-direction:column;gap:10px">
+<span style="font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#8b8681">{{ eyebrow }}</span>
+<h1 aria-live="polite" style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(28px,3.4vw,44px);font-weight:500;letter-spacing:-.045em;line-height:1.12;text-wrap:pretty;min-height:1.12em">{{ said }}<span style="display:inline-block;width:3px;height:.9em;margin-left:3px;vertical-align:-.08em;border-radius:2px;background:#3461f2;visibility:{{ caretVis }};animation:{{ caretAnim }}"></span></h1>
+<p style="margin:0;font-size:14px;line-height:1.5;color:#6d6a67;text-wrap:pretty">{{ sub }}</p>
+</div>
+
+<sc-if value="{{ isChoice }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-wrap:wrap;gap:8px;animation:bpop .4s cubic-bezier(.22,1,.36,1) both"><button onClick="{{ choose }}" data-k="signin" style="border:none;flex:none;white-space:nowrap;height:48px;padding:0 22px;border-radius:9999px;background:#1e1e24;color:#f9f7f4;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">Yes, sign me in</button><button onClick="{{ choose }}" data-k="signup" style="border:none;flex:none;white-space:nowrap;height:48px;padding:0 22px;border-radius:9999px;background:#f1eeea;color:#1e1e24;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer" style-hover="background:#edebe7">No, I’m new</button></div>
+</sc-if>
+
+<sc-if value="{{ isField }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:10px;animation:bpop .4s cubic-bezier(.22,1,.36,1) both">
+<div style="display:flex;align-items:center;gap:8px;padding:6px;border-radius:9999px;background:{{ fieldBg }};transition:background .2s">
+<input ref="{{ fieldRef }}" type="{{ fieldType }}" value="{{ fieldVal }}" onInput="{{ onField }}" onKeyDown="{{ fieldKey }}" autocomplete="{{ autoc }}" placeholder="{{ fieldPh }}" aria-label="{{ fieldPh }}" style="border:none;outline:none;flex:1;min-width:0;height:44px;padding:0 16px;background:transparent;color:#1e1e24;font-family:inherit;font-size:15px">
+<button onClick="{{ toggleMic }}" title="{{ micTitle }}" aria-label="{{ micTitle }}" disabled="{{ micDisabled }}" style="border:none;flex:none;width:44px;height:44px;border-radius:50%;background:{{ micBg }};color:{{ micFg }};display:flex;align-items:center;justify-content:center;cursor:{{ micCur }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{ micIco }}"></path></svg></button>
+<button onClick="{{ next }}" style="border:none;flex:none;white-space:nowrap;height:44px;padding:0 20px;border-radius:9999px;background:{{ nextBg }};color:{{ nextFg }};font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">{{ nextLabel }}</button>
+</div>
+<sc-if value="{{ hasError }}" hint-placeholder-val="{{ false }}"><p role="alert" style="margin:0;padding:10px 14px;border-radius:14px;background:#f7e6e4;font-size:13px;color:#a3352c">{{ error }}</p></sc-if>
+<div style="display:flex;flex-wrap:wrap;gap:4px"><sc-for list="{{ swaps }}" as="w" hint-placeholder-count="2"><button onClick="{{ swap }}" data-k="{{ w.k }}" style="border:none;flex:none;white-space:nowrap;height:32px;padding:0 12px;border-radius:9999px;background:transparent;color:#6d6a67;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer" style-hover="background:#f1eeea;color:#1e1e24">{{ w.l }}</button></sc-for></div>
+<sc-if value="{{ hasTrail }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ trail }}" as="t" hint-placeholder-count="2"><span style="height:28px;padding:0 11px;display:flex;align-items:center;gap:6px;border-radius:9999px;background:#f1eeea;font-size:12px"><span style="color:#8b8681">{{ t.k }}</span>{{ t.v }}</span></sc-for></div></sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{ isSent }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-wrap:wrap;gap:8px"><button onClick="{{ swap }}" data-k="start" style="border:none;flex:none;height:44px;padding:0 20px;border-radius:9999px;background:#f1eeea;color:#1e1e24;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">Back to sign in</button></div></sc-if>
+
+<sc-if value="{{ isIntro }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:6px;animation:bpop .4s cubic-bezier(.22,1,.36,1) both">
+<sc-for list="{{ introRows }}" as="r" hint-placeholder-count="3"><div style="display:flex;gap:12px;padding:13px 15px;border-radius:16px;background:#fffdfa"><span style="flex:none;width:24px;height:24px;border-radius:8px;background:#eef2fe;color:#2748bd;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">{{ r.n }}</span><span style="font-size:13.5px;line-height:1.5">{{ r.t }}</span></div></sc-for>
+<button onClick="{{ goPerms }}" style="border:none;align-self:flex-start;margin-top:10px;height:48px;padding:0 22px;border-radius:9999px;background:#3461f2;color:#fff;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">Show me</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ isPerms }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:14px;animation:bpop .4s cubic-bezier(.22,1,.36,1) both">
+<sc-for list="{{ groups }}" as="g" hint-placeholder-count="2">
+<div style="display:flex;flex-direction:column;gap:6px"><span style="padding:0 4px;font-size:11.5px;font-weight:600;color:#8b8681">{{ g.l }}</span>
+<sc-for list="{{ g.items }}" as="p" hint-placeholder-count="2">
+<button onClick="{{ togglePerm }}" data-k="{{ p.id }}" role="switch" aria-checked="{{ p.on }}" style="border:none;display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:18px;background:{{ p.bg }};font-family:inherit;text-align:left;cursor:pointer;transition:background .25s"><span style="flex:1;min-width:0"><span style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:#1e1e24">{{ p.title }}<span style="height:20px;padding:0 8px;display:flex;align-items:center;border-radius:9999px;background:{{ p.tagBg }};color:{{ p.tagFg }};font-size:10.5px;font-weight:600">{{ p.tag }}</span></span><span style="display:block;margin-top:3px;font-size:12.5px;line-height:1.5;color:#6d6a67">{{ p.line }}</span></span><span style="display:flex;flex:none;width:42px;height:25px;padding:3px;border-radius:9999px;background:{{ p.swBg }};justify-content:{{ p.swPos }};transition:background .25s"><span style="width:19px;height:19px;border-radius:50%;background:#fff;box-shadow:0 2px 5px rgba(30,30,36,.22)"></span></span></button>
+</sc-for>
+</div>
+</sc-for>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:4px"><button onClick="{{ confirmPerms }}" style="border:none;flex:none;white-space:nowrap;height:48px;padding:0 22px;border-radius:9999px;background:#3461f2;color:#fff;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">{{ permsBtn }}</button><span style="font-size:12.5px;color:#6d6a67">You can change any of these later in Settings.</span></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isAsking }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:10px;animation:bpop .4s cubic-bezier(.22,1,.36,1) both">
+<div role="dialog" aria-label="macOS permission" style="align-self:flex-start;width:min(360px,100%);padding:18px;border-radius:18px;background:#fffdfa;box-shadow:0 24px 54px -26px rgba(30,30,36,.4);display:flex;flex-direction:column;gap:10px">
+<span style="font-size:11px;font-weight:600;color:#8b8681">macOS</span>
+<p style="margin:0;font-size:14px;font-weight:600;line-height:1.4">“Atlas” would like to {{ askVerb }}.</p>
+<p style="margin:0;font-size:12.5px;line-height:1.5;color:#6d6a67">{{ askWhy }}</p>
+<div style="display:flex;gap:6px;justify-content:flex-end"><button onClick="{{ osAnswer }}" data-k="no" style="border:none;height:32px;padding:0 14px;border-radius:9999px;background:#f1eeea;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer">Don’t Allow</button><button onClick="{{ osAnswer }}" data-k="yes" style="border:none;height:32px;padding:0 14px;border-radius:9999px;background:#3461f2;color:#fff;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer">Allow</button></div>
+</div>
+<p style="margin:0;font-size:12.5px;color:#6d6a67">{{ askCount }}</p>
+</div>
+</sc-if>
+
+<sc-if value="{{ isWelcome }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:6px;animation:bpop .4s cubic-bezier(.22,1,.36,1) both">
+<sc-for list="{{ summary }}" as="s" hint-placeholder-count="4"><div style="display:flex;align-items:center;gap:12px;padding:12px 15px;border-radius:16px;background:#fffdfa"><span style="flex:1;font-size:13.5px;font-weight:600">{{ s.t }}</span><span style="flex:none;font-size:12.5px;font-weight:600;color:{{ s.fg }}">{{ s.v }}</span></div></sc-for>
+<a href="Atlas Dashboard Beta.dc.html" style="align-self:flex-start;margin-top:10px;height:48px;padding:0 22px;display:flex;align-items:center;border-radius:9999px;background:#1e1e24;color:#f9f7f4;font-size:14px;font-weight:600" style-hover="background:#2a2a31;color:#f9f7f4">Enter Atlas →</a>
+</div>
+</sc-if>
+</div>
+
+<footer style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;font-size:12px;color:#8b8681"><span>helloatlas.dk</span><span style="display:flex;gap:14px"><a href="https://helloatlas.dk/terms" target="_blank" rel="noopener" style="color:#6d6a67">Terms</a><a href="https://helloatlas.dk/privacy" target="_blank" rel="noopener" style="color:#6d6a67">Privacy</a></span></footer>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;startAt&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;login&quot;,&quot;options&quot;:[&quot;login&quot;,&quot;onboarding&quot;],&quot;tsType&quot;:&quot;'login' | 'onboarding'&quot;}}">
+class Component extends DCLogic {
+  state = { vw: window.innerWidth, stage: 'start', mode: null, key: null, vals: { email: '', password: '', name: '' }, said: '', target: '', typing: false, error: '', submitting: false, voice: true, mic: 'idle', perms: { microphone: true, notifications: true, liveData: true, proactive: false }, askQ: [], askI: 0, granted: {} };
+  componentDidMount() {
+    this.onResize = () => this.setState({ vw: window.innerWidth });
+    window.addEventListener('resize', this.onResize);
+    const st = this.props.startAt;
+    if (st === 'onboarding') this.toStage('intro'); else this.say('Hey, I’m Atlas. Have we met before?');
+  }
+  componentDidUpdate(p) { if (p.startAt !== this.props.startAt) { if (this.props.startAt === 'onboarding') this.toStage('intro'); else this.restart(); } const ns = this.state.typing && this.state.voice ? 'speaking' : this.state.mic === 'listening' ? 'listening' : this.state.submitting ? 'thinking' : 'idle'; if (this.sph && this.lastS !== ns) { this.lastS = ns; this.sph.set({ state: ns }); } }
+  componentWillUnmount() { window.removeEventListener('resize', this.onResize); clearInterval(this.iv); (this.timers || []).forEach(clearTimeout); if (this.sph) this.sph.destroy(); }
+  later(fn, ms) { (this.timers = this.timers || []).push(setTimeout(fn, ms)); }
+  say(t) {
+    clearInterval(this.iv);
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { this.setState({ said: t, target: t, typing: false }); return; }
+    this.setState({ said: '', target: t, typing: true }); let i = 0;
+    this.iv = setInterval(() => { i += 2; this.setState({ said: t.slice(0, i) }); if (i >= t.length) { clearInterval(this.iv); this.setState({ typing: false }); if (this.field) this.field.focus(); } }, 28);
+  }
+  restart() { this.setState({ stage: 'start', mode: null, key: null, error: '', vals: { email: '', password: '', name: '' }, mic: 'idle' }); this.say('Hey, I’m Atlas. Have we met before?'); }
+  order() { return this.state.mode === 'signin' ? ['email', 'password'] : ['name', 'email', 'password']; }
+  line(key) {
+    const m = this.state.mode, n = this.state.vals.name.trim();
+    if (m === 'signin') return key === 'email' ? 'Welcome back. What’s your email?' : 'And your password?';
+    if (key === 'name') return 'Lovely. What should I call you?';
+    if (key === 'email') return 'Nice to meet you' + (n ? ', ' + n : '') + '. What’s your email?';
+    return 'Now pick a password to keep it safe.';
+  }
+  ask(key) { this.setState({ stage: 'field', key, error: '', mic: key === 'password' ? 'blocked' : (this.state.mic === 'blocked' ? 'idle' : this.state.mic) }); this.say(this.line(key)); }
+  toStage(s) {
+    this.setState({ stage: s });
+    if (s === 'intro') this.say('Before we start, here’s what I’d like to do. You decide.');
+    if (s === 'perms') this.say('Switch on what you’re comfortable with.');
+    if (s === 'welcome') this.say('Welcome' + (this.state.vals.name.trim() ? ', ' + this.state.vals.name.trim() : ', Marcus') + '. I’m ready when you are.');
+  }
+  next() {
+    const s = this.state, k = s.key, v = (s.vals[k] || '').trim();
+    if (s.submitting) return;
+    if (s.stage === 'forgot') {
+      if (!v) { this.setState({ error: 'This one can’t be empty.' }); return; }
+      this.setState({ submitting: true, error: '' });
+      this.later(() => { this.setState({ submitting: false, stage: 'sent' }); this.say('If that address has an Atlas account, a link is on its way.'); }, 1100);
+      return;
+    }
+    if (!v) { this.setState({ error: 'This one can’t be empty.' }); return; }
+    if (k === 'email' && !/^\S+@\S+\.\S+$/.test(v)) { this.setState({ error: 'That doesn’t look like an email address.' }); return; }
+    if (k === 'password' && s.mode === 'signup' && v.length < 8) { this.setState({ error: 'Use at least 8 characters.' }); return; }
+    const o = this.order(), i = o.indexOf(k);
+    if (i < o.length - 1) { this.ask(o[i + 1]); return; }
+    this.setState({ submitting: true, error: '' });
+    this.later(() => {
+      if (s.mode === 'signin' && v === 'wrong') { this.setState({ submitting: false, error: 'That didn’t match what I have. Want to try again?' }); this.say('That didn’t match what I have. Want to try again?'); return; }
+      this.setState({ submitting: false, mic: 'idle' });
+      if (s.mode === 'signup') this.toStage('intro');
+      else { this.setState({ stage: 'done' }); this.say('Welcome back. Everything is where you left it.'); }
+    }, 1200);
+  }
+  renderVals() {
+    const st = this.state, narrow = st.vw < 900;
+    const P = [
+      ['microphone', 'Microphone', 'So we can just talk, instead of you typing everything.', 'Voice conversations are unavailable. Typing works exactly as well.', true, 'record audio', 'Atlas listens for its name on this Mac and only sends what you say after it.'],
+      ['notifications', 'Notifications', 'So I can tell you when something actually matters, not for the sake of it.', 'Alerts appear inside Atlas only, when you open it.', true, 'send you notifications', 'Notifications may include alerts, sounds and badges.'],
+      ['liveData', 'Live data', 'Weather, markets and news on your dashboard, fetched as you look at them.', 'Those cards stay empty. Nothing else changes.', false],
+      ['proactive', 'Proactive digest', 'A short digest of what changed, prepared while you’re away.', 'I only ever respond when you ask. Nothing runs on its own.', false]
+    ];
+    const SW = (on) => ({ swBg: on ? '#3461f2' : '#d8d4cd', swPos: on ? 'flex-end' : 'flex-start' });
+    const stg = st.stage;
+    const onbIdx = { intro: 0, perms: 1, asking: 1, welcome: 2 }[stg];
+    const isPw = st.key === 'password';
+    const micBlocked = isPw || st.mic === 'blocked';
+    const micOn = st.mic === 'listening' && !micBlocked;
+    const sub = stg === 'done' ? 'Everything is ready.' : stg === 'sent' ? 'Check your inbox.' : stg === 'start' ? 'Tell me where to begin.' : stg === 'intro' ? 'Three things, then you’re in.' : stg === 'perms' ? 'Two of these make macOS ask you. Two are just Atlas settings.' : stg === 'asking' ? 'macOS asks for the ones you switched on, one at a time.' : stg === 'welcome' ? 'Here’s what you chose.' : micBlocked ? 'Type this one. I stop listening for passwords.' : micOn ? 'I’m listening, or just type.' : 'Type it, or tap the microphone.';
+    const cur = st.askQ[st.askI];
+    const curP = P.find((p) => p[0] === cur);
+    return {
+      sphereRef: (el) => {
+        if (!el || el.__q) return;
+        const go = () => { if (el.__q || !el.isConnected) return; if (!window.QuickSphere) return setTimeout(go, 60);
+          el.__q = this.sph = window.QuickSphere.mount(el, { mode: 'veil', bg: '#3461f2', dust: [214, 224, 255], strand: [255, 253, 250], blend: 'source-over', alpha: 0.7, seed: 11, count: 16000, scale: 0.42, state: 'idle' }); this.lastS = 'idle'; };
+        go();
+      },
+      fieldRef: (el) => { this.field = el; },
+      screenLabel: onbIdx != null ? 'Atlas Onboarding — Beta' : st.mode === 'signup' ? 'Atlas Sign up — Beta' : 'Atlas Login — Beta',
+      cols: narrow ? 'minmax(0,1fr)' : 'minmax(320px,.9fr) minmax(0,1.1fr)', asideMin: narrow ? '300px' : '100vh',
+      asideKicker: onbIdx != null ? 'Setting up' : st.mode === 'signup' ? 'New here' : 'Sign in',
+      asideLine: onbIdx != null ? 'Your memories, documents and voice stay on this Mac. What leaves it is the question you ask, with the few memories that help answer it.' : 'Speak to Atlas or type. Passwords are always typed, and the microphone switches off while one is on screen.',
+      voiceLabel: st.voice ? 'Voice on' : 'Voice off', voiceAria: st.voice ? 'Turn Atlas’s voice off' : 'Turn Atlas’s voice on', voiceTitle: st.voice ? 'Atlas is speaking. Click to silence.' : 'Atlas is silent. Click to hear it.',
+      voiceIco: st.voice ? 'M4 9.5h3.5L12 5.5v13l-4.5-4H4zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11' : 'M4 9.5h3.5L12 5.5v13l-4.5-4H4zM16 9.5l5 5M21 9.5l-5 5',
+      toggleVoice: () => this.setState((s) => ({ voice: !s.voice })),
+      showSteps: onbIdx != null, steps: ['Intro', 'Permissions', 'Welcome'].map((l, i) => ({ l, cur: i === onbIdx ? 'step' : 'false', bar: i <= onbIdx ? '#3461f2' : '#edebe7', fg: i === onbIdx ? '#1e1e24' : '#8b8681' })),
+      eyebrow: stg === 'start' ? 'Atlas' : st.mode === 'signin' || stg === 'forgot' || stg === 'sent' || stg === 'done' ? 'Sign in' : onbIdx != null ? 'Step ' + (onbIdx + 1) + ' of 3' : 'Create your account',
+      said: st.said, caretVis: st.typing ? 'visible' : 'hidden', caretAnim: st.typing ? 'caret 1s steps(1) infinite' : 'none', sub,
+      isChoice: stg === 'start' && !st.typing,
+      choose: (e) => { const m = e.currentTarget.getAttribute('data-k'); this.setState({ mode: m }, () => this.ask(m === 'signin' ? 'email' : 'name')); },
+      isField: stg === 'field' || stg === 'forgot',
+      fieldType: isPw ? 'password' : st.key === 'email' ? 'email' : 'text', autoc: isPw ? (st.mode === 'signin' ? 'current-password' : 'new-password') : st.key === 'name' ? 'given-name' : 'email',
+      fieldVal: st.vals[st.key] || '', fieldPh: { email: 'your email', password: 'password', name: 'your first name' }[st.key] || '',
+      onField: (e) => { const v = e.currentTarget.value; this.setState((s) => ({ vals: Object.assign({}, s.vals, { [s.key]: v }), error: '' })); },
+      fieldKey: (e) => { if (e.key === 'Enter') this.next(); },
+      fieldBg: st.error ? '#f7e6e4' : '#fffdfa',
+      micTitle: micBlocked ? 'Microphone off while a password is on screen' : micOn ? 'Stop listening' : 'Let Atlas hear you', micDisabled: micBlocked,
+      micBg: micBlocked ? '#f1eeea' : micOn ? '#3461f2' : '#f1eeea', micFg: micBlocked ? '#b6b1aa' : micOn ? '#fff' : '#1e1e24', micCur: micBlocked ? 'not-allowed' : 'pointer',
+      micIco: micBlocked ? 'M12 3.5a2.6 2.6 0 0 1 2.6 2.6v5.4a2.6 2.6 0 0 1-5.2 0V6.1A2.6 2.6 0 0 1 12 3.5zM18.1 11.5a6.1 6.1 0 0 1-12.2 0M12 17.6v3M4.4 4.4l15.2 15.2' : 'M12 3.5a2.6 2.6 0 0 1 2.6 2.6v5.4a2.6 2.6 0 0 1-5.2 0V6.1A2.6 2.6 0 0 1 12 3.5zM18.1 11.5a6.1 6.1 0 0 1-12.2 0M12 17.6v3',
+      toggleMic: () => { if (micBlocked) return; if (micOn) { this.setState({ mic: 'idle' }); return; } this.setState({ mic: 'listening' }); this.later(() => { if (this.state.mic !== 'listening') return; const k = this.state.key; const v = k === 'name' ? 'Marcus' : k === 'email' ? 'marcus.hale@gmail.com' : ''; this.setState((s) => ({ mic: 'idle', vals: Object.assign({}, s.vals, { [k]: v }) })); }, 1600); },
+      next: () => this.next(), nextLabel: st.submitting ? (stg === 'forgot' ? 'Sending…' : 'One moment…') : stg === 'forgot' ? 'Send me a link →' : (st.key === 'password' ? (st.mode === 'signin' ? 'Sign in' : 'Create account') : 'Next'),
+      nextBg: (st.vals[st.key] || '').trim() ? '#3461f2' : '#f1eeea', nextFg: (st.vals[st.key] || '').trim() ? '#fff' : '#b6b1aa',
+      hasError: !!st.error, error: st.error,
+      swaps: (st.mode === 'signin' && isPw && stg === 'field' ? [{ k: 'forgot', l: 'Forgot password?' }] : []).concat([{ k: 'start', l: stg === 'forgot' ? 'Back to sign in' : 'Start over' }]),
+      swap: (e) => { const k = e.currentTarget.getAttribute('data-k'); if (k === 'forgot') { this.setState({ stage: 'forgot', key: 'email', error: '', mic: 'idle' }); this.say('No problem. What’s the email on the account?'); } else this.restart(); },
+      hasTrail: stg === 'field' && st.mode === 'signup' && st.key !== 'name', trail: [['Name', st.vals.name], ['Email', st.key === 'password' ? st.vals.email : '']].filter((x) => x[1]).map(([k, v]) => ({ k, v })),
+      isSent: stg === 'sent' || stg === 'done',
+      isIntro: stg === 'intro' && !st.typing, introRows: ['I’ll tell you what I’d like to be able to do, and why.', 'You switch on only what you’re comfortable with. Nothing is required.', 'macOS asks you itself for the two that need its permission.'].map((t, i) => ({ n: String(i + 1), t })),
+      goPerms: () => this.toStage('perms'),
+      isPerms: stg === 'perms',
+      groups: [['macOS permissions', P.filter((p) => p[4])], ['Atlas settings', P.filter((p) => !p[4])]].map(([l, items]) => ({ l, items: items.map(([id, title, on, off, os]) => { const v = !!st.perms[id]; return Object.assign({ id, title, on: v ? 'true' : 'false', line: v ? on : off, tag: os ? 'macOS will ask' : 'Atlas setting', tagBg: os ? '#eef2fe' : '#f1eeea', tagFg: os ? '#2748bd' : '#6d6a67', bg: v ? '#fffdfa' : '#f1eeea' }, SW(v)); }) })),
+      togglePerm: (e) => { const k = e.currentTarget.getAttribute('data-k'); const v = !this.state.perms[k]; const p = P.find((x) => x[0] === k); this.setState((s) => ({ perms: Object.assign({}, s.perms, { [k]: v }) })); this.say(v ? p[2] : p[3]); },
+      permsBtn: Object.values(st.perms).some(Boolean) ? 'Continue' : 'Continue without any',
+      confirmPerms: () => { const q = P.filter((p) => p[4] && st.perms[p[0]]).map((p) => p[0]); if (q.length) { this.setState({ askQ: q, askI: 0, granted: {} }); this.toStage('asking'); this.say('macOS will ask you now.'); } else this.toStage('welcome'); },
+      isAsking: stg === 'asking' && !!curP, askVerb: curP ? curP[5] : '', askWhy: curP ? curP[6] : '', askCount: st.askQ.length > 1 ? (st.askI + 1) + ' of ' + st.askQ.length : '',
+      osAnswer: (e) => { const yes = e.currentTarget.getAttribute('data-k') === 'yes'; const g = Object.assign({}, st.granted, { [cur]: yes }); if (st.askI + 1 < st.askQ.length) this.setState({ granted: g, askI: st.askI + 1 }); else { this.setState({ granted: g }); this.toStage('welcome'); } },
+      isWelcome: stg === 'welcome' && !st.typing,
+      summary: P.map(([id, title, , , os]) => { const on = !!st.perms[id], denied = os && on && st.granted[id] === false; return { t: title, v: denied ? 'Declined in macOS' : on ? 'On' : 'Off', fg: denied ? '#9a5a00' : on ? '#0a7a53' : '#8b8681' }; })
+    };
+  }
+}
+</script>
+</body>
+</html>

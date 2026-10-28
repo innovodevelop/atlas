@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>(function(){window.addEventListener("unhandledrejection",function(e){var m=String(e.reason&&e.reason.message||e.reason);if(/Transition was aborted|ViewTransition/.test(m))e.preventDefault()});var top=false;try{top=window.self===window.top}catch(e){}var s=document.createElement("style");if(top){s.textContent="@view-transition{navigation:auto}";}else{s.textContent="html{animation:atlas-in .45s cubic-bezier(.22,1,.36,1) both}html.atlas-out{transition:opacity .22s ease,transform .22s ease;opacity:0;transform:scale(.988)}@keyframes atlas-in{from{opacity:0;transform:scale(1.012)}}";document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a||e.defaultPrevented||e.metaKey||e.ctrlKey||a.target)return;var h=a.getAttribute("href");if(!/\.dc\.html/.test(h)||/^https?:/.test(h))return;if(h.split("#")[0]===""||location.pathname.endsWith(encodeURI(h.split("#")[0]))&&h.indexOf("#")>0)return;e.preventDefault();document.documentElement.classList.add("atlas-out");setTimeout(function(){location.href=h},210)},true);}document.head.appendChild(s)})();</script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script>window.addEventListener("pagereveal",function(e){var t=e.viewTransition;if(t){["ready","finished","updateCallbackDone"].forEach(function(p){t[p]&&t[p].catch(function(){})})}});window.addEventListener("unhandledrejection",function(e){if(/Transition was aborted|ViewTransition/.test(String(e.reason&&e.reason.message||e.reason)))e.preventDefault()});</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+::view-transition-group(*){animation-duration:.55s;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+::view-transition-old(root){animation:.4s cubic-bezier(.22,1,.36,1) both vt-out}
+::view-transition-new(root){animation:.55s cubic-bezier(.22,1,.36,1) both vt-in}
+@keyframes vt-out{to{opacity:0;transform:scale(.985)}}
+@keyframes vt-in{from{opacity:0;transform:scale(1.015)}}
+*{box-sizing:border-box}
+body{margin:0;background:#f9f7f4}
+button,input,textarea,select{border:none;font:inherit;background:none;color:inherit}
+a{color:#3461f2;text-decoration:none}a:hover{color:#2748bd}
+::selection{background:#e8d8c2}
+::placeholder{color:#b6b1aa}
+.nosb{scrollbar-width:none}.nosb::-webkit-scrollbar{display:none}
+@keyframes bpop{from{opacity:0;transform:translateY(14px) scale(.986)}to{opacity:1;transform:none}}
+@keyframes bdot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
+@keyframes ring{0%,100%{transform:rotate(0)}20%{transform:rotate(-8deg)}40%{transform:rotate(8deg)}60%{transform:rotate(-5deg)}80%{transform:rotate(5deg)}}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;transition:none !important}}
+</style>
+<script src="atlas-quickstart-sphere.js"></script>
+<script src="atlas-orb.js"></script>
+<script src="atlas-topbar.js"></script>
+</helmet>
+
+<div data-screen-label="Atlas Clock — {{ modeName }}" class="nosb" style="height:100vh;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding:26px 26px 88px;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased">
+
+<header data-screen-label="Clock hero" style="flex:none;view-transition-name:hero;flex:none;position:relative;border-radius:36px;background:#1e1e24;color:#f9f7f4;padding:clamp(20px,3vw,34px) clamp(22px,3vw,40px) 22px;display:flex;flex-direction:column;gap:18px;overflow:hidden;animation:bpop .6s cubic-bezier(.22,1,.36,1) both">
+<div style="position:absolute;right:-40px;top:-50px;width:min(360px,40vw);aspect-ratio:1"><canvas ref="{{ sphereRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas></div>
+<div style="position:relative;display:flex;flex-direction:column;gap:4px">
+<span style="font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:rgba(249,247,244,.62)">{{ eyebrow }}</span>
+<a href="Atlas Dashboard Beta.dc.html" title="Back to Home · Esc" style="align-self:flex-start;display:flex;align-items:baseline;gap:.08em;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(76px,12vw,184px);font-weight:500;letter-spacing:-.06em;line-height:.88;color:#f9f7f4;font-variant-numeric:tabular-nums" style-hover="color:#f9f7f4;opacity:.9">{{ bigHM }}<span style="font-size:.34em;letter-spacing:-.03em;color:rgba(249,247,244,.62)">{{ bigS }}</span></a>
+<p style="margin:8px 0 0;max-width:620px;font-size:15px;line-height:1.5;color:rgba(249,247,244,.78)">{{ subline }}</p>
+</div>
+<div style="position:relative;display:flex;flex-direction:column;gap:8px">
+<div style="position:relative;height:72px;border-radius:16px;overflow:hidden;display:flex">
+<sc-for list="{{ dayBand }}" as="b" hint-placeholder-count="24"><span style="flex:1;background:{{ b.c }}"></span></sc-for>
+<span style="position:absolute;top:0;bottom:0;left:{{ nowX }};width:2px;background:#f9f7f4"></span>
+<sc-for list="{{ bandCities }}" as="c" hint-placeholder-count="5"><span title="{{ c.n }} · {{ c.t }}" style="position:absolute;top:{{ c.y }};left:{{ c.x }};transform:translate(-50%,-50%);height:28px;padding:0 10px;display:flex;align-items:center;gap:6px;border-radius:9999px;background:{{ c.bg }};color:{{ c.fg }};font-size:12px;font-weight:600;white-space:nowrap"><span style="font-variant-numeric:tabular-nums">{{ c.t }}</span>{{ c.n }}</span></sc-for>
+</div>
+<div style="display:flex;justify-content:space-between;font-family:'Geist Mono',ui-monospace,monospace;font-size:11px;color:rgba(249,247,244,.62)"><span>00</span><span>06</span><span>12</span><span>18</span><span>24 · your time</span></div>
+</div>
+</header>
+
+<div style="flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:8px">
+<div role="tablist" aria-label="Clock mode" style="flex:none;display:flex;gap:2px;padding:4px;border-radius:22px;background:#f1eeea">
+<sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4"><button role="tab" aria-selected="{{ t.on }}" onClick="{{ pickTab }}" data-k="{{ t.k }}" style="border:none;flex:none;white-space:nowrap;display:flex;align-items:center;gap:8px;height:40px;padding:0 16px;border-radius:9999px;background:{{ t.bg }};color:{{ t.fg }};font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;transition:background .2s"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{ t.ico }}"></path></svg>{{ t.l }}<sc-if value="{{ t.live }}" hint-placeholder-val="{{ false }}"><span style="width:7px;height:7px;border-radius:50%;background:{{ t.dot }}"></span></sc-if></button></sc-for>
+</div>
+<span style="flex:1"></span>
+<sc-for list="{{ running }}" as="r" hint-placeholder-count="0"><button onClick="{{ pickTab }}" data-k="{{ r.k }}" title="Open {{ r.l }}" style="border:none;flex:none;white-space:nowrap;display:flex;align-items:center;gap:8px;height:36px;padding:0 14px 0 12px;border-radius:9999px;background:{{ r.bg }};color:{{ r.fg }};font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer"><span style="width:7px;height:7px;border-radius:50%;background:{{ r.dot }}"></span>{{ r.l }}<span style="font-family:'Geist Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums">{{ r.v }}</span></button></sc-for>
+</div>
+
+<sc-if value="{{ isTimer }}" hint-placeholder-val="{{ false }}">
+<div style="display:grid;grid-template-columns:{{ twoCols }};gap:12px;align-items:start">
+<section style="border-radius:28px;background:#fffdfa;padding:28px;display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center">
+<span style="height:26px;padding:0 11px;display:flex;align-items:center;border-radius:9999px;background:{{ tStateBg }};color:{{ tStateFg }};font-size:12px;font-weight:600">{{ tStateLabel }}</span>
+<span role="timer" aria-live="off" style="font-family:'Hanken Grotesk',sans-serif;font-size:clamp(56px,8vw,104px);font-weight:600;letter-spacing:-.05em;line-height:1;font-variant-numeric:tabular-nums">{{ tBig }}</span>
+<span style="min-height:20px;font-size:14px;color:#6d6a67;font-variant-numeric:tabular-nums">{{ curLap }}</span>
+<div style="display:flex;gap:10px"><button onClick="{{ tSec }}" aria-disabled="{{ tSecDis }}" style="border:none;flex:none;white-space:nowrap;min-width:120px;height:52px;padding:0 26px;border-radius:9999px;background:#f1eeea;color:{{ tSecFg }};font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;transition:background .2s">{{ tSecL }}</button><button onClick="{{ tMain }}"  style="border:none;flex:none;white-space:nowrap;min-width:120px;height:52px;padding:0 26px;border-radius:9999px;background:{{ tMainBg }};color:#fff;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;transition:background .2s">{{ tMainL }}</button></div>
+</section>
+<section style="border-radius:28px;background:#f1eeea;padding:16px;display:flex;flex-direction:column;gap:4px;max-height:520px">
+<div style="display:flex;justify-content:space-between;gap:10px;padding:2px 6px 8px"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em">Laps</p><span style="font-size:12px;color:#6d6a67">{{ lapCount }}</span></div>
+<div style="display:grid;grid-template-columns:44px 1fr 1fr 1fr;gap:10px;padding:0 12px 4px;font-size:11px;font-weight:600;color:#8b8681"><span>#</span><span>Lap</span><span>vs previous</span><span style="text-align:right">Total</span></div>
+<div class="nosb" style="overflow-y:auto;display:flex;flex-direction:column;gap:4px">
+<sc-for list="{{ laps }}" as="l" hint-placeholder-count="0"><div style="display:grid;grid-template-columns:44px 1fr 1fr 1fr;gap:10px;align-items:center;padding:10px 12px;border-radius:12px;background:#fffdfa;font-variant-numeric:tabular-nums;font-size:13px;animation:bpop .3s cubic-bezier(.22,1,.36,1) both"><span style="font-weight:600;color:#8b8681">{{ l.n }}</span><span style="display:flex;align-items:center;gap:6px;font-weight:600;font-family:'Geist Mono',ui-monospace,monospace">{{ l.split }}<sc-if value="{{ l.hasTag }}" hint-placeholder-val="{{ false }}"><span style="height:18px;padding:0 7px;display:flex;align-items:center;border-radius:9999px;background:{{ l.tagBg }};color:{{ l.tagFg }};font-family:'Geist',sans-serif;font-size:10px">{{ l.tag }}</span></sc-if></span><span style="font-family:'Geist Mono',ui-monospace,monospace;color:{{ l.dFg }}">{{ l.delta }}</span><span style="text-align:right;font-family:'Geist Mono',ui-monospace,monospace;color:#6d6a67">{{ l.total }}</span></div></sc-for>
+<sc-if value="{{ noLaps }}" hint-placeholder-val="{{ true }}"><div style="padding:22px 16px;border-radius:14px;background:#f9f7f4;font-size:12.5px;color:#6d6a67;text-align:center">Start the timer and press Lap to mark a split. Each lap shows how it compares with the one before.</div></sc-if>
+</div>
+</section>
+</div>
+</sc-if>
+<sc-if value="{{ isCountdown }}" hint-placeholder-val="{{ false }}">
+<div style="display:grid;grid-template-columns:{{ twoCols }};gap:12px;align-items:start">
+<section style="border-radius:28px;background:{{ cCardBg }};padding:28px;display:flex;flex-direction:column;align-items:center;gap:18px;transition:background .4s">
+<div style="position:relative;width:min(300px,70vw);aspect-ratio:1">
+<svg viewBox="0 0 280 280" style="width:100%;height:100%;transform:rotate(-90deg)"><circle cx="140" cy="140" r="{{ R }}" fill="none" stroke="{{ ringTrack }}" stroke-width="10"></circle><circle cx="140" cy="140" r="{{ R }}" fill="none" stroke="{{ ringC }}" stroke-width="10" stroke-linecap="round" stroke-dasharray="{{ ringDash }}" stroke-dashoffset="{{ ringOff }}" style="transition:stroke-dashoffset .25s linear,stroke .4s"></circle></svg>
+<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center"><span role="timer" style="font-family:'Hanken Grotesk',sans-serif;font-size:clamp(40px,5vw,60px);font-weight:600;letter-spacing:-.05em;line-height:1;color:{{ cBigFg }};font-variant-numeric:tabular-nums">{{ cBig }}</span><span style="font-size:12.5px;color:{{ cSubFg }};font-variant-numeric:tabular-nums">{{ cTotalL }}</span></div>
+</div>
+<span style="font-size:13px;font-weight:600;color:{{ cSubFg }}">{{ cState }}</span>
+<div style="display:flex;gap:10px"><button onClick="{{ cSplit }}"  style="border:none;flex:none;white-space:nowrap;min-width:120px;height:52px;padding:0 26px;border-radius:9999px;background:{{ cSecBg }};color:{{ cSecFg }};font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;transition:background .2s">{{ cSecL }}</button><button onClick="{{ cMain }}"  style="border:none;flex:none;white-space:nowrap;min-width:120px;height:52px;padding:0 26px;border-radius:9999px;background:{{ cMainBg }};color:{{ cMainFg }};font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;transition:background .2s">{{ cMainL }}</button></div>
+</section>
+<div style="display:flex;flex-direction:column;gap:12px">
+<section style="border-radius:28px;background:#f1eeea;padding:16px;display:flex;flex-direction:column;gap:10px">
+<div role="tablist" aria-label="Countdown type" style="align-self:flex-start;display:flex;gap:2px;padding:4px;border-radius:9999px;background:#fffdfa"><sc-for list="{{ cModes }}" as="m" hint-placeholder-count="2"><button role="tab" onClick="{{ pickCMode }}" data-k="{{ m.k }}" style="border:none;flex:none;white-space:nowrap;height:30px;padding:0 13px;border-radius:9999px;background:{{ m.bg }};color:{{ m.fg }};font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer">{{ m.l }}</button></sc-for></div>
+<sc-if value="{{ isDur }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ presets }}" as="p" hint-placeholder-count="5"><button onClick="{{ pickPreset }}" data-k="{{ p.m }}" style="border:none;flex:none;white-space:nowrap;height:36px;padding:0 15px;border-radius:9999px;background:{{ p.bg }};color:{{ p.fg }};font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">{{ p.l }}</button></sc-for></div>
+<div style="display:flex;gap:6px"><button onClick="{{ stepDur }}" data-k="-1" style="border:none;flex:1;height:36px;border-radius:12px;background:#fffdfa;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">− 1 min</button><button onClick="{{ stepDur }}" data-k="1" style="border:none;flex:1;height:36px;border-radius:12px;background:#fffdfa;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">+ 1 min</button><button onClick="{{ stepDur }}" data-k="10" style="border:none;flex:1;height:36px;border-radius:12px;background:#fffdfa;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">+ 10 min</button></div></sc-if>
+<sc-if value="{{ isTarget }}" hint-placeholder-val="{{ false }}"><input type="datetime-local" value="{{ cTarget }}" onInput="{{ onTarget }}" aria-label="Count down to" style="border:none;outline:none;height:44px;padding:0 14px;border-radius:14px;background:#fffdfa;color:#1e1e24;font-family:inherit;font-size:14px;font-variant-numeric:tabular-nums"><p style="margin:0;font-size:12px;color:#6d6a67">Counts down to that moment, then keeps going past it.</p></sc-if>
+</section>
+<section style="border-radius:28px;background:#fffdfa;padding:16px;display:flex;flex-direction:column;gap:4px">
+<div style="padding:2px 6px 8px"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em">Splits</p></div>
+<sc-for list="{{ cSplits }}" as="s" hint-placeholder-count="0"><div style="display:flex;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:12px;background:#f9f7f4;font-size:13px;font-variant-numeric:tabular-nums"><span style="font-weight:600;color:#8b8681">{{ s.n }}</span><span style="font-family:'Geist Mono',ui-monospace,monospace">{{ s.v }} left</span><span style="font-family:'Geist Mono',ui-monospace,monospace;color:#6d6a67">{{ s.used }} used</span></div></sc-for>
+<sc-if value="{{ noSplits }}" hint-placeholder-val="{{ true }}"><div style="padding:16px;border-radius:14px;background:#f9f7f4;font-size:12.5px;color:#6d6a67;text-align:center">Press Split while it runs to mark how much was left.</div></sc-if>
+</section>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ isAlarm }}" hint-placeholder-val="{{ true }}">
+<section role="note" style="border-radius:24px;background:{{ honestBg }};color:{{ honestFg }};padding:18px 20px;display:flex;flex-direction:column;gap:10px;transition:background .3s">
+<div style="display:flex;gap:12px;align-items:flex-start"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:1px"><path d="M4 5h16v10H4zM2 19h20"></path></svg><div style="flex:1;min-width:0"><p style="margin:0;font-size:14px;font-weight:600;line-height:1.45">{{ honestTitle }}</p><p style="margin:4px 0 0;font-size:12.5px;line-height:1.55;color:{{ honestSub }};text-wrap:pretty">{{ honestBody }}</p></div></div>
+<sc-if value="{{ showAwake }}" hint-placeholder-val="{{ false }}"><button onClick="{{ toggleAwake }}" role="switch" style="border:none;display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:rgba(249,247,244,.08);color:#f9f7f4;font-family:inherit;text-align:left;cursor:pointer"><span style="flex:1;font-size:13px;font-weight:600;line-height:1.45">{{ awakeLabel }}</span><span style="display:flex;flex:none;width:42px;height:25px;padding:3px;border-radius:9999px;background:{{ awakeSwBg }};justify-content:{{ awakeSwPos }};transition:background .25s"><span style="width:19px;height:19px;border-radius:50%;background:#fff"></span></span></button></sc-if>
+</section>
+<div style="display:grid;grid-template-columns:{{ twoCols }};gap:12px;align-items:start">
+<section style="border-radius:28px;background:#f1eeea;padding:12px;display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 8px 6px"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em">Alarms</p><button onClick="{{ newAlarm }}" style="border:none;flex:none;white-space:nowrap;height:32px;padding:0 14px;border-radius:9999px;background:#3461f2;color:#fff;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer">New alarm</button></div>
+<sc-for list="{{ alarmRows }}" as="a" hint-placeholder-count="4">
+<div style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:20px;background:{{ a.bg }};transition:background .25s">
+<button onClick="{{ editAlarm }}" data-k="{{ a.id }}" style="border:none;flex:1;min-width:0;display:flex;align-items:center;gap:16px;padding:0;background:transparent;font-family:inherit;text-align:left;cursor:pointer">
+<span style="flex:none;font-family:'Hanken Grotesk',sans-serif;font-size:34px;font-weight:600;letter-spacing:-.045em;line-height:1;color:{{ a.tFg }};font-variant-numeric:tabular-nums">{{ a.t }}</span>
+<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
+<span style="display:flex;align-items:baseline;gap:8px;min-width:0"><span style="font-size:14px;font-weight:600;color:{{ a.tFg }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.label }}</span><span style="flex:none;font-size:12px;font-weight:600;color:{{ a.whenFg }};white-space:nowrap">{{ a.when }}</span></span>
+<span style="display:flex;flex-wrap:wrap;align-items:center;gap:8px"><span style="display:flex;gap:2px" title="{{ a.dl }}"><sc-for list="{{ a.days }}" as="d" hint-placeholder-count="7"><span style="width:18px;height:18px;border-radius:50%;background:{{ d.bg }};color:{{ d.fg }};display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700">{{ d.d }}</span></sc-for></span><span style="display:flex;align-items:center;gap:5px;font-size:12px;color:#6d6a67;white-space:nowrap"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{ a.outIco }}"></path></svg>{{ a.out }}</span></span>
+<sc-if value="{{ a.hasSnz }}" hint-placeholder-val="{{ false }}"><span style="font-size:11.5px;font-weight:600;color:#2748bd">{{ a.snz }}</span></sc-if>
+</span>
+</button>
+<button onClick="{{ toggleAlarm }}" data-k="{{ a.id }}" role="switch" aria-checked="{{ a.on }}" aria-label="{{ a.label }} at {{ a.t }}" style="display:flex;flex:none;width:46px;height:28px;padding:3px;border:none;border-radius:9999px;background:{{ a.swBg }};justify-content:{{ a.swPos }};cursor:pointer;transition:background .25s"><span style="width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 2px 5px rgba(30,30,36,.22)"></span></button>
+</div>
+</sc-for>
+<sc-if value="{{ noAlarms }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:32px 18px;border-radius:20px;background:#f9f7f4;text-align:center"><p style="margin:0;font-size:14px;font-weight:600">No alarms</p><p style="margin:0;max-width:320px;font-size:12.5px;line-height:1.5;color:#6d6a67">Set one here, or just say “Atlas, wake me at seven”.</p><button onClick="{{ newAlarm }}" style="border:none;margin-top:6px;height:36px;padding:0 16px;border-radius:9999px;background:#3461f2;color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">New alarm</button></div></sc-if>
+</section>
+<sc-if value="{{ isEditing }}" hint-placeholder-val="{{ false }}">
+<section style="border-radius:28px;background:#fffdfa;padding:20px;display:flex;flex-direction:column;gap:12px;animation:bpop .35s cubic-bezier(.22,1,.36,1) both">
+<p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em">{{ edTitle }}</p>
+<div style="display:flex;gap:8px"><input type="time" value="{{ edT }}" onInput="{{ edField }}" data-f="t" aria-label="Time" style="border:none;outline:none;flex:none;width:150px;height:56px;padding:0 14px;border-radius:16px;background:#f9f7f4;color:#1e1e24;font-family:'Hanken Grotesk',sans-serif;font-size:30px;font-weight:600;letter-spacing:-.04em;font-variant-numeric:tabular-nums" style-focus="background:#eef2fe"><input value="{{ edLabel }}" onInput="{{ edField }}" data-f="label" placeholder="Label" aria-label="Label" style="border:none;outline:none;flex:1;min-width:0;height:56px;padding:0 16px;border-radius:16px;background:#f9f7f4;color:#1e1e24;font-family:inherit;font-size:15px" style-focus="background:#eef2fe"></div>
+<span style="font-size:11.5px;font-weight:600;color:#8b8681">Repeat</span>
+<div style="display:flex;flex-wrap:wrap;gap:4px"><sc-for list="{{ edDays }}" as="d" hint-placeholder-count="7"><button onClick="{{ edDay }}" data-k="{{ d.x }}" style="border:none;flex:none;width:52px;height:36px;border-radius:12px;background:{{ d.bg }};color:{{ d.fg }};font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer">{{ d.d }}</button></sc-for></div>
+<span style="font-size:11.5px;font-weight:600;color:#8b8681">Ring on</span>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px"><sc-for list="{{ edOuts }}" as="o" hint-placeholder-count="4"><button onClick="{{ edOut }}" data-k="{{ o.k }}" style="border:none;display:flex;align-items:center;gap:9px;height:44px;padding:0 13px;border-radius:14px;background:{{ o.bg }};color:{{ o.fg }};font-family:inherit;font-size:13px;font-weight:600;text-align:left;cursor:pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{ o.ico }}"></path></svg>{{ o.l }}</button></sc-for></div>
+<p style="margin:0;font-size:12px;line-height:1.5;color:#6d6a67">{{ edOutNote }}</p>
+<div style="display:flex;flex-wrap:wrap;gap:6px;padding-top:4px"><button onClick="{{ saveAlarm }}" style="border:none;flex:none;height:38px;padding:0 18px;border-radius:9999px;background:#3461f2;color:#fff;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Save</button><button onClick="{{ testRing }}" style="border:none;flex:none;height:38px;padding:0 16px;border-radius:9999px;background:#f1eeea;color:#1e1e24;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Ring now to test</button><button onClick="{{ cancelEdit }}" style="border:none;flex:none;height:38px;padding:0 14px;border-radius:9999px;background:transparent;color:#6d6a67;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Cancel</button><span style="flex:1"></span><sc-if value="{{ canDelete }}" hint-placeholder-val="{{ false }}"><button onClick="{{ deleteAlarm }}" style="border:none;flex:none;height:38px;padding:0 14px;border-radius:9999px;background:#f1eeea;color:#a3352c;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#f7e6e4">Delete</button></sc-if></div>
+</section>
+</sc-if>
+</div>
+</sc-if>
+<sc-if value="{{ isClocks }}" hint-placeholder-val="{{ false }}">
+<div style="display:grid;grid-template-columns:{{ twoCols }};gap:12px;align-items:start">
+<section style="border-radius:28px;background:#f1eeea;padding:12px;display:flex;flex-direction:column;gap:6px">
+<sc-for list="{{ cityRows }}" as="c" hint-placeholder-count="5"><div style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:20px;background:{{ c.bg }};color:{{ c.fg }}">
+<div style="flex:1;min-width:140px"><p style="margin:0;font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</p><p style="margin:3px 0 0;display:flex;align-items:center;gap:6px;font-size:12px;color:{{ c.sub }};white-space:nowrap"><span style="flex:none;height:18px;padding:0 7px;display:flex;align-items:center;border-radius:9999px;background:{{ c.bBg }};color:{{ c.bFg }};font-size:10.5px;font-weight:600">{{ c.badge }}</span>{{ c.diff }}</p></div>
+<span style="flex:none;font-family:'Hanken Grotesk',sans-serif;font-size:32px;font-weight:600;letter-spacing:-.045em;font-variant-numeric:tabular-nums">{{ c.t }}</span>
+<span style="flex:none;display:flex;gap:2px"><sc-if value="{{ c.up }}" hint-placeholder-val="{{ true }}"><button onClick="{{ moveCity }}" data-k="{{ c.i }}" data-d="-1" aria-label="Move up" style="border:none;width:28px;height:28px;border-radius:50%;background:transparent;color:{{ c.sub }};cursor:pointer;font-size:13px">↑</button></sc-if><sc-if value="{{ c.down }}" hint-placeholder-val="{{ true }}"><button onClick="{{ moveCity }}" data-k="{{ c.i }}" data-d="1" aria-label="Move down" style="border:none;width:28px;height:28px;border-radius:50%;background:transparent;color:{{ c.sub }};cursor:pointer;font-size:13px">↓</button></sc-if><sc-if value="{{ c.canRemove }}" hint-placeholder-val="{{ true }}"><button onClick="{{ removeCity }}" data-k="{{ c.i }}" aria-label="Remove {{ c.name }}" style="border:none;width:28px;height:28px;border-radius:50%;background:transparent;color:{{ c.sub }};cursor:pointer;font-size:15px">×</button></sc-if></span>
+</div></sc-for>
+<div style="position:relative;margin-top:4px"><input value="{{ addQ }}" onInput="{{ onAddQ }}" placeholder="Add a city" aria-label="Add a city" style="border:none;outline:none;width:100%;height:44px;padding:0 16px;border-radius:9999px;background:#fffdfa;color:#1e1e24;font-family:inherit;font-size:13.5px" style-focus="background:#eef2fe">
+<sc-if value="{{ hasHits }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-direction:column;gap:2px;margin-top:6px;padding:6px;border-radius:18px;background:#fffdfa"><sc-for list="{{ addHits }}" as="h" hint-placeholder-count="3"><button onClick="{{ addCity }}" data-k="{{ h.n }}" data-tz="{{ h.tz }}" style="border:none;display:flex;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:12px;background:transparent;font-family:inherit;font-size:13px;text-align:left;cursor:pointer" style-hover="background:#f1eeea"><span style="font-weight:600">{{ h.n }}</span><span style="color:#8b8681;font-size:11.5px">{{ h.tz }}</span></button></sc-for></div></sc-if>
+<sc-if value="{{ noHits }}" hint-placeholder-val="{{ false }}"><p style="margin:6px 12px 0;font-size:12px;color:#6d6a67">No city by that name in the list.</p></sc-if></div>
+</section>
+<section style="display:flex;flex-direction:column;gap:10px">
+<span style="padding:0 6px;font-size:11.5px;font-weight:600;color:#8b8681">On your dashboard</span>
+<a href="Atlas Clock Beta.dc.html#clocks" style="display:flex;flex-direction:column;gap:12px;padding:18px 20px;border-radius:24px;background:#fffdfa;color:#1e1e24" style-hover="background:#fdfbf7;color:#1e1e24">
+<div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:12.5px;font-weight:600">Clock</span><span style="font-size:11.5px;color:#6d6a67">{{ cardNext }}</span></div>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px"><sc-for list="{{ cardCities }}" as="c" hint-placeholder-count="4"><div style="padding:10px 12px;border-radius:14px;background:{{ c.bg }};color:{{ c.fg }}"><p style="margin:0;font-size:11.5px;color:{{ c.sub }}">{{ c.name }}</p><p style="margin:2px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:22px;font-weight:600;letter-spacing:-.04em;font-variant-numeric:tabular-nums">{{ c.t }}</p></div></sc-for></div>
+<sc-if value="{{ cardHasTimer }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:12px;background:#eef2fe;font-size:12.5px;font-weight:600;color:#2748bd"><span style="width:7px;height:7px;border-radius:50%;background:#3461f2"></span>Running<span style="margin-left:auto;font-family:'Geist Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums">{{ cardTimer }}</span></div></sc-if>
+</a>
+<p style="margin:0;padding:0 6px;font-size:12px;line-height:1.5;color:#6d6a67">The 2×2 card shows your first four cities and the next alarm. When a timer runs, it appears on the card too. Tapping the card opens Clock.</p>
+</section>
+</div>
+</sc-if>
+<sc-if value="{{ isRinging }}" hint-placeholder-val="{{ false }}"><div role="alertdialog" aria-label="Alarm" style="position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(30,30,36,.5);animation:bpop .3s cubic-bezier(.22,1,.36,1) both"><div style="width:min(440px,100%);padding:32px;border-radius:32px;background:#1e1e24;color:#f9f7f4;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="animation:ring 1s ease-in-out infinite"><path d="M12 6a6 6 0 0 1 6 6v3l1.5 2.5h-15L6 15v-3a6 6 0 0 1 6-6zM10 20a2 2 0 0 0 4 0M5 4 3 6M19 4l2 2"></path></svg><span style="font-family:'Hanken Grotesk',sans-serif;font-size:72px;font-weight:600;letter-spacing:-.05em;line-height:1;font-variant-numeric:tabular-nums">{{ ringT }}</span><span style="font-size:18px;font-weight:600">{{ ringLabel }}</span><span style="font-size:13px;color:rgba(249,247,244,.62)">{{ ringOut }}</span><div style="display:flex;gap:10px;margin-top:10px;width:100%"><button onClick="{{ snooze }}" style="border:none;flex:1;height:56px;border-radius:9999px;background:rgba(249,247,244,.12);color:#f9f7f4;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer">Snooze 9 min</button><button onClick="{{ stopRing }}" style="border:none;flex:1;height:56px;border-radius:9999px;background:#f9f7f4;color:#1e1e24;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer">Stop</button></div><span style="font-size:12px;color:rgba(249,247,244,.62)">Or say “Atlas, stop” or “snooze”.</span></div></div></sc-if>
+<nav aria-label="Atlas" data-dock="beta" style="view-transition-name:atlas-dock;position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:4px;padding:6px;border-radius:9999px;background:rgba(255,253,250,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 18px 40px -20px rgba(30,30,36,.28)">
+<a href="Atlas Dashboard Beta.dc.html" title="Home" aria-label="Home" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M3.5 10.9 10.7 4.3a2 2 0 0 1 2.6 0l7.2 6.6v6.9a3 3 0 0 1-3 3h-3v-5.4a2.5 2.5 0 0 0-5 0v5.4h-3a3 3 0 0 1-3-3z"></path></svg></a>
+<a href="Atlas Core Beta.dc.html" title="Core" aria-label="Core" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.6a8.4 8.4 0 1 1 0 16.8 8.4 8.4 0 0 1 0-16.8M12 8.8a3.2 3.2 0 1 1 0 6.4 3.2 3.2 0 0 1 0-6.4M12 3.6v5.2M12 15.2v5.2M3.6 12h5.2M15.2 12h5.2"></path></svg></a>
+<a href="Atlas Teach Beta.dc.html" title="Teach" aria-label="Teach" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 7.4a5.2 5.2 0 0 0-3.9-1.8H5a1.2 1.2 0 0 0-1.2 1.2v9.6A1.2 1.2 0 0 0 5 17.6h3.1A5.2 5.2 0 0 1 12 19.4a5.2 5.2 0 0 1 3.9-1.8H19a1.2 1.2 0 0 0 1.2-1.2V6.8A1.2 1.2 0 0 0 19 5.6h-3.1A5.2 5.2 0 0 0 12 7.4zM12 7.4v12"></path></svg></a>
+<a href="Atlas Mail Beta.dc.html" title="Mail" aria-label="Mail" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M6.6 5.6h10.8a3.2 3.2 0 0 1 3.2 3.2v6.4a3.2 3.2 0 0 1-3.2 3.2H6.6a3.2 3.2 0 0 1-3.2-3.2V8.8a3.2 3.2 0 0 1 3.2-3.2zM3.8 7.6l7 4.8a2.2 2.2 0 0 0 2.4 0l7-4.8"></path></svg></a>
+<a href="Atlas Architecture Beta.dc.html" title="Architecture" aria-label="Architecture" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.4 3.4 7.9 12 12.4l8.6-4.5zM3.4 12.1 12 16.6l8.6-4.5M3.4 16.3 12 20.8l8.6-4.5"></path></svg></a>
+<a href="Atlas Voice Beta.dc.html" title="Voice" aria-label="Voice" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.5a2.6 2.6 0 0 1 2.6 2.6v5.4a2.6 2.6 0 0 1-5.2 0V6.1A2.6 2.6 0 0 1 12 3.5zM18.1 11.5a6.1 6.1 0 0 1-12.2 0M12 17.6v3"></path></svg></a>
+<a href="Atlas Settings Beta.dc.html" title="Marcus · Settings" aria-label="Settings" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#1e1e24" style-hover="background:#f1eeea;color:#1e1e24"><span style="width:34px;height:34px;border-radius:50%;background:#1e1e24;color:#f9f7f4;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">M</span></a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;alarmsState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;sample&quot;,&quot;options&quot;:[&quot;sample&quot;,&quot;empty&quot;],&quot;tsType&quot;:&quot;'sample' | 'empty'&quot;}}">
+class Component extends DCLogic {
+  state = { vw: window.innerWidth, ico: {}, tab: 'alarm', now: new Date(),
+    tRun: false, tStart: 0, tAcc: 0, laps: [],
+    cMode: 'duration', cDur: 25 * 60000, cTarget: '', cRun: false, cEnd: 0, cPausedLeft: null, cSplits: [],
+    alarms: [{ id: 'al1', t: '06:45', label: 'Run', days: [1, 3, 5], out: 'bedroom', on: true }, { id: 'al2', t: '07:30', label: 'Wake up', days: [1, 2, 3, 4, 5], out: 'mac', on: true }, { id: 'al3', t: '09:00', label: 'Weekend', days: [6, 0], out: 'kitchen', on: false }, { id: 'al4', t: '15:55', label: 'Pick up Sam', days: [4], out: 'mac', on: true }],
+    edit: null, awake: false, ringing: null, snoozed: {},
+    cities: [['Copenhagen', 'Europe/Copenhagen', true], ['London', 'Europe/London'], ['New York', 'America/New_York'], ['San Francisco', 'America/Los_Angeles'], ['Tokyo', 'Asia/Tokyo'], ['Sydney', 'Australia/Sydney']], addQ: '' };
+  componentDidMount() {
+    this.onResize = () => this.setState({ vw: window.innerWidth });
+    window.addEventListener('resize', this.onResize);
+    this.onKey = (e) => { if (e.key === 'Escape' && !/INPUT|SELECT/.test(document.activeElement && document.activeElement.tagName)) { if (this.state.ringing) return; if (this.state.edit) this.setState({ edit: null }); else window.location.href = 'Atlas Dashboard Beta.dc.html'; } };
+    window.addEventListener('keydown', this.onKey);
+    this.iv = setInterval(() => this.setState({ now: new Date() }), 250);
+    const h = (window.location.hash || '').slice(1); if (['timer', 'countdown', 'alarm', 'clocks'].includes(h)) this.setState({ tab: h });
+    if (this.props.alarmsState === 'empty') this.setState({ alarms: [] });
+    fetch('atlas-icon-data.js').then((r) => r.text()).then((t) => { const SET = new Function(t.replace(/export\s+const\s+SET\s*=/, 'return'))(), ico = {}; SET.forEach((g) => g[2].forEach(([n, d]) => { ico[n] = d; })); this.setState({ ico }); }).catch(() => {});
+  }
+  componentDidUpdate(p) { if (p.alarmsState !== this.props.alarmsState) this.setState({ alarms: this.props.alarmsState === 'empty' ? [] : this.state.alarms }); const ns = this.state.ringing ? 'alert' : (this.state.tRun || this.state.cRun) ? 'working' : 'idle'; if (this.sph && this.lastS !== ns) { this.lastS = ns; this.sph.set({ state: ns }); } }
+  componentWillUnmount() { window.removeEventListener('resize', this.onResize); window.removeEventListener('keydown', this.onKey); clearInterval(this.iv); if (this.sph) this.sph.destroy(); }
+  tEl() { const s = this.state; return s.tAcc + (s.tRun ? Date.now() - s.tStart : 0); }
+  cLeft() { const s = this.state; if (s.cRun) return s.cEnd - Date.now(); if (s.cPausedLeft != null) return s.cPausedLeft; return this.cTotal(); }
+  cTotal() { const s = this.state; if (s.cMode === 'target' && s.cTarget) { return Math.max(0, new Date(s.cTarget).getTime() - Date.now()); } return s.cDur; }
+  renderVals() {
+    const st = this.state, I = st.ico, ic = (n) => I[n] || '', now = st.now, narrow = st.vw < 1000;
+    const pad = (n, l) => String(Math.floor(n)).padStart(l || 2, '0');
+    const fmtT = (ms, cs) => { const a = Math.abs(ms), h = Math.floor(a / 3600000), m = Math.floor(a / 60000) % 60, s = Math.floor(a / 1000) % 60, c = Math.floor(a / 10) % 100; return (h ? h + ':' + pad(m) : pad(m)) + ':' + pad(s) + (cs ? '.' + pad(c) : ''); };
+    const tE = this.tEl(), left = this.cLeft(), total = this.cTotal(), over = left < 0;
+    const OUT = { mac: 'This Mac', bedroom: 'Bedroom speaker', kitchen: 'Kitchen speaker', living: 'Living room TV' };
+    const DN = ['S', 'M', 'T', 'W', 'T', 'F', 'S'], ORDER = [1, 2, 3, 4, 5, 6, 0];
+    const daysLabel = (d) => d.length === 7 ? 'Every day' : d.length === 5 && !d.includes(0) && !d.includes(6) ? 'Weekdays' : d.length === 2 && d.includes(0) && d.includes(6) ? 'Weekends' : d.length === 0 ? 'Once' : ORDER.filter((x) => d.includes(x)).map((x) => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][x]).join(', ');
+    const nextFire = (a) => { const [hh, mm] = a.t.split(':').map(Number); for (let i = 0; i < 8; i++) { const d = new Date(now); d.setDate(d.getDate() + i); d.setHours(hh, mm, 0, 0); if (d <= now) continue; if (a.days.length && !a.days.includes(d.getDay())) continue; return d; } return null; };
+    const enabled = st.alarms.filter((a) => a.on).map((a) => ({ a, d: nextFire(a) })).filter((x) => x.d).sort((x, y) => x.d - y.d);
+    const next = enabled[0];
+    const inLabel = (d) => { const m = Math.round((d - now) / 60000); return m < 60 ? 'in ' + m + ' min' : 'in ' + Math.floor(m / 60) + ' h ' + (m % 60) + ' min'; };
+    const earlyNext = next && next.d.getHours() < 10 && (next.d - now) > 3 * 3600000;
+    const running = [];
+    if (st.tRun) running.push({ k: 'timer', l: 'Timer', v: fmtT(tE), bg: '#fffdfa', fg: '#1e1e24', dot: '#3461f2' });
+    if (st.cRun) running.push({ k: 'countdown', l: over ? 'Over by' : 'Countdown', v: (over ? '+' : '') + fmtT(left), bg: over ? '#1e1e24' : '#fffdfa', fg: over ? '#f9f7f4' : '#1e1e24', dot: over ? '#f9f7f4' : '#3461f2' });
+    const TABS = [['timer', 'Timer', 'stopwatch', st.tRun], ['countdown', 'Countdown', 'countdown', st.cRun], ['alarm', 'Alarm', 'alarm', !!st.ringing], ['clocks', 'Clocks', 'clock', false]];
+    // laps
+    const lapTimes = st.laps.map((t, i) => t - (i ? st.laps[i - 1] : 0));
+    const minL = lapTimes.length > 2 ? Math.min.apply(null, lapTimes) : null, maxL = lapTimes.length > 2 ? Math.max.apply(null, lapTimes) : null;
+    const laps = lapTimes.map((d, i) => { const prev = i ? lapTimes[i - 1] : null, delta = prev == null ? null : d - prev; return { n: String(i + 1), split: fmtT(d, true), total: fmtT(st.laps[i], true), delta: delta == null ? '—' : (delta > 0 ? '+' : '−') + fmtT(delta, true), dFg: delta == null ? '#b6b1aa' : delta > 0 ? '#a3352c' : '#0a7a53', tag: d === minL ? 'Fastest' : d === maxL ? 'Slowest' : '', hasTag: d === minL || d === maxL, tagBg: d === minL ? '#e3f4ec' : '#f1eeea', tagFg: d === minL ? '#0a7a53' : '#6d6a67' }; }).reverse();
+    const curLap = tE - (st.laps.length ? st.laps[st.laps.length - 1] : 0);
+    // ring geometry
+    const R = 120, CIRC = 2 * Math.PI * R;
+    const frac = total > 0 ? Math.max(0, Math.min(1, left / total)) : 0;
+    const cSplits = st.cSplits.map((t, i) => ({ n: String(i + 1), v: (t < 0 ? '+' : '') + fmtT(t), used: fmtT((i ? st.cSplits[i - 1] : total) - t) })).reverse();
+    // clocks
+    const here = now;
+    const cityRows = st.cities.map(([name, tz, home], i) => {
+      let t = '', dd = 0, hdiff = 0, night = false;
+      try {
+        const f = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }); t = f.format(here);
+        const parts = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false }).formatToParts(here); const g = (k) => +parts.find((p) => p.type === k).value;
+        const loc = new Date(g('year'), g('month') - 1, g('day')); const me = new Date(here.getFullYear(), here.getMonth(), here.getDate()); dd = Math.round((loc - me) / 86400000);
+        const h = g('hour') % 24; night = h < 6 || h >= 20;
+        const offTz = (z) => { const s = new Intl.DateTimeFormat('en-US', { timeZone: z, timeZoneName: 'shortOffset' }).formatToParts(here).find((p) => p.type === 'timeZoneName').value; const m = s.match(/GMT([+-]\d+)?(?::(\d+))?/); return m && m[1] ? +m[1] + (m[2] ? Math.sign(+m[1]) * +m[2] / 60 : 0) : 0; };
+        hdiff = offTz(tz) - offTz(Intl.DateTimeFormat().resolvedOptions().timeZone);
+      } catch (e) {}
+      const badge = dd === 0 ? 'Today' : dd > 0 ? 'Tomorrow' : 'Yesterday';
+      return { i: String(i), name, t, badge, bBg: dd === 0 ? '#f1eeea' : '#eef2fe', bFg: dd === 0 ? '#6d6a67' : '#2748bd', diff: home ? 'Home' : hdiff === 0 ? 'Same time' : (hdiff > 0 ? '+' : '−') + Math.abs(hdiff) + ' h', night, bg: night ? '#1e1e24' : '#fffdfa', fg: night ? '#f9f7f4' : '#1e1e24', sub: night ? 'rgba(249,247,244,.62)' : '#6d6a67', up: i > 0, down: i < st.cities.length - 1, canRemove: !home };
+    });
+    const ALL = [['Lisbon', 'Europe/Lisbon'], ['Paris', 'Europe/Paris'], ['Berlin', 'Europe/Berlin'], ['Dubai', 'Asia/Dubai'], ['Singapore', 'Asia/Singapore'], ['Hong Kong', 'Asia/Hong_Kong'], ['Chicago', 'America/Chicago'], ['Toronto', 'America/Toronto'], ['São Paulo', 'America/Sao_Paulo'], ['Reykjavík', 'Atlantic/Reykjavik'], ['Mumbai', 'Asia/Kolkata'], ['Auckland', 'Pacific/Auckland']];
+    const aq = st.addQ.trim().toLowerCase();
+    const addHits = aq ? ALL.filter(([n]) => n.toLowerCase().includes(aq) && !st.cities.some((c) => c[0] === n)).slice(0, 5).map(([n, tz]) => ({ n, tz })) : [];
+    const ed = st.edit;
+    return {
+      sphereRef: (el) => {
+        if (!el || el.__q) return;
+        const go = () => { if (el.__q || !el.isConnected) return; if (!window.QuickSphere) return setTimeout(go, 60);
+          el.__q = this.sph = window.QuickSphere.mount(el, { mode: 'veil', bg: '#1e1e24', dust: [92, 122, 248], strand: [176, 196, 255], blend: 'lighter', alpha: 0.5, seed: 11, count: 12000, scale: 0.42, state: 'idle' }); this.lastS = 'idle'; };
+        go();
+      },
+      modeName: TABS.find((t) => t[0] === st.tab)[1],
+      bigHM: pad(now.getHours()) + ':' + pad(now.getMinutes()), bigS: ':' + pad(now.getSeconds()),
+      dayBand: Array.from({ length: 24 }, (_, h) => ({ c: h >= 6 && h < 20 ? 'rgba(249,247,244,' + (h >= 9 && h < 17 ? '.18' : '.11') + ')' : 'rgba(249,247,244,.04)' })),
+      nowX: ((now.getHours() * 60 + now.getMinutes()) / 1440 * 100).toFixed(2) + '%',
+      bandCities: st.cities.slice(0, 5).map(([n, tz], i) => { let t = '', x = 0; try { t = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).format(now); const [hh, mm] = t.split(':').map(Number); const diff = ((hh * 60 + mm) - (now.getHours() * 60 + now.getMinutes()) + 2160) % 1440; x = ((now.getHours() * 60 + now.getMinutes() + diff) % 1440) / 1440; } catch (e) {} const home = i === 0; return { y: i % 2 ? '72%' : '28%', n: n.split(' ')[0], t, x: Math.min(93, Math.max(7, x * 100)).toFixed(1) + '%', bg: home ? '#f9f7f4' : '#26262d', fg: home ? '#1e1e24' : '#f9f7f4' }; }),
+      eyebrow: 'Clock · ' + now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }),
+      nowLabel: pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds()),
+      subline: next ? 'Next alarm: ' + next.a.label + ' at ' + next.a.t + ', ' + inLabel(next.d) + '. Rings only while Atlas is running.' : st.alarms.length ? 'No alarms are switched on.' : 'No alarms yet.',
+      tabs: TABS.map(([k, l, i, live]) => { const on = st.tab === k; return { k, l, ico: ic(i), on: on ? 'true' : 'false', bg: on ? '#1e1e24' : 'transparent', fg: on ? '#f9f7f4' : '#1e1e24', live: !!live && !on, dot: k === 'alarm' ? '#d0453a' : '#3461f2' }; }),
+      pickTab: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.setState({ tab: k, edit: null }); try { history.replaceState(null, '', '#' + k); } catch (x) {} },
+      running: running.filter((r) => r.k !== st.tab),
+      isTimer: st.tab === 'timer', isCountdown: st.tab === 'countdown', isAlarm: st.tab === 'alarm', isClocks: st.tab === 'clocks',
+      twoCols: narrow ? 'minmax(0,1fr)' : 'minmax(0,1.1fr) minmax(0,1fr)',
+      // timer
+      tBig: fmtT(tE, true), tStateLabel: st.tRun ? 'Running' : tE ? 'Paused' : 'Ready', tStateBg: st.tRun ? '#3461f2' : tE ? '#f1eeea' : '#f1eeea', tStateFg: st.tRun ? '#fff' : '#6d6a67',
+      curLap: st.laps.length ? 'Lap ' + (st.laps.length + 1) + ' · ' + fmtT(curLap, true) : '',
+      tMainL: st.tRun ? 'Pause' : tE ? 'Resume' : 'Start', tMainBg: st.tRun ? '#1e1e24' : '#3461f2',
+      tMain: () => { if (st.tRun) this.setState({ tRun: false, tAcc: this.tEl() }); else this.setState({ tRun: true, tStart: Date.now() }); },
+      tSecL: st.tRun ? 'Lap' : 'Reset', tSecDis: !st.tRun && !tE ? 'true' : 'false', tSecFg: !st.tRun && !tE ? '#b6b1aa' : '#1e1e24',
+      tSec: () => { if (st.tRun) this.setState((s) => ({ laps: s.laps.concat([this.tEl()]) })); else this.setState({ tAcc: 0, laps: [] }); },
+      laps, hasLaps: laps.length > 0, noLaps: laps.length === 0, lapCount: st.laps.length + (st.laps.length === 1 ? ' lap' : ' laps'),
+      // countdown
+      cModes: [['duration', 'Duration'], ['target', 'Until a date']].map(([k, l]) => { const on = st.cMode === k; return { k, l, bg: on ? '#1e1e24' : 'transparent', fg: on ? '#f9f7f4' : '#6d6a67' }; }),
+      pickCMode: (e) => { if (st.cRun) return; this.setState({ cMode: e.currentTarget.getAttribute('data-k'), cPausedLeft: null }); },
+      isDur: st.cMode === 'duration', isTarget: st.cMode === 'target',
+      presets: [['5 min', 5], ['10 min', 10], ['25 min', 25], ['45 min', 45], ['1 h', 60]].map(([l, m]) => { const on = st.cDur === m * 60000; return { l, m: String(m), bg: on ? '#3461f2' : '#fffdfa', fg: on ? '#fff' : '#1e1e24' }; }),
+      pickPreset: (e) => { if (st.cRun) return; this.setState({ cDur: +e.currentTarget.getAttribute('data-k') * 60000, cPausedLeft: null }); },
+      stepDur: (e) => { if (st.cRun) return; const d = +e.currentTarget.getAttribute('data-k'); this.setState((s) => ({ cDur: Math.max(60000, s.cDur + d * 60000), cPausedLeft: null })); },
+      cTarget: st.cTarget, onTarget: (e) => this.setState({ cTarget: e.currentTarget.value, cPausedLeft: null }),
+      cBig: (over ? '+' : '') + fmtT(left), cBigFg: over ? '#f9f7f4' : '#1e1e24', cCardBg: over ? '#1e1e24' : '#fffdfa', cSubFg: over ? 'rgba(249,247,244,.62)' : '#6d6a67',
+      cState: over ? 'Past zero · still counting' : st.cRun ? 'Running · ends ' + new Date(st.cEnd).toTimeString().slice(0, 5) : st.cPausedLeft != null ? 'Paused' : 'Ready', cTotalL: 'of ' + fmtT(total),
+      ringDash: String(CIRC), ringOff: String(CIRC * (1 - (over ? 1 : frac))), ringC: over ? '#f9f7f4' : '#3461f2', ringTrack: over ? 'rgba(249,247,244,.14)' : '#edebe7', R: String(R),
+      cMainL: st.cRun ? 'Pause' : st.cPausedLeft != null ? 'Resume' : 'Start', cMainBg: st.cRun ? (over ? '#fffdfa' : '#1e1e24') : '#3461f2', cMainFg: st.cRun && over ? '#1e1e24' : '#fff',
+      cMain: () => { if (st.cRun) this.setState({ cRun: false, cPausedLeft: this.cLeft() }); else { const l = st.cPausedLeft != null ? st.cPausedLeft : this.cTotal(); if (l <= 0 && st.cPausedLeft == null) return; this.setState({ cRun: true, cEnd: Date.now() + l, cPausedLeft: null }); } },
+      cSplit: () => { if (st.cRun) this.setState((s) => ({ cSplits: s.cSplits.concat([this.cLeft()]) })); else this.setState({ cPausedLeft: null, cSplits: [] }); },
+      cSecL: st.cRun ? 'Split' : 'Reset', cSecBg: over ? 'rgba(249,247,244,.12)' : '#f1eeea', cSecFg: over ? '#f9f7f4' : '#1e1e24',
+      cSplits, hasSplits: cSplits.length > 0, noSplits: cSplits.length === 0,
+      // alarm
+      alarmRows: st.alarms.map((a) => { const d = nextFire(a); return { id: a.id, t: a.t, label: a.label, days: ORDER.map((x) => ({ d: DN[x], bg: a.days.includes(x) ? (a.on ? '#3461f2' : '#8b8681') : 'transparent', fg: a.days.includes(x) ? '#fff' : '#b6b1aa' })), dl: daysLabel(a.days), out: OUT[a.out], outIco: a.out === 'mac' ? ic('mac') : ic('speaker'), on: a.on, bg: a.on ? '#fffdfa' : '#f9f7f4', tFg: a.on ? '#1e1e24' : '#8b8681', swBg: a.on ? '#3461f2' : '#d8d4cd', swPos: a.on ? 'flex-end' : 'flex-start', when: a.on && d ? inLabel(d) : 'Off', whenFg: a.on ? '#2748bd' : '#8b8681', snz: st.snoozed[a.id] ? 'Snoozed until ' + st.snoozed[a.id] : '', hasSnz: !!st.snoozed[a.id] }; }),
+      hasAlarms: st.alarms.length > 0, noAlarms: st.alarms.length === 0,
+      toggleAlarm: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.setState((s) => ({ alarms: s.alarms.map((a) => (a.id === k ? Object.assign({}, a, { on: !a.on }) : a)) })); },
+      editAlarm: (e) => { const k = e.currentTarget.getAttribute('data-k'); const a = st.alarms.find((x) => x.id === k); this.setState({ edit: Object.assign({}, a) }); },
+      newAlarm: () => this.setState({ edit: { id: 'new' + Date.now(), t: '07:00', label: 'Alarm', days: [1, 2, 3, 4, 5], out: 'mac', on: true, isNew: true } }),
+      isEditing: !!ed, edT: ed ? ed.t : '', edLabel: ed ? ed.label : '', edTitle: ed && ed.isNew ? 'New alarm' : 'Edit alarm',
+      edDays: ed ? ORDER.map((x) => ({ x: String(x), d: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][(x + 6) % 7], bg: ed.days.includes(x) ? '#3461f2' : '#f9f7f4', fg: ed.days.includes(x) ? '#fff' : '#1e1e24' })) : [],
+      edOuts: ed ? Object.keys(OUT).map((k) => ({ k, l: OUT[k], bg: ed.out === k ? '#eef2fe' : '#f9f7f4', fg: ed.out === k ? '#2748bd' : '#1e1e24', ico: k === 'mac' ? ic('mac') : ic('speaker') })) : [],
+      edField: (e) => { const f = e.currentTarget.getAttribute('data-f'), v = e.currentTarget.value; this.setState((s) => ({ edit: Object.assign({}, s.edit, { [f]: v }) })); },
+      edDay: (e) => { const x = +e.currentTarget.getAttribute('data-k'); this.setState((s) => ({ edit: Object.assign({}, s.edit, { days: s.edit.days.includes(x) ? s.edit.days.filter((y) => y !== x) : s.edit.days.concat([x]) }) })); },
+      edOut: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.setState((s) => ({ edit: Object.assign({}, s.edit, { out: k }) })); },
+      saveAlarm: () => { const e2 = Object.assign({}, st.edit); delete e2.isNew; this.setState((s) => ({ alarms: s.alarms.some((a) => a.id === e2.id) ? s.alarms.map((a) => (a.id === e2.id ? e2 : a)) : s.alarms.concat([e2]).sort((p, q) => p.t.localeCompare(q.t)), edit: null })); },
+      deleteAlarm: () => this.setState((s) => ({ alarms: s.alarms.filter((a) => a.id !== s.edit.id), edit: null })),
+      cancelEdit: () => this.setState({ edit: null }), canDelete: ed && !ed.isNew,
+      testRing: () => this.setState({ ringing: Object.assign({}, st.edit), edit: null }),
+      edOutNote: ed && ed.out !== 'mac' ? 'Rings through ' + OUT[ed.out] + ' via Home Assistant. If the speaker doesn’t answer, it rings on this Mac instead.' : 'Rings on this Mac’s speakers, at the system volume.',
+      honestTitle: earlyNext ? 'For ' + next.a.label + ' at ' + next.a.t + ', this Mac has to stay awake and Atlas has to stay open.' : 'Alarms ring only while Atlas is running.',
+      honestBody: 'A Mac that is asleep, lid closed or with Atlas quit won’t ring. macOS doesn’t let apps wake it. For anything you can’t miss, set one on your phone too.',
+      honestBg: earlyNext ? '#1e1e24' : '#f1eeea', honestFg: earlyNext ? '#f9f7f4' : '#1e1e24', honestSub: earlyNext ? 'rgba(249,247,244,.78)' : '#6d6a67',
+      showAwake: !!earlyNext, awakeSwBg: st.awake ? '#50dca0' : 'rgba(249,247,244,.22)', awakeSwPos: st.awake ? 'flex-end' : 'flex-start',
+      awakeLabel: st.awake ? 'Keeping this Mac awake until ' + (next ? next.a.t : '') + '. Closing the lid still puts it to sleep.' : 'Keep this Mac awake until then', toggleAwake: () => this.setState((s) => ({ awake: !s.awake })),
+      // ringing
+      isRinging: !!st.ringing, ringT: st.ringing ? st.ringing.t : '', ringLabel: st.ringing ? st.ringing.label : '', ringOut: st.ringing ? 'Ringing on ' + OUT[st.ringing.out] : '',
+      snooze: () => { const d = new Date(Date.now() + 9 * 60000); this.setState((s) => ({ snoozed: Object.assign({}, s.snoozed, { [s.ringing.id]: pad(d.getHours()) + ':' + pad(d.getMinutes()) }), ringing: null })); },
+      stopRing: () => this.setState({ ringing: null }),
+      // clocks
+      cityRows, moveCity: (e) => { const i = +e.currentTarget.getAttribute('data-k'), d = +e.currentTarget.getAttribute('data-d'); this.setState((s) => { const c = s.cities.slice(); const j = i + d; if (j < 0 || j >= c.length) return null; [c[i], c[j]] = [c[j], c[i]]; return { cities: c }; }); },
+      removeCity: (e) => { const i = +e.currentTarget.getAttribute('data-k'); this.setState((s) => ({ cities: s.cities.filter((_, j) => j !== i) })); },
+      addQ: st.addQ, onAddQ: (e) => this.setState({ addQ: e.currentTarget.value }), addHits, hasHits: addHits.length > 0, noHits: !!aq && addHits.length === 0,
+      addCity: (e) => { const n = e.currentTarget.getAttribute('data-k'), tz = e.currentTarget.getAttribute('data-tz'); this.setState((s) => ({ cities: s.cities.concat([[n, tz]]), addQ: '' })); },
+      cardCities: cityRows.slice(0, 4), cardNext: next ? next.a.label + ' · ' + next.a.t : 'No alarm set', cardTimer: st.cRun ? (over ? '+' : '') + fmtT(left) : st.tRun ? fmtT(tE) : '', cardHasTimer: st.cRun || st.tRun
+    };
+  }
+}
+</script>
+</body>
+</html>

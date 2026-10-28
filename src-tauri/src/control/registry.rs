@@ -7,7 +7,9 @@
 //                  why). Nothing here writes a row or changes remote state.
 //   Write (6)      local SQLite rows in four pinned tables. Reversible, visible
 //                  in the app, confined to this machine, and audited before
-//                  dispatch.
+//                  dispatch. Plus the Clock's three (set, stop, snooze an
+//                  alarm), which change the webview's alarm store rather than
+//                  a table — same properties, same audit.
 //   Actuate (3)    music transport. Nothing in a table changes; what changes is
 //                  the room the user is in. Runs on the interactive profile,
 //                  queues for approval on the background one.
@@ -50,6 +52,8 @@
 // mod.rs, so that a new runner module cannot appear without touching the file
 // the capability table lives in.
 
+#[path = "ops_clock.rs"]
+mod ops_clock;
 #[path = "ops_data.rs"]
 mod ops_data;
 #[path = "ops_db.rs"]
@@ -372,6 +376,34 @@ pub static OPS: &[Op] = &[
         run: ops_data::news,
     },
     // --- local app data. Each is pinned to one table by ops_db.rs. ---
+    // --- clock. The alarms live in the webview's store, not in a table: the
+    // runners check the arguments and ask the store, which answers for itself
+    // (ops_clock.rs). Write, not Actuate: what changes is Atlas' own alarm list
+    // and its own chime, both shown on the Clock screen and undone there. ---
+    Op {
+        name: "clock.set_alarm",
+        tier: Tier::Write,
+        timeout_ms: 8_000,
+        summary: "Set an alarm on the Clock in Atlas. Needs 'time', 24-hour HH:MM on the user's own clock (seven in the morning is 07:00). Optional 'label' (up to 60 characters) and 'days', weekday names such as 'mon' or 'sat' to repeat it; leave 'days' out for a one-off alarm. An alarm with the same time and days is switched on rather than duplicated. It rings on this Mac, only while Atlas is running and the Mac is awake.",
+        summary_keys: None,
+        run: ops_clock::set_alarm,
+    },
+    Op {
+        name: "clock.stop_alarm",
+        tier: Tier::Write,
+        timeout_ms: 8_000,
+        summary: "Stop the alarm that is ringing on the Clock right now. No arguments. Answers that nothing is ringing when nothing is.",
+        summary_keys: None,
+        run: ops_clock::stop_alarm,
+    },
+    Op {
+        name: "clock.snooze_alarm",
+        tier: Tier::Write,
+        timeout_ms: 8_000,
+        summary: "Snooze the alarm that is ringing on the Clock right now. Optional 'minutes', 1 to 30 (9 when left out). Answers that nothing is ringing when nothing is.",
+        summary_keys: None,
+        run: ops_clock::snooze_alarm,
+    },
     Op {
         name: "tasks.list",
         tier: Tier::Read,
@@ -814,6 +846,9 @@ mod tests {
         // mirror through db_select, so no mail read command is listed.
         "crate::mail::mail_mark_read",
         "crate::mail::mail_set_status",
+        // Clock: the one bridge to the webview's alarm store. It emits an event
+        // and waits for the store's answer; it reads and writes no table.
+        "crate::clock::run_voice_command",
         // Portfolio: analytics reads only.
         "crate::portfolio::portfolio_status",
         "crate::portfolio::portfolio_summary",
@@ -1004,6 +1039,7 @@ mod tests {
     /// what `every_runner_lives_in_a_scanned_module` exists to make safe — it
     /// keeps executable code out of the one file neither scan reads.
     const RUNNER_SOURCES: &[(&str, &str)] = &[
+        ("ops_clock.rs", include_str!("ops_clock.rs")),
         ("ops_data.rs", include_str!("ops_data.rs")),
         ("ops_db.rs", include_str!("ops_db.rs")),
         ("ops_health.rs", include_str!("ops_health.rs")),
@@ -1653,6 +1689,11 @@ mod tests {
         ("notes.update", Tier::Write),
         ("events.create", Tier::Write),
         ("watchlist.add", Tier::Write),
+        // The alarm list and the chime are Atlas' own, visible on the Clock
+        // screen and undone there; nothing outside the app changes.
+        ("clock.set_alarm", Tier::Write),
+        ("clock.stop_alarm", Tier::Write),
+        ("clock.snooze_alarm", Tier::Write),
         ("music.play", Tier::Actuate),
         ("music.pause", Tier::Actuate),
         ("music.volume", Tier::Actuate),
@@ -1882,7 +1923,7 @@ mod tests {
     #[test]
     fn mutating_summaries_name_their_arguments() {
         for op in OPS.iter().filter(|op| op.tier != Tier::Read) {
-            let takes_no_args = matches!(op.name, "music.pause");
+            let takes_no_args = matches!(op.name, "music.pause" | "clock.stop_alarm");
             if takes_no_args {
                 assert!(op.summary.contains("No arguments"), "{}", op.name);
                 continue;

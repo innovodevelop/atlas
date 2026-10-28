@@ -37,13 +37,20 @@ import { createLearningHandlers } from "./learningRoutes.ts";
 import { createProactiveHandlers } from "./proactive.ts";
 import { createGreetingHandlers } from "./greeting.ts";
 import { createMailDraftHandlers } from "./mailDraft.ts";
+import { createAnswerShapeHandlers } from "./answerShapes.ts";
+import { createConversationHandlers } from "./conversations.ts";
 import { createAdminHandlers } from "./adminRoutes.ts";
+import { createBrowserHandlers } from "./browserRoutes.ts";
 import { RUNNING_FROM_SOURCE } from "./projectRoot.ts";
 import { CLAUDE_PROJECTS_DIR, ingestJsonlSessions } from "./jsonlIngest.ts";
 import { startJsonlWatcher } from "./jsonlWatcher.ts";
 import { createControlClient } from "./control.ts";
+import { createAgentRunner } from "./agentRunner.ts";
+import { createAgentRunHandlers } from "./agentRoutes.ts";
 import { embedText } from "./localEmbed.ts";
 import { AUTO_EMBED_BATCH, embedPending, scheduleAutoEmbed } from "./autoEmbed.ts";
+import { readRememberShared } from "./memorySettings.ts";
+import { createModelCallHandlers, installModelCallRecorder } from "./modelCalls.ts";
 
 import { runChat } from "../../../supabase/functions/_shared/orchestrator.ts";
 import { aiChatCompletion, hasAIKey } from "../../../supabase/functions/_shared/aiGateway.ts";
@@ -113,6 +120,11 @@ function requireUser(req: Request): { userId: string; email: string; token: stri
 // service-role client for the orchestrator — there's no RLS locally.
 const localDb = createLocalDb();
 
+// The model-call ledger (modelCalls.ts): from here on every call the AI gateway
+// makes, from any route or background loop, is written to atlas_model_calls.
+installModelCallRecorder(localDb._db);
+const modelCalls = createModelCallHandlers({ db: localDb._db, requireUser, json });
+
 // The desktop control port. Created ONCE per process, not per request: the
 // capability list is fetched lazily and cached, and a client per request would
 // re-probe the port on every chat turn.
@@ -139,6 +151,21 @@ const greeting = createGreetingHandlers({ db: localDb, requireUser, json });
 // only — never the Cloudflare mail worker, never sends (see mailDraft.ts).
 const mailDraft = createMailDraftHandlers({ db: localDb, requireUser, json });
 
+// The Beta Browser: fetch a page on this Mac (guarded: public http/https only,
+// capped, timed, no scripts) and ask about it. Built WITHOUT the db on purpose:
+// Ask and "On this page" are page-grounded and never write memory (see
+// browserRoutes.ts).
+const browser = createBrowserHandlers({ requireUser, json });
+
+// Beta Answer shapes: /answer/compare is ONE cheap call that restates an
+// answer Atlas already gave as a table; /answer/person reads this Mac's mail
+// and calendar with no model at all (see answerShapes.ts).
+const answerShapes = createAnswerShapeHandlers({ db: localDb, requireUser, json });
+
+// Earlier conversations for Voice and Answer: the words from chat_turns,
+// never the system prompts or tool traffic stored beside them.
+const conversations = createConversationHandlers({ db: localDb, requireUser, json });
+
 // Admin routes: version tracking, agent sessions, design sync, tests. Same
 // requireUser as every other route — these read and write the whole admin
 // surface of atlas.db, so they are not exempt from auth (see adminRoutes.ts).
@@ -146,6 +173,15 @@ const admin = createAdminHandlers({ db: localDb._db, requireUser });
 // Keep /versions in step with GitHub while the brain runs (planSync.ts).
 // ATLAS_PLAN_SYNC=off disables it; without `gh` each tick fails fast.
 if (process.env.ATLAS_PLAN_SYNC !== "off") admin.startPlanSync();
+
+// Agent runs: the brain executes `runs` rows (agentRunner.ts) — a schedule's
+// "Run now" was a pending row nothing picked up before this. One runner per
+// process, and lib.rs keeps one brain per app. ATLAS_AGENT_RUNNER=off leaves
+// runs unexecuted. The Agent View pauses, resumes and stops them through
+// agentRoutes.ts, which also stops the sessions the brain tracks.
+const agentRunner = createAgentRunner({ db: localDb._db, control });
+if (process.env.ATLAS_AGENT_RUNNER !== "off") agentRunner.start();
+const agentRuns = createAgentRunHandlers({ db: localDb._db, runner: agentRunner, requireUser, json });
 
 // Live agent view (feat-018): keep atlas_agent_sessions current while Claude
 // Code works. Only from a source checkout (RUNNING_FROM_SOURCE, not "the repo
@@ -188,6 +224,9 @@ async function handleChatWithMemory(req: Request): Promise<Response> {
       // Persisted trait/lexicon state — composed into the system prompt by the
       // orchestrator (personality.ts). Absent for other callers ⇒ defaults.
       personality: getPersonality(localDb._db, userId),
+      // Settings → "Remember things I share" (memorySettings.ts). Off, the
+      // orchestrator saves only what the user explicitly asks it to.
+      rememberShared: readRememberShared(localDb._db, userId),
       // Desktop reads. `controlCaps` decides which domain tools get declared,
       // so an unreachable port simply means no desktop tools this turn.
       control: control.available() ? control : undefined,
@@ -451,28 +490,47 @@ const server = Bun.serve({
       if (req.method === "POST" && url.pathname === "/research") return await learning.research(req);
       if (req.method === "POST" && url.pathname === "/greeting") return await greeting.greeting(req);
       if (req.method === "POST" && url.pathname === "/mail/draft") return await mailDraft.draft(req);
+      if (req.method === "POST" && url.pathname === "/browser/fetch") return await browser.fetch(req);
+      if (req.method === "POST" && url.pathname === "/browser/ask") return await browser.ask(req);
+      if (req.method === "POST" && url.pathname === "/browser/notice") return await browser.notice(req);
       if (req.method === "POST" && url.pathname === "/memory/maintenance") return await learning.memoryMaintenance(req);
       if (req.method === "POST" && url.pathname === "/memory/list") return await handleMemoryList(req);
       if (req.method === "POST" && url.pathname === "/memory/forget") return await handleMemoryForget(req);
       if (req.method === "POST" && url.pathname === "/memory/erase-all") return await handleMemoryEraseAll(req);
-      // Admin routes
-      if (url.pathname === "/admin/versions/sync" && req.method === "POST") return admin.syncVersionPlan(req);
-      if (url.pathname === "/admin/versions/sync-status" && req.method === "GET") return admin.getPlanSyncStatus(req);
+      if (req.method === "POST" && url.pathname === "/answer/compare") return await answerShapes.compare(req);
+      if (req.method === "POST" && url.pathname === "/answer/person") return await answerShapes.person(req);
+      if (req.method === "POST" && url.pathname === "/conversations/list") return await conversations.list(req);
+      if (req.method === "POST" && url.pathname === "/conversations/get") return await conversations.get(req);
+      // Admin routes. The async ones are awaited here, inside the try: a bare
+      // `return promise` would let an AuthError skip the catch below and reach
+      // Bun as a 500 page without CORS headers, which the webview reads as
+      // the brain not answering.
+      if (url.pathname === "/admin/versions/sync" && req.method === "POST") return await admin.syncVersionPlan(req);
+      if (url.pathname === "/admin/versions/sync-status" && req.method === "GET") return await admin.getPlanSyncStatus(req);
       if (url.pathname === "/admin/versions" && req.method === "GET") return admin.getVersions(req);
       if (url.pathname.startsWith("/admin/versions/") && req.method === "GET") return admin.getVersionDetail(req, url.pathname.split("/")[3]);
       if (url.pathname === "/admin/changelog/sync" && req.method === "POST") return admin.syncChangelog(req);
       if (url.pathname === "/admin/changelog" && req.method === "GET") return admin.getChangelog(req, url.searchParams.get("version_id") ?? undefined);
       if (url.pathname === "/admin/agent-sessions" && req.method === "GET") return admin.getAgentSessions(req, url.searchParams.get("status") ?? undefined);
       if (url.pathname.startsWith("/admin/agent-events/") && req.method === "GET") return admin.getAgentEvents(req, url.pathname.split("/")[3]);
+      if (url.pathname.startsWith("/admin/agent-sessions/") && url.pathname.endsWith("/stop") && req.method === "POST") return await agentRuns.stopSession(req, url.pathname.split("/")[3]);
+      if (url.pathname.startsWith("/admin/agent-runs/") && url.pathname.endsWith("/pause") && req.method === "POST") return agentRuns.pauseRun(req, url.pathname.split("/")[3]);
+      if (url.pathname.startsWith("/admin/agent-runs/") && url.pathname.endsWith("/resume") && req.method === "POST") return agentRuns.resumeRun(req, url.pathname.split("/")[3]);
+      if (url.pathname.startsWith("/admin/agent-runs/") && url.pathname.endsWith("/stop") && req.method === "POST") return await agentRuns.stopRun(req, url.pathname.split("/")[3], url.searchParams.get("undo") === "1");
       if (url.pathname === "/admin/tests/suites" && req.method === "GET") return admin.getTestSuites(req);
       if (url.pathname === "/admin/tests/runs" && req.method === "GET") return admin.getTestRuns(req, url.searchParams.get("suite_id") ?? undefined);
       if (url.pathname === "/admin/tests/discover" && req.method === "POST") return admin.discoverTests(req);
       if (url.pathname.startsWith("/admin/tests/run/") && req.method === "POST") return admin.runTest(req, url.pathname.split("/")[4]);
       if (url.pathname === "/admin/design-syncs" && req.method === "GET") return admin.getDesignSyncs(req);
       if (url.pathname === "/admin/design-syncs/sync" && req.method === "POST") return admin.syncDesignSyncs(req);
+      if (url.pathname === "/admin/design-syncs/screens" && req.method === "GET") return admin.getDesignScreens(req);
       if (url.pathname === "/admin/ingest-sessions" && req.method === "POST") return admin.ingestSessions(req);
       if (url.pathname === "/admin/ci-runs" && req.method === "POST") return admin.getCiRuns(req);
-      if (url.pathname === "/admin/system/health" && req.method === "GET") return admin.getSystemHealth(req);
+      if (url.pathname === "/admin/github/pulls" && req.method === "GET") return await admin.getGithubPulls(req);
+      if (url.pathname === "/admin/github/deploys" && req.method === "GET") return await admin.getGithubDeploys(req);
+      // Awaited so an auth failure inside the async handler still reaches the catch below.
+      if (url.pathname === "/admin/system/health" && req.method === "GET") return await admin.getSystemHealth(req, url.searchParams.get("fresh") === "1");
+      if (url.pathname === "/admin/model-calls" && req.method === "GET") return modelCalls.getModelCalls(req, url.searchParams.get("days"));
       if (url.pathname === "/admin/system/errors" && req.method === "GET") return admin.getErrorLogs(req, Number(url.searchParams.get("limit")) || 50);
       if (url.pathname === "/admin/system/scan" && req.method === "POST") return admin.scanErrors(req);
       if (url.pathname === "/admin/system/repairs" && req.method === "GET") return admin.getRepairs(req);

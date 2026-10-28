@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>(function(){window.addEventListener("unhandledrejection",function(e){var m=String(e.reason&&e.reason.message||e.reason);if(/Transition was aborted|ViewTransition/.test(m))e.preventDefault()});var top=false;try{top=window.self===window.top}catch(e){}var s=document.createElement("style");if(top){s.textContent="@view-transition{navigation:auto}";}else{s.textContent="html{animation:atlas-in .45s cubic-bezier(.22,1,.36,1) both}html.atlas-out{transition:opacity .22s ease,transform .22s ease;opacity:0;transform:scale(.988)}@keyframes atlas-in{from{opacity:0;transform:scale(1.012)}}";document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a||e.defaultPrevented||e.metaKey||e.ctrlKey||a.target)return;var h=a.getAttribute("href");if(!/\.dc\.html/.test(h)||/^https?:/.test(h))return;if(h.split("#")[0]===""||location.pathname.endsWith(encodeURI(h.split("#")[0]))&&h.indexOf("#")>0)return;e.preventDefault();document.documentElement.classList.add("atlas-out");setTimeout(function(){location.href=h},210)},true);}document.head.appendChild(s)})();</script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script>window.addEventListener("pagereveal",function(e){var t=e.viewTransition;if(t){["ready","finished","updateCallbackDone"].forEach(function(p){t[p]&&t[p].catch(function(){})})}});window.addEventListener("unhandledrejection",function(e){if(/Transition was aborted|ViewTransition/.test(String(e.reason&&e.reason.message||e.reason)))e.preventDefault()});</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script type="module" src="atlas-devices-3d.js"></script>
+<style>
+::view-transition-group(*){animation-duration:.55s;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+::view-transition-old(root){animation:.4s cubic-bezier(.22,1,.36,1) both vt-out}
+::view-transition-new(root){animation:.55s cubic-bezier(.22,1,.36,1) both vt-in}
+@keyframes vt-out{to{opacity:0;transform:scale(.985)}}
+@keyframes vt-in{from{opacity:0;transform:scale(1.015)}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#f9f7f4}
+button,input{border:none;font:inherit;background:none;color:inherit}
+a{color:#3461f2;text-decoration:none}a:hover{color:#2748bd}
+.nosb{scrollbar-width:none}.nosb::-webkit-scrollbar{display:none}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:44px;border-radius:14px;background:#f1eeea;outline:none;overflow:hidden;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:4px;height:44px;background:#1e1e24;box-shadow:-1000px 0 0 996px #ffd9a0;cursor:pointer}
+@keyframes bpop{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;transition:none !important}}
+</style>
+<script src="atlas-quickstart-sphere.js"></script>
+<script src="atlas-orb.js"></script>
+<script src="atlas-topbar.js"></script>
+</helmet>
+<div data-screen-label="Atlas Smart Home · {{ roomName }}" class="nosb" style="height:100vh;overflow-y:auto;padding:20px 20px 92px;display:flex;flex-direction:column;gap:12px;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased">
+
+<header style="display:flex;flex-wrap:wrap;align-items:center;gap:16px 28px;padding:6px 8px 4px;animation:bpop .5s both">
+<div style="position:relative;width:clamp(88px,10vw,128px);aspect-ratio:1;flex:none;margin:-8px -10px -8px -12px"><canvas ref="{{ sphereRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas></div>
+<div style="flex:1 1 360px;min-width:0"><a href="Atlas Dashboard Beta.dc.html" title="Back to Home · Esc" style="font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#6d6a67" style-hover="color:#1e1e24">Home · Jægersborggade 12</a>
+<div style="margin-top:6px;display:flex;align-items:baseline;gap:18px;flex-wrap:wrap"><span style="font-family:'Hanken Grotesk',sans-serif;font-size:clamp(48px,6vw,88px);font-weight:500;letter-spacing:-.06em;line-height:.9">{{ inside }}</span><span style="font-size:15px;color:#6d6a67">inside · 12° and cloudy out · <span style="white-space:nowrap">{{ onCount }} on</span></span></div></div>
+<div style="display:flex;gap:2px;padding:4px;border-radius:9999px;background:#f1eeea"><sc-for list="{{ modes }}" as="m" hint-placeholder-count="3"><button onClick="{{ pickMode }}" data-k="{{ m.k }}" style="border:none;height:42px;padding:0 18px;display:flex;align-items:center;gap:8px;border-radius:9999px;background:{{ m.bg }};color:{{ m.fg }};font-size:13.5px;font-weight:600;cursor:pointer;white-space:nowrap"><span style="width:7px;height:7px;border-radius:50%;background:{{ m.dot }}"></span>{{ m.l }}</button></sc-for></div>
+</header>
+
+<div class="nosb" style="display:flex;gap:6px;overflow-x:auto;padding:0 2px"><sc-for list="{{ scenes }}" as="s" hint-placeholder-count="5"><button onClick="{{ runScene }}" data-k="{{ s.k }}" style="border:none;flex:none;display:flex;align-items:center;gap:12px;height:56px;padding:0 18px 0 8px;border-radius:9999px;background:{{ s.bg }};color:{{ s.fg }};cursor:pointer;white-space:nowrap;transition:background .2s"><span style="width:40px;height:40px;border-radius:50%;background:{{ s.sw }}"></span><span style="text-align:left"><span style="display:block;font-size:14px;font-weight:600">{{ s.l }}</span><span style="display:block;font-size:11.5px;color:{{ s.sub }}">{{ s.d }}</span></span></button></sc-for></div>
+
+<div style="display:grid;grid-template-columns:{{ cols }};gap:12px;align-items:start">
+<nav aria-label="Rooms" style="display:flex;flex-direction:{{ roomDir }};gap:4px;padding:8px;border-radius:28px;background:#f1eeea;overflow-x:auto" class="nosb"><sc-for list="{{ rooms }}" as="r" hint-placeholder-count="5"><button onClick="{{ pickRoom }}" data-k="{{ r.k }}" aria-current="{{ r.cur }}" style="border:none;flex:none;text-align:left;display:flex;flex-direction:column;gap:3px;padding:14px 16px;border-radius:20px;background:{{ r.bg }};cursor:pointer;min-width:150px" style-hover="background:{{ r.hov }}"><span style="display:flex;justify-content:space-between;gap:8px;font-size:14.5px;font-weight:600;white-space:nowrap">{{ r.n }}<span style="font-weight:500;color:#6d6a67;font-variant-numeric:tabular-nums">{{ r.temp }}</span></span><span style="font-size:12px;color:#6d6a67">{{ r.sub }}</span></button></sc-for></nav>
+
+<section style="min-width:0;display:flex;flex-direction:column;gap:12px">
+<div style="view-transition-name:hero;position:relative;height:clamp(360px,52vh,560px);border-radius:36px;background:#f1eeea;overflow:hidden">
+<canvas ref="{{ stageRef }}" style="position:absolute;left:0;right:0;top:0;bottom:96px;width:100%;height:calc(100% - 96px);display:block;cursor:grab"></canvas>
+<div style="position:absolute;left:24px;top:22px;right:24px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;pointer-events:none"><div><span style="display:block;font-size:12px;font-weight:600;color:#6d6a67">{{ roomName }}</span><span style="display:block;margin-top:4px;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(26px,2.8vw,40px);font-weight:500;letter-spacing:-.04em;line-height:1">{{ d.name }}</span><span style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13.5px;font-weight:600;color:{{ d.stFg }}"><span style="width:8px;height:8px;border-radius:50%;background:{{ d.stDot }}"></span>{{ d.status }}</span></div><span style="font-size:11.5px;color:#6d6a67">Drag to turn</span></div>
+<sc-if value="{{ loading3d }}" hint-placeholder-val="{{ true }}"><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:#6d6a67">Loading the model…</div></sc-if>
+<div style="position:absolute;left:16px;right:16px;bottom:16px;padding:14px;border-radius:24px;background:rgba(255,253,250,.94);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);display:flex;flex-wrap:wrap;align-items:center;gap:10px">
+<sc-if value="{{ d.hasPower }}" hint-placeholder-val="{{ true }}"><button onClick="{{ togglePower }}" role="switch" aria-checked="{{ d.onAttr }}" aria-label="Power" style="border:none;flex:none;height:44px;padding:0 18px;border-radius:9999px;background:{{ d.powBg }};color:{{ d.powFg }};font-size:14px;font-weight:600;cursor:pointer">{{ d.powL }}</button></sc-if>
+<sc-if value="{{ d.isLight }}" hint-placeholder-val="{{ true }}"><div style="flex:1 1 200px;position:relative"><input type="range" min="1" max="100" value="{{ d.br }}" onInput="{{ setBr }}" aria-label="Brightness"><span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:13px;font-weight:600;pointer-events:none;color:#1e1e24">{{ d.br }}%</span></div><div style="display:flex;gap:4px"><sc-for list="{{ swatches }}" as="w" hint-placeholder-count="5"><button onClick="{{ setColor }}" data-k="{{ w.c }}" aria-label="{{ w.l }}" title="{{ w.l }}" style="border:none;width:36px;height:36px;border-radius:50%;background:{{ w.c }};box-shadow:{{ w.ring }};cursor:pointer"></button></sc-for></div></sc-if>
+<sc-if value="{{ d.isTherm }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:6px"><button onClick="{{ stepTemp }}" data-k="-0.5" aria-label="Cooler" style="border:none;width:44px;height:44px;border-radius:50%;background:#f1eeea;font-size:18px;cursor:pointer">−</button><span style="min-width:96px;text-align:center;font-family:'Hanken Grotesk',sans-serif;font-size:28px;font-weight:600;letter-spacing:-.03em;font-variant-numeric:tabular-nums">{{ d.target }}°</span><button onClick="{{ stepTemp }}" data-k="0.5" aria-label="Warmer" style="border:none;width:44px;height:44px;border-radius:50%;background:#f1eeea;font-size:18px;cursor:pointer">+</button></div><span style="font-size:13px;color:#6d6a67">{{ d.thermNote }}</span></sc-if>
+<sc-if value="{{ d.isLock }}" hint-placeholder-val="{{ false }}"><button onClick="{{ toggleLock }}" style="border:none;height:44px;padding:0 18px;border-radius:9999px;background:{{ d.lockBg }};color:{{ d.lockFg }};font-size:14px;font-weight:600;cursor:pointer">{{ d.lockL }}</button><span style="font-size:13px;color:#6d6a67">{{ d.lockNote }}</span></sc-if>
+<sc-if value="{{ d.isSpeaker }}" hint-placeholder-val="{{ false }}"><div style="flex:1 1 200px;position:relative"><input type="range" min="0" max="100" value="{{ d.vol }}" onInput="{{ setVol }}" aria-label="Volume"><span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:13px;font-weight:600;pointer-events:none">Volume {{ d.vol }}%</span></div><a href="Atlas Music Beta.dc.html" style="height:44px;padding:0 16px;display:flex;align-items:center;border-radius:9999px;background:#f1eeea;color:#1e1e24;font-size:13.5px;font-weight:600" style-hover="background:#edebe7;color:#1e1e24">Open Music</a></sc-if>
+<sc-if value="{{ d.isCam }}" hint-placeholder-val="{{ false }}"><span style="display:flex;align-items:center;gap:8px;height:44px;padding:0 16px;border-radius:9999px;background:#1e1e24;color:#f9f7f4;font-size:13.5px;font-weight:600"><span style="width:8px;height:8px;border-radius:50%;background:#ff4d4d;animation:pulse 1.6s infinite"></span>Live · 1 person at 10:42</span><span style="font-size:13px;color:#6d6a67">Recordings stay on your home hub</span></sc-if>
+<sc-if value="{{ d.isBlinds }}" hint-placeholder-val="{{ false }}"><div style="flex:1 1 200px;position:relative"><input type="range" min="0" max="100" value="{{ d.open }}" onInput="{{ setOpen }}" aria-label="Open"><span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:13px;font-weight:600;pointer-events:none">{{ d.open }}% open</span></div></sc-if>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(170px,100%),1fr));gap:8px"><sc-for list="{{ devices }}" as="v" hint-placeholder-count="4"><button onClick="{{ pickDevice }}" data-k="{{ v.id }}" aria-pressed="{{ v.sel }}" style="border:none;text-align:left;display:flex;flex-direction:column;padding:8px 8px 14px;border-radius:26px;background:{{ v.bg }};cursor:pointer;transition:background .2s" style-hover="background:{{ v.hov }}">
+<span style="position:relative;display:block;width:100%;aspect-ratio:1;border-radius:20px;background-color:#f1eeea;background-image:{{ v.img }};background-size:cover;background-position:center;overflow:hidden"></span>
+<span style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:12px;padding:0 8px"><span style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ v.name }}</span><span style="flex:none;width:9px;height:9px;border-radius:50%;background:{{ v.dot }}"></span></span>
+<span style="display:block;margin-top:2px;padding:0 8px;font-size:12px;color:#6d6a67">{{ v.status }}</span>
+</button></sc-for></div>
+</section>
+
+<aside style="display:flex;flex-direction:column;gap:12px">
+<section style="padding:20px 22px;border-radius:28px;background:#1e1e24;color:#f9f7f4;display:flex;flex-direction:column;gap:10px"><span style="font-size:13px;font-weight:600;color:rgba(249,247,244,.78)">Energy today</span><span style="font-family:'Hanken Grotesk',sans-serif;font-size:44px;font-weight:500;letter-spacing:-.05em;line-height:1">{{ kwh }}<span style="font-size:18px;color:rgba(249,247,244,.62)"> kWh</span></span><div style="display:flex;align-items:flex-end;gap:3px;height:64px"><sc-for list="{{ energy }}" as="e" hint-placeholder-count="12"><span style="flex:1;height:{{ e.h }};border-radius:4px;background:{{ e.c }}"></span></sc-for></div><span style="font-size:12.5px;color:rgba(249,247,244,.78)">1.4 kWh under your usual Tuesday</span></section>
+<section style="padding:10px;border-radius:28px;background:#f1eeea;display:flex;flex-direction:column;gap:4px"><span style="padding:8px 10px 4px;font-size:14px;font-weight:600">Atlas runs these</span><sc-for list="{{ autos }}" as="a" hint-placeholder-count="4"><div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:18px;background:#fffdfa"><span style="flex:1;min-width:0"><span style="display:block;font-size:13.5px;font-weight:600">{{ a.t }}</span><span style="display:block;margin-top:2px;font-size:12px;line-height:1.45;color:#6d6a67">{{ a.d }}</span></span><button onClick="{{ toggleAuto }}" data-k="{{ a.k }}" role="switch" aria-checked="{{ a.on }}" aria-label="{{ a.t }}" style="border:none;display:flex;flex:none;width:46px;height:28px;padding:3px;border-radius:9999px;background:{{ a.swBg }};justify-content:{{ a.swPos }};cursor:pointer;transition:background .25s"><span style="width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 2px 5px rgba(30,30,36,.22)"></span></button></div></sc-for></section>
+<div style="padding:14px 16px;border-radius:22px;background:#eef2fe;font-size:13px;line-height:1.55"><strong style="font-weight:600;color:#2748bd">Atlas:</strong> {{ atlasTip }}</div>
+</aside>
+</div>
+
+<nav aria-label="Atlas" data-dock="beta" style="view-transition-name:atlas-dock;position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:4px;padding:6px;border-radius:9999px;background:rgba(255,253,250,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 18px 40px -20px rgba(30,30,36,.28)">
+<sc-for list="{{ dock }}" as="k" hint-placeholder-count="6"><a href="{{ k.h }}" title="{{ k.l }}" aria-label="{{ k.l }}" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{ k.ico }}"></path></svg></a></sc-for>
+<a href="Atlas Settings Beta.dc.html" title="Marcus · Settings" aria-label="Settings" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px" style-hover="background:#f1eeea"><span style="width:34px;height:34px;border-radius:50%;background:#1e1e24;color:#f9f7f4;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">M</span></a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const DEV = {
+  d1: ['living', 'Floor lamp', 'lamp', { on: true, br: 62, color: '#ffd9a0' }],
+  d2: ['living', 'Ceiling bulbs', 'bulb', { on: true, br: 40, color: '#fff1d6' }],
+  d3: ['living', 'Sonos Era 300', 'speaker', { on: true, vol: 46 }],
+  d4: ['living', 'Thermostat', 'thermostat', { on: true, target: 21.5 }],
+  d5: ['kitchen', 'Pendant', 'bulb', { on: false, br: 80, color: '#fff1d6' }],
+  d6: ['kitchen', 'HomePod mini', 'speaker', { on: false, vol: 30, shade: 0xe9e4dc }],
+  d7: ['office', 'Desk lamp', 'lamp', { on: true, br: 85, color: '#f4f1ff' }],
+  d8: ['office', 'Office heating', 'thermostat', { on: true, target: 20 }],
+  d9: ['hall', 'Front door', 'lock', { on: true, locked: true }],
+  d10: ['hall', 'Doorbell camera', 'camera', { on: true }],
+  d11: ['bedroom', 'Bedside bulb', 'bulb', { on: false, br: 25, color: '#ffb36b' }],
+  d12: ['bedroom', 'Blinds', 'blinds', { on: true, open: 60 }]
+};
+const ROOMS = [['living', 'Living room', '21.5°'], ['kitchen', 'Kitchen', '21.0°'], ['office', 'Office', '20.0°'], ['hall', 'Hall', '19.5°'], ['bedroom', 'Bedroom', '18.5°']];
+class Component extends DCLogic {
+  state = { ico: {}, vw: window.innerWidth, ready: !!window.AtlasDevices3D, room: 'living', sel: 'd1', dev: Object.fromEntries(Object.entries(DEV).map(([k, v]) => [k, Object.assign({}, v[3])])), mode: 'home', scene: null, autos: { leave: true, night: true, sun: true, sleep: false } };
+  componentDidMount() {
+    fetch('atlas-icon-data.js').then((r) => r.text()).then((t) => { const SET = new Function(t.replace(/export\s+const\s+SET\s*=/, 'return'))(), ico = {}; SET.forEach((g) => g[2].forEach(([n, d]) => { ico[n] = d; })); this.setState({ ico }); }).catch(() => {});
+    this.onResize = () => this.setState({ vw: window.innerWidth }); window.addEventListener('resize', this.onResize);
+    this.onReady = () => { this.setState({ ready: true }); this.mountStage(); }; window.addEventListener('atlas-devices-3d-ready', this.onReady);
+    this.onKey = (e) => { if (e.key === 'Escape') window.location.href = 'Atlas Dashboard Beta.dc.html'; }; window.addEventListener('keydown', this.onKey);
+  }
+  componentWillUnmount() { window.removeEventListener('resize', this.onResize); window.removeEventListener('atlas-devices-3d-ready', this.onReady); window.removeEventListener('keydown', this.onKey); if (this.stage) this.stage.destroy(); }
+  mountStage() { if (this.stage || !this.canvas || !window.AtlasDevices3D) return; this.stage = window.AtlasDevices3D.mountStage(this.canvas, { bg: '#f1eeea' }); this.lastKey = ''; this.syncStage(); }
+  syncStage() { if (!this.stage) return; const k = DEV[this.state.sel][2], st = this.state.dev[this.state.sel], key = this.state.sel + JSON.stringify(st); if (key !== this.lastKey) { this.lastKey = key; this.stage.set(k, st); } }
+  componentDidUpdate() { this.syncStage(); }
+  upd(id, o) { this.setState((s) => ({ dev: Object.assign({}, s.dev, { [id]: Object.assign({}, s.dev[id], o) }) })); }
+  status(id) { const [, , kind] = DEV[id], st = this.state.dev[id]; if (kind === 'lock') return st.locked ? 'Locked' : 'Unlocked'; if (kind === 'camera') return 'Live'; if (kind === 'thermostat') return st.on ? 'Heating to ' + st.target + '°' : 'Off'; if (kind === 'speaker') return st.on ? 'Playing · ' + st.vol + '%' : 'Idle'; if (kind === 'blinds') return st.open + '% open'; return st.on ? st.br + '% · ' + ({ '#ffd9a0': 'warm', '#fff1d6': 'soft white', '#f4f1ff': 'daylight', '#ffb36b': 'candle', '#b6a8ff': 'dusk' }[st.color] || 'colour') : 'Off'; }
+  renderVals() {
+    const s = this.state, ic = (n) => s.ico[n] || '', A = window.AtlasDevices3D, sel = DEV[s.sel], st = s.dev[s.sel], kind = sel[2];
+    const isOn = (id) => { const k = DEV[id][2], x = s.dev[id]; return k === 'lock' ? false : k === 'blinds' ? x.open > 0 : k === 'camera' ? false : !!x.on; };
+    const onCount = Object.keys(DEV).filter(isOn).length;
+    const SCENES = { morning: ['Morning', 'Blinds up, lights soft', '#ffd9a0'], focus: ['Focus', 'Office bright, music off', '#f4f1ff'], dinner: ['Dinner', 'Pendant warm, speaker low', '#ffb36b'], movie: ['Movie', 'Lights at 10%, blinds down', '#b6a8ff'], away: ['All off', 'Everything off, door locked', '#1e1e24'] };
+    const apply = (k) => { const d = Object.assign({}, s.dev), set = (id, o) => { d[id] = Object.assign({}, d[id], o); };
+      if (k === 'morning') { set('d12', { open: 100 }); set('d1', { on: true, br: 40, color: '#ffd9a0' }); set('d5', { on: true, br: 60 }); }
+      if (k === 'focus') { set('d7', { on: true, br: 100, color: '#f4f1ff' }); set('d3', { on: false }); }
+      if (k === 'dinner') { set('d5', { on: true, br: 55, color: '#ffb36b' }); set('d6', { on: true, vol: 20 }); set('d1', { on: true, br: 35, color: '#ffb36b' }); }
+      if (k === 'movie') { set('d1', { on: true, br: 10, color: '#b6a8ff' }); set('d2', { on: false }); set('d12', { open: 0 }); }
+      if (k === 'away') { ['d1', 'd2', 'd5', 'd7', 'd11', 'd3', 'd6'].forEach((id) => set(id, { on: false })); set('d9', { locked: true }); }
+      return d; };
+    return {
+      sphereRef: (el) => { if (!el || el.__q) return; const go = () => { if (el.__q || !el.isConnected) return; if (!window.QuickSphere) return setTimeout(go, 60); el.__q = this._sph = window.QuickSphere.mount(el, { mode: 'veil', bg: 'transparent', dust: [122, 148, 246], strand: [52, 97, 242], blend: 'source-over', alpha: 0.62, seed: 11, count: 7000, scale: 0.42, state: 'idle' }); this._sphSt = 'idle'; }; go(); },
+      _sphSync: (() => { const ns = s.busy ? 'working' : s.mode === 'away' ? 'muted' : s.mode === 'night' ? 'listening' : 'idle'; if (this._sph && this._sphSt !== ns) { this._sphSt = ns; this._sph.set({ state: ns }); } return ''; })(),
+      stageRef: (el) => { if (!el) return; this.canvas = el; if (window.AtlasDevices3D) this.mountStage(); },
+      loading3d: !s.ready,
+      inside: (s.dev.d4.on ? s.dev.d4.target : 19.5).toFixed(1).replace('.0', '') + '°', onCount: String(onCount),
+      modes: [['home', 'Home', '#0fae76'], ['away', 'Away', '#e07a1f'], ['night', 'Night', '#7854ff']].map(([k, l, dot]) => ({ k, l, dot, bg: s.mode === k ? '#1e1e24' : 'transparent', fg: s.mode === k ? '#f9f7f4' : '#1e1e24' })),
+      pickMode: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.setState({ mode: k, dev: k === 'away' ? apply('away') : k === 'night' ? apply('movie') : s.dev }); },
+      scenes: Object.keys(SCENES).map((k) => { const [l, d, sw] = SCENES[k], on = s.scene === k; return { k, l, d, sw, bg: on ? '#1e1e24' : '#f1eeea', fg: on ? '#f9f7f4' : '#1e1e24', sub: on ? 'rgba(249,247,244,.62)' : '#6d6a67' }; }),
+      runScene: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.setState({ scene: k, dev: apply(k), busy: true }); clearTimeout(this._bt); this._bt = setTimeout(() => this.setState({ busy: false }), 1600); },
+      cols: s.vw >= 1280 ? '220px minmax(0,1fr) 320px' : s.vw >= 900 ? '200px minmax(0,1fr)' : 'minmax(0,1fr)', roomDir: s.vw >= 900 ? 'column' : 'row',
+      rooms: ROOMS.map(([k, n, temp]) => { const ids = Object.keys(DEV).filter((id) => DEV[id][0] === k), on = ids.filter(isOn).length, c = s.room === k; return { k, n, temp, sub: ids.length + ' devices · ' + on + ' on', cur: c ? 'page' : 'false', bg: c ? '#fffdfa' : 'transparent', hov: c ? '#fffdfa' : '#edebe7' }; }),
+      pickRoom: (e) => { const k = e.currentTarget.getAttribute('data-k'), first = Object.keys(DEV).find((id) => DEV[id][0] === k); this.setState({ room: k, sel: first }); },
+      roomName: ROOMS.find((r) => r[0] === sel[0])[1],
+      d: { name: sel[1], status: this.status(s.sel), stDot: isOn(s.sel) || kind === 'lock' && st.locked || kind === 'camera' ? '#0fae76' : '#b6b1aa', stFg: '#1e1e24', onAttr: st.on ? 'true' : 'false', powBg: st.on ? '#1e1e24' : '#f1eeea', powFg: st.on ? '#f9f7f4' : '#1e1e24', powL: st.on ? 'On' : 'Off', hasPower: kind !== 'lock' && kind !== 'camera' && kind !== 'blinds', isLight: kind === 'lamp' || kind === 'bulb', isTherm: kind === 'thermostat', isLock: kind === 'lock', isSpeaker: kind === 'speaker', isCam: kind === 'camera', isBlinds: kind === 'blinds', br: String(st.br || 0), target: String(st.target || 21), thermNote: (st.target || 21) > 21 ? 'Warming the room, about 25 min' : 'Holding steady', lockBg: st.locked ? '#e3f4ec' : '#fdf0e2', lockFg: st.locked ? '#0a7a53' : '#9a5410', lockL: st.locked ? 'Locked · tap to unlock' : 'Unlocked · tap to lock', lockNote: st.locked ? 'Locked by Atlas at 08:31 when you left' : 'Atlas locks it 2 minutes after the door closes', vol: String(st.vol || 0), open: String(st.open || 0) },
+      togglePower: () => this.upd(s.sel, { on: !st.on }),
+      setBr: (e) => this.upd(s.sel, { br: +e.currentTarget.value, on: true }),
+      swatches: [['#ffb36b', 'Candle'], ['#ffd9a0', 'Warm'], ['#fff1d6', 'Soft white'], ['#f4f1ff', 'Daylight'], ['#b6a8ff', 'Dusk']].map(([c, l]) => ({ c, l, ring: st.color === c ? '0 0 0 3px #fffdfa, 0 0 0 5px #1e1e24' : 'none' })),
+      setColor: (e) => this.upd(s.sel, { color: e.currentTarget.getAttribute('data-k'), on: true }),
+      stepTemp: (e) => this.upd(s.sel, { target: Math.max(15, Math.min(27, (st.target || 21) + +e.currentTarget.getAttribute('data-k'))) }),
+      toggleLock: () => this.upd(s.sel, { locked: !st.locked }),
+      setVol: (e) => this.upd(s.sel, { vol: +e.currentTarget.value, on: true }),
+      setOpen: (e) => this.upd(s.sel, { open: +e.currentTarget.value }),
+      devices: Object.keys(DEV).filter((id) => DEV[id][0] === s.room).map((id) => { const [, name, k] = DEV[id], on = s.sel === id; return { id, name, status: this.status(id), sel: on ? 'true' : 'false', img: A && s.ready ? 'url(' + A.thumb(k, s.dev[id], '#f1eeea', 220) + ')' : 'none', dot: isOn(id) || (k === 'lock' && s.dev[id].locked) || k === 'camera' ? '#0fae76' : '#d8d4cd', bg: on ? '#1e1e24' : '#fffdfa', hov: on ? '#1e1e24' : '#f9f7f4' }; }),
+      pickDevice: (e) => this.setState({ sel: e.currentTarget.getAttribute('data-k') }),
+      kwh: '8.2', energy: [20, 26, 34, 52, 66, 48, 30, 24, 22, 28, 40, 58].map((v, i, a) => ({ h: v + '%', c: i === a.length - 1 ? '#8fa9ff' : 'rgba(249,247,244,.22)' })),
+      autos: [['leave', 'When everyone leaves', 'Lights off, door locked, heating to 17°'], ['night', 'At bedtime', 'Hall at 5% until 06:00, blinds down'], ['sun', 'Follow the sun', 'Warmer light after sunset, 17:42 today'], ['sleep', 'Sleep-friendly heating', 'Bedroom starts warming 30 min later']].map(([k, t, d]) => { const on = !!s.autos[k]; return { k, t, d, on: on ? 'true' : 'false', swBg: on ? '#3461f2' : '#d8d4cd', swPos: on ? 'flex-end' : 'flex-start' }; }),
+      toggleAuto: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.setState((x) => ({ autos: Object.assign({}, x.autos, { [k]: !x.autos[k] }) })); },
+      atlasTip: s.room === 'office' ? 'the office heats at 06:00 for a room you enter at 09:00. Moving it would save about 0.9 kWh a day.' : s.room === 'bedroom' ? 'you woke twice last night when the heating switched on. Turn on Sleep-friendly heating to fix it.' : 'the living room lamp has been on for 6 hours. Want it to dim after 22:00?',
+      dock: [['home', 'Home', 'Atlas Dashboard Beta.dc.html'], ['core', 'Core', 'Atlas Core Beta.dc.html'], ['teach', 'Teach', 'Atlas Teach Beta.dc.html'], ['mail', 'Mail', 'Atlas Mail Beta.dc.html'], ['architecture', 'Architecture', 'Atlas Architecture Beta.dc.html'], ['voice', 'Voice', 'Atlas Voice Beta.dc.html']].map(([k, l, h]) => ({ l, h, ico: ic(k) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

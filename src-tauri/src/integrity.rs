@@ -45,7 +45,8 @@ use std::path::Path;
 /// Manifest baked in at compile time. build.rs copies
 /// `src-tauri/binaries/manifest.json` into OUT_DIR, substituting `{}` when the
 /// file does not exist (dev checkouts where the sidecars aren't compiled).
-const EMBEDDED_MANIFEST: &str = include_str!(concat!(env!("OUT_DIR"), "/sidecar-manifest.json"));
+/// System Status also reads each entry's `model_bytes` from it (system_status.rs).
+pub(crate) const EMBEDDED_MANIFEST: &str = include_str!(concat!(env!("OUT_DIR"), "/sidecar-manifest.json"));
 
 /// Expected identity of one sidecar, parsed from the manifest.
 #[derive(Debug, PartialEq)]

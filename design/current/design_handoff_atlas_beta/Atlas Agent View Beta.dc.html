@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>(function(){window.addEventListener("unhandledrejection",function(e){var m=String(e.reason&&e.reason.message||e.reason);if(/Transition was aborted|ViewTransition/.test(m))e.preventDefault()});var top=false;try{top=window.self===window.top}catch(e){}var s=document.createElement("style");if(top){s.textContent="@view-transition{navigation:auto}";}else{s.textContent="html{animation:atlas-in .45s cubic-bezier(.22,1,.36,1) both}html.atlas-out{transition:opacity .22s ease,transform .22s ease;opacity:0;transform:scale(.988)}@keyframes atlas-in{from{opacity:0;transform:scale(1.012)}}";document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a||e.defaultPrevented||e.metaKey||e.ctrlKey||a.target)return;var h=a.getAttribute("href");if(!/\.dc\.html/.test(h)||/^https?:/.test(h))return;if(h.split("#")[0]===""||location.pathname.endsWith(encodeURI(h.split("#")[0]))&&h.indexOf("#")>0)return;e.preventDefault();document.documentElement.classList.add("atlas-out");setTimeout(function(){location.href=h},210)},true);}document.head.appendChild(s)})();</script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#1e1e24}
+button,input{border:none;font:inherit;background:none;color:inherit}
+a{color:#8fa9ff;text-decoration:none}a:hover{color:#f9f7f4}
+.nosb{scrollbar-width:none}.nosb::-webkit-scrollbar{display:none}
+@keyframes bpop{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;transition:none !important}}
+</style>
+<script src="atlas-quickstart-sphere.js"></script>
+<script src="atlas-topbar.js"></script>
+</helmet>
+<div data-screen-label="Atlas Agent View · {{ run.t }}" style="height:100vh;display:grid;grid-template-columns:{{ cols }};gap:12px;padding:20px 20px 84px;background:#1e1e24;color:#f9f7f4;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden">
+
+<aside class="nosb" style="min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px">
+<a href="Atlas Dashboard Beta.dc.html" title="Back to Home · Esc" style="padding:6px 8px 10px;font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:rgba(249,247,244,.62)" style-hover="color:#f9f7f4">Agent · {{ activeN }} running</a>
+<sc-for list="{{ runs }}" as="r" hint-placeholder-count="5"><button onClick="{{ pickRun }}" data-k="{{ r.id }}" style="border:none;width:100%;text-align:left;display:flex;flex-direction:column;gap:8px;padding:14px 16px;border-radius:22px;background:{{ r.bg }};cursor:pointer;transition:background .2s" style-hover="background:{{ r.hov }}">
+<span style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:50%;background:{{ r.dot }};animation:{{ r.anim }}"></span><span style="flex:1;min-width:0;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.t }}</span><span style="font-family:'Geist Mono',monospace;font-size:11.5px;color:rgba(249,247,244,.62)">{{ r.when }}</span></span>
+<span style="height:4px;border-radius:9999px;background:rgba(249,247,244,.1);overflow:hidden"><span style="display:block;height:100%;width:{{ r.pct }};background:{{ r.dot }};transition:width .6s"></span></span>
+<span style="font-size:12px;color:rgba(249,247,244,.62)">{{ r.sub }}</span>
+</button></sc-for>
+</aside>
+
+<main style="min-width:0;min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr);gap:12px">
+<section style="view-transition-name:hero;position:relative;padding:clamp(18px,2.4vw,30px);border-radius:36px;background:#26262d;display:grid;grid-template-columns:{{ heroCols }};gap:24px;align-items:center;overflow:hidden">
+<div style="position:relative;width:min(240px,100%);aspect-ratio:1;justify-self:center"><canvas ref="{{ sphereRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas></div>
+<div style="min-width:0;display:flex;flex-direction:column;gap:12px">
+<span style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:{{ run.stFg }}"><span style="width:8px;height:8px;border-radius:50%;background:{{ run.dot }};animation:{{ run.anim }}"></span>{{ run.status }}</span>
+<h1 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(28px,3.2vw,48px);font-weight:500;letter-spacing:-.045em;line-height:1.04;text-wrap:balance">{{ run.t }}</h1>
+<p style="margin:0;font-size:15px;line-height:1.55;color:rgba(249,247,244,.78);text-wrap:pretty">{{ run.goal }}</p>
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+<sc-if value="{{ run.canPause }}" hint-placeholder-val="{{ true }}"><button onClick="{{ togglePause }}" style="border:none;height:40px;padding:0 16px;border-radius:9999px;background:#f9f7f4;color:#1e1e24;font-size:13px;font-weight:600;cursor:pointer">{{ run.pauseL }}</button><button onClick="{{ stopRun }}" style="border:none;height:40px;padding:0 16px;border-radius:9999px;background:rgba(249,247,244,.1);color:#f9f7f4;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:rgba(208,69,58,.35)">Stop and undo</button></sc-if>
+<span style="height:40px;padding:0 14px;display:flex;align-items:center;gap:8px;border-radius:9999px;background:rgba(249,247,244,.06);font-size:12.5px;color:rgba(249,247,244,.78)">Limit · {{ run.limit }}</span>
+</div>
+</div>
+</section>
+
+<div style="min-height:0;display:grid;grid-template-columns:{{ bodyCols }};gap:12px">
+<section class="nosb" style="min-height:0;overflow-y:auto;padding:10px;border-radius:32px;background:#26262d;display:flex;flex-direction:column;gap:4px">
+<span style="padding:8px 12px;font-size:13px;font-weight:600;color:rgba(249,247,244,.62)">Plan · {{ run.doneN }} of {{ run.stepN }} steps</span>
+<sc-for list="{{ steps }}" as="s" hint-placeholder-count="6"><div style="display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:12px;align-items:start;padding:13px 14px;border-radius:18px;background:{{ s.bg }};opacity:{{ s.op }};animation:bpop .35s both">
+<span style="width:24px;height:24px;border-radius:50%;background:{{ s.cBg }};color:{{ s.cFg }};display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700">{{ s.mark }}</span>
+<span style="min-width:0"><span style="display:block;font-size:14px;font-weight:600">{{ s.t }}</span><span style="display:block;margin-top:3px;font-size:12.5px;line-height:1.5;color:rgba(249,247,244,.62)">{{ s.d }}</span>
+<sc-if value="{{ s.isApproval }}" hint-placeholder-val="{{ false }}"><span style="display:flex;gap:6px;margin-top:10px"><button onClick="{{ approve }}" style="border:none;height:34px;padding:0 14px;border-radius:9999px;background:#3461f2;color:#fff;font-size:12.5px;font-weight:600;cursor:pointer">Approve</button><button onClick="{{ decline }}" style="border:none;height:34px;padding:0 13px;border-radius:9999px;background:rgba(249,247,244,.1);color:#f9f7f4;font-size:12.5px;font-weight:600;cursor:pointer">Skip this step</button></span></sc-if>
+</span>
+<span style="font-family:'Geist Mono',monospace;font-size:11.5px;color:rgba(249,247,244,.62)">{{ s.time }}</span>
+</div></sc-for>
+</section>
+<section class="nosb" style="min-height:0;overflow-y:auto;padding:10px;border-radius:32px;background:#16161b;display:flex;flex-direction:column;gap:2px">
+<span style="padding:8px 12px;font-size:13px;font-weight:600;color:rgba(249,247,244,.62)">What Atlas is doing · live</span>
+<sc-for list="{{ log }}" as="l" hint-placeholder-count="8"><div style="display:grid;grid-template-columns:56px 74px minmax(0,1fr);gap:10px;padding:9px 12px;border-radius:12px;font-family:'Geist Mono',monospace;font-size:12px;line-height:1.5;background:{{ l.bg }};animation:bpop .3s both"><span style="color:rgba(249,247,244,.62)">{{ l.t }}</span><span style="color:{{ l.kFg }}">{{ l.k }}</span><span style="color:#f9f7f4;font-family:'Geist',sans-serif;font-size:13px">{{ l.m }}</span></div></sc-for>
+</section>
+</div>
+</main>
+
+<nav aria-label="Atlas" data-dock="beta" style="view-transition-name:atlas-dock;position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:4px;padding:6px;border-radius:9999px;background:rgba(255,253,250,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 18px 40px -20px rgba(0,0,0,.5)">
+<sc-for list="{{ dock }}" as="d" hint-placeholder-count="6"><a href="{{ d.h }}" title="{{ d.l }}" aria-label="{{ d.l }}" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{ d.ico }}"></path></svg></a></sc-for>
+<a href="Atlas Settings Beta.dc.html" title="Marcus · Settings" aria-label="Settings" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px" style-hover="background:#f1eeea"><span style="width:34px;height:34px;border-radius:50%;background:#1e1e24;color:#f9f7f4;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">M</span></a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const RUNS = [
+  { id: 'r1', t: 'Plan the Lisbon trip', goal: 'Book flights, a place near Príncipe Real and an airport transfer for 1–5 November, inside your €2,000 travel limit.', limit: '€2,000 travel', steps: [['Read the trip note and calendar', '1–5 Nov is free. Ana joins on the 2nd.'], ['Compare flights', 'TP1338 07:40 is €184 and arrives before your 15:00.'], ['Shortlist places to stay', 'Casa Amarela, 4 nights, €612, cancellable to 28 Oct.'], ['Book TP1338 and Casa Amarela', 'Total €796 · inside your limit.', 'approval'], ['Book the airport transfer', '€38 on Friday 06:40.'], ['Add everything to your calendar', 'With check-in reminders.']], at: 3, state: 'waiting' },
+  { id: 'r2', t: 'Research: AI Act duties for Atlas', goal: 'Read the regulation and guidance, and write a one-page brief of what applies to a general-purpose assistant.', limit: 'Read only', steps: [['Find primary sources', 'EUR-Lex, Commission guidance, 3 law firm notes.'], ['Read and extract duties', '41 pages read, 9 duties found.'], ['Check against how Atlas works', 'Disclosure: already met. Logging: met.'], ['Write the brief', 'Drafting section 2 of 4…'], ['Send it to Core', '']], at: 3, state: 'running' },
+  { id: 'r3', t: 'Clear the inbox since 06:00', goal: 'Answer what your rules allow, draft the rest, and hold anything about money or new people.', limit: 'Mail rules', steps: [['Read 48 new messages', 'Across 3 accounts.'], ['Answer 14 within your rules', 'Logged in the audit trail.'], ['Draft 3 replies for you', 'In Mail, Needs you.'], ['Hold 2 for approval', 'Both about money.']], at: 4, state: 'done' },
+  { id: 'r4', t: 'Repair the nightly sync job', goal: 'The 03:12 sync failed. Find out why and fix it without losing anything.', limit: 'Sandbox only', steps: [['Reproduce in a sandbox', 'Token expired during upload.'], ['Refresh the token and retry', 'Succeeded at 03:14.'], ['Verify nothing was lost', '2,140 items, all present.']], at: 3, state: 'done' }
+];
+class Component extends DCLogic {
+  state = { vw: window.innerWidth, ico: {}, sel: 'r1', runs: RUNS.map((r) => Object.assign({}, r)), log: [], tick: 0 };
+  componentDidMount() {
+    fetch('atlas-icon-data.js').then((r) => r.text()).then((t) => { const SET = new Function(t.replace(/export\s+const\s+SET\s*=/, 'return'))(), ico = {}; SET.forEach((g) => g[2].forEach(([n, d]) => { ico[n] = d; })); this.setState({ ico }); }).catch(() => {});
+    this.onResize = () => this.setState({ vw: window.innerWidth }); window.addEventListener('resize', this.onResize);
+    this.onKey = (e) => { if (e.key === 'Escape') window.location.href = 'Atlas Dashboard Beta.dc.html'; }; window.addEventListener('keydown', this.onKey);
+    const LINES = [['read', 'eur-lex.europa.eu · Article 50, transparency'], ['think', 'Disclosure duty applies to chat and voice'], ['tool', 'core.notes.append("Duties", 2 items)'], ['read', 'Commission guidance, section 4.2'], ['think', 'Logging requirement already met by the audit trail'], ['write', 'Brief §2: “What Atlas already does”'], ['check', 'Citations verified · 6 of 6'], ['tool', 'calendar.find_free("Lisbon", 1–5 Nov)']];
+    let i = 0; this.iv = setInterval(() => { const L = LINES[i % LINES.length]; i++; const d = new Date(); this.setState((s) => ({ tick: s.tick + 1, log: [{ t: d.toTimeString().slice(0, 8), k: L[0], m: L[1], id: i }].concat(s.log).slice(0, 14), runs: s.runs.map((r) => (r.state === 'running' && s.tick % 6 === 5 && r.at < r.steps.length ? Object.assign({}, r, { at: r.at + 1, state: r.at + 1 >= r.steps.length ? 'done' : 'running' }) : r)) })); }, 1800);
+  }
+  componentWillUnmount() { clearInterval(this.iv); window.removeEventListener('resize', this.onResize); window.removeEventListener('keydown', this.onKey); if (this.sph) this.sph.destroy(); }
+  componentDidUpdate() { const r = this.state.runs.find((x) => x.id === this.state.sel), st = { running: 'working', waiting: 'listening', paused: 'muted', done: 'success', stopped: 'idle' }[r.state]; if (this.sph && this._ls !== st) { this._ls = st; this.sph.set({ state: st }); } }
+  upd(o) { this.setState((s) => ({ runs: s.runs.map((r) => (r.id === s.sel ? Object.assign({}, r, typeof o === 'function' ? o(r) : o) : r)) })); }
+  renderVals() {
+    const s = this.state, ic = (n) => s.ico[n] || '', R = s.runs.find((x) => x.id === s.sel);
+    const SC = { running: ['Working', '#e07a1f', 'pulse 1.4s infinite', '#ffb36b'], waiting: ['Waiting for you', '#3461f2', 'pulse 2s infinite', '#8fa9ff'], paused: ['Paused', '#b6b1aa', 'none', 'rgba(249,247,244,.78)'], done: ['Done', '#0fae76', 'none', '#50dca0'], stopped: ['Stopped · undone', '#d0453a', 'none', '#ff9d8a'] };
+    const K = { read: '#8fa9ff', think: '#b6a8ff', tool: '#ffb36b', write: '#50dca0', check: '#50dca0' };
+    const C = SC[R.state];
+    return {
+      sphereRef: (el) => { if (!el || el.__q) return; const go = () => { if (el.__q || !el.isConnected) return; if (!window.QuickSphere) return setTimeout(go, 60); el.__q = this.sph = window.QuickSphere.mount(el, { mode: 'veil', bg: '#26262d', dust: [92, 122, 248], strand: [176, 196, 255], blend: 'lighter', alpha: 0.55, seed: 11, count: 9000, scale: 0.42, state: 'listening' }); }; go(); },
+      cols: s.vw >= 1100 ? '300px minmax(0,1fr)' : 'minmax(0,1fr)', heroCols: s.vw >= 820 ? '240px minmax(0,1fr)' : 'minmax(0,1fr)', bodyCols: s.vw >= 1280 ? 'minmax(0,1.2fr) minmax(0,1fr)' : 'minmax(0,1fr)',
+      activeN: String(s.runs.filter((r) => r.state === 'running' || r.state === 'waiting').length),
+      runs: s.runs.map((r) => { const c = SC[r.state], on = r.id === s.sel; return { id: r.id, t: r.t, when: r.state === 'done' ? 'done' : r.at + '/' + r.steps.length, sub: c[0] + ' · ' + r.limit, dot: c[1], anim: c[2], pct: Math.round(Math.min(r.at, r.steps.length) / r.steps.length * 100) + '%', bg: on ? '#26262d' : 'transparent', hov: on ? '#26262d' : 'rgba(249,247,244,.05)' }; }),
+      pickRun: (e) => this.setState({ sel: e.currentTarget.getAttribute('data-k') }),
+      run: { t: R.t, goal: R.goal, limit: R.limit, status: C[0], dot: C[1], anim: C[2], stFg: C[3], canPause: R.state === 'running' || R.state === 'paused' || R.state === 'waiting', pauseL: R.state === 'paused' ? 'Resume' : 'Pause', doneN: String(Math.min(R.at, R.steps.length)), stepN: String(R.steps.length) },
+      steps: R.steps.map(([t, d, kind], i) => { const done = i < R.at, now = i === R.at && R.state !== 'done', appr = now && kind === 'approval' && R.state === 'waiting'; return { t, d: d || '', isApproval: appr, mark: done ? '✓' : String(i + 1), cBg: done ? '#0fae76' : now ? '#3461f2' : 'rgba(249,247,244,.1)', cFg: '#fff', bg: now ? 'rgba(52,97,242,.16)' : 'transparent', op: !done && !now ? '.55' : '1', time: done ? ['09:02', '09:03', '09:05', '09:06', '09:08', '09:09'][i] || '' : now ? 'now' : '' }; }),
+      togglePause: () => this.upd((r) => ({ state: r.state === 'paused' ? (r.steps[r.at] && r.steps[r.at][2] === 'approval' ? 'waiting' : 'running') : 'paused' })),
+      stopRun: () => this.upd({ state: 'stopped' }),
+      approve: () => this.upd((r) => ({ at: r.at + 1, state: 'running' })), decline: () => this.upd((r) => ({ at: r.at + 1, state: 'running' })),
+      log: s.log.map((l, i) => ({ t: l.t, k: l.k, m: l.m, kFg: K[l.k], bg: i === 0 ? 'rgba(249,247,244,.06)' : 'transparent' })),
+      dock: [['home', 'Home', 'Atlas Dashboard Beta.dc.html'], ['core', 'Core', 'Atlas Core Beta.dc.html'], ['teach', 'Teach', 'Atlas Teach Beta.dc.html'], ['mail', 'Mail', 'Atlas Mail Beta.dc.html'], ['architecture', 'Architecture', 'Atlas Architecture Beta.dc.html'], ['voice', 'Voice', 'Atlas Voice Beta.dc.html']].map(([k, l, h]) => ({ l, h, ico: ic(k) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

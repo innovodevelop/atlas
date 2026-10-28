@@ -57,13 +57,22 @@ export interface DockItem {
   popover?: ReactNode;
 }
 
+/**
+ * `ink` is the Workshop dock (dark pill). `beta` is the Beta guideline dock
+ * (paper pill, 42px items) rendered by the Beta shell; the final Beta dock is
+ * still to be chosen from the handoff's Dock Explorations, which is why this
+ * is a variant and not a second component.
+ */
+export type DockVariant = 'ink' | 'beta';
+
 interface DockProps {
   items: DockItem[];
   /** Id of the current screen. That item, and only that item, shows its label. */
   current?: string;
+  variant?: DockVariant;
 }
 
-export const Dock = ({ items: allItems, current }: DockProps) => {
+export const Dock = ({ items: allItems, current, variant = 'ink' }: DockProps) => {
   const navigate = useNavigate();
   const items = dockableItems(allItems);
 
@@ -82,7 +91,7 @@ export const Dock = ({ items: allItems, current }: DockProps) => {
   }
 
   return (
-    <div className="dock">
+    <div className={variant === 'beta' ? 'dock dock--beta' : 'dock'} data-dock={variant}>
       {items.map((item) => {
         const kind = item.kind ?? 'nav';
         const on = item.id === current;

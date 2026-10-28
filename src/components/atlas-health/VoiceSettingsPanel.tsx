@@ -14,8 +14,10 @@ import { useStreamingTTS } from '@/hooks/useStreamingTTS';
 
 // Curated ElevenLabs voices — each one verified to work via API on the free
 // plan (several premade voices, e.g. Aria/Rachel/Charlotte, are API-blocked
-// for free accounts with "paid_plan_required").
-const VOICES: Array<{ id: string; name: string; description: string }> = [
+// for free accounts with "paid_plan_required"). Exported with MODELS so the
+// Beta Settings draws the same list: a second copy of five voice ids is the
+// kind of thing that drifts.
+export const VOICES: Array<{ id: string; name: string; description: string }> = [
   { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah', description: 'Soft, warm (default)' },
   { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George', description: 'Calm, British' },
   { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel', description: 'Deep, authoritative' },
@@ -23,7 +25,7 @@ const VOICES: Array<{ id: string; name: string; description: string }> = [
   { id: 'ErXwobaYiN019PkySvjV', name: 'Antoni', description: 'Well-rounded, friendly' },
 ];
 
-const MODELS: Array<{ id: AtlasSettings['ttsModel']; name: string; description: string }> = [
+export const MODELS: Array<{ id: AtlasSettings['ttsModel']; name: string; description: string }> = [
   { id: 'eleven_turbo_v2_5', name: 'Turbo v2.5', description: 'Fast, great quality (default)' },
   { id: 'eleven_flash_v2_5', name: 'Flash v2.5', description: 'Lowest latency (~75ms)' },
   { id: 'eleven_multilingual_v2', name: 'Multilingual v2', description: 'Highest quality, slower' },

@@ -53,10 +53,13 @@
 // what is actually enforced, so the switches on the Setup screen cannot drift
 // away from the code.
 
+pub mod beta;
 pub mod companion;
+pub mod extras;
 pub mod ha;
 #[cfg(feature = "homekit")]
 pub mod hap;
+pub mod history;
 pub mod keys;
 pub mod store;
 pub mod ws;
@@ -342,25 +345,36 @@ pub fn autonomy() -> Value {
 /// leak it. It is moved into the adapter and never returned.
 fn adapter_for(bridge: &store::BridgeRow) -> Result<Box<dyn HomeAdapter>, HomeError> {
     match bridge.kind {
-        BridgeKind::HomeAssistant => {
-            let base_url = bridge.base_url.as_deref().filter(|u| !u.is_empty()).ok_or_else(|| {
-                HomeError::Refused(
-                    "this Home Assistant bridge has no address stored. Link it again.".into(),
-                )
-            })?;
-            let token = keys::ha_token().ok_or_else(|| {
-                HomeError::Unauthorised(
-                    "Atlas has no Home Assistant token in the Keychain. Link the bridge again."
-                        .into(),
-                )
-            })?;
-            Ok(Box::new(ha::HomeAssistant::new(base_url, &token)))
-        }
+        BridgeKind::HomeAssistant => Ok(Box::new(ha_for(bridge)?)),
         // The row carries everything the HomeKit adapter needs to find its
         // accessory; the Keychain half is read inside `for_bridge`, which is
         // the single place that touches it — same rule as the token above.
         BridgeKind::HomekitCompanion => Ok(Box::new(companion::Companion::for_bridge(bridge))),
     }
+}
+
+/// The Home Assistant client for a linked bridge — for the calls only Home
+/// Assistant has (automations, scripts, statistics, the camera proxy), which
+/// the narrow `HomeAdapter` trait deliberately does not carry. Same single
+/// Keychain read as `adapter_for`, which builds its HA adapter through here.
+fn ha_for(bridge: &store::BridgeRow) -> Result<ha::HomeAssistant, HomeError> {
+    if bridge.kind != BridgeKind::HomeAssistant {
+        return Err(HomeError::Unavailable(
+            "that needs Home Assistant; the linked bridge is HomeKit, which has no such thing.".into(),
+        ));
+    }
+    let base_url = bridge.base_url.as_deref().filter(|u| !u.is_empty()).ok_or_else(|| {
+        HomeError::Refused(
+            "this Home Assistant bridge has no address stored. Link it again.".into(),
+        )
+    })?;
+    let token = keys::ha_token().ok_or_else(|| {
+        HomeError::Unauthorised(
+            "Atlas has no Home Assistant token in the Keychain. Link the bridge again."
+                .into(),
+        )
+    })?;
+    Ok(ha::HomeAssistant::new(base_url, &token))
 }
 
 /// The one linked bridge Atlas can act through, if there is one.
@@ -513,25 +527,37 @@ fn live_loop(app: AppHandle, user_id: String, stop: Arc<AtomicBool>) {
 
         let client = ha::HomeAssistant::new(&base_url, &token);
         let keep_going = || !stop.load(Ordering::SeqCst);
-        let mut on_state = |p: ha::PushedState| {
+        let mut on_state = |push: ha::Push| {
             let Some(db) = app.try_state::<DbState>() else { return };
             let Ok(conn) = db.conn.lock() else { return };
-            let applied = store::apply_pushed_state(
-                &conn,
-                &bridge.id,
-                &p.external_id,
-                p.value,
-                Some(p.state.as_str()),
-                p.colour.as_deref(),
-                p.available,
-                p.last_changed.as_deref(),
-            );
+            // A device push writes the mirror row, the detail (a thermostat's
+            // target and action) and, when it is a change worth keeping, the
+            // history — `history::apply_push`. A hub push (an automation
+            // switched, somebody came home) updates a row a sync created.
+            let (applied, table) = match &push {
+                ha::Push::Device(p) => (
+                    history::apply_push(
+                        &conn,
+                        &bridge.id,
+                        &p.external_id,
+                        p.value,
+                        &p.state,
+                        p.colour.as_deref(),
+                        p.available,
+                        p.last_changed.as_deref(),
+                        &p.detail,
+                        &now_iso(),
+                    ),
+                    "home_device_state",
+                ),
+                ha::Push::Hub(h) => (history::apply_pushed_hub(&conn, &bridge.id, h), "home_hub_entities"),
+            };
             // The lock is held across the emit decision but not across the
             // emit itself: `changed` goes to the webview, which may be busy.
             drop(conn);
             if matches!(applied, Ok(true)) && last_notify.elapsed() >= PUSH_NOTIFY_WINDOW {
                 last_notify = Instant::now();
-                changed(&app, "home_device_state");
+                changed(&app, table);
             }
         };
 
@@ -874,7 +900,17 @@ fn sync_bridge(
     // The network call happens with NO database lock held. Holding the single
     // shared WAL connection across a LAN round trip would block the webview's
     // own reads for as long as the hub takes to answer.
-    let pull = match adapter_for(&bridge).and_then(|a| a.pull()) {
+    //
+    // Home Assistant is pulled through `pull_full`, which also brings the Beta
+    // extras (detail, automations, scripts, people); the HomeKit adapter has
+    // none of them and goes through the trait as before.
+    let pulled = match bridge.kind {
+        BridgeKind::HomeAssistant => ha_for(&bridge).and_then(|h| h.pull_full()),
+        BridgeKind::HomekitCompanion => {
+            adapter_for(&bridge).and_then(|a| a.pull()).map(|p| (p, extras::PullExtras::default()))
+        }
+    };
+    let (pull, more) = match pulled {
         Ok(p) => p,
         Err(e) => {
             let (health, detail) = health_of(&e);
@@ -888,10 +924,21 @@ fn sync_bridge(
 
     let report = {
         let mut conn = state.conn.lock().map_err(|e| e.to_string())?;
+        let now = now_iso();
+        // What each device was doing BEFORE this pull lands, so the history
+        // can record what moved. A failure here costs the history, not the sync.
+        let before = history::readings(&conn, bridge_id).unwrap_or_default();
         let report = store::apply_pull(&mut conn, user_id, bridge_id, &pull).map_err(String::from)?;
-        store::mark_synced(&conn, bridge_id, &now_iso()).map_err(String::from)?;
+        store::mark_synced(&conn, bridge_id, &now).map_err(String::from)?;
         store::set_bridge_health(&conn, bridge_id, "connected", &bridge.detail_or_default(), None)
             .map_err(String::from)?;
+        if let Err(e) = history::upsert_details(&conn, bridge_id, &more.details)
+            .and_then(|_| history::apply_hub(&conn, user_id, bridge_id, &more.hub))
+            .and_then(|_| history::record_pull(&conn, user_id, bridge_id, &before, &pull, &more, &now))
+            .and_then(|_| history::prune_events(&conn, user_id, chrono::Utc::now()))
+        {
+            log::warn!("[home] the Beta extras did not apply on this sync: {e}");
+        }
         report
     };
     changed(app, "home_devices");
@@ -925,6 +972,7 @@ pub fn home_device_set(
     adapter_for(&target.bridge)
         .and_then(|a| a.set_value(&target.external_id, value))
         .map_err(String::from)?;
+    record_sent(&state, &user_id, &target.bridge.id, &target.external_id, Some(value), "set");
 
     // The bridge is the source of truth for what the device is now doing, and
     // it pushes that on the live channel. Atlas records the ATTEMPT's effect
@@ -948,6 +996,7 @@ pub fn home_device_colour(
     adapter_for(&target.bridge)
         .and_then(|a| a.set_colour(&target.external_id, &colour))
         .map_err(String::from)?;
+    record_sent(&state, &user_id, &target.bridge.id, &target.external_id, None, "colour");
     changed(&app, "home_devices");
     Ok(json!({ "device_id": target.id, "device": target.name, "colour": colour }))
 }
@@ -976,6 +1025,15 @@ pub fn home_lock_set(
     adapter_for(&target.bridge)
         .and_then(|a| a.set_lock(&target.external_id, locked))
         .map_err(String::from)?;
+    // The record the lock note reads: "Locked by Atlas at 08:31".
+    record_sent(
+        &state,
+        &user_id,
+        &target.bridge.id,
+        &target.external_id,
+        Some(if locked { 1.0 } else { 0.0 }),
+        if locked { "lock" } else { "unlock" },
+    );
     changed(&app, "home_devices");
     Ok(json!({ "device_id": target.id, "device": target.name, "locked": locked }))
 }
@@ -1004,6 +1062,7 @@ pub fn home_scene_run(
     adapter_for(&target.bridge)
         .and_then(|a| a.run_scene(&target.external_id))
         .map_err(String::from)?;
+    record_sent(&state, &user_id, &target.bridge.id, &target.external_id, None, "run");
     changed(&app, "home_devices");
     Ok(json!({ "scene_id": target.id, "scene": target.label }))
 }
@@ -1056,6 +1115,25 @@ pub fn home_live_start(
 pub fn home_live_stop(home: State<'_, HomeState>) -> Result<Value, String> {
     home.stop();
     Ok(json!({ "running": false }))
+}
+
+/// Write a command Atlas sent into the history.
+///
+/// Best effort, after the bridge accepted it: a history row that could not be
+/// written must not turn a command that worked into an error the user sees.
+fn record_sent(
+    state: &State<'_, DbState>,
+    user_id: &str,
+    bridge_id: &str,
+    external_id: &str,
+    value: Option<f64>,
+    verb: &str,
+) {
+    if let Ok(conn) = state.conn.lock() {
+        if let Err(e) = history::record_command(&conn, user_id, bridge_id, external_id, value, verb, &now_iso()) {
+            log::warn!("[home] a command went through but could not be recorded: {e}");
+        }
+    }
 }
 
 /// Resolve a local device id to something a bridge can be told about.

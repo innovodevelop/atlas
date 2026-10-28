@@ -1,0 +1,290 @@
+/* ── Beta Smart Home ───────────────────────────────────────────────────────────
+   Source: design/current/design_handoff_atlas_beta/Atlas Smart Home Beta.dc.html
+   (the header, the scenes strip, the rooms nav, the 3D stage with its control
+   row, the device grid, the aside). The design carries its styles inline; the
+   values below are those values, named with the --b-* tokens. Every button and
+   input is borderless under the Beta shell; depth is the paper scale only.
+   Imported by src/pages/atlas/BetaSmartHome.tsx; every class is b-sh-*. */
+
+.b-sh { display: flex; flex-direction: column; gap: var(--b-gap); padding: 14px var(--b-pad-page) 0; min-width: 0; }
+.b-sh-nowrap { white-space: nowrap; }
+
+/* Header: sphere, "Home · hub", the inside temperature, the line, the pill. */
+.b-sh-head { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 28px; padding: 6px 8px 4px; animation: b-pop .5s var(--b-spring) both; }
+.b-sh-sphere { position: relative; display: block; width: clamp(88px, 10vw, 128px); aspect-ratio: 1; flex: none; margin: -8px -10px -8px -12px; padding: 0; border-radius: 50%; background: none; cursor: pointer; }
+.b-sh-head-text { flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; }
+.b-sh-back { align-self: flex-start; padding: 0; background: none; cursor: pointer; font: inherit; font-size: 11px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase; color: var(--b-ink2); transition: color .2s; }
+.b-sh-back:hover { color: var(--b-ink); }
+.b-sh-head-line { margin-top: 6px; display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; }
+.b-sh-inside { font-family: var(--b-font-display); font-size: clamp(48px, 6vw, 88px); font-weight: 500; letter-spacing: -.06em; line-height: .9; font-variant-numeric: tabular-nums; }
+.b-sh-head-sub { font-size: 15px; color: var(--b-ink2); }
+.b-sh-head-sub .sampleB { margin: 0 6px 0 8px; vertical-align: 2px; }
+.b-sh-head-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.b-sh-head-tools .b-btn { height: 34px; }
+.b-sh-head-tools .b-status { height: 34px; padding: 0 14px; font-size: 12.5px; }
+
+/* Notices: why the surface is inert, a failed command, a degraded extra. */
+.b-sh-notice { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border-radius: var(--b-r-card); background: var(--b-panel); color: var(--b-ink2); font-size: 13px; line-height: 1.5; }
+.b-sh-notice > svg { flex: none; margin-top: 1px; color: var(--b-ink); }
+.b-sh-notice > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.b-sh-notice b { font-weight: 600; color: var(--b-ink); }
+.b-sh-notice--bad { background: var(--b-destructive-hover); color: var(--b-red-deep); }
+.b-sh-notice--bad > svg, .b-sh-notice--bad b { color: var(--b-red-deep); }
+.b-sh-notice .b-btn { flex: none; align-self: center; }
+
+/* Scenes: a strip of 56px pills, each with a 40px circle. */
+.b-sh-scenes { display: flex; gap: 6px; overflow-x: auto; padding: 0 2px; min-height: 56px; align-items: center; }
+.b-sh-scene { flex: none; display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 18px 0 8px; border-radius: var(--b-r-pill); background: var(--b-panel); color: var(--b-ink); cursor: pointer; white-space: nowrap; transition: background .2s; text-align: left; }
+.b-sh-scene:hover { background: var(--b-hover); }
+.b-sh-scene:disabled { cursor: default; opacity: .55; }
+.b-sh-scene.ran { background: var(--b-emphasis); }
+.b-sh-scene.ran .b-sh-scene-text span:last-child { color: var(--b-blue-deep); }
+.b-sh-scene-sw { flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--b-ink); color: var(--b-on-ink); display: flex; align-items: center; justify-content: center; font-family: var(--b-font-display); font-size: 15px; font-weight: 600; }
+.b-sh-scene.ran .b-sh-scene-sw { background: var(--b-blue); }
+.b-sh-scene-text span { display: block; }
+.b-sh-scene-text span:first-child { font-size: 14px; font-weight: 600; }
+.b-sh-scene-text span:last-child { font-size: 11.5px; color: var(--b-ink2); }
+.b-sh-scenes-empty { padding: 0 10px; font-size: 13px; color: var(--b-ink2); }
+
+/* The three columns: rooms · stage + grid · aside. */
+.b-sh-grid { display: grid; grid-template-columns: 220px minmax(0, 1fr) 320px; gap: var(--b-gap); align-items: start; }
+
+/* Rooms nav. */
+.b-sh-rooms { display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: var(--b-r-hero); background: var(--b-panel); overflow-x: auto; min-width: 0; }
+.b-sh-room { flex: none; text-align: left; display: flex; flex-direction: column; gap: 3px; padding: 14px 16px; border-radius: 20px; background: transparent; color: var(--b-ink); cursor: pointer; min-width: 150px; transition: background .2s; }
+.b-sh-room:hover { background: var(--b-hover); }
+.b-sh-room.on, .b-sh-room.on:hover { background: var(--b-card); }
+.b-sh-room-top { display: flex; justify-content: space-between; gap: 8px; font-size: 14.5px; font-weight: 600; white-space: nowrap; }
+.b-sh-room-temp { font-weight: 500; color: var(--b-ink2); font-variant-numeric: tabular-nums; }
+.b-sh-room-sub { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--b-ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-sh-room-sub i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--b-green); }
+.b-sh-room-sub i[data-tone="warn"] { background: #e07a1f; }
+.b-sh-room-sub i[data-tone="error"] { background: var(--b-red); }
+.b-sh-rooms-empty { padding: 14px 16px; font-size: 13px; line-height: 1.5; color: var(--b-ink2); }
+
+/* The stage card. */
+.b-sh-main { min-width: 0; display: flex; flex-direction: column; gap: var(--b-gap); }
+.b-sh-stage { view-transition-name: hero; position: relative; height: clamp(360px, 52vh, 560px); border-radius: 36px; background: var(--b-panel); overflow: hidden; }
+.b-sh-canvas, .b-sh-still { position: absolute; left: 0; right: 0; top: 0; width: 100%; height: calc(100% - 96px); display: block; }
+.b-sh-canvas { cursor: grab; touch-action: none; }
+.b-sh-canvas:active { cursor: grabbing; }
+.b-sh-still { object-fit: contain; object-position: center; }
+/* A device that is not answering is drawn as history, like its tile. */
+.b-sh-stage.stale .b-sh-canvas, .b-sh-stage.stale .b-sh-still { opacity: .55; filter: saturate(.3); }
+.b-sh-stage-head { position: absolute; left: 24px; top: 22px; right: 24px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; pointer-events: none; }
+.b-sh-stage-room { display: block; font-size: 12px; font-weight: 600; color: var(--b-ink2); }
+.b-sh-stage-name { display: block; margin-top: 4px; font-family: var(--b-font-display); font-size: clamp(26px, 2.8vw, 40px); font-weight: 500; letter-spacing: -.04em; line-height: 1; }
+.b-sh-stage-status { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 13.5px; font-weight: 600; color: var(--b-ink); }
+.b-sh-stage-status.stale { color: var(--b-ink2); }
+.b-sh-stage-status i, .b-sh-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #d8d4cd; transition: background .3s; }
+.b-sh-stage-status i[data-on="true"], .b-sh-dot[data-on="true"] { background: var(--b-green); }
+.b-sh-stage-hint { font-size: 11.5px; color: var(--b-ink2); white-space: nowrap; }
+.b-sh-stage-note { position: absolute; left: 24px; right: 24px; top: 50%; transform: translateY(-50%); text-align: center; font-size: 13px; line-height: 1.5; color: var(--b-ink2); pointer-events: none; }
+.b-sh-stage-empty { max-width: 380px; margin: 0 auto; }
+
+/* The control row floats over the stage's foot, on frosted card paper. */
+.b-sh-controls { position: absolute; left: 16px; right: 16px; bottom: 16px; padding: 14px; border-radius: var(--b-r-card); background: rgba(255, 253, 250, .94); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.b-sh-pow { flex: none; height: 44px; padding: 0 18px; border-radius: var(--b-r-pill); background: var(--b-panel); color: var(--b-ink); font-size: 14px; font-weight: 600; cursor: pointer; transition: background .2s, color .2s; }
+.b-sh-pow:hover { background: var(--b-hover); }
+.b-sh-pow.on, .b-sh-pow.on:hover { background: var(--b-ink); color: var(--b-on-ink); }
+.b-sh-range { --b-sh-fill: #ffd9a0; flex: 1 1 200px; position: relative; min-width: 0; }
+.b-sh-range input[type="range"] { -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 44px; margin: 0; padding: 0; border-radius: var(--b-r-row); background: var(--b-panel); outline: none; overflow: hidden; cursor: pointer; }
+.b-sh-range input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 4px; height: 44px; border-radius: 0; background: var(--b-ink); box-shadow: -1000px 0 0 996px var(--b-sh-fill); cursor: pointer; }
+.b-sh-range input[type="range"]::-moz-range-thumb { width: 4px; height: 44px; border: none; border-radius: 0; background: var(--b-ink); cursor: pointer; }
+.b-sh-range input[type="range"]::-moz-range-progress { height: 44px; background: var(--b-sh-fill); }
+.b-sh-range input[type="range"]:focus-visible { box-shadow: 0 0 0 3px rgba(52, 97, 242, .18); }
+.b-sh-range-label { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 13px; font-weight: 600; color: var(--b-ink); pointer-events: none; font-variant-numeric: tabular-nums; }
+.b-sh-swatches { display: flex; gap: 4px; }
+.b-sh-swatch { width: 36px; height: 36px; padding: 0; border-radius: 50%; cursor: pointer; transition: transform .15s var(--b-spring); }
+.b-sh-swatch:hover { transform: scale(1.06); }
+.b-sh-swatch[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--b-card), 0 0 0 5px var(--b-ink); }
+.b-sh-stepper { display: flex; align-items: center; gap: 6px; }
+.b-sh-stepper button { width: 44px; height: 44px; border-radius: 50%; background: var(--b-panel); color: var(--b-ink); font-size: 18px; cursor: pointer; transition: background .2s; }
+.b-sh-stepper button:hover { background: var(--b-hover); }
+.b-sh-stepper span { min-width: 96px; text-align: center; font-family: var(--b-font-display); font-size: 28px; font-weight: 600; letter-spacing: -.03em; }
+.b-sh-ctl-note { font-size: 13px; line-height: 1.45; color: var(--b-ink2); }
+.b-sh-lock { height: 44px; padding: 0 18px; border-radius: var(--b-r-pill); background: #fdf0e2; color: #9a5410; font-size: 14px; font-weight: 600; cursor: pointer; transition: background .2s; }
+.b-sh-lock.locked { background: var(--b-green-fill); color: var(--b-green-deep); }
+.b-sh-link { height: 44px; padding: 0 16px; display: inline-flex; align-items: center; border-radius: var(--b-r-pill); background: var(--b-panel); color: var(--b-ink); font-size: 13.5px; font-weight: 600; cursor: pointer; transition: background .2s; }
+.b-sh-link:hover { background: var(--b-hover); }
+.b-sh-live { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border-radius: var(--b-r-pill); background: var(--b-ink); color: var(--b-on-ink); font-size: 13.5px; font-weight: 600; }
+.b-sh-live i { width: 8px; height: 8px; border-radius: 50%; background: var(--b-neutral); }
+.b-sh-live i[data-on="true"] { background: #ff4d4d; animation: b-sh-pulse 1.6s infinite; }
+@keyframes b-sh-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+/* A fieldset only so `disabled` reaches the Workshop control's own buttons;
+   it draws nothing of its own. */
+.b-sh-generic { flex: 1 1 200px; min-width: 0; min-inline-size: 0; margin: 0; padding: 0; border: none; }
+/* Nothing can be commanded while the bridge is down; the controls say so by
+   dimming, and the reason is the outage notice in the aside. */
+.b-sh-controls button:disabled, .b-sh-controls input:disabled { cursor: default; opacity: .55; }
+.b-sh-pow:disabled:hover, .b-sh-stepper button:disabled:hover { background: var(--b-panel); }
+.b-sh-pow.on:disabled:hover { background: var(--b-ink); }
+.b-sh-truth { flex: 1 1 100%; margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--b-ink2); }
+.b-sh-truth[data-tone="bad"] { color: var(--b-red-deep); }
+.b-sh-truth[data-tone="warn"] { color: #8a6100; }
+
+/* The device grid: 3D thumbnails on panel paper, the selected tile in ink. */
+.b-sh-devices { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(170px, 100%), 1fr)); gap: 8px; }
+.b-sh-tile { text-align: left; display: flex; flex-direction: column; padding: 8px 8px 14px; border-radius: 26px; background: var(--b-card); color: var(--b-ink); cursor: pointer; transition: background .2s; min-width: 0; }
+.b-sh-tile:hover { background: var(--b-page); }
+.b-sh-tile.on, .b-sh-tile.on:hover { background: var(--b-ink); color: var(--b-on-ink); }
+.b-sh-tile.stale .b-sh-tile-img { opacity: .55; filter: saturate(.3); }
+.b-sh-tile-img { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 1; border-radius: 20px; background-color: var(--b-panel); background-size: cover; background-position: center; overflow: hidden; color: var(--b-ink2); }
+.b-sh-tile-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 12px; padding: 0 8px; }
+.b-sh-tile-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-sh-tile-row .b-sh-dot { width: 9px; height: 9px; }
+.b-sh-tile-status { display: block; margin-top: 2px; padding: 0 8px; font-size: 12px; color: var(--b-ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-sh-tile.on .b-sh-tile-status { color: var(--b-on-ink-small); }
+
+/* Aside. */
+.b-sh-aside { display: flex; flex-direction: column; gap: var(--b-gap); min-width: 0; }
+.b-sh-card { padding: 18px 20px; border-radius: var(--b-r-hero); background: var(--b-panel); display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.b-sh-card--ink { background: var(--b-ink); color: var(--b-on-ink); padding: 20px 22px; }
+.b-sh-card-eyebrow { font-size: 13px; font-weight: 600; color: var(--b-on-ink-body); }
+.b-sh-card-big { font-family: var(--b-font-display); font-size: clamp(26px, 2.4vw, 34px); font-weight: 500; letter-spacing: -.045em; line-height: 1.05; overflow-wrap: anywhere; }
+.b-sh-facts { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 4px; }
+.b-sh-facts div { display: flex; align-items: baseline; gap: 5px; }
+.b-sh-facts b { font-size: 20px; font-weight: 500; }
+.b-sh-facts span { font-size: 12px; color: var(--b-on-ink-small); }
+.b-sh-card-foot { font-size: 12.5px; line-height: 1.5; color: var(--b-on-ink-body); }
+.b-sh-card-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.b-sh-card-actions .b-btn--onink { height: 32px; }
+.b-sh-card-p { margin: 0; font-size: 13px; line-height: 1.55; color: var(--b-ink2); }
+.b-sh-bridges { display: flex; flex-direction: column; gap: 6px; }
+.b-sh-bridge { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--b-r-row); background: var(--b-card); }
+.b-sh-bridge-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.b-sh-bridge-text b { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-sh-bridge-text span { font-size: 12px; color: var(--b-ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-sh-unlink { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
+.b-sh-recents { display: flex; flex-direction: column; gap: 4px; }
+.b-sh-recent { width: 100%; text-align: left; background: var(--b-card); color: var(--b-ink); }
+.b-sh-recent.on { background: var(--b-emphasis); }
+.b-sh-recent-img { flex: none; width: 36px; height: 36px; border-radius: 11px; background-color: var(--b-panel); background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; color: var(--b-ink2); }
+.b-sh-recent-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.b-sh-recent-text b { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-sh-recent-text span { font-size: 12px; color: var(--b-ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* The Workshop pieces reused in the aside (LinkForm, OutageNotice) sit on
+   panel paper here, so their recessed fields step down to the page tone. */
+.b-sh-card .sh-field { background: var(--b-page); border-radius: var(--b-r-row); }
+.b-sh-card .sh-panel-note { font-size: 12.5px; color: var(--b-ink2); }
+.b-sh-card .sh-panel-note:last-child { margin-bottom: 0; }
+
+/* The Beta extras: modes, the suggestion, energy, automations, tips,
+   history, the mode map, the camera still. Values from the design's header
+   segmented control, its ink energy card, its "runs these" list and its
+   tip bubble. */
+.b-sh-modes { display: flex; gap: 2px; padding: 4px; border-radius: var(--b-r-pill); background: var(--b-panel); flex: none; max-width: 100%; overflow-x: auto; }
+.b-sh-mode { height: 42px; padding: 0 18px; display: flex; align-items: center; gap: 8px; border-radius: var(--b-r-pill); background: transparent; color: var(--b-ink); font-size: 13.5px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background .2s, color .2s; }
+.b-sh-mode:hover { background: var(--b-hover); }
+.b-sh-mode.on, .b-sh-mode.on:hover { background: var(--b-ink); color: var(--b-on-ink); }
+.b-sh-mode i { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.b-sh-mode:disabled { cursor: default; opacity: .55; }
+.b-sh-mode.on:disabled { opacity: 1; }
+.b-sh-notice--suggest { background: var(--b-emphasis); }
+.b-sh-notice--suggest > svg, .b-sh-notice--suggest b { color: var(--b-blue-deep); }
+
+.b-sh-energy-big { font-family: var(--b-font-display); font-size: 44px; font-weight: 500; letter-spacing: -.05em; line-height: 1; font-variant-numeric: tabular-nums; }
+.b-sh-energy-big span { font-size: 18px; color: var(--b-on-ink-small); letter-spacing: 0; }
+.b-sh-energy-bars { display: flex; align-items: flex-end; gap: 3px; height: 64px; }
+.b-sh-energy-bars span { flex: 1; min-width: 0; height: 4%; border-radius: 4px; background: rgba(249, 247, 244, .22); }
+.b-sh-energy-bars span[data-now="true"] { background: #8fa9ff; }
+.b-sh-energy-bars span[data-none="true"] { height: 2px; background: rgba(249, 247, 244, .12); }
+.b-sh-energy-rows { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
+.b-sh-energy-row { display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px; color: var(--b-on-ink-body); }
+.b-sh-energy-row span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-sh-energy-row b { flex: none; font-weight: 600; color: var(--b-on-ink); }
+
+.b-sh-autos { padding: 10px; gap: 4px; }
+.b-sh-autos > .b-card-title { padding: 8px 10px 4px; }
+.b-sh-autos > .b-sh-card-p { padding: 4px 10px 6px; }
+.b-sh-auto { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 18px; background: var(--b-card); }
+.b-sh-auto.stale { opacity: .6; }
+.b-sh-auto-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.b-sh-auto-text b { font-size: 13.5px; font-weight: 600; overflow-wrap: anywhere; }
+.b-sh-auto-text span { font-size: 12px; line-height: 1.45; color: var(--b-ink2); }
+.b-sh-switch { display: flex; flex: none; width: 46px; height: 28px; padding: 3px; border-radius: var(--b-r-pill); background: #d8d4cd; justify-content: flex-start; cursor: pointer; transition: background .25s; }
+.b-sh-switch span { width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 2px 5px rgba(30, 30, 36, .22); }
+.b-sh-switch.on { background: var(--b-blue); justify-content: flex-end; }
+.b-sh-switch:disabled { cursor: default; opacity: .55; }
+.b-sh-switch.busy { opacity: .75; }
+.b-sh-switch:focus-visible { box-shadow: 0 0 0 3px rgba(52, 97, 242, .18); }
+
+.b-sh-tips { display: flex; flex-direction: column; gap: 8px; }
+.b-sh-tip { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 14px 16px; border-radius: 22px; background: var(--b-emphasis); font-size: 13px; line-height: 1.55; color: var(--b-ink); }
+.b-sh-tip strong { font-weight: 600; color: var(--b-blue-deep); }
+
+.b-sh-history { display: flex; flex-direction: column; gap: 4px; }
+.b-sh-history-row { display: flex; gap: 10px; padding: 8px 12px; border-radius: var(--b-r-row); background: var(--b-card); font-size: 12.5px; line-height: 1.45; }
+.b-sh-history-row .b-num { flex: none; min-width: 44px; color: var(--b-ink2); }
+.b-sh-history-row[data-kind="command"] { background: var(--b-emphasis); }
+
+.b-sh-mode-map { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
+.b-sh-mode-name { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; flex: none; }
+.b-sh-mode-name i { width: 7px; height: 7px; border-radius: 50%; }
+.b-sh-select { flex: 1 1 auto; min-width: 0; max-width: 220px; height: 36px; padding: 0 12px; border: none; border-radius: var(--b-r-row); background: var(--b-card); color: var(--b-ink); font: inherit; font-size: 13px; cursor: pointer; }
+.b-sh-select:disabled { cursor: default; opacity: .55; }
+.b-sh-select:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(52, 97, 242, .18); }
+
+.b-sh-camshot { object-fit: cover; background: var(--b-ink); }
+.b-sh-link:disabled { cursor: default; opacity: .55; }
+
+/* The Home widgets this screen feeds (Lamp, Bulb, Floor lamp, Front door),
+   from the lamp widget in Atlas Dashboard Beta.dc.html. Imported by
+   src/components/atlas/home/widgets.tsx; every class is bw-sh-*. */
+.bw-sh-lamp { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+.bw-sh-lamp-glow { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); width: 110px; height: 110px; border-radius: 50%; filter: blur(8px); pointer-events: none; transition: opacity .45s; }
+.bw-sh-lamp-btn { position: relative; padding: 2px; border: none; background: none; cursor: pointer; transition: transform .2s; }
+.bw-sh-lamp-btn:active { transform: scale(.9); }
+.bw-sh-lamp-btn:disabled { cursor: default; }
+.bw-sh-lamp-btn svg { display: block; }
+.bw-sh-lamp-btn svg * { transition: fill .4s, opacity .4s; }
+.bw-sh-lamp-status { flex-shrink: 0; font-size: 12px; color: var(--b-ink2); text-align: center; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bw-sh-swatches { flex-shrink: 0; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 2px; }
+.bw-sh-swatches button { width: 22px; height: 22px; padding: 0; border: none; border-radius: 50%; cursor: pointer; transition: transform .2s; }
+.bw-sh-swatches button:hover { transform: scale(1.12); }
+.bw-sh-swatches button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--b-card), 0 0 0 4px var(--b-ink); }
+.bw-sh-swatches button:disabled { cursor: default; opacity: .55; }
+.bw--s .bw-sh-swatches { display: none; }
+.bw-sh-cam { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .55; }
+.bw-sh-cam-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.bw-sh-cam-err { font-size: 12px; color: var(--b-on-ink-small); }
+@media (prefers-reduced-motion: reduce) {
+  .bw-sh-lamp-glow, .bw-sh-lamp-btn, .bw-sh-lamp-btn svg *, .bw-sh-swatches button { transition: none; }
+}
+
+/* Widths: two columns under 1280, one under 900 with the rooms as a row. */
+@media (max-width: 1279px) {
+  .b-sh-grid { grid-template-columns: 200px minmax(0, 1fr); }
+  .b-sh-aside { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); align-items: start; }
+}
+@media (max-width: 899px) {
+  .b-sh-grid { grid-template-columns: minmax(0, 1fr); }
+  .b-sh-rooms { flex-direction: row; }
+  .b-sh-room { min-width: 140px; }
+}
+@media (max-width: 640px) {
+  .b-sh { padding-left: 16px; padding-right: 16px; }
+  .b-sh-head { gap: 10px 16px; }
+  .b-sh-mode { height: 38px; padding: 0 14px; }
+  .b-sh-select { max-width: 180px; }
+  .b-sh-stage { height: clamp(380px, 70vh, 560px); border-radius: var(--b-r-band); }
+  .b-sh-stage-head { left: 18px; right: 18px; top: 18px; }
+  .b-sh-controls { left: 10px; right: 10px; bottom: 10px; padding: 10px; }
+  .b-sh-stepper span { min-width: 72px; font-size: 24px; }
+  /* Two tiles a row on a phone: one 340px-tall tile per device is a scroll, not a grid. */
+  .b-sh-devices { grid-template-columns: repeat(auto-fill, minmax(min(140px, 100%), 1fr)); }
+  .b-sh-tile { padding: 6px 6px 12px; border-radius: 22px; }
+  .b-sh-tile-img { border-radius: 16px; }
+  .b-sh-tile-row { margin-top: 10px; padding: 0 6px; }
+  .b-sh-tile-status { padding: 0 6px; }
+  .b-sh-swatch { width: 32px; height: 32px; }
+  .b-sh-card--ink .b-sh-card-big { font-size: 24px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .b-sh-head { animation: none; }
+  .b-sh-live i[data-on="true"] { animation: none; }
+  .b-sh-scene, .b-sh-room, .b-sh-tile, .b-sh-pow, .b-sh-swatch, .b-sh-stage-status i, .b-sh-dot, .b-sh-back, .b-sh-lock, .b-sh-link,
+  .b-sh-mode, .b-sh-switch { transition: none; }
+}

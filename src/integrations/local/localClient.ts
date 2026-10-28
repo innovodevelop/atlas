@@ -30,7 +30,7 @@ let _invoke: (<T>(cmd: string, args?: Record<string, unknown>) => Promise<T>) | 
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (!_invoke) {
     const core = await import("@tauri-apps/api/core");
-    _invoke = core.invoke as typeof _invoke;
+    _invoke = core.invoke as unknown as typeof _invoke;
   }
   return _invoke!<T>(cmd, args);
 }
@@ -39,7 +39,7 @@ let _listen: ((event: string, cb: (e: { payload: unknown }) => void) => Promise<
 async function tauriListen(event: string, cb: (e: { payload: unknown }) => void): Promise<() => void> {
   if (!_listen) {
     const ev = await import("@tauri-apps/api/event");
-    _listen = ev.listen as typeof _listen;
+    _listen = ev.listen as unknown as typeof _listen;
   }
   return _listen!(event, cb);
 }

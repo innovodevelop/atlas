@@ -22,6 +22,18 @@ export interface TestRunRow {
   error_message: string | null;
   triggered_by: string;
   run_at: string;
+  /**
+   * What the run's bun test step reported — counts per file, durations and
+   * the coverage figure (services/atlas-brain/src/testReport.ts). Null for a
+   * job with no test step, a run still going, or a brain that predates it.
+   */
+  report?: TestReportRow | null;
+}
+
+export interface TestReportRow {
+  totals: { pass: number; fail: number; skip: number; todo: number; errors: number; tests: number; files: number; ms: number | null };
+  files: Array<{ path: string; pass: number; fail: number; skip: number; todo: number; ms: number; failed: string[] }>;
+  coverage: { lines: number | null; funcs: number | null; files: number } | null;
 }
 
 /** GET /admin/tests/suites — backs the "Test Suites" panel on /tests. */
@@ -47,6 +59,22 @@ export function useTestRuns(suiteId: string | null) {
     ...ADMIN_QUERY_OPTIONS,
   });
   return { runs: data ?? [], isLoading, error: error as Error | null };
+}
+
+/**
+ * GET /admin/tests/runs with no suite — the newest 50 runs across every
+ * suite, for the Beta dev tools' durations and log tails. Each row carries
+ * up to 20 KB of output, so this does not poll: the page refetches it when a
+ * run it was watching finishes.
+ */
+export function useRecentTestRuns() {
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['admin', 'test-runs-recent'],
+    queryFn: () => adminGet<TestRunRow[]>('/admin/tests/runs'),
+    staleTime: 10_000,
+    ...ADMIN_QUERY_OPTIONS,
+  });
+  return { runs: data ?? [], isLoading, error: error as Error | null, refetch };
 }
 
 /** POST /admin/tests/run/:suiteId — fires a suite off via runTest's CI_JOBS allowlist. */

@@ -49,6 +49,8 @@ import { Route, Routes } from 'react-router-dom';
 import NotFound from './pages/NotFound';
 import { entitledSurfaces } from './surfaces';
 import { useAuth } from './hooks/useAuth';
+import { useBetaUi } from './lib/betaFlag';
+import { BetaShell } from './components/atlas/BetaShell';
 
 export interface RouteOverride {
   /** Renders instead of the registry's `lazy()` component (for `eager` surfaces). */
@@ -74,6 +76,9 @@ export const AppRoutes = ({ overrides = {}, fallback = null }: Props) => {
   // therefore lands on the same 404 as an admin path in a consumer build. It is
   // not routed-then-hidden: there is no route.
   const surfaces = entitledSurfaces(hasFeature);
+  // The Beta redesign ships behind a flag (src/lib/betaFlag.ts). With it on,
+  // every route renders inside the Beta shell: top bar, dock, Talk to Atlas.
+  const beta = useBetaUi();
 
   if (import.meta.env.DEV) {
     const unhonoured = surfaces
@@ -87,26 +92,30 @@ export const AppRoutes = ({ overrides = {}, fallback = null }: Props) => {
     }
   }
 
+  const routes = (
+    <Routes>
+      {surfaces.flatMap(({ meta, paths, Component }) => {
+        const override = overrides[meta.path];
+        const Page = override?.Component ?? Component;
+        const element = override?.wrap ? override.wrap(<Page />) : <Page />;
+        // Aliases render the SAME element, not a second copy: `/dashboard`
+        // and `/` were two hand-written routes before, which is how they
+        // drifted into different wrappers in the first place.
+        return paths.map((path) => <Route key={path} path={path} element={element} />);
+      })}
+
+      {/* Everything the registry does not route for THIS edition — including
+          every admin path in a consumer build — falls here. That is the
+          entire product of the split: `/model-lab` is not a hidden route in a
+          consumer build, it is an unknown one. */}
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+
   return (
     /* One suspense boundary for every lazy route. */
     <Suspense fallback={fallback}>
-      <Routes>
-        {surfaces.flatMap(({ meta, paths, Component }) => {
-          const override = overrides[meta.path];
-          const Page = override?.Component ?? Component;
-          const element = override?.wrap ? override.wrap(<Page />) : <Page />;
-          // Aliases render the SAME element, not a second copy: `/dashboard`
-          // and `/` were two hand-written routes before, which is how they
-          // drifted into different wrappers in the first place.
-          return paths.map((path) => <Route key={path} path={path} element={element} />);
-        })}
-
-        {/* Everything the registry does not route for THIS edition — including
-            every admin path in a consumer build — falls here. That is the
-            entire product of the split: `/model-lab` is not a hidden route in a
-            consumer build, it is an unknown one. */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      {beta ? <BetaShell>{routes}</BetaShell> : routes}
     </Suspense>
   );
 };

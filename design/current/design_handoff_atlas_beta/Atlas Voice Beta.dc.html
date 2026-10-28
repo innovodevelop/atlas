@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>(function(){window.addEventListener("unhandledrejection",function(e){var m=String(e.reason&&e.reason.message||e.reason);if(/Transition was aborted|ViewTransition/.test(m))e.preventDefault()});var top=false;try{top=window.self===window.top}catch(e){}var s=document.createElement("style");if(top){s.textContent="@view-transition{navigation:auto}";}else{s.textContent="html{animation:atlas-in .45s cubic-bezier(.22,1,.36,1) both}html.atlas-out{transition:opacity .22s ease,transform .22s ease;opacity:0;transform:scale(.988)}@keyframes atlas-in{from{opacity:0;transform:scale(1.012)}}";document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a||e.defaultPrevented||e.metaKey||e.ctrlKey||a.target)return;var h=a.getAttribute("href");if(!/\.dc\.html/.test(h)||/^https?:/.test(h))return;if(h.split("#")[0]===""||location.pathname.endsWith(encodeURI(h.split("#")[0]))&&h.indexOf("#")>0)return;e.preventDefault();document.documentElement.classList.add("atlas-out");setTimeout(function(){location.href=h},210)},true);}document.head.appendChild(s)})();</script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script>window.addEventListener("pagereveal",function(e){var t=e.viewTransition;if(t){["ready","finished","updateCallbackDone"].forEach(function(p){t[p]&&t[p].catch(function(){})})}});window.addEventListener("unhandledrejection",function(e){if(/Transition was aborted|ViewTransition/.test(String(e.reason&&e.reason.message||e.reason)))e.preventDefault()});</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+::view-transition-group(*){animation-duration:.55s;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+::view-transition-old(root){animation:.4s cubic-bezier(.22,1,.36,1) both vt-out}
+::view-transition-new(root){animation:.55s cubic-bezier(.22,1,.36,1) both vt-in}
+@keyframes vt-out{to{opacity:0;transform:scale(.985)}}
+@keyframes vt-in{from{opacity:0;transform:scale(1.015)}}
+*{box-sizing:border-box}
+body{margin:0;background:#f9f7f4}
+button,input,textarea{border:none;font:inherit;background:none;color:inherit}
+a{color:#3461f2;text-decoration:none}a:hover{color:#2748bd}
+::selection{background:#e8d8c2}
+::placeholder{color:#b6b1aa}
+.nosb{scrollbar-width:none}.nosb::-webkit-scrollbar{display:none}
+@keyframes bpop{from{opacity:0;transform:translateY(14px) scale(.986)}to{opacity:1;transform:none}}
+@keyframes bdot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
+</style>
+<script src="atlas-quickstart-sphere.js"></script>
+<script src="atlas-topbar.js"></script>
+</helmet>
+
+<div data-screen-label="Atlas Voice — Beta" style="height:100vh;display:flex;flex-direction:column;gap:12px;padding:26px 26px 88px;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow-y:{{ pageOvf }}" class="nosb">
+
+<header style="flex:none;height:{{ bandH }};min-height:{{ bandMin }};align-items:{{ bandAlign }};border-radius:32px;background:#f1eeea;padding:18px 26px 18px 8px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:22px;animation:bpop .6s cubic-bezier(.22,1,.36,1) both">
+<div style="position:relative;width:{{ sphW }};height:{{ sphH }};aspect-ratio:1"><canvas ref="{{ sphereRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas><button onClick="{{ tapSphere }}" title="{{ tapTitle }}" aria-label="{{ tapTitle }}" style="border:none;position:absolute;inset:14%;border-radius:50%;background:transparent;cursor:pointer"></button></div>
+<div style="min-width:0;display:flex;flex-direction:column;gap:12px;padding:10px 0">
+<div style="display:flex;align-items:center;gap:10px">
+<span style="flex:none;white-space:nowrap;display:flex;align-items:center;gap:7px;height:28px;padding:0 11px;border-radius:9999px;background:{{ chipBg }};color:{{ chipFg }};font-size:12px;font-weight:600;transition:background .3s"><span style="width:7px;height:7px;border-radius:50%;background:{{ chipDot }};animation:{{ chipAnim }}"></span>{{ stateLabel }}</span>
+<span style="flex:1"></span>
+<a href="Atlas Dashboard Beta.dc.html" title="Back — or press Esc" style="flex:none;display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px 0 13px;border-radius:9999px;background:#fffdfa;color:#1e1e24;font-size:13px;font-weight:600;transition:background .2s" style-hover="background:#edebe7;color:#1e1e24"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>Back<span style="font-size:11px;font-weight:500;color:#8b8681">Esc</span></a>
+</div>
+<div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:12px;overflow:hidden">
+<p style="margin:0;font-size:14px;font-weight:500;color:{{ youFg }};line-height:1.5;text-wrap:pretty;min-height:21px">{{ youLine }}</p>
+<p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(22px,2.4vw,36px);font-weight:500;letter-spacing:-.035em;line-height:1.2;text-wrap:pretty;color:{{ replyFg }}">{{ replyLine }}</p>
+<p style="margin:0;font-size:12.5px;line-height:1.5;color:#6d6a67;text-wrap:pretty">{{ eyebrow }}</p>
+</div>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px">
+<sc-for list="{{ controls }}" as="c" hint-placeholder-count="3">
+<button onClick="{{ ctl }}" data-a="{{ c.a }}" title="{{ c.l }}" style="border:none;flex:none;white-space:nowrap;display:flex;align-items:center;gap:8px;height:40px;padding:0 16px 0 13px;border-radius:9999px;background:{{ c.bg }};color:{{ c.fg }};font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s" style-hover="filter:brightness(.96)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{ c.ico }}"></path></svg>{{ c.l }}</button>
+</sc-for>
+</div>
+<sc-if value="{{ showAsks }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ asks }}" as="q" hint-placeholder-count="3"><button onClick="{{ ask }}" data-q="{{ q }}" style="border:none;flex:none;white-space:nowrap;height:34px;padding:0 14px;border-radius:9999px;background:#fffdfa;color:#1e1e24;font-family:inherit;font-size:12.5px;font-weight:500;cursor:pointer" style-hover="background:#edebe7">{{ q }}</button></sc-for></div></sc-if>
+</div>
+</header>
+
+<div class="nosb" style="flex:{{ bodyFlex }};min-height:0;display:grid;grid-template-columns:{{ cols }};grid-auto-rows:{{ bodyRows }};gap:12px">
+
+<section aria-label="This session" style="min-height:{{ sessMin }};display:flex;flex-direction:column;border-radius:28px;background:#f1eeea;padding:16px;gap:10px">
+<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:2px 6px"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em">This session</p><span style="flex:none;white-space:nowrap;font-size:12px;color:#6d6a67;font-variant-numeric:tabular-nums">{{ sessionMeta }}</span></div>
+<div ref="{{ turnsRef }}" class="nosb" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px">
+<sc-for list="{{ turns }}" as="t" hint-placeholder-count="3">
+<div style="display:flex;gap:12px;padding:12px 14px;border-radius:16px;background:{{ t.bg }};animation:bpop .4s cubic-bezier(.22,1,.36,1) both">
+<span style="flex:none;width:44px;font-size:11.5px;font-weight:600;color:{{ t.whoFg }};padding-top:2px">{{ t.who }}</span>
+<p style="flex:1;min-width:0;margin:0;font-size:13.5px;line-height:1.55;color:#1e1e24;text-wrap:pretty">{{ t.t }}</p>
+<span style="flex:none;font-size:11px;color:#b6b1aa;font-variant-numeric:tabular-nums;padding-top:3px">{{ t.ts }}</span>
+</div>
+</sc-for>
+<sc-if value="{{ noTurns }}" hint-placeholder-val="{{ false }}"><div style="padding:28px 16px;border-radius:16px;background:#f9f7f4;text-align:center;font-size:12.5px;line-height:1.5;color:#6d6a67">Say “Atlas”, tap the sphere, or pick a question to start.</div></sc-if>
+</div>
+<div style="display:flex;align-items:center;gap:8px;padding:6px;border-radius:9999px;background:#fffdfa">
+<input value="{{ typed }}" onInput="{{ onTyped }}" onKeyDown="{{ typedKey }}" placeholder="Or type to Atlas…" aria-label="Type to Atlas" style="border:none;outline:none;flex:1;min-width:0;height:36px;padding:0 12px;background:transparent;color:#1e1e24;font-family:inherit;font-size:13.5px">
+<button onClick="{{ sendTyped }}" style="border:none;flex:none;height:36px;padding:0 16px;border-radius:9999px;background:{{ sendBg }};color:{{ sendFg }};font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">Send</button>
+</div>
+</section>
+
+<aside class="nosb" style="min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px">
+<div style="border-radius:28px;background:#fffdfa;padding:18px;display:flex;flex-direction:column;gap:6px">
+<div style="padding:2px 4px 8px"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em">Context this turn</p><p style="margin:3px 0 0;font-size:12.5px;line-height:1.5;color:#6d6a67">What Atlas included with your question, and where it went.</p></div>
+<sc-for list="{{ ctx }}" as="c" hint-placeholder-count="3">
+<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:{{ c.bg }};animation:bpop .4s cubic-bezier(.22,1,.36,1) both"><span style="flex:none;height:22px;padding:0 8px;display:flex;align-items:center;border-radius:9999px;background:{{ c.tagBg }};color:{{ c.tagFg }};font-size:10.5px;font-weight:600">{{ c.tag }}</span><span style="flex:1;min-width:0;font-size:13px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.t }}</span></div>
+</sc-for>
+<sc-if value="{{ noCtx }}" hint-placeholder-val="{{ true }}"><div style="padding:18px 14px;border-radius:14px;background:#f9f7f4;font-size:12.5px;color:#6d6a67;text-align:center">Nothing sent yet this session.</div></sc-if>
+<sc-if value="{{ hasRoute }}" hint-placeholder-val="{{ false }}"><p style="margin:6px 4px 0;font-size:12px;line-height:1.5;color:#6d6a67">{{ route }} <a href="Atlas Architecture Beta.dc.html#providers">How this works</a></p></sc-if>
+</div>
+<div style="border-radius:28px;background:#fffdfa;padding:18px;display:flex;flex-direction:column;gap:6px">
+<p style="margin:0;padding:2px 4px 8px;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em">Earlier conversations</p>
+<sc-for list="{{ recent }}" as="r" hint-placeholder-count="4">
+<button onClick="{{ openRecent }}" data-k="{{ r.k }}" style="border:none;display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:14px;background:#f9f7f4;font-family:inherit;text-align:left;cursor:pointer;transition:background .2s" style-hover="background:#edebe7"><span style="flex:1;min-width:0"><span style="display:block;font-size:13px;font-weight:600;color:#1e1e24;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.t }}</span><span style="display:block;margin-top:2px;font-size:11.5px;color:#6d6a67">{{ r.s }}</span></span><span style="flex:none;font-size:11px;color:#b6b1aa">{{ r.when }}</span></button>
+</sc-for>
+</div>
+</aside>
+</div>
+
+<nav aria-label="Atlas" data-dock="beta" style="view-transition-name:atlas-dock;position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:4px;padding:6px;border-radius:9999px;background:rgba(255,253,250,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 18px 40px -20px rgba(30,30,36,.28)">
+<a href="Atlas Dashboard Beta.dc.html" title="Home" aria-label="Home" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M3.5 10.9 10.7 4.3a2 2 0 0 1 2.6 0l7.2 6.6v6.9a3 3 0 0 1-3 3h-3v-5.4a2.5 2.5 0 0 0-5 0v5.4h-3a3 3 0 0 1-3-3z"></path></svg></a>
+<a href="Atlas Core Beta.dc.html" title="Core" aria-label="Core" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.6a8.4 8.4 0 1 1 0 16.8 8.4 8.4 0 0 1 0-16.8M12 8.8a3.2 3.2 0 1 1 0 6.4 3.2 3.2 0 0 1 0-6.4M12 3.6v5.2M12 15.2v5.2M3.6 12h5.2M15.2 12h5.2"></path></svg></a>
+<a href="Atlas Teach Beta.dc.html" title="Teach" aria-label="Teach" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 7.4a5.2 5.2 0 0 0-3.9-1.8H5a1.2 1.2 0 0 0-1.2 1.2v9.6A1.2 1.2 0 0 0 5 17.6h3.1A5.2 5.2 0 0 1 12 19.4a5.2 5.2 0 0 1 3.9-1.8H19a1.2 1.2 0 0 0 1.2-1.2V6.8A1.2 1.2 0 0 0 19 5.6h-3.1A5.2 5.2 0 0 0 12 7.4zM12 7.4v12"></path></svg></a>
+<a href="Atlas Mail Beta.dc.html" title="Mail" aria-label="Mail" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M6.6 5.6h10.8a3.2 3.2 0 0 1 3.2 3.2v6.4a3.2 3.2 0 0 1-3.2 3.2H6.6a3.2 3.2 0 0 1-3.2-3.2V8.8a3.2 3.2 0 0 1 3.2-3.2zM3.8 7.6l7 4.8a2.2 2.2 0 0 0 2.4 0l7-4.8"></path></svg></a>
+<a href="Atlas Architecture Beta.dc.html" title="Architecture" aria-label="Architecture" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.4 3.4 7.9 12 12.4l8.6-4.5zM3.4 12.1 12 16.6l8.6-4.5M3.4 16.3 12 20.8l8.6-4.5"></path></svg></a>
+<span aria-current="page" style="flex:none;display:flex;align-items:center;gap:8px;height:42px;padding:0 16px 0 13px;border-radius:9999px;background:#1e1e24;color:#f9f7f4;font-size:13px;font-weight:600;white-space:nowrap"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.5a2.6 2.6 0 0 1 2.6 2.6v5.4a2.6 2.6 0 0 1-5.2 0V6.1A2.6 2.6 0 0 1 12 3.5zM18.1 11.5a6.1 6.1 0 0 1-12.2 0M12 17.6v3"></path></svg>Voice</span>
+<a href="Atlas Settings Beta.dc.html" title="Marcus · Settings" aria-label="Settings" style="flex:none;display:flex;align-items:center;justify-content:center;gap:8px;height:42px;width:42px;border-radius:9999px;background:transparent;color:#1e1e24;font-size:13px;font-weight:600;white-space:nowrap" style-hover="background:#f1eeea;color:#1e1e24"><span style="width:34px;height:34px;border-radius:50%;background:#1e1e24;color:#f9f7f4;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">M</span></a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;autoStart&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  state = { vh: window.innerHeight, vw: window.innerWidth, ico: {}, phase: 'idle', muted: false, you: '', reply: '', turns: [], ctx: [], route: '', typed: '', started: null };
+  componentDidMount() {
+    this.onResize = () => this.setState({ vw: window.innerWidth, vh: window.innerHeight });
+    window.addEventListener('resize', this.onResize);
+    this.onKey = (e) => {
+      if (/INPUT|TEXTAREA/.test(document.activeElement && document.activeElement.tagName)) return;
+      if (e.key === 'Escape') window.location.href = 'Atlas Dashboard Beta.dc.html';
+      if (e.key === ' ') { e.preventDefault(); this.tap(); }
+    };
+    window.addEventListener('keydown', this.onKey);
+    fetch('atlas-icon-data.js').then((r) => r.text()).then((t) => {
+      const SET = new Function(t.replace(/export\s+const\s+SET\s*=/, 'return'))(), ico = {};
+      SET.forEach((g) => g[2].forEach(([n, d]) => { ico[n] = d; }));
+      this.setState({ ico });
+    }).catch(() => {});
+    if (this.props.autoStart) this.later(() => this.run(this.Q()[0]), 600);
+  }
+  componentDidUpdate() {
+    const ns = this.sphState();
+    if (this.sph && this.lastS !== ns) { this.lastS = ns; this.sph.set({ state: ns }); }
+    const n = this.state.turns.length; if (n !== this.lastN) { this.lastN = n; if (this.turnsEl) this.turnsEl.scrollTop = this.turnsEl.scrollHeight; }
+  }
+  componentWillUnmount() { window.removeEventListener('resize', this.onResize); window.removeEventListener('keydown', this.onKey); this.clear(); if (this.sph) this.sph.destroy(); }
+  later(fn, ms) { const t = setTimeout(fn, ms); (this.timers = this.timers || []).push(t); return t; }
+  clear() { (this.timers || []).forEach(clearTimeout); this.timers = []; clearInterval(this.iv); }
+  sphState() { const s = this.state; if (s.muted) return 'muted'; return { idle: 'idle', waking: 'waking', listening: 'listening', thinking: 'thinking', speaking: 'speaking', ending: 'dissolving' }[s.phase] || 'idle'; }
+  now() { return new Date().toTimeString().slice(0, 5); }
+  Q() {
+    return [
+      { q: 'What’s the best day to fly to Paris next week?', a: 'Tuesday. Fares are lowest, you have no meetings after two, and it’s dry in Paris. The 08:40 from Heathrow gets you to Le Marais by lunch.', ctx: [['Memory', 'Paris trip · staying in Le Marais'], ['Calendar', 'Next week · 11 events'], ['Live data', 'Flight prices, LHR → CDG'], ['Live data', 'Paris forecast']] },
+      { q: 'Remind me what Maya said about the Q4 plan.', a: 'She wants the hiring numbers before Friday, and she flagged the research budget as tight. She asked you to choose between two contractors or one full-time hire.', ctx: [['Memory', 'Maya Reyes · direct report'], ['Mail', '“Q4 plan, comments inline” · 2:14 PM'], ['Knowledge', 'Q4 hiring benchmarks']] },
+      { q: 'Book a table somewhere nice on Friday.', a: 'Le Petit Marché has a table at eight on Friday, and nothing on the menu is shellfish-only. I’ll ask before I book. Want me to send the request?', ctx: [['Memory', 'Allergy · shellfish'], ['Memory', 'Partner · Sam'], ['Agent', 'Booking · waits for your approval']] }
+    ];
+  }
+  run(item, typed) {
+    if (this.state.muted) return;
+    this.clear();
+    const words = item.q.split(' ');
+    this.setState((s) => ({ phase: typed ? 'thinking' : 'waking', you: typed ? item.q : '', reply: '', ctx: [], route: '', started: s.started || Date.now() }));
+    const afterHear = () => {
+      this.setState((s) => ({ phase: 'thinking', turns: s.turns.concat([{ who: 'You', t: item.q, ts: this.now() }]) }));
+      item.ctx.forEach((c, i) => this.later(() => this.setState((s) => ({ ctx: s.ctx.concat([c]) })), 220 + i * 240));
+      this.later(() => {
+        this.setState({ phase: 'speaking', route: 'Sent to Anthropic with ' + item.ctx.length + ' pieces of context. The reply is spoken here, on this Mac.' });
+        const aw = item.a.split(' '); let k = 0;
+        this.iv = setInterval(() => {
+          k++; this.setState({ reply: aw.slice(0, k).join(' ') });
+          if (k >= aw.length) { clearInterval(this.iv); this.later(() => this.setState((s) => ({ phase: 'listening', turns: s.turns.concat([{ who: 'Atlas', t: item.a, ts: this.now() }]) })), 600); }
+        }, 120);
+      }, 1400);
+    };
+    if (typed) { afterHear(); return; }
+    this.later(() => {
+      this.setState({ phase: 'listening' });
+      let k = 0;
+      this.iv = setInterval(() => { k++; this.setState({ you: words.slice(0, k).join(' ') }); if (k >= words.length) { clearInterval(this.iv); this.later(afterHear, 500); } }, 170);
+    }, 700);
+  }
+  tap() {
+    const s = this.state;
+    if (s.muted) { this.setState({ muted: false }); return; }
+    if (s.phase === 'speaking') { this.clear(); this.setState((x) => ({ phase: 'listening', turns: x.turns.concat([{ who: 'Atlas', t: x.reply + ' …', ts: this.now() }]) })); return; }
+    if (s.phase === 'idle') { const q = this.Q(); this.run(q[s.turns.length / 2 % q.length | 0]); return; }
+  }
+  renderVals() {
+    const st = this.state, I = st.ico, ic = (n) => I[n] || '';
+    const compact = st.vw < 1000 || st.vh < 720;
+    const T = window.QuickSphere ? window.QuickSphere.TINT : null, rgb = (k) => (T && T[k] ? 'rgb(' + T[k].join(',') + ')' : '#8b8681');
+    const P = st.muted ? 'muted' : st.phase;
+    const L = { idle: ['Resting', null, 'Say “Atlas”, tap the sphere, or press Space'], waking: ['Waking', 'd', 'Heard its name'], listening: ['Listening', 'c', 'Speak naturally. Atlas waits for a real pause'], thinking: ['Thinking', 'v', 'The request has left this Mac'], speaking: ['Speaking', 'b', 'Tap the sphere or just talk to interrupt'], ending: ['Ending', 'm', 'Closing the session'], muted: ['Muted', 'n', 'The microphone is off. Nothing is being heard'] }[P];
+    const live = P !== 'idle' && P !== 'muted';
+    const turnsN = st.turns.length;
+    const mins = st.started ? Math.max(1, Math.round((Date.now() - st.started) / 60000)) : 0;
+    const B = (a, l, i, bg, fg) => ({ a, l, ico: ic(i) || i, bg, fg });
+    const controls = [];
+    if (P === 'idle') controls.push(B('start', 'Start talking', 'mic', '#3461f2', '#fffdfa'));
+    if (P === 'speaking') controls.push(B('interrupt', 'Stop speaking', 'pause', '#1e1e24', '#f9f7f4'));
+    controls.push(st.muted ? B('mute', 'Unmute', 'mic', '#f7e6e4', '#a3352c') : B('mute', 'Mute', 'M12 3.5a2.6 2.6 0 0 1 2.6 2.6v5.4a2.6 2.6 0 0 1-5.2 0V6.1A2.6 2.6 0 0 1 12 3.5zM18.1 11.5a6.1 6.1 0 0 1-12.2 0M12 17.6v3M4.4 4.4l15.2 15.2', '#fffdfa', '#1e1e24'));
+    if (live || turnsN) controls.push(B('end', 'End session', 'close', '#fffdfa', '#a3352c'));
+    return {
+      sphereRef: (el) => {
+        if (!el || el.__q) return;
+        const go = () => { if (el.__q || !el.isConnected) return; if (!window.QuickSphere) return setTimeout(go, 60);
+          el.__q = this.sph = window.QuickSphere.mount(el, { mode: 'veil', bg: 'transparent', dust: [122, 148, 246], strand: [52, 97, 242], blend: 'source-over', alpha: 0.62, seed: 11, count: 22000, scale: 0.42, state: this.sphState() }); this.lastS = this.sphState(); };
+        go();
+      },
+      turnsRef: (el) => { this.turnsEl = el; },
+      tapSphere: () => this.tap(), tapTitle: P === 'speaking' ? 'Interrupt' : P === 'idle' ? 'Start talking' : st.muted ? 'Unmute' : 'Atlas is listening',
+      stateLabel: L[0], chipBg: P === 'idle' ? '#fffdfa' : P === 'muted' ? '#f7e6e4' : '#fffdfa', chipFg: P === 'muted' ? '#a3352c' : '#1e1e24', chipDot: L[1] ? rgb(L[1]) : '#b6b1aa', chipAnim: live ? 'bdot 1.4s ease-in-out infinite' : 'none',
+      eyebrow: L[2],
+      youLine: st.you ? '“' + st.you + '”' : '', youFg: P === 'listening' || P === 'waking' ? '#2748bd' : '#6d6a67',
+      replyLine: st.reply || (P === 'thinking' ? '…' : P === 'idle' && !turnsN ? 'Good afternoon, Marcus. What can I do for you?' : P === 'muted' ? 'I’m not listening.' : st.reply), replyFg: P === 'thinking' ? '#8b8681' : '#1e1e24',
+      controls, ctl: (e) => {
+        const a = e.currentTarget.getAttribute('data-a');
+        if (a === 'start') this.tap();
+        if (a === 'interrupt') this.tap();
+        if (a === 'mute') { if (!st.muted) this.clear(); this.setState((s) => ({ muted: !s.muted, phase: s.muted ? s.phase : (s.phase === 'idle' ? 'idle' : 'listening') })); }
+        if (a === 'end') { this.clear(); this.setState({ phase: 'ending', muted: false }); this.later(() => this.setState({ phase: 'idle', you: '', reply: '', turns: [], ctx: [], route: '', started: null }), 1400); }
+      },
+      showAsks: !(compact && st.vh < 720) && ((P === 'idle' || P === 'listening') && !this.state.you || P === 'idle'),
+      asks: this.Q().map((x) => x.q),
+      ask: (e) => { const q = e.currentTarget.getAttribute('data-q'); this.run(this.Q().find((x) => x.q === q)); },
+      cols: compact ? 'minmax(0,1fr)' : 'minmax(0,1.5fr) minmax(300px,1fr)',
+      pageOvf: compact ? 'auto' : 'hidden', bandH: compact ? 'auto' : 'clamp(260px,42vh,420px)', bandMin: compact ? '200px' : '0', bandAlign: compact ? 'center' : 'stretch', sphW: compact ? 'clamp(140px,22vw,200px)' : 'auto', sphH: compact ? 'clamp(140px,22vw,200px)' : '100%', bodyFlex: compact ? 'none' : '1', bodyRows: compact ? 'min-content' : 'minmax(0,1fr)', sessMin: compact ? '380px' : '0',
+      sessionMeta: turnsN ? Math.ceil(turnsN / 2) + ' turn' + (turnsN > 2 ? 's' : '') + ' · ' + mins + ' min' : 'Not started',
+      turns: st.turns.map((t) => ({ who: t.who, t: t.t, ts: t.ts, bg: t.who === 'You' ? '#f9f7f4' : '#fffdfa', whoFg: t.who === 'You' ? '#8b8681' : '#3461f2' })),
+      noTurns: turnsN === 0,
+      typed: st.typed, onTyped: (e) => this.setState({ typed: e.currentTarget.value }),
+      typedKey: (e) => { if (e.key === 'Enter') this.sendTyped(); },
+      sendTyped: () => this.sendTyped(),
+      sendBg: st.typed.trim() ? '#3461f2' : '#f1eeea', sendFg: st.typed.trim() ? '#fffdfa' : '#b6b1aa',
+      ctx: st.ctx.map(([tag, t]) => ({ tag, t, bg: '#f9f7f4', tagBg: tag === 'Memory' ? '#e3f4ec' : tag === 'Agent' ? '#f7e6e4' : '#eef2fe', tagFg: tag === 'Memory' ? '#0a7a53' : tag === 'Agent' ? '#a3352c' : '#2748bd' })),
+      noCtx: st.ctx.length === 0, hasRoute: !!st.route, route: st.route,
+      recent: [['r1', 'Paris packing list', '6 turns · 4 min', 'Yesterday'], ['r2', 'Morning briefing', '3 turns · 2 min', 'Today, 8:02'], ['r3', 'Heat pump quotes', '9 turns · 7 min', 'Thursday'], ['r4', 'Birthday ideas for Sam', '5 turns · 3 min', '18 Oct']].map(([k, t, s, when]) => ({ k, t, s, when })),
+      openRecent: () => { window.location.href = 'Atlas Core Beta.dc.html#memory'; }
+    };
+  }
+  sendTyped() {
+    const t = this.state.typed.trim(); if (!t) return;
+    const m = this.Q().find((x) => t.toLowerCase().split(' ').some((w) => w.length > 3 && x.q.toLowerCase().includes(w)));
+    this.setState({ typed: '' });
+    this.run(m ? Object.assign({}, m, { q: t }) : { q: t, a: 'Let me look into that. I’ll keep it short and check with you before doing anything.', ctx: [['Memory', 'Recent conversations']] }, true);
+  }
+}
+</script>
+</body>
+</html>

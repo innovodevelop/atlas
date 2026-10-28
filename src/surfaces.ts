@@ -164,6 +164,15 @@ export const SURFACES: readonly SurfaceMeta[] = [
   },
   { path: '/mail', label: 'Mail', icon: 'Mail', entry: 'dock', mock: false, edition: 'consumer' },
   { path: '/home', label: 'Voice home', icon: 'Mic', entry: 'menu', mock: false, edition: 'consumer' },
+  // Beta phase 3: where the Talk panel's "Open the full answer" lands. Reached
+  // by navigation only; the page sends the Workshop UI back to the admin view.
+  { path: '/answer', label: 'Answer', icon: 'Sparkles', entry: 'none', mock: false, edition: 'consumer' },
+  // Beta phase 4: timer, countdown, alarms and world clocks — local features,
+  // nothing sampled. Linked from the menu and from Home's "Elsewhere" widget.
+  { path: '/clock', label: 'Clock', icon: 'Clock', entry: 'menu', mock: false, edition: 'consumer' },
+  // Beta phase 5: study plan, flashcards, tutor and the School Tools — all the
+  // student's own, kept on this Mac. No school feed exists, and the screen says so.
+  { path: '/school', label: 'School', icon: 'GraduationCap', entry: 'menu', mock: false, edition: 'consumer' },
   {
     path: '/atlas-teach',
     label: 'Teach Atlas',
@@ -190,6 +199,16 @@ export const SURFACES: readonly SurfaceMeta[] = [
     // Real since the Apple Health import landed: `useHealth` → `health_snapshot`
     // → the local store filled from a genuine iPhone export. Normally EMPTY
     // (macOS has no HealthKit store, ADR 008) — empty is not mock.
+    mock: false,
+    edition: 'consumer',
+  },
+  {
+    path: '/music',
+    label: 'Music',
+    icon: 'Music',
+    entry: 'menu',
+    // Beta phase 4: the listening room. Everything on it is the user's own
+    // Spotify account through `useMusicPlayer`; with no account it says so.
     mock: false,
     edition: 'consumer',
   },
@@ -309,9 +328,13 @@ const CONSUMER_LOADERS: Record<string, Loader> = {
   '/atlas-core': () => import('./pages/atlas/AtlasCoreScreen'),
   '/mail': () => import('./pages/atlas/AtlasMail'),
   '/home': () => import('./pages/atlas/AtlasHome'),
+  '/answer': () => import('./pages/atlas/BetaAnswer'),
+  '/clock': () => import('./pages/atlas/BetaClock'),
+  '/school': () => import('./pages/atlas/BetaSchool'),
   '/atlas-teach': () => import('./pages/AtlasTeach'),
   '/smart-home': () => import('./pages/atlas/AtlasSmartHome'),
   '/health': () => import('./pages/atlas/AtlasHealth'),
+  '/music': () => import('./pages/atlas/BetaMusic'),
   '/onboarding': () => import('./pages/atlas/AtlasOnboarding'),
   '/settings': () => import('./pages/atlas/AtlasSettingsRoute'),
   '/auth': () => import('./pages/Auth'),

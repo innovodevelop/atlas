@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>(function(){window.addEventListener("unhandledrejection",function(e){var m=String(e.reason&&e.reason.message||e.reason);if(/Transition was aborted|ViewTransition/.test(m))e.preventDefault()});var top=false;try{top=window.self===window.top}catch(e){}var s=document.createElement("style");if(top){s.textContent="@view-transition{navigation:auto}";}else{s.textContent="html{animation:atlas-in .45s cubic-bezier(.22,1,.36,1) both}html.atlas-out{transition:opacity .22s ease,transform .22s ease;opacity:0;transform:scale(.988)}@keyframes atlas-in{from{opacity:0;transform:scale(1.012)}}";document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a||e.defaultPrevented||e.metaKey||e.ctrlKey||a.target)return;var h=a.getAttribute("href");if(!/\.dc\.html/.test(h)||/^https?:/.test(h))return;if(h.split("#")[0]===""||location.pathname.endsWith(encodeURI(h.split("#")[0]))&&h.indexOf("#")>0)return;e.preventDefault();document.documentElement.classList.add("atlas-out");setTimeout(function(){location.href=h},210)},true);}document.head.appendChild(s)})();</script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script>window.addEventListener("pagereveal",function(e){var t=e.viewTransition;if(t){["ready","finished","updateCallbackDone"].forEach(function(p){t[p]&&t[p].catch(function(){})})}});window.addEventListener("unhandledrejection",function(e){if(/Transition was aborted|ViewTransition/.test(String(e.reason&&e.reason.message||e.reason)))e.preventDefault()});</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+@keyframes spin{to{transform:rotate(360deg)}}
+::view-transition-group(*){animation-duration:.55s;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+::view-transition-old(root){animation:.4s cubic-bezier(.22,1,.36,1) both vt-out}
+::view-transition-new(root){animation:.55s cubic-bezier(.22,1,.36,1) both vt-in}
+@keyframes vt-out{to{opacity:0;transform:scale(.985)}}
+@keyframes vt-in{from{opacity:0;transform:scale(1.015)}}
+*{box-sizing:border-box}
+body{margin:0;background:#f9f7f4}
+button,input,textarea{border:none;font:inherit;background:none;color:inherit}
+a{color:#3461f2;text-decoration:none}a:hover{color:#2748bd}
+::selection{background:#e8d8c2}
+.nosb{scrollbar-width:none}.nosb::-webkit-scrollbar{display:none}
+@keyframes bpop{from{opacity:0;transform:translateY(14px) scale(.986)}to{opacity:1;transform:none}}
+@keyframes bdot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
+</style>
+<script src="atlas-quickstart-sphere.js"></script>
+<script src="atlas-orb.js"></script>
+<script src="atlas-topbar.js"></script>
+</helmet>
+
+<div data-screen-label="Atlas Architecture — Beta" style="height:100vh;display:flex;flex-direction:column;gap:12px;padding:26px 26px 88px;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden">
+
+<header data-screen-label="Architecture hero" style="flex:none;view-transition-name:hero;position:relative;border-radius:36px;background:#f1eeea;padding:clamp(22px,3vw,40px);display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:28px;align-items:center;overflow:hidden"><a href="Atlas Dashboard Beta.dc.html" title="Back · Esc" style="position:absolute;right:18px;top:18px;height:34px;padding:0 12px;display:flex;align-items:center;gap:6px;border-radius:9999px;background:#fffdfa;color:#1e1e24;font-size:12.5px;font-weight:600;z-index:2">← Home</a>
+<div style="display:flex;flex-direction:column;gap:10px"><span style="display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#6d6a67"><span style="width:7px;height:7px;border-radius:50%;background:#0fae76"></span>Running on this Mac · 4 local · 2 remote</span><h1 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(40px,5vw,76px);font-weight:500;letter-spacing:-.055em;line-height:.95">How Atlas works</h1><p style="margin:0;max-width:520px;font-size:15.5px;line-height:1.55;color:#6d6a67;text-wrap:pretty">A plain account of where your words go, what stays on this Mac, and what doesn’t.</p></div>
+<div style="position:relative;height:250px;perspective:900px"><div style="position:absolute;left:50%;top:0;width:110px;height:110px;transform:translateX(-50%);z-index:3"><canvas ref="{{ bandRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas></div><div style="position:absolute;left:8%;right:8%;top:92px;bottom:0;transform:rotateX(52deg);transform-origin:50% 0;display:flex;flex-direction:column;gap:6px"><span style="flex:1;border-radius:12px;background:#3461f2;color:#fff;display:flex;align-items:center;padding:0 14px;font-size:11px;font-weight:600">You · voice and screen</span><span style="flex:1;border-radius:12px;background:#7f9bf7;display:flex;align-items:center;padding:0 14px;font-size:11px;font-weight:600">Wake word · on device</span><span style="flex:1;border-radius:12px;background:#fffdfa;display:flex;align-items:center;padding:0 14px;font-size:11px;font-weight:600">Agent and limits</span><span style="flex:1;border-radius:12px;background:#fffdfa;display:flex;align-items:center;padding:0 14px;font-size:11px;font-weight:600">Memory · encrypted</span><span style="flex:1;border-radius:12px;background:#e3dbd0;display:flex;align-items:center;padding:0 14px;font-size:11px;font-weight:600">Connections</span><span style="flex:1;border-radius:12px;background:#1e1e24;color:#f9f7f4;display:flex;align-items:center;padding:0 14px;font-size:11px;font-weight:600">Reasoning model · remote</span></div></div>
+</header>
+
+<div style="flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:10px">
+<nav aria-label="Architecture sections" style="display:flex;flex-wrap:wrap;gap:2px;padding:5px;border-radius:9999px;background:#f1eeea">
+<sc-for list="{{ tabs }}" as="t" hint-placeholder-count="5">
+<button onClick="{{ pickTab }}" data-k="{{ t.k }}" aria-current="{{ t.cur }}" style="border:none;flex:none;white-space:nowrap;height:36px;padding:0 15px;border-radius:9999px;background:{{ t.bg }};color:{{ t.fg }};box-shadow:{{ t.sh }};font-family:inherit;font-size:13px;font-weight:{{ t.fw }};cursor:pointer;transition:background .2s" style-hover="background:{{ t.hov }}">{{ t.l }}</button>
+</sc-for>
+</nav>
+<span style="flex:1"></span>
+<div role="group" aria-label="Detail level" style="display:flex;gap:2px;padding:4px;border-radius:9999px;background:#f1eeea">
+<sc-for list="{{ levels }}" as="l" hint-placeholder-count="2"><button onClick="{{ pickLevel }}" data-k="{{ l.k }}" style="border:none;flex:none;white-space:nowrap;height:30px;padding:0 13px;border-radius:9999px;background:{{ l.bg }};color:{{ l.fg }};box-shadow:{{ l.sh }};font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer">{{ l.l }}</button></sc-for>
+</div>
+</div>
+
+<main ref="{{ mainRef }}" class="nosb" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px">
+
+<sc-if value="{{ isOverview }}" hint-placeholder-val="{{ true }}">
+<section style="border-radius:28px;background:#f1eeea;padding:22px;display:flex;flex-direction:column;gap:16px;animation:bpop .55s cubic-bezier(.22,1,.36,1) both">
+<div style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;padding:4px 6px 0">
+<div><span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8b8681">The whole picture</span><h2 style="margin:6px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:26px;font-weight:600;letter-spacing:-.035em">One trip through Atlas</h2></div>
+<p style="margin:0;max-width:440px;font-size:13.5px;line-height:1.55;color:#6d6a67;text-wrap:pretty">Follow it left to right along the top, and back along the bottom. Everything in the white panel happens here, on your machine.</p>
+</div>
+<div class="nosb" style="overflow-x:auto;border-radius:22px">
+<div style="position:relative;width:1160px;height:670px;margin:0 auto">
+
+    <svg viewBox="0 0 1160 670" style="position:absolute;inset:0;width:1160px;height:670px;pointer-events:none">
+      <defs>
+        <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#b6b1aa"></path></marker>
+        <marker id="ahb" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#3461f2"></path></marker>
+        <marker id="ahg" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#0a7a53"></path></marker>
+      </defs>
+
+      <rect x="8" y="8" width="1144" height="340" rx="26" fill="#fffdfa"></rect>
+      <rect x="8" y="416" width="1144" height="234" rx="26" fill="#f9f7f4"></rect>
+      <line x1="8" y1="382" x2="1152" y2="382" stroke="#3461f2" stroke-opacity=".38" stroke-width="1.5" stroke-dasharray="8 8"></line>
+
+      <path d="M178,139 H204" stroke="#b6b1aa" stroke-width="1.6" fill="none" marker-end="url(#ah)"></path>
+      <path d="M380,139 H406" stroke="#b6b1aa" stroke-width="1.6" fill="none" marker-end="url(#ah)"></path>
+      <path d="M582,139 H608" stroke="#b6b1aa" stroke-width="1.6" fill="none" marker-end="url(#ah)"></path>
+      <path id="pOut" d="M794,139 H852 Q880,139 880,167 V402" stroke="#3461f2" stroke-width="2" fill="none" marker-end="url(#ahb)"></path>
+      <path id="pIn" d="M704,416 V306" stroke="#0a7a53" stroke-width="2" fill="none" marker-end="url(#ahg)"></path>
+      <path d="M614,257 H588" stroke="#b6b1aa" stroke-width="1.6" fill="none" marker-end="url(#ah)"></path>
+      <path d="M412,257 H386" stroke="#b6b1aa" stroke-width="1.6" fill="none" marker-end="url(#ah)"></path>
+      <path id="pLoop" d="M295,214 C295,192 400,204 497,188" stroke="#b6b1aa" stroke-width="1.6" fill="none" stroke-dasharray="5 5" marker-end="url(#ah)"></path>
+
+      <sc-if value="{{ animate }}" hint-placeholder-val="{{ true }}">
+        <g>
+          <circle r="3.5" fill="#3461f2"><animateMotion dur="2.6s" repeatCount="indefinite" path="M794,139 H852 Q880,139 880,167 V402"></animateMotion></circle>
+          <circle r="3.5" fill="#0a7a53"><animateMotion dur="2.6s" begin="1.3s" repeatCount="indefinite" path="M704,416 V306"></animateMotion></circle>
+          <circle r="3" fill="#3461f2"><animateMotion dur="1.5s" repeatCount="indefinite" path="M178,139 H406"></animateMotion></circle>
+          <circle r="3" fill="#3461f2"><animateMotion dur="1.5s" begin=".5s" repeatCount="indefinite" path="M406,139 H608"></animateMotion></circle>
+        </g>
+      </sc-if>
+    </svg>
+
+    <p style="position:absolute;left:30px;top:26px;margin:0;font-size:11.5px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#8b8681">On this Mac</p>
+    <p style="position:absolute;left:30px;top:48px;margin:0;font-size:12.5px;color:#6d6a67">Nothing in this panel is sent anywhere</p>
+
+    <div style="position:absolute;left:28px;top:96px;width:150px;height:86px;box-sizing:border-box;background:#f9f7f4;border-radius:16px;padding:13px 14px">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#3461f2" stroke-width="1.8" stroke-linecap="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><path d="M12 19v3"></path></svg>
+      <p style="font-size:14px;font-weight:600;letter-spacing:-.01em;margin:7px 0 0">You speak</p>
+      <p style="font-size:11.5px;color:#6d6a67;margin:3px 0 0;line-height:1.35">or type, the same way</p>
+    </div>
+
+    <div style="position:absolute;left:204px;top:96px;width:176px;height:86px;box-sizing:border-box;background:#fffdfa;border-radius:16px;padding:13px 14px;">
+      <p style="font-size:14px;font-weight:600;letter-spacing:-.01em;margin:0">Atlas hears you</p>
+      <p style="font-size:11.5px;color:#6d6a67;margin:4px 0 0;line-height:1.4">Catches its name, notices when you stop, turns sound into words</p>
+    </div>
+
+    <div style="position:absolute;left:406px;top:96px;width:176px;height:86px;box-sizing:border-box;background:#fffdfa;border-radius:16px;padding:13px 14px;">
+      <p style="font-size:14px;font-weight:600;letter-spacing:-.01em;margin:0">It looks things up</p>
+      <p style="font-size:11.5px;color:#6d6a67;margin:4px 0 0;line-height:1.4">Searches what you've told it and picks the few bits that matter here</p>
+    </div>
+
+    <div style="position:absolute;left:608px;top:96px;width:186px;height:86px;box-sizing:border-box;background:#eef2fe;border-radius:16px;padding:13px 14px">
+      <p style="font-size:14px;font-weight:600;letter-spacing:-.01em;margin:0;color:#2748bd">It writes the request</p>
+      <p style="font-size:11.5px;color:#6d6a67;margin:4px 0 0;line-height:1.4">Your question, plus those bits, as one block of text</p>
+    </div>
+
+    <div style="position:absolute;left:608px;top:214px;width:186px;height:92px;box-sizing:border-box;background:#fffdfa;border-radius:16px;padding:13px 14px;">
+      <p style="font-size:14px;font-weight:600;letter-spacing:-.01em;margin:0">It answers you</p>
+      <p style="font-size:11.5px;color:#6d6a67;margin:4px 0 0;line-height:1.4">Speaks out loud, shows the text, moves the sphere</p>
+    </div>
+
+    <div style="position:absolute;left:406px;top:214px;width:176px;height:92px;box-sizing:border-box;background:#fffdfa;border-radius:16px;padding:13px 14px;">
+      <p style="font-size:14px;font-weight:600;letter-spacing:-.01em;margin:0">It decides what to keep</p>
+      <p style="font-size:11.5px;color:#6d6a67;margin:4px 0 0;line-height:1.4">Most of a conversation is not worth remembering</p>
+    </div>
+
+    <div style="position:absolute;left:204px;top:214px;width:176px;height:92px;box-sizing:border-box;background:#f9f7f4;border-radius:16px;padding:13px 14px">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6d6a67" stroke-width="1.6"><ellipse cx="12" cy="5" rx="8" ry="3"></ellipse><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"></path><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"></path></svg>
+      <p style="font-size:14px;font-weight:600;letter-spacing:-.01em;margin:6px 0 0">It writes it down</p>
+      <p style="font-size:11.5px;color:#6d6a67;margin:3px 0 0;line-height:1.35">Into one file, here</p>
+    </div>
+
+    <p style="position:absolute;left:296px;top:196px;margin:0;font-size:11px;color:#b6b1aa;font-style:italic">next time, it remembers</p>
+
+    <div style="position:absolute;left:28px;top:190px;width:150px;box-sizing:border-box;background:#f9f7f4;border-radius:16px;padding:13px">
+      <p style="margin:0;font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#8b8681">Stays here</p>
+      <p style="margin:9px 0 0;font-size:12.5px;color:#1e1e24;line-height:1.75">Your memories<br>Your documents<br>The search index<br>Your recordings<br>The wake word</p>
+    </div>
+
+    <sc-if value="{{ technical }}" hint-placeholder-val="{{ false }}">
+      <span style="position:absolute;left:204px;top:322px;font-size:11.5px;font-family:ui-monospace,'SF Mono',Menlo,monospace;color:#8b8681">SQLite + sqlite-vec · Silero VAD · openWakeWord · Whisper · local TTS</span>
+    </sc-if>
+
+    <div style="position:absolute;left:24px;top:370px;padding:2px 10px;background:#f1eeea;font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#3461f2">The edge of your Mac</div>
+
+    <div style="position:absolute;left:370px;top:356px;width:318px;text-align:right;background:#f1eeea;padding:4px 10px;box-sizing:border-box">
+      <p style="margin:0;font-size:12.5px;font-weight:600;color:#0a7a53">Comes back: the reply</p>
+      <p style="margin:2px 0 0;font-size:12px;color:#6d6a67;line-height:1.4">Text, which Atlas then speaks in your chosen voice — here, not out there.</p>
+    </div>
+
+    <div style="position:absolute;left:896px;top:356px;width:250px;background:#f1eeea;padding:4px 10px;box-sizing:border-box">
+      <p style="margin:0;font-size:12.5px;font-weight:600;color:#2748bd">Leaves: the request</p>
+      <p style="margin:2px 0 0;font-size:12px;color:#6d6a67;line-height:1.4">What you said, plus the memories Atlas chose to include.</p>
+    </div>
+
+    <p style="position:absolute;left:40px;top:436px;margin:0;font-size:11.5px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#8b8681">Somewhere else</p>
+
+    <div style="position:absolute;left:40px;top:468px;width:520px;height:150px;box-sizing:border-box;background:#fffdfa;border-radius:18px;padding:18px 20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <p style="font-size:16px;font-weight:600;letter-spacing:-.01em;margin:0">Anthropic</p>
+        <span style="font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:9999px;background:rgba(52,97,242,.1);color:#2748bd">While you're talking</span>
+      </div>
+      <p style="font-size:13.5px;color:#6d6a67;margin:9px 0 0;line-height:1.55">Every reply you hear comes from here. Chosen for the quality of the conversation, and because it will hold a long thread of context without losing the thread.</p>
+      <p style="font-size:12.5px;color:#b6b1aa;margin:10px 0 0">Sees: the request. Doesn't see: your files, your index, your recordings.</p>
+    </div>
+
+    <div style="position:absolute;left:600px;top:468px;width:520px;height:150px;box-sizing:border-box;background:#fffdfa;border-radius:18px;padding:18px 20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <p style="font-size:16px;font-weight:600;letter-spacing:-.01em;margin:0">AWS Bedrock, in Europe</p>
+        <span style="font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:9999px;background:#edebe7;color:#55524f">While you're away</span>
+      </div>
+      <p style="font-size:13.5px;color:#6d6a67;margin:9px 0 0;line-height:1.55">Overnight summaries, research, the daily briefing. Slower and cheaper, and the data stays inside the EU — which matters more for work that runs unattended.</p>
+      <p style="font-size:12.5px;color:#b6b1aa;margin:10px 0 0">Sees: the request. Runs on a schedule you set, and you can switch it off.</p>
+    </div>
+
+  </div>
+</div>
+</section>
+
+<section style="border-radius:28px;background:#1e1e24;color:#f9f7f4;padding:clamp(24px,3vw,40px);display:flex;flex-direction:column;gap:18px">
+<span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:rgba(249,247,244,.62)">The part worth being clear about</span>
+<h2 style="margin:0;max-width:820px;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(26px,3vw,40px);font-weight:500;letter-spacing:-.035em;line-height:1.12;text-wrap:pretty">Your memories stay on this Mac. The requests built from them do not.</h2>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px">
+<p style="margin:0;font-size:14.5px;line-height:1.65;color:rgba(249,247,244,.78);text-wrap:pretty">Atlas keeps everything it knows about you in a single file on your own disk. No copy is uploaded, no account holds it, and deleting it deletes it.</p>
+<p style="margin:0;font-size:14.5px;line-height:1.65;color:rgba(249,247,244,.78);text-wrap:pretty">But to answer you, it has to send your question somewhere, and it sends the relevant memories along with it. That's what makes the answer feel like yours.</p>
+<p style="margin:0;font-size:14.5px;line-height:1.65;color:rgba(249,247,244,.78);text-wrap:pretty">So the file never travels. Sentences from it do, a handful at a time, every time you ask something. That's the honest shape of it.</p>
+</div>
+<div style="display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:4px"><a href="Atlas Core Beta.dc.html#memory" style="flex:none;white-space:nowrap;display:inline-flex;align-items:center;height:40px;padding:0 18px;border-radius:9999px;background:#3461f2;color:#fffdfa;font-size:13.5px;font-weight:600" style-hover="background:#2748bd;color:#fffdfa">See exactly what Atlas remembers</a><span style="font-size:13px;color:rgba(249,247,244,.62)">Every memory is listed, and every one can be removed.</span></div>
+</section>
+
+<section style="border-radius:28px;background:#fffdfa;padding:22px;display:flex;flex-direction:column;gap:6px">
+<div style="padding:0 4px 10px"><span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8b8681">In short</span><h2 style="margin:6px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:22px;font-weight:600;letter-spacing:-.03em">What runs where</h2></div>
+<sc-for list="{{ runsWhere }}" as="r" hint-placeholder-count="6">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 14px;border-radius:14px;background:#f9f7f4"><span style="font-size:14px">{{ r.t }}</span><span style="flex:none;height:24px;padding:0 10px;display:flex;align-items:center;border-radius:9999px;background:{{ r.bg }};color:{{ r.fg }};font-size:11.5px;font-weight:600">{{ r.w }}</span></div>
+</sc-for>
+<sc-if value="{{ technical }}" hint-placeholder-val="{{ false }}"><p style="margin:10px 4px 0;font-family:'Geist Mono',ui-monospace,monospace;font-size:12px;line-height:1.7;color:#6d6a67">Tauri + React shell · Rust sidecar (voice gateway, WS-B duplex) · atlas-brain orchestrator · SQLite + sqlite-vec · Anthropic Messages API · AWS Bedrock eu-central-1</p></sc-if>
+<p style="margin:10px 4px 0;font-size:13px;line-height:1.6;color:#6d6a67;text-wrap:pretty">Turn off the network and Atlas still hears you and still knows you, but it can't answer you. That division is deliberate.</p>
+</section>
+</sc-if>
+
+<sc-if value="{{ isProviders }}" hint-placeholder-val="{{ false }}">
+<section style="border-radius:28px;background:#f1eeea;padding:22px;display:flex;flex-direction:column;gap:12px">
+<div style="padding:4px 6px"><span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8b8681">Somewhere else</span><h2 style="margin:6px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:26px;font-weight:600;letter-spacing:-.035em">Two providers, for two kinds of work</h2></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px">
+<sc-for list="{{ providers }}" as="p" hint-placeholder-count="2">
+<div style="border-radius:24px;background:#fffdfa;padding:22px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><span style="font-family:'Hanken Grotesk',sans-serif;font-size:19px;font-weight:600;letter-spacing:-.025em">{{ p.n }}</span><span style="flex:none;height:26px;padding:0 11px;display:flex;align-items:center;border-radius:9999px;background:{{ p.tagBg }};color:{{ p.tagFg }};font-size:11.5px;font-weight:600;white-space:nowrap">{{ p.tag }}</span></div>
+<p style="margin:0;font-size:14px;line-height:1.6;color:#6d6a67;text-wrap:pretty">{{ p.d }}</p>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:4px"><div style="padding:10px 12px;border-radius:12px;background:#eef2fe"><p style="margin:0;font-size:11px;font-weight:600;color:#2748bd">Sees</p><p style="margin:3px 0 0;font-size:12.5px;line-height:1.45;color:#1e1e24">{{ p.sees }}</p></div><div style="padding:10px 12px;border-radius:12px;background:#f9f7f4"><p style="margin:0;font-size:11px;font-weight:600;color:#6d6a67">Never sees</p><p style="margin:3px 0 0;font-size:12.5px;line-height:1.45;color:#1e1e24">{{ p.never }}</p></div></div>
+<sc-if value="{{ technical }}" hint-placeholder-val="{{ false }}"><p style="margin:4px 0 0;font-family:'Geist Mono',ui-monospace,monospace;font-size:12px;color:#6d6a67">{{ p.tech }}</p></sc-if>
+</div>
+</sc-for>
+</div>
+</section>
+<section style="border-radius:28px;background:#f1eeea;padding:22px;display:flex;flex-direction:column;gap:12px">
+<div style="padding:4px 6px"><span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8b8681">Kept here</span><h2 style="margin:6px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:26px;font-weight:600;letter-spacing:-.035em">Four things that never go online</h2><p style="margin:6px 0 0;max-width:620px;font-size:13.5px;line-height:1.55;color:#6d6a67;text-wrap:pretty">These run on your machine because they have to be fast, because they're always on, or because sending them would be indefensible.</p></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px">
+<sc-for list="{{ local }}" as="l" hint-placeholder-count="4">
+<div style="border-radius:24px;background:#fffdfa;padding:20px;display:flex;flex-direction:column;gap:8px">
+<span style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:12px;background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{ l.ico }}"></path></svg></span>
+<p style="margin:6px 0 0;font-size:15.5px;font-weight:600;letter-spacing:-.01em">{{ l.t }}</p>
+<p style="margin:0;font-size:13.5px;line-height:1.6;color:#6d6a67;text-wrap:pretty">{{ l.d }}</p>
+<sc-if value="{{ technical }}" hint-placeholder-val="{{ false }}"><p style="margin:4px 0 0;font-family:'Geist Mono',ui-monospace,monospace;font-size:12px;color:#6d6a67">{{ l.tech }}</p></sc-if>
+</div>
+</sc-for>
+</div>
+</section>
+</sc-if>
+
+<sc-if value="{{ isMemory }}" hint-placeholder-val="{{ false }}">
+<section style="border-radius:28px;background:#f1eeea;padding:22px;display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px">
+<div style="padding:4px 6px;display:flex;flex-direction:column;gap:8px"><span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8b8681">How it remembers</span><h2 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:26px;font-weight:600;letter-spacing:-.035em">Three kinds of memory</h2><p style="margin:0;max-width:420px;font-size:13.5px;line-height:1.55;color:#6d6a67;text-wrap:pretty">They behave differently on purpose. Only the third one lasts.</p></div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<sc-for list="{{ kinds }}" as="k" hint-placeholder-count="3">
+<div style="display:flex;gap:14px;padding:16px 18px;border-radius:18px;background:{{ k.bg }}">
+<span style="flex:none;width:28px;font-size:13px;font-weight:600;color:{{ k.nFg }};font-variant-numeric:tabular-nums">{{ k.n }}</span>
+<div style="min-width:0"><p style="margin:0;font-size:15px;font-weight:600">{{ k.t }}</p><p style="margin:4px 0 0;font-size:13.5px;line-height:1.55;color:#6d6a67;text-wrap:pretty">{{ k.d }}</p><sc-if value="{{ k.hasCats }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px"><sc-for list="{{ cats }}" as="c" hint-placeholder-count="6"><span style="height:26px;padding:0 10px;display:flex;align-items:center;border-radius:9999px;background:#fffdfa;font-size:12px">{{ c }}</span></sc-for></div></sc-if></div>
+</div>
+</sc-for>
+</div>
+</section>
+<section style="border-radius:28px;background:#fffdfa;padding:22px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px">
+<sc-for list="{{ memFacts }}" as="m" hint-placeholder-count="3"><div style="padding:16px 18px;border-radius:18px;background:#f9f7f4"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:28px;font-weight:600;letter-spacing:-.04em;font-variant-numeric:tabular-nums">{{ m.v }}</p><p style="margin:4px 0 0;font-size:13px;font-weight:600">{{ m.t }}</p><p style="margin:2px 0 0;font-size:12.5px;line-height:1.5;color:#6d6a67">{{ m.d }}</p></div></sc-for>
+</section>
+</sc-if>
+
+<sc-if value="{{ isLearning }}" hint-placeholder-val="{{ false }}">
+<section style="border-radius:28px;background:#f1eeea;padding:22px;display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px">
+<div style="padding:4px 6px;display:flex;flex-direction:column;gap:8px"><span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8b8681">How it learns</span><h2 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:26px;font-weight:600;letter-spacing:-.035em">Learning happens after the fact</h2><p style="margin:0;max-width:420px;font-size:13.5px;line-height:1.55;color:#6d6a67;text-wrap:pretty">Nothing about you is trained into a model. Learning here means writing things down and reading them back.</p><p style="margin:8px 0 0;max-width:420px;font-size:13.5px;line-height:1.55;color:#6d6a67;text-wrap:pretty">Overnight, the same loop runs without you: summarising the day and following up on research you asked for. That's the work that goes to Bedrock in Europe.</p><a href="Atlas Teach Beta.dc.html" style="align-self:flex-start;margin-top:8px;white-space:nowrap;height:36px;padding:0 16px;display:flex;align-items:center;border-radius:9999px;background:#3461f2;color:#fffdfa;font-size:13px;font-weight:600" style-hover="background:#2748bd;color:#fffdfa">Teach it something directly</a></div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<sc-for list="{{ steps }}" as="s" hint-placeholder-count="4">
+<button onClick="{{ pickStep }}" data-k="{{ s.k }}" style="border:none;display:flex;align-items:flex-start;gap:14px;padding:15px 16px;border-radius:18px;background:{{ s.bg }};font-family:inherit;text-align:left;cursor:pointer;transition:background .25s" style-hover="background:{{ s.hov }}">
+<span style="flex:none;width:28px;height:28px;border-radius:9px;background:{{ s.nBg }};color:{{ s.nFg }};display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600">{{ s.n }}</span>
+<span style="min-width:0"><span style="display:block;font-size:14.5px;font-weight:600;color:{{ s.tFg }}">{{ s.t }}</span><span style="display:block;margin-top:2px;font-size:13px;line-height:1.5;color:#6d6a67">{{ s.d }}</span><sc-if value="{{ s.on }}" hint-placeholder-val="{{ false }}"><span style="display:block;margin-top:10px;padding:10px 12px;border-radius:12px;background:#fffdfa;font-size:12.5px;line-height:1.5;color:#1e1e24">{{ s.ex }}</span></sc-if></span>
+</button>
+</sc-for>
+</div>
+</section>
+</sc-if>
+
+<sc-if value="{{ isSphere }}" hint-placeholder-val="{{ false }}">
+<section style="border-radius:28px;background:#f1eeea;padding:22px;display:grid;grid-template-columns:{{ sphCols }};gap:12px">
+<div style="position:relative;border-radius:24px;background:#fffdfa;aspect-ratio:1;max-height:440px;width:100%"><canvas ref="{{ demoRef }}" style="position:absolute;inset:6%;width:88%;height:88%;display:block"></canvas><span style="position:absolute;left:18px;bottom:16px;height:26px;padding:0 11px;display:flex;align-items:center;gap:7px;border-radius:9999px;background:#f1eeea;font-size:12px;font-weight:600"><span style="width:8px;height:8px;border-radius:50%;background:{{ curC }}"></span>{{ curN }}</span></div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="padding:4px 6px 10px"><span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8b8681">The sphere</span><h2 style="margin:6px 0 0;font-family:'Hanken Grotesk',sans-serif;font-size:26px;font-weight:600;letter-spacing:-.035em">It isn't decoration</h2><p style="margin:6px 0 0;font-size:13.5px;line-height:1.55;color:#6d6a67;text-wrap:pretty">Twenty thousand points, drawn on your machine sixty times a second. Its shape is the one honest read-out of what Atlas is doing, readable from across the room. Pick a state to see it.</p></div>
+<sc-for list="{{ states }}" as="s" hint-placeholder-count="10">
+<button onClick="{{ pickState }}" data-k="{{ s.k }}" style="border:none;display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:14px;background:{{ s.bg }};font-family:inherit;text-align:left;cursor:pointer;transition:background .2s" style-hover="background:{{ s.hov }}"><span style="flex:none;width:9px;height:9px;border-radius:50%;background:{{ s.c }}"></span><span style="flex:none;width:96px;font-size:13.5px;font-weight:600;color:#1e1e24">{{ s.n }}</span><span style="font-size:12.5px;line-height:1.45;color:#6d6a67">{{ s.d }}</span></button>
+</sc-for>
+<sc-if value="{{ technical }}" hint-placeholder-val="{{ false }}"><p style="margin:8px 6px 0;font-family:'Geist Mono',ui-monospace,monospace;font-size:12px;line-height:1.6;color:#6d6a67">QuickSphere · mode veil · canvas 2D · spring-settled params (K 2.6) · tint mix 0.8 · count 20k band / 4k mini</p></sc-if>
+</div>
+</section>
+</sc-if>
+
+</main>
+
+<nav aria-label="Atlas" data-dock="beta" style="view-transition-name:atlas-dock;position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:4px;padding:6px;border-radius:9999px;background:rgba(255,253,250,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 18px 40px -20px rgba(30,30,36,.28)">
+<a href="Atlas Dashboard Beta.dc.html" title="Home" aria-label="Home" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M3.5 10.9 10.7 4.3a2 2 0 0 1 2.6 0l7.2 6.6v6.9a3 3 0 0 1-3 3h-3v-5.4a2.5 2.5 0 0 0-5 0v5.4h-3a3 3 0 0 1-3-3z"></path></svg></a>
+<a href="Atlas Core Beta.dc.html" title="Core" aria-label="Core" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.6a8.4 8.4 0 1 1 0 16.8 8.4 8.4 0 0 1 0-16.8M12 8.8a3.2 3.2 0 1 1 0 6.4 3.2 3.2 0 0 1 0-6.4M12 3.6v5.2M12 15.2v5.2M3.6 12h5.2M15.2 12h5.2"></path></svg></a>
+<a href="Atlas Teach Beta.dc.html" title="Teach" aria-label="Teach" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 7.4a5.2 5.2 0 0 0-3.9-1.8H5a1.2 1.2 0 0 0-1.2 1.2v9.6A1.2 1.2 0 0 0 5 17.6h3.1A5.2 5.2 0 0 1 12 19.4a5.2 5.2 0 0 1 3.9-1.8H19a1.2 1.2 0 0 0 1.2-1.2V6.8A1.2 1.2 0 0 0 19 5.6h-3.1A5.2 5.2 0 0 0 12 7.4zM12 7.4v12"></path></svg></a>
+<a href="Atlas Mail Beta.dc.html" title="Mail" aria-label="Mail" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M6.6 5.6h10.8a3.2 3.2 0 0 1 3.2 3.2v6.4a3.2 3.2 0 0 1-3.2 3.2H6.6a3.2 3.2 0 0 1-3.2-3.2V8.8a3.2 3.2 0 0 1 3.2-3.2zM3.8 7.6l7 4.8a2.2 2.2 0 0 0 2.4 0l7-4.8"></path></svg></a>
+<span aria-current="page" style="flex:none;display:flex;align-items:center;gap:8px;height:42px;padding:0 16px 0 13px;border-radius:9999px;background:#1e1e24;color:#f9f7f4;font-size:13px;font-weight:600;white-space:nowrap"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.4 3.4 7.9 12 12.4l8.6-4.5zM3.4 12.1 12 16.6l8.6-4.5M3.4 16.3 12 20.8l8.6-4.5"></path></svg>Architecture</span>
+<a href="Atlas Voice Beta.dc.html" title="Voice" aria-label="Voice" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.5a2.6 2.6 0 0 1 2.6 2.6v5.4a2.6 2.6 0 0 1-5.2 0V6.1A2.6 2.6 0 0 1 12 3.5zM18.1 11.5a6.1 6.1 0 0 1-12.2 0M12 17.6v3"></path></svg></a>
+<a href="Atlas Settings Beta.dc.html" title="Marcus · Settings" aria-label="Settings" style="flex:none;display:flex;align-items:center;justify-content:center;gap:8px;height:42px;width:42px;border-radius:9999px;background:transparent;color:#1e1e24;font-size:13px;font-weight:600;white-space:nowrap" style-hover="background:#f1eeea;color:#1e1e24"><span style="width:34px;height:34px;border-radius:50%;background:#1e1e24;color:#f9f7f4;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">M</span></a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;technical&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;},&quot;animate&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  state = { tab: 'overview', tech: false, vw: window.innerWidth, ico: {}, sph: 'idle', step: 'recall' };
+  componentDidMount() {
+    this.onResize = () => this.setState({ vw: window.innerWidth });
+    window.addEventListener('resize', this.onResize);
+    this.onKey = (e) => { if (e.key === 'Escape') window.location.href = 'Atlas Dashboard Beta.dc.html'; };
+    window.addEventListener('keydown', this.onKey);
+    const h = (window.location.hash || '').slice(1);
+    if (['overview', 'providers', 'memory', 'learning', 'sphere'].includes(h)) this.setState({ tab: h });
+    if (this.props.technical) this.setState({ tech: true });
+    fetch('atlas-icon-data.js').then((r) => r.text()).then((t) => {
+      const SET = new Function(t.replace(/export\s+const\s+SET\s*=/, 'return'))(), ico = {};
+      SET.forEach((g) => g[2].forEach(([n, d]) => { ico[n] = d; }));
+      this.setState({ ico });
+    }).catch(() => {});
+  }
+  componentDidUpdate(p) { if (p.technical !== this.props.technical) this.setState({ tech: !!this.props.technical }); }
+  componentWillUnmount() { window.removeEventListener('resize', this.onResize); window.removeEventListener('keydown', this.onKey); (this.sphs || []).forEach((s) => s.destroy()); }
+  mount(el, bg, count, key) {
+    if (!el || el.__q) return;
+    const go = () => { if (el.__q || !el.isConnected) return; if (!window.QuickSphere) return setTimeout(go, 60);
+      el.__q = window.QuickSphere.mount(el, { mode: 'veil', bg, dust: [122, 148, 246], strand: [52, 97, 242], blend: 'source-over', alpha: 0.62, seed: 11, count, scale: 0.42, state: key ? this.state.sph : 'idle' });
+      (this.sphs = this.sphs || []).push(el.__q); if (key) this.demo = el.__q; };
+    go();
+  }
+  renderVals() {
+    const st = this.state, I = st.ico, ic = (n) => I[n] || '';
+    const T = window.QuickSphere ? window.QuickSphere.TINT : null, rgb = (k) => (T && T[k] ? 'rgb(' + T[k].join(',') + ')' : '#8b8681');
+    const seg = (on) => ({ bg: on ? '#fffdfa' : 'transparent', fg: on ? '#1e1e24' : '#6d6a67', sh: on ? '0 2px 8px -3px rgba(30,30,36,.16)' : 'none' });
+    const STATES = [['idle', 'Resting', 'Slow drift. Nothing is being sent.', null], ['waking', 'Waking', 'It heard its name. A session is opening.', 'd'], ['listening', 'Listening', 'Reacting to your voice in real time.', 'c'], ['thinking', 'Thinking', 'The request has left. This is the honest wait.', 'v'], ['speaking', 'Speaking', 'The reply is being spoken, here on this Mac.', 'b'], ['working', 'Working', 'A job is running without you.', 'a'], ['success', 'Done', 'A task you asked for finished.', 'g'], ['alert', 'Needs you', 'Something failed, or needs a decision.', 'r'], ['muted', 'Muted', 'The microphone is off. Nothing is being heard.', 'n'], ['dissolving', 'Ending', 'The session is closing.', 'm']];
+    const cur = STATES.find((s) => s[0] === st.sph);
+    const STEPS = [['notice', 'Notice', 'Something you said looks worth keeping', '“My sister Ana is moving to Porto in March.”'], ['file', 'File it', 'Given a category and a weight, then written to disk', 'Relationships · Ana, sister · moving to Porto, March · importance 0.7'], ['reconcile', 'Reconcile', 'If it contradicts something older, the older one is superseded, not silently overwritten', '“Ana lives in Lyon” is marked as superseded and kept in history.'], ['recall', 'Recall', 'Next time it’s relevant, it comes back into the request', 'You ask about flights in March. Atlas suggests Porto.']];
+    return {
+      bandRef: (el) => this.mount(el, 'transparent', 9000),
+      demoRef: (el) => this.mount(el, '#fffdfa', 20000, 'demo'),
+      mainRef: (el) => { this.main = el; },
+      technical: st.tech,
+      tabs: [['overview', 'Overview'], ['providers', 'AI providers'], ['memory', 'Memory'], ['learning', 'Learning'], ['sphere', 'Sphere']].map(([k, l]) => { const on = st.tab === k; return Object.assign({ k, l, cur: on ? 'page' : 'false', fw: on ? 600 : 500, hov: on ? '#fffdfa' : '#edebe7' }, seg(on)); }),
+      pickTab: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.setState({ tab: k }); if (this.main) this.main.scrollTop = 0; try { history.replaceState(null, '', '#' + k); } catch (x) {} },
+      levels: [['plain', 'Plain'], ['tech', 'Technical']].map(([k, l]) => Object.assign({ k, l }, seg((k === 'tech') === st.tech))),
+      pickLevel: (e) => this.setState({ tech: e.currentTarget.getAttribute('data-k') === 'tech' }),
+      isOverview: st.tab === 'overview', isProviders: st.tab === 'providers', isMemory: st.tab === 'memory', isLearning: st.tab === 'learning', isSphere: st.tab === 'sphere',
+      animate: this.props.animate ?? true,
+      runsWhere: [['The app you’re looking at', 'This Mac'], ['Voice: hearing, waking, speaking', 'This Mac'], ['Memories, documents, search', 'This Mac'], ['Deciding what to say back', 'Anthropic'], ['Overnight summaries and research', 'Bedrock, EU'], ['Your account and settings', 'This Mac']].map(([t, w]) => ({ t, w, bg: w === 'This Mac' ? '#e3f4ec' : '#eef2fe', fg: w === 'This Mac' ? '#0a7a53' : '#2748bd' })),
+      providers: [
+        { n: 'Anthropic', tag: 'While you’re talking', tagBg: '#eef2fe', tagFg: '#2748bd', d: 'Every reply you hear comes from here. Chosen for the quality of the conversation, and because it can hold a long thread of context without losing track.', sees: 'Your question and the memories Atlas chose to include', never: 'Your files, the search index, your recordings', tech: 'Messages API · US · streaming · web-search tool on chat turns' },
+        { n: 'AWS Bedrock, in Europe', tag: 'While you’re away', tagBg: '#f1eeea', tagFg: '#6d6a67', d: 'Overnight summaries, research and the daily briefing. Slower and cheaper, and the data stays inside the EU, which matters more for work that runs unattended.', sees: 'The request for each scheduled job', never: 'Live conversation, your files, the memory file', tech: 'eu-central-1 · scheduler.rs ticks /proactive/cycle · switch off in Permissions' }
+      ],
+      local: [
+        { ico: ic('memory'), t: 'The memory file', d: 'One database on your disk holding every fact, preference and person Atlas has learned. You can open it, back it up, or delete it.', tech: 'SQLite, ~/Library/Application Support/Atlas' },
+        { ico: ic('search'), t: 'Search by meaning', d: 'Ask about “the pitch” and it finds the note that says “Innovo deck”. The maths behind that runs locally, so nobody else ever indexes your documents.', tech: 'On-device embeddings, sqlite-vec ANN' },
+        { ico: ic('mic'), t: 'Listening for its name', d: 'The microphone is open, and nothing it hears goes anywhere until you say the wake phrase. That check runs here, on a model small enough to run constantly.', tech: 'openWakeWord, ONNX runtime' },
+        { ico: ic('activity'), t: 'Knowing when you’ve stopped', d: 'Atlas waits for a real pause rather than a fixed timer, and stops talking the moment you start. Both have to react in milliseconds, which rules out a round trip.', tech: 'Silero VAD, barge-in on the local gateway' }
+      ],
+      kinds: [
+        { n: '01', t: 'This conversation', d: 'What you’ve said in the last few minutes. Held in the moment, gone when the conversation ends.', bg: '#fffdfa', nFg: '#8b8681', hasCats: false },
+        { n: '02', t: 'What it fetched', d: 'A handful of memories pulled in because they seemed relevant to what you just asked. Assembled fresh each turn, then discarded.', bg: '#fffdfa', nFg: '#8b8681', hasCats: false },
+        { n: '03', t: 'What it keeps', d: 'Facts filed under a category, each with a sense of how much it matters. This is the file on your disk.', bg: '#eef2fe', nFg: '#2748bd', hasCats: true }
+      ],
+      cats: ['identity', 'work', 'relationships', 'values', 'joys', 'dreams', 'preferences', '+ 11 more'],
+      memFacts: [{ v: '412', t: 'Memories kept', d: 'On this Mac, in one file' }, { v: '5–8', t: 'Fetched per turn', d: 'Only the ones that look relevant' }, { v: '0', t: 'Copies uploaded', d: 'The file itself never leaves' }],
+      steps: STEPS.map(([k, t, d, ex], i) => { const on = st.step === k, last = i === 3; return { k, n: String(i + 1), t, d, ex, on, bg: on ? '#eef2fe' : '#fffdfa', hov: on ? '#eef2fe' : '#f9f7f4', nBg: on || last ? '#3461f2' : '#f1eeea', nFg: on || last ? '#fff' : '#6d6a67', tFg: on ? '#2748bd' : '#1e1e24' }; }),
+      pickStep: (e) => this.setState({ step: e.currentTarget.getAttribute('data-k') }),
+      sphCols: st.vw < 980 ? 'minmax(0,1fr)' : 'minmax(0,.9fr) minmax(0,1.1fr)',
+      states: STATES.map(([k, n, d, t]) => { const on = st.sph === k; return { k, n, d, c: t ? rgb(t) : '#c8c3bb', bg: on ? '#fffdfa' : 'transparent', hov: on ? '#fffdfa' : '#edebe7' }; }),
+      curN: cur[1], curC: cur[3] ? rgb(cur[3]) : '#c8c3bb',
+      pickState: (e) => { const k = e.currentTarget.getAttribute('data-k'); this.setState({ sph: k }); if (this.demo) this.demo.set({ state: k }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

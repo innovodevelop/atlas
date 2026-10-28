@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>(function(){window.addEventListener("unhandledrejection",function(e){var m=String(e.reason&&e.reason.message||e.reason);if(/Transition was aborted|ViewTransition/.test(m))e.preventDefault()});var top=false;try{top=window.self===window.top}catch(e){}var s=document.createElement("style");if(top){s.textContent="@view-transition{navigation:auto}";}else{s.textContent="html{animation:atlas-in .45s cubic-bezier(.22,1,.36,1) both}html.atlas-out{transition:opacity .22s ease,transform .22s ease;opacity:0;transform:scale(.988)}@keyframes atlas-in{from{opacity:0;transform:scale(1.012)}}";document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a||e.defaultPrevented||e.metaKey||e.ctrlKey||a.target)return;var h=a.getAttribute("href");if(!/\.dc\.html/.test(h)||/^https?:/.test(h))return;if(h.split("#")[0]===""||location.pathname.endsWith(encodeURI(h.split("#")[0]))&&h.indexOf("#")>0)return;e.preventDefault();document.documentElement.classList.add("atlas-out");setTimeout(function(){location.href=h},210)},true);}document.head.appendChild(s)})();</script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f9f7f4}
+button{border:none;font:inherit;background:none;color:inherit}
+a{color:#3461f2;text-decoration:none}a:hover{color:#2748bd}
+.nosb{scrollbar-width:none}.nosb::-webkit-scrollbar{display:none}
+@keyframes bpop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+</style>
+<script src="atlas-quickstart-sphere.js"></script>
+<script src="atlas-orb.js"></script>
+<script src="atlas-topbar.js"></script>
+</helmet>
+<div data-screen-label="Atlas Dev Tools · {{ tabName }}" class="nosb" style="height:100vh;overflow-y:auto;padding:20px 20px 160px;display:flex;flex-direction:column;gap:12px;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased">
+<header style="flex:none;view-transition-name:hero;display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;padding:8px 6px">
+<div><a href="Atlas Dashboard Beta.dc.html" style="font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#6d6a67" style-hover="color:#1e1e24">Developer · internal</a><h1 style="margin:6px 0 0;font-family:'Geist Mono',monospace;font-size:clamp(28px,3vw,42px);font-weight:500;letter-spacing:-.04em">{{ heading }}</h1></div>
+<div style="display:flex;gap:2px;padding:4px;border-radius:9999px;background:#f1eeea"><sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3"><a href="#{{ t.k }}" style="height:38px;padding:0 16px;display:flex;align-items:center;border-radius:9999px;background:{{ t.bg }};color:{{ t.fg }};font-size:13.5px;font-weight:600" style-hover="color:{{ t.fg }}">{{ t.l }}</a></sc-for></div>
+</header>
+
+<sc-if value="{{ isTests }}" hint-placeholder-val="{{ true }}">
+<div style="flex:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px"><sc-for list="{{ testKpis }}" as="k" hint-placeholder-count="4"><div style="padding:16px 18px;border-radius:24px;background:{{ k.bg }};color:{{ k.fg }}"><span style="display:block;font-size:12px;font-weight:600;color:{{ k.sub }}">{{ k.l }}</span><span style="display:block;margin-top:6px;font-family:'Hanken Grotesk',sans-serif;font-size:34px;font-weight:500;letter-spacing:-.04em">{{ k.v }}</span></div></sc-for></div>
+<div style="flex:none;display:flex;gap:8px"><button onClick="{{ runTests }}" style="border:none;height:42px;padding:0 18px;border-radius:9999px;background:#1e1e24;color:#f9f7f4;font-size:13.5px;font-weight:600;cursor:pointer">{{ runL }}</button><span style="height:42px;padding:0 14px;display:flex;align-items:center;border-radius:9999px;background:#f1eeea;font-family:'Geist Mono',monospace;font-size:12.5px">main · 8f3c21a</span></div>
+<section style="flex:none;padding:10px;border-radius:28px;background:#f1eeea;display:flex;flex-direction:column;gap:4px"><sc-for list="{{ suites }}" as="s" hint-placeholder-count="7"><div style="display:grid;grid-template-columns:12px minmax(0,1fr) 90px 70px;gap:12px;align-items:center;padding:13px 14px;border-radius:16px;background:#fffdfa;font-size:13.5px"><span style="width:9px;height:9px;border-radius:50%;background:{{ s.dot }};animation:{{ s.anim }}"></span><span style="font-family:'Geist Mono',monospace">{{ s.n }}<span style="margin-left:10px;font-family:'Geist',sans-serif;color:#6d6a67">{{ s.d }}</span></span><span style="font-family:'Geist Mono',monospace;color:#6d6a67">{{ s.c }}</span><span style="text-align:right;font-family:'Geist Mono',monospace;color:#6d6a67">{{ s.t }}</span></div></sc-for></section>
+</sc-if>
+
+<sc-if value="{{ isVersions }}" hint-placeholder-val="{{ false }}">
+<section style="flex:none;padding:10px;border-radius:28px;background:#f1eeea;display:flex;flex-direction:column;gap:4px"><sc-for list="{{ versions }}" as="v" hint-placeholder-count="5"><div style="display:grid;grid-template-columns:110px 110px minmax(0,1fr) auto;gap:14px;align-items:center;padding:14px 16px;border-radius:18px;background:{{ v.bg }};font-size:13.5px"><span style="font-family:'Geist Mono',monospace;font-weight:500">{{ v.v }}</span><span style="height:24px;padding:0 10px;display:flex;align-items:center;justify-self:start;border-radius:9999px;background:{{ v.chBg }};color:{{ v.chFg }};font-size:11.5px;font-weight:600">{{ v.ch }}</span><span><span style="display:block;font-weight:600">{{ v.t }}</span><span style="display:block;margin-top:2px;font-size:12px;color:#6d6a67">{{ v.d }}</span></span><button onClick="{{ promote }}" data-k="{{ v.v }}" style="border:none;height:32px;padding:0 13px;border-radius:9999px;background:{{ v.btnBg }};color:{{ v.btnFg }};font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap">{{ v.btn }}</button></div></sc-for></section>
+</sc-if>
+
+<sc-if value="{{ isSync }}" hint-placeholder-val="{{ false }}">
+<div style="flex:none;padding:16px 20px;border-radius:24px;background:{{ syncBg }};display:flex;flex-wrap:wrap;align-items:center;gap:14px"><span style="width:9px;height:9px;border-radius:50%;background:{{ syncDot }}"></span><span style="flex:1;min-width:220px;font-size:14px;line-height:1.5">{{ syncLine }}</span><button onClick="{{ syncNow }}" style="border:none;height:38px;padding:0 16px;border-radius:9999px;background:#1e1e24;color:#f9f7f4;font-size:13px;font-weight:600;cursor:pointer">{{ syncL }}</button></div>
+<section style="flex:none;padding:10px;border-radius:28px;background:#f1eeea;display:flex;flex-direction:column;gap:4px"><div style="display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 110px;gap:12px;padding:6px 16px;font-size:12px;font-weight:600;color:#6d6a67"><span>Design file</span><span>Code</span><span>State</span></div><sc-for list="{{ screens }}" as="s" hint-placeholder-count="8"><div style="display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) 110px;gap:12px;align-items:center;padding:13px 16px;border-radius:16px;background:#fffdfa;font-size:13px"><a href="{{ s.f }}" style="font-weight:600;color:#1e1e24" style-hover="color:#3461f2">{{ s.n }}</a><span style="font-family:'Geist Mono',monospace;font-size:12px;color:#6d6a67;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.c }}</span><span style="height:24px;padding:0 10px;display:flex;align-items:center;justify-self:start;border-radius:9999px;background:{{ s.bg }};color:{{ s.fg }};font-size:11.5px;font-weight:600">{{ s.st }}</span></div></sc-for></section>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const TABS = [['tests', 'Tests'], ['versions', 'Versions'], ['sync', 'Design Sync']];
+class Component extends DCLogic {
+  state = { tab: 'tests', running: false, ran: false, channel: { '4.6.1': 'beta' }, synced: false, syncing: false };
+  componentDidMount() { this.onHash = () => { const h = (location.hash || '').slice(1); if (TABS.some((t) => t[0] === h)) this.setState({ tab: h }); }; window.addEventListener('hashchange', this.onHash); this.onHash(); }
+  componentWillUnmount() { window.removeEventListener('hashchange', this.onHash); clearTimeout(this.t1); }
+  renderVals() {
+    const s = this.state, T = s.tab;
+    const SUITES = [['surfaces.test.ts', 'every surface renders', 42, '1.2s'], ['editionSplit.test.ts', 'edition flags', 18, '0.4s'], ['newSurface.test.ts', 'scaffold', 9, '0.6s'], ['auth.spec.ts', 'sign in, 2FA, passkey', 14, '8.4s'], ['mail.rules.test.ts', 'limits and holds', 31, '2.1s'], ['sphere.perf.test.ts', 'frame budget < 4 ms', 6, '3.0s', true], ['sync.e2e.test.ts', 'two Macs, conflicts', 12, '14.2s']];
+    const fail = !s.ran;
+    return {
+      tabName: TABS.find((t) => t[0] === T)[1], heading: { tests: 'tests', versions: 'versions', sync: 'design ⇄ code' }[T],
+      tabs: TABS.map(([k, l]) => ({ k, l, bg: T === k ? '#1e1e24' : 'transparent', fg: T === k ? '#f9f7f4' : '#1e1e24' })),
+      isTests: T === 'tests', isVersions: T === 'versions', isSync: T === 'sync',
+      testKpis: [['Passing', s.running ? '…' : fail ? '131' : '132'], ['Failing', s.running ? '…' : fail ? '1' : '0'], ['Coverage', '78%'], ['Last run', s.ran ? 'just now' : '42 min ago']].map(([l, v], i) => ({ l, v, bg: i === 1 && fail && !s.running ? '#f7e6e4' : i === 0 ? '#1e1e24' : '#f1eeea', fg: i === 0 ? '#f9f7f4' : '#1e1e24', sub: i === 0 ? 'rgba(249,247,244,.78)' : i === 1 && fail ? '#a3352c' : '#6d6a67' })),
+      runL: s.running ? 'Running…' : 'Run all tests',
+      runTests: () => { if (s.running) return; this.setState({ running: true }); if (window.AtlasOrb) window.AtlasOrb.set('working'); clearTimeout(this.t1); this.t1 = setTimeout(() => { this.setState({ running: false, ran: true }); if (window.AtlasOrb) { window.AtlasOrb.set('success'); setTimeout(() => window.AtlasOrb && window.AtlasOrb.set('idle'), 2000); } }, 2200); },
+      suites: SUITES.map(([n, d, c, t, bad]) => { const f = bad && !s.ran; return { n, d, c: c + ' tests', t, dot: s.running ? '#3461f2' : f ? '#d0453a' : '#0fae76', anim: s.running ? 'pulse 1s infinite' : 'none' }; }),
+      versions: [['4.6.1', 'beta', 'Fluid screen transitions', 'Built 27 Oct · 3 testers'], ['4.6.0', 'stable', 'The Beta design', '20 Oct · 1,240 Macs'], ['4.5.2', 'stable', 'Clock and alarms', '6 Oct'], ['4.5.0', 'archived', 'Repairs you can see', '2 Aug'], ['4.4.2', 'archived', 'One shared sphere', '26 Jul']].map(([v, ch0, t, d]) => { const ch = s.channel[v] || ch0, beta = ch === 'beta'; return { v: 'v' + v, ch, t, d, bg: beta ? '#eef2fe' : '#fffdfa', chBg: ch === 'stable' ? '#e3f4ec' : beta ? '#3461f2' : '#f1eeea', chFg: ch === 'stable' ? '#0a7a53' : beta ? '#fff' : '#6d6a67', btn: beta ? 'Promote to stable' : ch === 'stable' ? 'Roll back to this' : 'Restore', btnBg: beta ? '#1e1e24' : '#f1eeea', btnFg: beta ? '#f9f7f4' : '#1e1e24' }; }),
+      promote: (e) => { const v = e.currentTarget.getAttribute('data-k').slice(1); this.setState((x) => ({ channel: Object.assign({}, x.channel, { [v]: 'stable' }) })); },
+      syncBg: s.synced ? '#e3f4ec' : '#fdf0e2', syncDot: s.synced ? '#0fae76' : '#e07a1f', syncLine: s.synced ? 'Design and code match. 26 screens in sync.' : '4 screens changed in design since the last sync: Mail, Smart Home, Weather and Answer Views.', syncL: s.syncing ? 'Syncing…' : s.synced ? 'Sync again' : 'Sync now',
+      syncNow: () => { if (s.syncing) return; this.setState({ syncing: true }); clearTimeout(this.t1); this.t1 = setTimeout(() => this.setState({ syncing: false, synced: true }), 1600); },
+      screens: [['Home', 'Atlas Dashboard Beta.dc.html', 'src/pages/AtlasHome.tsx', 0], ['Mail', 'Atlas Mail Beta.dc.html', 'src/pages/AtlasMail.tsx', 1], ['Smart Home', 'Atlas Smart Home Beta.dc.html', 'src/pages/AtlasSmartHome.tsx', 1], ['Weather', 'Atlas Widget Screens Beta.dc.html#weather', 'src/pages/widgets/Weather.tsx', 1], ['Answer Views', 'Atlas Answer Views Beta.dc.html', 'src/pages/AtlasAnswer.tsx', 1], ['Agent View', 'Atlas Agent View Beta.dc.html', 'src/pages/AtlasAgentView.tsx', 2], ['System Status', 'Atlas System Status Beta.dc.html', 'src/pages/AtlasSystemStatus.tsx', 2], ['Settings', 'Atlas Settings Beta.dc.html', 'src/pages/AtlasSettings.tsx', 0]].map(([n, f, c, k]) => { const st = s.synced ? 'In sync' : ['In sync', 'Design ahead', 'New'][k]; return { n, f, c, st, bg: st === 'In sync' ? '#e3f4ec' : st === 'New' ? '#eef2fe' : '#fdf0e2', fg: st === 'In sync' ? '#0a7a53' : st === 'New' ? '#2748bd' : '#9a5410' }; })
+    };
+  }
+}
+</script>
+</body>
+</html>

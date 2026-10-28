@@ -352,7 +352,13 @@ CREATE TABLE IF NOT EXISTS runs (
   error_message    TEXT,
   started_at       TEXT,
   finished_at      TEXT,
-  created_at       TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  created_at       TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  -- Set while the user has paused the run; the brain's runner waits between
+  -- steps until it is cleared. A column, not a status value: changing the
+  -- CHECK above means rebuilding the table, which would cascade-delete every
+  -- run's steps and approvals. The brain adds it to databases made before it
+  -- (services/atlas-brain/src/agentRunner.ts, ensureAgentRunSchema).
+  paused_at        TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_runs_user_created ON runs(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_runs_status ON runs(status);
@@ -1409,3 +1415,470 @@ CREATE TABLE IF NOT EXISTS dashboard_layout (
 CREATE TRIGGER IF NOT EXISTS trg_dashboard_layout_updated AFTER UPDATE ON dashboard_layout
   FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
   BEGIN UPDATE dashboard_layout SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+
+-- ###########################################################################
+-- # BETA HOME — what Atlas wrote for a calendar event or a task               #
+-- ###########################################################################
+-- "Prepare" on a calendar event and "Research" on a task ask the brain for a
+-- short note; the note is kept here, one row per item, so it is still on the
+-- card tomorrow. A task's row also remembers when it was handed to Atlas (the
+-- "Atlas is on it" badge). No foreign key: events and tasks are deleted from
+-- several places (the screens, the brain's ops), and a note left behind is
+-- harmless — the cards only ever look a note up by the id they hold.
+CREATE TABLE IF NOT EXISTS atlas_item_notes (
+  id           TEXT PRIMARY KEY NOT NULL,
+  user_id      TEXT NOT NULL,
+  item_kind    TEXT NOT NULL CHECK (item_kind IN ('event','task')),
+  item_id      TEXT NOT NULL,
+  -- The note Atlas wrote, as it wrote it. NULL until it has written one.
+  body         TEXT,
+  -- When the note was written; the card says how old it is.
+  noted_at     TEXT,
+  -- Tasks only: when the user handed the task to Atlas.
+  delegated_at TEXT,
+  created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE(user_id, item_kind, item_id)
+);
+
+CREATE TRIGGER IF NOT EXISTS trg_atlas_item_notes_updated AFTER UPDATE ON atlas_item_notes
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE atlas_item_notes SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+
+-- ###########################################################################
+-- # MUSIC — lyrics cache and resume points (Beta Music, Podcast)             #
+-- ###########################################################################
+
+-- LRCLIB answers, so a track's lyrics are asked for once. `found` 0 with no
+-- text is a remembered miss; music.rs asks again after a week.
+CREATE TABLE IF NOT EXISTS music_lyrics_cache (
+  cache_key    TEXT PRIMARY KEY NOT NULL,
+  found        INTEGER NOT NULL DEFAULT 0,
+  instrumental INTEGER NOT NULL DEFAULT 0,
+  synced       TEXT,
+  plain        TEXT,
+  fetched_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+-- Where Atlas's own engine stopped in an episode. Spotify's resume point only
+-- moves for Connect playback, and Atlas drives librespot directly, so this is
+-- the place it keeps on this Mac. `meta` is the webview's record of the item
+-- (title, show, artwork) for Home's Podcast widget. Capped at 300 rows.
+CREATE TABLE IF NOT EXISTS music_resume (
+  item_id     TEXT PRIMARY KEY NOT NULL,
+  uri         TEXT NOT NULL,
+  position_ms INTEGER NOT NULL DEFAULT 0,
+  duration_ms INTEGER NOT NULL DEFAULT 0,
+  meta        TEXT NOT NULL DEFAULT '{}',
+  updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_music_resume_updated ON music_resume(updated_at);
+
+-- ###########################################################################
+-- # SMART HOME, THE BETA EXTRAS — begin                                      #
+-- #                                                                          #
+-- # What the Beta Smart Home reads beyond the mirror above: the attributes a #
+-- # device's one value cannot carry, Home Assistant's own machinery          #
+-- # (automations, scripts, people), the history Atlas keeps of what the      #
+-- # devices did, and the Home / Away / Night modes. New tables only, so no   #
+-- # migration: CREATE TABLE IF NOT EXISTS creates each one on first launch.  #
+-- # Everything is keyed to a bridge and cascades with it, so unlinking Home  #
+-- # Assistant takes its history with it — except the mode mapping, which    #
+-- # names routines by their Home Assistant id and survives a relink.         #
+-- # Written by src-tauri/src/home/history.rs.                                #
+-- ###########################################################################
+
+-- One row per mirrored device: what the bridge says beyond `value`.
+CREATE TABLE IF NOT EXISTS home_device_detail (
+  device_id     TEXT PRIMARY KEY REFERENCES home_devices(id) ON DELETE CASCADE,
+  user_id       TEXT NOT NULL,
+  -- The Home Assistant domain (`climate`, `water_heater`, `sensor`). It is
+  -- what keeps a water heater's 55° out of the inside temperature.
+  domain        TEXT NOT NULL,
+  device_class  TEXT,
+  unit          TEXT,
+  state_class   TEXT,
+  -- What a thermostat is SET to. NULL is "the bridge did not say" (a
+  -- thermostat that is off, a heat-cool range) — never 0.
+  target        REAL,
+  -- The climate entity's own word for what it is doing: heating, idle, off.
+  hvac_action   TEXT,
+  -- The Home Assistant device the entity belongs to: files a plug's power
+  -- sensor under the plug, a doorbell's motion sensor under the camera.
+  hub_device_id TEXT,
+  -- grid | solar | device, from Home Assistant's Energy dashboard.
+  energy_role   TEXT,
+  updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+-- Home Assistant's machinery: read, never drawn as a device.
+CREATE TABLE IF NOT EXISTS home_hub_entities (
+  id             TEXT PRIMARY KEY,
+  user_id        TEXT NOT NULL,
+  bridge_id      TEXT NOT NULL REFERENCES home_bridges(id) ON DELETE CASCADE,
+  external_id    TEXT NOT NULL,
+  domain         TEXT NOT NULL CHECK (domain IN ('automation','script','person','device_tracker')),
+  label          TEXT NOT NULL,
+  -- The raw state word: on/off, home/not_home or a zone's name.
+  state          TEXT,
+  available      INTEGER NOT NULL DEFAULT 1 CHECK (available IN (0,1)),
+  -- For a script: 0 only when Atlas read its config and found no lock in it.
+  -- DEFAULT 1 for the same reason as home_scenes.touches_locks.
+  touches_locks  INTEGER NOT NULL DEFAULT 1 CHECK (touches_locks IN (0,1)),
+  last_changed   TEXT,
+  last_triggered TEXT,
+  created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_home_hub_entities_bridge_ext ON home_hub_entities(bridge_id, external_id);
+CREATE INDEX IF NOT EXISTS idx_home_hub_entities_user ON home_hub_entities(user_id, domain, label);
+
+-- What the mirror saw the devices do, and what Atlas told them to do.
+-- Capped: rows older than 30 days are pruned, and each account keeps at most
+-- 20 000 (home/history.rs, `prune_events`). Measurements (sensor.*) are never
+-- recorded — the energy card reads Home Assistant's own statistics instead.
+CREATE TABLE IF NOT EXISTS home_events (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id      TEXT NOT NULL,
+  bridge_id    TEXT NOT NULL REFERENCES home_bridges(id) ON DELETE CASCADE,
+  -- The entity id. Not the local device id: the history outlives a device
+  -- being re-created by a sync, and a scene or automation has no device row.
+  external_id  TEXT NOT NULL,
+  -- `state`: the bridge reported a change. `command`: Atlas sent one.
+  kind         TEXT NOT NULL CHECK (kind IN ('state','command')),
+  value        REAL,
+  state        TEXT,
+  available    INTEGER CHECK (available IN (0,1)),
+  -- For a command, the verb ("lock", "turn_off", "set"); NULL for a state.
+  detail       TEXT,
+  at           TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_home_events_entity ON home_events(user_id, external_id, at);
+CREATE INDEX IF NOT EXISTS idx_home_events_at ON home_events(user_id, at);
+
+-- Home / Away / Night, each mapped by the user to a scene or a script.
+CREATE TABLE IF NOT EXISTS home_modes (
+  user_id              TEXT NOT NULL,
+  mode                 TEXT NOT NULL CHECK (mode IN ('home','away','night')),
+  routine_kind         TEXT CHECK (routine_kind IN ('scene','script')),
+  routine_external_id  TEXT,
+  routine_label        TEXT,
+  updated_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  PRIMARY KEY (user_id, mode)
+);
+
+-- The mode the house is in, as far as Atlas set it. One row per account.
+CREATE TABLE IF NOT EXISTS home_mode_state (
+  user_id    TEXT PRIMARY KEY,
+  mode       TEXT NOT NULL CHECK (mode IN ('home','away','night')),
+  since      TEXT NOT NULL
+);
+
+-- ###########################################################################
+-- # SMART HOME, THE BETA EXTRAS — end.                                       #
+-- ###########################################################################
+
+-- ###########################################################################
+-- # MONEY — the bank store behind the Beta Money screen                       #
+-- ###########################################################################
+-- Transactions reach this Mac two ways: a netbank CSV export the user picks
+-- (parsed in the webview, src/lib/bankCsv.ts, written through
+-- bank_store_transactions), or the optional read-only GoCardless Bank Account
+-- Data link, which src-tauri/src/bank.rs reads on demand and once a day. Either
+-- way the rows live here and nowhere else. GoCardless's keys are in the
+-- Keychain (atlas-core), never in these tables.
+
+CREATE TABLE IF NOT EXISTS bank_accounts (
+  id           TEXT PRIMARY KEY,
+  user_id      TEXT NOT NULL,
+  name         TEXT NOT NULL,
+  institution  TEXT,
+  -- Only the last four digits: enough to tell two accounts apart on screen.
+  iban_last4   TEXT,
+  currency     TEXT NOT NULL DEFAULT 'DKK',
+  source       TEXT NOT NULL DEFAULT 'csv' CHECK (source IN ('csv','gocardless')),
+  link_id      TEXT,
+  external_id  TEXT,
+  balance      REAL,
+  balance_at   TEXT,
+  -- Savings and shared accounts stay out of the budget and the projection.
+  is_excluded  INTEGER NOT NULL DEFAULT 0,
+  created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_bank_accounts_user ON bank_accounts(user_id);
+
+-- The id is the dedupe key: a hash of account, day, amount, text and place
+-- among identical rows for CSV ("csv-…"), the bank's own transaction id for
+-- GoCardless ("gc:…"). Re-imports are INSERT OR IGNORE against it.
+CREATE TABLE IF NOT EXISTS bank_transactions (
+  id            TEXT PRIMARY KEY,
+  user_id       TEXT NOT NULL,
+  account_id    TEXT NOT NULL REFERENCES bank_accounts(id) ON DELETE CASCADE,
+  booked_on     TEXT NOT NULL,                -- YYYY-MM-DD, the booking day
+  amount        REAL NOT NULL,                -- signed: money out is negative
+  currency      TEXT,
+  text          TEXT NOT NULL,                -- the statement line as the bank wrote it
+  balance_after REAL,
+  source        TEXT NOT NULL DEFAULT 'csv' CHECK (source IN ('csv','gocardless')),
+  imported_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_bank_tx_user_day ON bank_transactions(user_id, booked_on DESC);
+CREATE INDEX IF NOT EXISTS idx_bank_tx_account_day ON bank_transactions(account_id, booked_on DESC);
+
+-- Merchant patterns the user set, or that Atlas set when asked to sort.
+-- Categories are the fixed set in src/lib/bankLedger.ts.
+CREATE TABLE IF NOT EXISTS bank_rules (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL,
+  pattern    TEXT NOT NULL,
+  category   TEXT NOT NULL,
+  origin     TEXT NOT NULL DEFAULT 'user' CHECK (origin IN ('user','atlas')),
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE(user_id, pattern)
+);
+
+CREATE TABLE IF NOT EXISTS bank_budgets (
+  id            TEXT PRIMARY KEY,
+  user_id       TEXT NOT NULL,
+  category      TEXT NOT NULL,
+  monthly_limit REAL NOT NULL,
+  created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE(user_id, category)
+);
+
+CREATE TABLE IF NOT EXISTS bank_goals (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL,
+  name       TEXT NOT NULL,
+  target     REAL NOT NULL,
+  due_on     TEXT,
+  -- When set, the goal's saved amount is this account's balance.
+  account_id TEXT REFERENCES bank_accounts(id) ON DELETE SET NULL,
+  currency   TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+-- Manual contributions; a negative one is a withdrawal.
+CREATE TABLE IF NOT EXISTS bank_goal_moves (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL,
+  goal_id    TEXT NOT NULL REFERENCES bank_goals(id) ON DELETE CASCADE,
+  amount     REAL NOT NULL,
+  made_on    TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+-- What the user said about a subscription Atlas found. Atlas cannot cancel
+-- at the merchant: 'reminded' means a reminder task to cancel it exists
+-- (`task_id`) and it still counts; 'cancelled' only stops it counting;
+-- 'ignored' means it was never a subscription. `merchant` is the recurring key
+-- from bankLedger.ts.
+CREATE TABLE IF NOT EXISTS bank_subscription_marks (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL,
+  merchant   TEXT NOT NULL,
+  status     TEXT NOT NULL CHECK (status IN ('reminded','cancelled','ignored')),
+  task_id    TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE(user_id, merchant)
+);
+
+-- One row per GoCardless requisition (the bank consent). `status` is
+-- GoCardless's own code (CR created, LN linked, EX expired, RJ rejected, …).
+CREATE TABLE IF NOT EXISTS bank_links (
+  id               TEXT PRIMARY KEY,           -- the requisition id
+  user_id          TEXT NOT NULL,
+  institution_id   TEXT NOT NULL,
+  institution_name TEXT,
+  agreement_id     TEXT,
+  status           TEXT NOT NULL DEFAULT 'CR',
+  history_days     INTEGER,
+  access_days      INTEGER,
+  linked_at        TEXT,
+  expires_at       TEXT,
+  last_synced_at   TEXT,
+  -- Claimed by whichever running bundle syncs next, so two open apps over the
+  -- one database do not both spend the bank's few daily reads.
+  sync_claimed_at  TEXT,
+  last_error       TEXT,
+  created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+CREATE TRIGGER IF NOT EXISTS trg_bank_accounts_updated AFTER UPDATE ON bank_accounts
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE bank_accounts SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_bank_rules_updated AFTER UPDATE ON bank_rules
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE bank_rules SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_bank_budgets_updated AFTER UPDATE ON bank_budgets
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE bank_budgets SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_bank_goals_updated AFTER UPDATE ON bank_goals
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE bank_goals SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_bank_links_updated AFTER UPDATE ON bank_links
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE bank_links SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+
+-- ###########################################################################
+-- # MAIL — Beta left-out features: reply watches, archive, bill alerts       #
+-- ###########################################################################
+
+-- "Snooze until they reply": a snoozed thread that also wakes when a given
+-- address (or '*' for anyone) writes back. The wake time itself stays on
+-- mail_threads.snoozed_until, so a watch is an addition to a snooze, never a
+-- replacement for its fallback date. `seen_message_at` is the newest message
+-- time the wake pass has already looked at; only mail after it can wake the
+-- thread, which is also what keeps the pass to one detail fetch per reply
+-- instead of one per sync. mail.rs (wake_snoozes) is the only reader.
+CREATE TABLE IF NOT EXISTS mail_snoozes (
+  thread_id       TEXT PRIMARY KEY REFERENCES mail_threads(id) ON DELETE CASCADE,
+  user_id         TEXT NOT NULL,
+  watch           TEXT NOT NULL,
+  snoozed_at      TEXT NOT NULL,
+  seen_message_at TEXT,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_mail_snoozes_user ON mail_snoozes(user_id);
+
+-- The Archive lane. mail_threads.status mirrors the mail server's enum, which
+-- has no 'archived', so an archived thread is 'handled' there and carries a
+-- row here. `prev_status` is what Undo puts back. A thread whose
+-- last_message_at moves past `archived_at` is back in the inbox (a reply
+-- un-archives, as it does in every mail client), so the row needs no cleanup
+-- to stop applying.
+CREATE TABLE IF NOT EXISTS mail_archived (
+  thread_id   TEXT PRIMARY KEY REFERENCES mail_threads(id) ON DELETE CASCADE,
+  user_id     TEXT NOT NULL,
+  archived_at TEXT NOT NULL,
+  prev_status TEXT NOT NULL,
+  created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_mail_archived_user ON mail_archived(user_id);
+
+-- Settings → Mail → Alerts. One row per user; no row reads as the design's
+-- default (on). Rust reads it before posting a notification (mail_flags.rs).
+CREATE TABLE IF NOT EXISTS mail_prefs (
+  user_id        TEXT PRIMARY KEY,
+  alerts_enabled INTEGER NOT NULL DEFAULT 1,
+  updated_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+-- One row per mail thread a bill or deadline alert was raised for, so a
+-- reminder, a forward or a re-sync of the same thread never raises or
+-- notifies twice. `thread_key` is account + sender + subject without its
+-- Re:/Fwd: prefixes (the connected mailboxes store no thread ids). `due_on`
+-- is the date the subject or preview names, when one does; `notified_at` is
+-- set once the notification went out. Deleting the alert (a disconnect
+-- cascades through mail_messages) forgets the thread with it.
+CREATE TABLE IF NOT EXISTS mail_alert_threads (
+  user_id     TEXT NOT NULL,
+  thread_key  TEXT NOT NULL,
+  alert_id    TEXT NOT NULL REFERENCES mail_alerts(id) ON DELETE CASCADE,
+  alert_type  TEXT NOT NULL CHECK (alert_type IN ('bill','deadline')),
+  due_on      TEXT,
+  received_at TEXT,
+  notified_at TEXT,
+  created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  PRIMARY KEY (user_id, thread_key)
+);
+
+-- Archive at the provider, for the mailboxes the user connected (Gmail,
+-- Outlook, IMAP). One row per stored message the user archived from Mail:
+-- the provider has already moved it out of its inbox (Gmail drops the INBOX
+-- label, Outlook moves it to Archive, IMAP moves it to the server's Archive
+-- folder) by the time the row is written, so the row is what the Archive lane
+-- lists and what Undo reverses. `folder` is the IMAP folder it went to, so
+-- Undo knows where to look; NULL for Gmail and Outlook. Disconnecting the
+-- mailbox cascades through mail_messages and forgets these with it.
+-- mail_archive.rs is the only writer.
+CREATE TABLE IF NOT EXISTS mail_archived_messages (
+  message_id  TEXT PRIMARY KEY REFERENCES mail_messages(id) ON DELETE CASCADE,
+  user_id     TEXT NOT NULL,
+  account_id  TEXT NOT NULL,
+  folder      TEXT,
+  archived_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_mail_archived_messages_user ON mail_archived_messages(user_id, archived_at DESC);
+
+-- ###########################################################################
+-- # SETTINGS — the battery's last two days, and whether Atlas remembers       #
+-- ###########################################################################
+-- Settings → Battery draws the last 24 hours of charge. macOS keeps no such
+-- history that an app may read, so the owner instance samples `pmset -g batt`
+-- every ten minutes (mac_controls.rs) and deletes anything older than two
+-- days on each write: about three hundred rows, never more.
+CREATE TABLE IF NOT EXISTS battery_history (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  recorded_at TEXT NOT NULL,
+  percent     INTEGER NOT NULL CHECK (percent BETWEEN 0 AND 100),
+  charging    INTEGER NOT NULL DEFAULT 0,
+  on_power    INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_battery_history_recorded ON battery_history(recorded_at);
+
+-- Settings → Memory & Privacy → "Remember things I share". One row per user,
+-- written by the webview through the local CRUD shim and read by the brain on
+-- every chat turn (services/atlas-brain/src/memorySettings.ts). No row means
+-- the default, on. Off: the brain stops saving facts and conversation
+-- summaries on its own, and stores only what the user explicitly asks it to.
+CREATE TABLE IF NOT EXISTS atlas_memory_settings (
+  id              TEXT PRIMARY KEY NOT NULL,
+  user_id         TEXT NOT NULL UNIQUE,
+  remember_shared INTEGER NOT NULL DEFAULT 1 CHECK (remember_shared IN (0, 1)),
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+CREATE TRIGGER IF NOT EXISTS trg_atlas_memory_settings_updated AFTER UPDATE ON atlas_memory_settings
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE atlas_memory_settings SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+
+-- ###########################################################################
+-- # SYSTEM STATUS AND MODEL LAB — the model-call ledger and app versions      #
+-- ###########################################################################
+-- One row per call the AI gateway makes (Beta rows 72, 73, 77). The brain
+-- writes it (services/atlas-brain/src/modelCalls.ts, which carries a mirror of
+-- this DDL for a standalone brain — keep the two in lockstep) and prunes it to
+-- 90 days and 50 000 rows. `cost_usd` is an estimate at Anthropic's list price
+-- when the call was made; NULL when the model is unpriced or no tokens were
+-- reported, never a guessed zero. `latency_ms` runs until the provider
+-- answered (the first byte of a stream), `duration_ms` until the last byte.
+CREATE TABLE IF NOT EXISTS atlas_model_calls (
+  id                 TEXT PRIMARY KEY,
+  started_at         TEXT NOT NULL,
+  lane               TEXT NOT NULL,
+  provider           TEXT NOT NULL,
+  requested_model    TEXT,
+  model              TEXT NOT NULL,
+  stream             INTEGER NOT NULL DEFAULT 0,
+  http_status        INTEGER,
+  ok                 INTEGER NOT NULL,
+  error              TEXT,
+  latency_ms         INTEGER NOT NULL,
+  duration_ms        INTEGER,
+  input_tokens       INTEGER,
+  output_tokens      INTEGER,
+  cache_read_tokens  INTEGER,
+  cache_write_tokens INTEGER,
+  cost_usd           REAL,
+  created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_atlas_model_calls_started ON atlas_model_calls(started_at);
+
+-- Which version of each app bundle ran, one row per change (Beta row 78),
+-- written at launch by system_status.rs. Keyed by bundle because Atlas.app and
+-- Lighthouse.app share this database and are updated separately.
+CREATE TABLE IF NOT EXISTS atlas_app_versions (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  bundle_id        TEXT NOT NULL,
+  version          TEXT NOT NULL,
+  previous_version TEXT,
+  first_seen_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_atlas_app_versions_bundle ON atlas_app_versions(bundle_id, id);

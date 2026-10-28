@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>(function(){window.addEventListener("unhandledrejection",function(e){var m=String(e.reason&&e.reason.message||e.reason);if(/Transition was aborted|ViewTransition/.test(m))e.preventDefault()});var top=false;try{top=window.self===window.top}catch(e){}var s=document.createElement("style");if(top){s.textContent="@view-transition{navigation:auto}";}else{s.textContent="html{animation:atlas-in .45s cubic-bezier(.22,1,.36,1) both}html.atlas-out{transition:opacity .22s ease,transform .22s ease;opacity:0;transform:scale(.988)}@keyframes atlas-in{from{opacity:0;transform:scale(1.012)}}";document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a||e.defaultPrevented||e.metaKey||e.ctrlKey||a.target)return;var h=a.getAttribute("href");if(!/\.dc\.html/.test(h)||/^https?:/.test(h))return;if(h.split("#")[0]===""||location.pathname.endsWith(encodeURI(h.split("#")[0]))&&h.indexOf("#")>0)return;e.preventDefault();document.documentElement.classList.add("atlas-out");setTimeout(function(){location.href=h},210)},true);}document.head.appendChild(s)})();</script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f9f7f4}
+button{border:none;font:inherit;background:none;color:inherit}
+a{color:#3461f2;text-decoration:none}a:hover{color:#2748bd}
+.nosb{scrollbar-width:none}.nosb::-webkit-scrollbar{display:none}
+@keyframes bpop{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@media (prefers-reduced-motion: reduce){*{animation:none !important;transition:none !important}}
+</style>
+<script src="atlas-quickstart-sphere.js"></script>
+<script src="atlas-orb.js"></script>
+<script src="atlas-topbar.js"></script>
+</helmet>
+<div data-screen-label="Atlas System Status" class="nosb" style="height:100vh;overflow-y:auto;padding:20px 20px 160px;display:flex;flex-direction:column;gap:12px;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased">
+
+<section style="flex:none;view-transition-name:hero;display:grid;grid-template-columns:{{ heroCols }};gap:12px">
+<div style="padding:clamp(20px,3vw,36px);border-radius:36px;background:#f1eeea;display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+<div style="position:relative;width:180px;height:180px;flex:none"><canvas ref="{{ sphereRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas></div>
+<div style="flex:1;min-width:240px;display:flex;flex-direction:column;gap:10px"><a href="Atlas Dashboard Beta.dc.html" title="Back to Home · Esc" style="font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#6d6a67" style-hover="color:#1e1e24">System · checked {{ checked }}</a><h1 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(30px,3.6vw,54px);font-weight:500;letter-spacing:-.045em;line-height:1.02;text-wrap:balance">{{ headline }}</h1><p style="margin:0;font-size:15px;line-height:1.55;color:#6d6a67">{{ headSub }}</p><button onClick="{{ recheck }}" style="border:none;align-self:flex-start;height:40px;padding:0 16px;border-radius:9999px;background:#1e1e24;color:#f9f7f4;font-size:13px;font-weight:600;cursor:pointer">{{ checkL }}</button></div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px"><sc-for list="{{ tiles }}" as="t" hint-placeholder-count="4"><div style="padding:18px 20px;border-radius:26px;background:{{ t.bg }};color:{{ t.fg }};display:flex;flex-direction:column;gap:6px"><span style="font-size:12.5px;font-weight:600;color:{{ t.sub }}">{{ t.k }}</span><span style="font-family:'Hanken Grotesk',sans-serif;font-size:32px;font-weight:500;letter-spacing:-.04em;line-height:1">{{ t.v }}</span><span style="font-size:12px;color:{{ t.sub }}">{{ t.d }}</span></div></sc-for></div>
+</section>
+
+<section style="flex:none;padding:10px;border-radius:32px;background:#f1eeea;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr));gap:6px">
+<sc-for list="{{ devices }}" as="d" hint-placeholder-count="5"><div style="padding:16px 18px;border-radius:22px;background:#fffdfa;display:flex;align-items:center;gap:14px"><div style="position:relative;width:54px;height:54px;flex:none"><svg viewBox="0 0 54 54" style="position:absolute;inset:0;transform:rotate(-90deg)"><circle cx="27" cy="27" r="23" fill="none" stroke="#f1eeea" stroke-width="5"></circle><circle cx="27" cy="27" r="23" fill="none" stroke="{{ d.c }}" stroke-width="5" stroke-linecap="round" stroke-dasharray="144.5" stroke-dashoffset="{{ d.off }}"></circle></svg><span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{ d.ico }}"></path></svg></span></div><span style="min-width:0"><span style="display:block;font-size:14px;font-weight:600">{{ d.n }}</span><span style="display:block;margin-top:2px;font-size:12px;color:#6d6a67">{{ d.s }}</span></span></div></sc-for>
+</section>
+
+<div style="flex:none;display:grid;grid-template-columns:{{ twoCols }};gap:12px;align-items:start">
+<section style="padding:10px;border-radius:32px;background:#fffdfa;display:flex;flex-direction:column;gap:4px"><span style="padding:8px 12px;font-family:'Hanken Grotesk',sans-serif;font-size:19px;font-weight:600;letter-spacing:-.02em">Services</span>
+<sc-for list="{{ services }}" as="s" hint-placeholder-count="7"><div style="display:grid;grid-template-columns:12px minmax(0,1fr) 110px 70px;gap:12px;align-items:center;padding:14px 14px;border-radius:18px;background:#f9f7f4"><span style="width:9px;height:9px;border-radius:50%;background:{{ s.dot }};animation:{{ s.anim }}"></span><span style="min-width:0"><span style="display:block;font-size:14px;font-weight:600">{{ s.n }}</span><span style="display:block;margin-top:2px;font-size:12px;color:#6d6a67">{{ s.d }}</span></span><span style="display:flex;align-items:flex-end;gap:2px;height:22px"><sc-for list="{{ s.bars }}" as="b" hint-placeholder-count="12"><span style="flex:1;height:{{ b.h }};border-radius:2px;background:{{ b.c }}"></span></sc-for></span><span style="text-align:right;font-family:'Geist Mono',monospace;font-size:12px;color:{{ s.vFg }}">{{ s.v }}</span></div></sc-for>
+</section>
+<div style="display:flex;flex-direction:column;gap:12px">
+<section style="padding:20px 22px;border-radius:32px;background:#1e1e24;color:#f9f7f4;display:flex;flex-direction:column;gap:10px"><span style="font-family:'Hanken Grotesk',sans-serif;font-size:19px;font-weight:600;letter-spacing:-.02em">On this Mac</span><sc-for list="{{ storage }}" as="s" hint-placeholder-count="4"><div style="display:grid;grid-template-columns:minmax(0,1fr) 120px 70px;gap:10px;align-items:center;font-size:13.5px"><span>{{ s.k }}</span><span style="height:6px;border-radius:9999px;background:rgba(249,247,244,.14);overflow:hidden"><span style="display:block;height:100%;width:{{ s.w }};background:{{ s.c }}"></span></span><span style="text-align:right;font-family:'Geist Mono',monospace;font-size:12px;color:rgba(249,247,244,.78)">{{ s.v }}</span></div></sc-for></section>
+<section style="padding:10px;border-radius:32px;background:#f1eeea;display:flex;flex-direction:column;gap:4px"><span style="padding:8px 12px;font-size:14px;font-weight:600">Recently</span><sc-for list="{{ events }}" as="e" hint-placeholder-count="4"><div style="display:grid;grid-template-columns:52px 10px minmax(0,1fr);gap:10px;align-items:baseline;padding:11px 12px;border-radius:14px;background:#fffdfa;font-size:13.5px"><span style="font-family:'Geist Mono',monospace;font-size:12px;color:#6d6a67">{{ e.t }}</span><span style="width:7px;height:7px;border-radius:50%;background:{{ e.c }}"></span><span>{{ e.m }}</span></div></sc-for></section>
+</div>
+</div>
+
+<nav aria-label="Atlas" data-dock="beta" style="view-transition-name:atlas-dock;position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:4px;padding:6px;border-radius:9999px;background:rgba(255,253,250,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 18px 40px -20px rgba(30,30,36,.28)">
+<sc-for list="{{ dock }}" as="d" hint-placeholder-count="6"><a href="{{ d.h }}" title="{{ d.l }}" aria-label="{{ d.l }}" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{ d.ico }}"></path></svg></a></sc-for>
+<a href="Atlas Settings Beta.dc.html" title="Marcus · Settings" aria-label="Settings" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px" style-hover="background:#f1eeea"><span style="width:34px;height:34px;border-radius:50%;background:#1e1e24;color:#f9f7f4;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">M</span></a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { vw: window.innerWidth, ico: {}, checking: false, fixed: false, checkedAt: new Date() };
+  componentDidMount() {
+    fetch('atlas-icon-data.js').then((r) => r.text()).then((t) => { const SET = new Function(t.replace(/export\s+const\s+SET\s*=/, 'return'))(), ico = {}; SET.forEach((g) => g[2].forEach(([n, d]) => { ico[n] = d; })); this.setState({ ico }); }).catch(() => {});
+    this.onResize = () => this.setState({ vw: window.innerWidth }); window.addEventListener('resize', this.onResize);
+    this.onKey = (e) => { if (e.key === 'Escape') window.location.href = 'Atlas Dashboard Beta.dc.html'; }; window.addEventListener('keydown', this.onKey);
+  }
+  componentWillUnmount() { clearTimeout(this.ct); window.removeEventListener('resize', this.onResize); window.removeEventListener('keydown', this.onKey); if (this.sph) this.sph.destroy(); }
+  componentDidUpdate() { const st = this.state.checking ? 'thinking' : this.state.fixed ? 'success' : 'alert'; if (this.sph && this._ls !== st) { this._ls = st; this.sph.set({ state: st }); } if (window.AtlasOrb && this._os !== st) { this._os = st; } }
+  renderVals() {
+    const s = this.state, ic = (n) => s.ico[n] || '', ok = s.fixed;
+    const bars = (seed, bad) => Array.from({ length: 12 }, (_, i) => { const v = 30 + Math.round(40 * Math.abs(Math.sin(i * 1.3 + seed))), b = bad && i > 8 && !ok; return { h: (b ? 95 : v) + '%', c: b ? '#e07a1f' : '#d8d4cd' }; });
+    const SV = [['Reasoning', 'Claude · EU region', '412 ms', 0], ['Sync', ok ? 'All Macs up to date' : 'EU slowdown · 2 min behind', ok ? '0.8 s' : '2 min', 1], ['Voice', 'Wake word on device', '38 ms', 0], ['Mail', '3 accounts · last fetch 1 min ago', 'OK', 0], ['Home Assistant', '24 devices on the local network', '12 ms', 0], ['Banking', 'Danske Bank, Lunar · read only', 'OK', 0], ['Calendar', 'Google, iCloud', 'OK', 0]];
+    return {
+      sphereRef: (el) => { if (!el || el.__q) return; const go = () => { if (el.__q || !el.isConnected) return; if (!window.QuickSphere) return setTimeout(go, 60); el.__q = this.sph = window.QuickSphere.mount(el, { mode: 'veil', bg: 'transparent', dust: [122, 148, 246], strand: [52, 97, 242], blend: 'source-over', alpha: 0.62, seed: 11, count: 9000, scale: 0.42, state: 'alert' }); }; go(); },
+      heroCols: s.vw >= 1100 ? 'minmax(0,1.5fr) minmax(0,1fr)' : 'minmax(0,1fr)', twoCols: s.vw >= 1100 ? 'minmax(0,1.3fr) minmax(0,1fr)' : 'minmax(0,1fr)',
+      checked: s.checkedAt.toTimeString().slice(0, 5),
+      headline: s.checking ? 'Checking everything…' : ok ? 'Everything is working.' : 'One thing is slow. Everything else is fine.',
+      headSub: s.checking ? 'Pinging services, Macs and devices.' : ok ? 'All services, Macs and devices responded normally.' : 'Sync is about 2 minutes behind in the EU. Nothing is lost, and Atlas keeps working on each Mac.',
+      checkL: s.checking ? 'Checking…' : 'Check again',
+      recheck: () => { if (s.checking) return; this.setState({ checking: true }); clearTimeout(this.ct); this.ct = setTimeout(() => this.setState({ checking: false, fixed: true, checkedAt: new Date() }), 1800); },
+      tiles: [['Uptime', '14 days', 'since the last update'], ['Actions today', '212', '0 failed'], ['Model calls', '1,284', 'all in the audit trail'], ['Battery', '74%', 'MacBook Pro · 5 h left']].map(([k, v, d], i) => ({ k, v, d, bg: i === 0 ? '#1e1e24' : '#f1eeea', fg: i === 0 ? '#f9f7f4' : '#1e1e24', sub: i === 0 ? 'rgba(249,247,244,.78)' : '#6d6a67' })),
+      devices: [['mac', 'MacBook Pro', 'This Mac · 74% · charging', 74, '#0fae76'], ['display', 'Studio Mac mini', 'Asleep · plugged in', 100, '#0fae76'], ['iphone', 'iPhone 16', '42% · Atlas app', 42, '#e07a1f'], ['airpods', 'AirPods Pro', '18% · case 80%', 18, '#d0453a'], ['watch', 'Apple Watch', '61%', 61, '#3461f2']].map(([i, n, st, p, c]) => ({ ico: ic(i), n, s: st, c, off: (144.5 * (1 - p / 100)).toFixed(1) })),
+      services: SV.map(([n, d, v, bad], i) => ({ n, d, v, vFg: bad && !ok ? '#9a5410' : '#6d6a67', dot: bad && !ok ? '#e07a1f' : '#0fae76', anim: bad && !ok ? 'pulse 1.6s infinite' : 'none', bars: bars(i, bad) })),
+      storage: [['Memory', '412 MB', 22, '#8fa9ff'], ['Audit trail', '88 MB', 8, '#50dca0'], ['Mail cache', '1.9 GB', 48, '#ffb36b'], ['Models on device', '640 MB', 30, '#b6a8ff']].map(([k, v, w, c]) => ({ k, v, w: w + '%', c })),
+      events: [[ok ? 'now' : '09:42', ok ? 'Sync caught up across all Macs' : 'EU sync slowed down', ok ? '#0fae76' : '#e07a1f'], ['06:02', 'Atlas 4.6.0 installed', '#3461f2'], ['03:14', 'Nightly sync repaired in a sandbox', '#0fae76'], ['Yesterday', 'AirPods battery under 20%', '#d0453a']].map(([t, m, c]) => ({ t, m, c })),
+      dock: [['home', 'Home', 'Atlas Dashboard Beta.dc.html'], ['core', 'Core', 'Atlas Core Beta.dc.html'], ['teach', 'Teach', 'Atlas Teach Beta.dc.html'], ['mail', 'Mail', 'Atlas Mail Beta.dc.html'], ['architecture', 'Architecture', 'Atlas Architecture Beta.dc.html'], ['voice', 'Voice', 'Atlas Voice Beta.dc.html']].map(([k, l, h]) => ({ l, h, ico: ic(k) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

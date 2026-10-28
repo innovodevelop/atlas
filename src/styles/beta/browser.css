@@ -1,0 +1,260 @@
+/* ── Phase 5: Browser ─────────────────────────────────────────────────────────
+   Source: design/current/design_handoff_atlas_beta/Atlas Browser Beta.dc.html —
+   the hero bar with its sphere, the strip under it, the tab rail, the page, "On
+   this page", and the ink omnibox floating over them. The page is a fetched
+   page's text drawn as reader blocks (headings, paragraphs, lists, quotes,
+   captions, code) in the design's article type; no remote image or style ever
+   reaches it. The design carries its
+   styles inline; the values below are those values, named, on the --b-* tokens
+   from src/styles/beta.css. Flat and borderless: depth comes from the paper
+   scale, plus the two soft shadows the design draws under the hero bar and
+   the omnibox. Imported by src/pages/atlas/BetaBrowser.tsx only. */
+
+/* The screen scrolls inside its panes, so the shell's dock padding goes. */
+html[data-ui="beta"] .beta-page:has(> .b-br) { padding-bottom: 0; }
+
+.b-br {
+  /* The design's find marks and its "warn" tag: colours with no token yet. */
+  --b-br-hit: #fbefd9;
+  --b-br-hit-on: #f2c46b;
+  --b-br-warn-fill: #fbefd9;
+  --b-br-warn-ink: #9a5a00;
+  height: calc(100vh - var(--b-topbar));
+  height: calc(100dvh - var(--b-topbar));
+  display: flex;
+  flex-direction: column;
+  gap: var(--b-gap);
+  padding: 14px var(--b-pad-page) 88px;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: var(--b-page);
+  color: var(--b-ink);
+  font-family: var(--b-font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+/* beta.css resets every button to `font: inherit` at (0,1,2); the button rules
+   that set type are scoped under .b-br so their (0,2,0) wins. */
+
+/* ---- Hero: the address-bar-shaped band --------------------------------- */
+
+.b-br-hero { flex: none; display: flex; align-items: center; gap: 10px; view-transition-name: hero; animation: b-pop .6s var(--b-spring) both; }
+.b-br-bar { flex: 1; min-width: 0; height: 72px; display: flex; align-items: center; gap: 12px; padding: 0 10px 0 4px; border-radius: var(--b-r-pill); background: var(--b-card); box-shadow: 0 14px 34px -24px rgba(30, 30, 36, .35); box-sizing: border-box; }
+.b-br-sphere { position: relative; flex: none; width: 64px; height: 64px; border-radius: 50%; overflow: hidden; }
+.b-br-talk { position: absolute; inset: 0; padding: 0; border-radius: 50%; background: transparent; cursor: pointer; }
+.b-br-sub { flex: 1; min-width: 0; font-size: 16px; color: var(--b-ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-br-count { flex: none; height: 44px; padding: 0 16px; display: flex; align-items: center; gap: 8px; border-radius: var(--b-r-pill); background: var(--b-panel); font-size: 13px; font-weight: 600; white-space: nowrap; }
+.b-br-count b { font-family: var(--b-font-display); font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.b-br .b-br-home { flex: none; height: 44px; padding: 0 14px; display: flex; align-items: center; border-radius: var(--b-r-pill); background: var(--b-panel); color: var(--b-ink); font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background .2s; }
+.b-br-home:hover { background: var(--b-hover); }
+
+/* ---- The strip: what happens on this Mac ---------------------------------- */
+
+.b-br-note { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px 12px 10px 16px; border-radius: 18px; background: var(--b-emphasis); }
+.b-br-note p { flex: 1; min-width: min(240px, 100%); margin: 0; font-size: 12.5px; line-height: 1.5; text-wrap: pretty; }
+.b-br .b-br-note-warn { flex-basis: 100%; color: var(--b-red-deep); font-weight: 600; }
+.b-br-stamp { flex: none; height: 22px; padding: 0 9px; display: inline-flex; align-items: center; border-radius: var(--b-r-pill); background: var(--b-blue); color: #fff; font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+
+/* ---- Tabs: the rail (wide) and the strip (narrow) ------------------------ */
+
+.b-br-fav { flex: none; width: 26px; height: 26px; border-radius: 8px; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+.b-br-x { flex: none; width: 26px; height: 26px; margin-right: 6px; padding: 0; border-radius: 50%; background: transparent; color: var(--b-neutral); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .2s, color .2s; }
+.b-br-x:hover { background: var(--b-hover); color: var(--b-ink); }
+
+.b-br-rail { min-height: 0; overflow-y: auto; border-radius: var(--b-r-hero); background: var(--b-panel); padding: 12px 12px 72px; display: flex; flex-direction: column; gap: 4px; box-sizing: border-box; }
+.b-br-rail-head { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 8px; }
+.b-br-label { font-size: 11.5px; font-weight: 600; color: var(--b-neutral); }
+.b-br .b-br-new { flex: none; height: 26px; padding: 0 10px; border-radius: var(--b-r-pill); background: var(--b-card); color: var(--b-ink); font-size: 11.5px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background .2s; }
+.b-br-new:hover { background: #fff; }
+.b-br-tab { flex: none; display: flex; align-items: center; gap: 6px; border-radius: var(--b-r-row); background: transparent; transition: background .2s; }
+.b-br-tab:hover { background: var(--b-hover); }
+.b-br-tab.on { background: var(--b-card); }
+.b-br-tab.on .b-br-x:hover { background: var(--b-panel); }
+.b-br-tab-hit { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 10px 4px 10px 10px; background: transparent; color: var(--b-ink); text-align: left; cursor: pointer; }
+.b-br-tab-text { min-width: 0; }
+.b-br-tab-text b, .b-br-tab-text span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.b-br-tab-text b { font-size: 12.5px; font-weight: 600; }
+.b-br-tab-text span { margin-top: 1px; font-size: 11px; color: var(--b-neutral); }
+.b-br-rail-empty { margin: 0; padding: 14px 10px; border-radius: var(--b-r-row); background: var(--b-page); font-size: 12px; line-height: 1.5; color: var(--b-ink2); }
+.b-br-kept-label { padding: 14px 6px 6px; }
+.b-br-kept { flex: none; display: flex; align-items: center; border-radius: var(--b-r-small); background: var(--b-page); transition: background .2s; }
+.b-br-kept:hover { background: var(--b-card); }
+.b-br .b-br-kept-hit { flex: 1; min-width: 0; padding: 9px 4px 9px 10px; background: transparent; color: var(--b-ink); text-align: left; cursor: pointer; }
+.b-br-kept p { margin: 0; font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.b-br-kept p + p { margin-top: 1px; font-size: 11px; font-weight: 400; color: var(--b-neutral); }
+.b-br-kept .b-br-x { width: 24px; height: 24px; }
+.b-br-kept-none { margin: 0; padding: 10px; font-size: 12px; color: var(--b-neutral); }
+
+/* Below 1100px the design drops the rail; the strip keeps the tabs reachable. */
+.b-br-strip { flex: none; display: none; gap: 6px; overflow-x: auto; }
+.b-br-stab { flex: none; max-width: 240px; height: 40px; display: flex; align-items: center; border-radius: var(--b-r-pill); background: var(--b-panel); transition: background .2s; }
+.b-br-stab:hover { background: var(--b-hover); }
+.b-br-stab.on { background: var(--b-card); }
+.b-br .b-br-stab-hit { min-width: 0; height: 100%; display: flex; align-items: center; gap: 8px; padding: 0 4px 0 7px; background: transparent; color: var(--b-ink); font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.b-br-stab-hit > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.b-br-stab .b-br-fav { width: 26px; height: 26px; border-radius: 50%; }
+.b-br-stab .b-br-x { margin-right: 7px; }
+.b-br .b-br-strip-new { flex: none; height: 40px; padding: 0 14px; border-radius: var(--b-r-pill); background: var(--b-panel); color: var(--b-ink); font-size: 12.5px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background .2s; }
+.b-br-strip-new:hover { background: var(--b-hover); }
+
+/* ---- The grid ------------------------------------------------------------ */
+
+.b-br-grid { flex: 1; min-height: 0; position: relative; display: grid; grid-template-columns: minmax(200px, 240px) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: var(--b-gap); }
+.b-br-grid.side { grid-template-columns: minmax(200px, 240px) minmax(0, 1fr) minmax(260px, 320px); }
+
+/* ---- The page ------------------------------------------------------------ */
+
+.b-br-page { min-height: 0; overflow-y: auto; border-radius: var(--b-r-hero); background: var(--b-card); position: relative; }
+.b-br-tools { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; padding: 12px 14px; background: var(--b-card); }
+.b-br .b-br-addr { flex: 1; min-width: 0; height: 34px; padding: 0 12px; display: flex; align-items: center; gap: 8px; border-radius: var(--b-r-pill); background: var(--b-page); color: var(--b-ink2); font-family: var(--b-font-mono); font-size: 12px; text-align: left; cursor: text; transition: background .2s; }
+.b-br-addr:hover { background: var(--b-hover); }
+.b-br-addr svg { flex: none; }
+/* A page that came over plain http says so where the lock would be. */
+.b-br-addr-flag { flex: none; height: 18px; padding: 0 6px; display: inline-flex; align-items: center; border-radius: var(--b-r-pill); background: var(--b-br-warn-fill); color: var(--b-br-warn-ink); font-family: var(--b-font-ui); font-size: 10.5px; font-weight: 600; }
+.b-br-addr span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.b-br .b-br-tool { flex: none; height: 34px; padding: 0 13px; border-radius: var(--b-r-pill); background: var(--b-panel); color: var(--b-ink); font-size: 12.5px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background .2s, color .2s; }
+.b-br-tool:hover { background: var(--b-hover); }
+.b-br-tool--reader.on { background: var(--b-ink); color: var(--b-on-ink); }
+.b-br-tool--keep.on { background: var(--b-emphasis); color: var(--b-blue-deep); }
+.b-br-tool--atlas.on { background: var(--b-blue); color: var(--b-card); }
+.b-br-tool--atlas.on:hover { background: var(--b-blue-deep); }
+
+.b-br-article { max-width: 860px; margin: 0 auto; padding: 12px clamp(20px, 4vw, 48px) 140px; display: flex; flex-direction: column; gap: 16px; transition: max-width .3s var(--b-spring); }
+.b-br-article.reader { max-width: 640px; }
+.b-br-byline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; color: var(--b-neutral); }
+.b-br-h1 { margin: 0; font-family: var(--b-font-display); font-size: clamp(28px, 3vw, 40px); font-weight: 500; letter-spacing: -.03em; line-height: 1.12; text-wrap: pretty; overflow-wrap: anywhere; }
+/* A page's own headings sit a step under the title, in the same display face. */
+.b-br-h2, .b-br-h3 { margin: 10px 0 -4px; font-family: var(--b-font-display); font-weight: 600; letter-spacing: -.02em; line-height: 1.25; text-wrap: pretty; overflow-wrap: anywhere; }
+.b-br-h2 { font-size: 22px; }
+.b-br-h3 { font-size: 18px; }
+.b-br-p { margin: 0; font-size: 15.5px; line-height: 1.7; text-wrap: pretty; overflow-wrap: anywhere; }
+.b-br-ul { margin: 0; padding: 0 0 0 20px; display: flex; flex-direction: column; gap: 6px; }
+.b-br-li { font-size: 15.5px; line-height: 1.6; text-wrap: pretty; overflow-wrap: anywhere; }
+.b-br-li::marker { color: var(--b-neutral); }
+.b-br-quote { margin: 0; padding: 12px 16px; border-radius: var(--b-r-inset); background: var(--b-page); font-size: 16px; line-height: 1.6; color: var(--b-ink2); text-wrap: pretty; overflow-wrap: anywhere; }
+.b-br-cap { margin: -6px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--b-ink2); overflow-wrap: anywhere; }
+/* Code keeps its lines; it scrolls inside its own box, never the page. */
+.b-br-code { margin: 0; max-width: 100%; padding: 12px 14px; overflow-x: auto; border-radius: var(--b-r-inset); background: var(--b-page); font-family: var(--b-font-mono); font-size: 12.5px; line-height: 1.55; white-space: pre; box-sizing: border-box; }
+/* The design reads in upright Newsreader; the app bundles only its italic
+   (public/fonts/fonts.css), so the reader takes the Mac's own serif, New York. */
+.b-br-article.reader :is(.b-br-h1, .b-br-h2, .b-br-h3, .b-br-p, .b-br-li, .b-br-quote) { font-family: ui-serif, 'New York', Georgia, serif; }
+.b-br-article.reader :is(.b-br-p, .b-br-li) { font-size: 19px; }
+.b-br-article.reader .b-br-quote { font-size: 19px; }
+.b-br-empty-copy { color: var(--b-ink2); }
+/* Links on the page: each opens as a new tab, through Go. */
+.b-br-links { margin-top: 12px; display: flex; flex-direction: column; gap: 2px; }
+.b-br-links > .b-br-label { margin: 0 0 6px; }
+.b-br-links > .b-btn { align-self: flex-start; margin-top: 6px; }
+.b-br .b-br-link { display: flex; align-items: baseline; gap: 10px; min-width: 0; padding: 8px 10px; border-radius: var(--b-r-row); background: transparent; color: var(--b-ink); text-align: left; cursor: pointer; transition: background .2s; }
+.b-br-link:hover { background: var(--b-panel); }
+.b-br-link > span:first-child { flex: 1; min-width: 0; font-size: 13.5px; color: var(--b-blue-deep); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.b-br-link > span:last-child { flex: none; max-width: 40%; font-size: 11.5px; color: var(--b-neutral); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.b-br-end { margin: 8px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--b-neutral); }
+.b-br-end-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.b-br .b-br-end-actions .b-btn, .b-br .b-br-none .b-btn, .b-br .b-br-links > .b-btn, .b-br .b-br-side-none .b-btn { font-size: 12.5px; font-weight: 600; }
+.b-br-hit { background: var(--b-br-hit); color: var(--b-ink); border-radius: 3px; box-shadow: 0 0 0 2px var(--b-br-hit); }
+.b-br-hit.on { background: var(--b-br-hit-on); box-shadow: 0 0 0 2px var(--b-br-hit-on); }
+.b-br-none { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 80px 24px 140px; text-align: center; }
+.b-br-none b { font-family: var(--b-font-display); font-size: 20px; font-weight: 600; letter-spacing: -.025em; }
+.b-br-none span { max-width: 380px; font-size: 13px; line-height: 1.55; color: var(--b-ink2); text-wrap: pretty; }
+.b-br-none .b-btn { margin-top: 8px; }
+
+/* ---- On this page -------------------------------------------------------- */
+
+.b-br-side { min-height: 0; overflow-y: auto; border-radius: var(--b-r-hero); background: var(--b-panel); padding: 14px 14px 80px; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; }
+.b-br-side-head { flex: none; display: flex; align-items: center; gap: 8px; padding: 2px 4px 4px; }
+.b-br-side-head > i { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--b-blue); }
+.b-br-side-head > p { margin: 0; font-family: var(--b-font-display); font-size: 15px; font-weight: 600; letter-spacing: -.02em; }
+.b-br-sp { flex: 1; }
+.b-br-side-meta { font-size: 11px; color: var(--b-neutral); white-space: nowrap; }
+.b-br-side-close { display: none; flex: none; width: 30px; height: 30px; padding: 0; border-radius: 50%; background: var(--b-card); color: var(--b-ink2); align-items: center; justify-content: center; cursor: pointer; transition: color .2s; }
+.b-br-side-close:hover { color: var(--b-ink); }
+.b-br-card { flex: none; padding: 14px; border-radius: var(--b-r-inset); display: flex; flex-direction: column; gap: 6px; animation: b-pop .35s var(--b-spring) both; }
+.b-br-answer { background: var(--b-emphasis); }
+.b-br-refuse { background: var(--b-card); }
+.b-br-card-head { display: flex; align-items: flex-start; gap: 8px; }
+.b-br-card-head p { flex: 1; min-width: 0; margin: 0; font-size: 12.5px; font-weight: 600; color: var(--b-blue-deep); overflow-wrap: anywhere; }
+.b-br-refuse .b-br-card-head p { color: var(--b-red-deep); }
+.b-br-dismiss { flex: none; width: 22px; height: 22px; padding: 0; border-radius: 50%; background: transparent; color: var(--b-blue-deep); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .2s; }
+.b-br-dismiss:hover { background: var(--b-emphasis-hover); }
+.b-br-refuse .b-br-dismiss { color: var(--b-ink2); }
+.b-br-refuse .b-br-dismiss:hover { background: var(--b-hover); }
+.b-br-card-body { margin: 0; font-size: 13px; line-height: 1.55; text-wrap: pretty; overflow-wrap: anywhere; }
+.b-br-refuse .b-br-card-body { font-size: 12.5px; }
+.b-br-basis { margin: 0; font-size: 11.5px; color: var(--b-ink2); }
+.b-br-card-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+/* The shared .b-btn sizes lose to beta.css's button `font: inherit`; restate them here. */
+.b-br .b-br-card-actions .b-btn { font-size: 12.5px; font-weight: 600; }
+.b-br-sum { flex: none; margin: 0; padding: 12px 14px; border-radius: var(--b-r-row); background: var(--b-page); font-size: 12.5px; line-height: 1.55; color: var(--b-ink2); text-wrap: pretty; }
+.b-br-point { flex: none; display: flex; align-items: flex-start; gap: 10px; padding: 11px 12px; border-radius: var(--b-r-row); background: var(--b-card); }
+.b-br-point p { margin: 0; min-width: 0; font-size: 12.5px; line-height: 1.5; text-wrap: pretty; }
+.b-br-point b { font-weight: 600; }
+.b-br-tag { flex: none; height: 20px; padding: 0 8px; display: flex; align-items: center; border-radius: var(--b-r-pill); font-size: 10.5px; font-weight: 600; }
+/* The design's fourth kind, "link" (a page tied to your Mail or calendar), is
+   not drawn: "On this page" reads the page text only and nothing of yours. */
+.b-br-tag[data-kind="claim"] { background: var(--b-emphasis); color: var(--b-blue-deep); }
+.b-br-tag[data-kind="quote"] { background: var(--b-panel); color: var(--b-ink2); }
+.b-br-tag[data-kind="warn"] { background: var(--b-br-warn-fill); color: var(--b-br-warn-ink); }
+.b-br-side-none { flex: none; margin: 0; padding: 18px 14px; border-radius: var(--b-r-row); background: var(--b-page); font-size: 12.5px; line-height: 1.5; color: var(--b-ink2); text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.b-br-side-none .b-btn:disabled { opacity: .6; cursor: default; transform: none; }
+.b-br-notes-basis { padding: 2px 4px; }
+
+/* ---- The omnibox --------------------------------------------------------- */
+
+.b-br-omni-wrap { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 5; width: min(640px, calc(100% - 40px)); display: flex; flex-direction: column; gap: 8px; }
+.b-br-suggest { padding: 8px; border-radius: var(--b-r-panel); background: rgba(255, 253, 250, .96); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: 0 24px 54px -24px rgba(30, 30, 36, .34); display: flex; flex-direction: column; gap: 2px; animation: b-pop .25s var(--b-spring) both; }
+.b-br-suggest button { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--b-r-row); background: transparent; color: var(--b-ink); text-align: left; cursor: pointer; transition: background .2s; }
+.b-br-suggest button:hover { background: var(--b-panel); }
+.b-br-suggest button > span:first-child { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.b-br-suggest button > span:last-child { flex: none; font-size: 11px; color: var(--b-neutral); white-space: nowrap; }
+.b-br-suggest .b-br-suggest-clear > span:first-child { color: var(--b-ink2); }
+.b-br-omni { display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: var(--b-r-pill); background: var(--b-ink); box-shadow: 0 24px 54px -22px rgba(30, 30, 36, .55); transition: box-shadow .2s; }
+/* The keyboard ring sits on the pill, not on the bare input inside it. */
+.b-br-omni:focus-within { box-shadow: 0 0 0 3px rgba(52, 97, 242, .28), 0 24px 54px -22px rgba(30, 30, 36, .55); }
+.b-br .b-br-mode { flex: none; height: 38px; padding: 0 14px 0 12px; display: flex; align-items: center; gap: 7px; border-radius: var(--b-r-pill); background: rgba(249, 247, 244, .14); color: var(--b-card); font-size: 12.5px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background .2s; }
+.b-br-mode:hover { background: rgba(249, 247, 244, .2); }
+.b-br-omni[data-mode="ask"] .b-br-mode { background: var(--b-blue); }
+.b-br-omni[data-mode="ask"] .b-br-mode:hover { background: var(--b-blue-deep); }
+.b-br-mode kbd { font-family: var(--b-font-ui); font-size: 10.5px; font-weight: 500; color: var(--b-on-ink-small); }
+html[data-ui="beta"] .b-br-in { flex: 1; min-width: 0; height: 38px; padding: 0; background: transparent; color: var(--b-on-ink); font-size: 14px; }
+html[data-ui="beta"] .b-br-in:focus-visible { box-shadow: none; }
+.b-br-in::placeholder { color: var(--b-on-ink-small); }
+.b-br-found { flex: none; font-size: 12px; font-weight: 600; color: var(--b-on-ink-body); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.b-br-go { flex: none; width: 38px; height: 38px; padding: 0; border-radius: 50%; background: var(--b-page); color: var(--b-ink); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .2s, color .2s; }
+.b-br-go:hover { background: #fff; }
+.b-br-go:disabled { background: rgba(249, 247, 244, .14); color: var(--b-on-ink-small); cursor: default; }
+
+/* ---- Widths -------------------------------------------------------------- */
+
+@media (max-width: 1099px) {
+  .b-br-strip { display: flex; }
+  .b-br-rail { display: none; }
+  .b-br-grid, .b-br-grid.side { grid-template-columns: minmax(0, 1fr); }
+  /* "On this page" lies over the page instead of squeezing beside it. */
+  .b-br-grid > .b-br-page, .b-br-grid > .b-br-side { grid-area: 1 / 1; }
+  .b-br-side { z-index: 3; }
+  .b-br-side-close { display: flex; }
+}
+@media (max-width: 640px) {
+  .b-br { padding: 10px 16px 88px; gap: 10px; }
+  .b-br-bar { height: 60px; gap: 8px; padding-right: 8px; }
+  .b-br-sphere { width: 52px; height: 52px; }
+  .b-br-sub { font-size: 13.5px; }
+  .b-br-count { height: 38px; padding: 0 12px; }
+  .b-br-count-l { display: none; }
+  .b-br .b-br-home { height: 38px; padding: 0 12px; }
+  .b-br-tools { padding: 10px; gap: 6px; }
+  .b-br .b-br-tool { padding: 0 10px; }
+  .b-br-h2 { font-size: 20px; }
+  .b-br-link > span:last-child { display: none; }
+  .b-br-mode kbd { display: none; }
+  /* Two lines of the strip; the whole sentence is in its title. */
+  .b-br-note { padding: 10px 10px 10px 12px; gap: 8px 10px; }
+  .b-br-note p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .b-br-omni-wrap { width: calc(100% - 20px); bottom: 10px; }
+  .b-br-article { padding-bottom: 120px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .b-br-hero, .b-br-card, .b-br-suggest { animation: none; }
+  .b-br-article, .b-br-omni { transition: none; }
+}

@@ -1,4 +1,12 @@
 import { useMemo, useSyncExternalStore } from 'react';
+import {
+  normalizePlaylist, normalizeTrack, type Playlist, type RawPlaylist, type RawTrack, type Track,
+} from '@/lib/musicSpotify';
+
+// The view models live with their normalizers in src/lib/musicSpotify.ts;
+// re-exported here because every music surface has always imported them from
+// this hook.
+export type { Playlist, Track } from '@/lib/musicSpotify';
 
 // Provider-agnostic music player hook (Spotify first). Audio + catalog come from
 // the LOCAL Rust backend (music.rs): OAuth via the atlas:// deep link, browse/
@@ -28,23 +36,6 @@ const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
 // --- Normalized view models (only the fields the UI uses) ------------------
 
-export interface Track {
-  id: string;
-  uri: string;
-  title: string;
-  artist: string;
-  album: string;
-  artUrl: string | null;
-  durationMs: number;
-}
-
-export interface Playlist {
-  id: string;
-  name: string;
-  imageUrl: string | null;
-  trackCount: number;
-}
-
 export interface NowPlaying {
   track: Track | null;
   isPlaying: boolean;
@@ -58,6 +49,14 @@ export interface NowPlaying {
    */
   positionMs: number;
   deviceName: string | null;
+  /**
+   * True once Atlas's own engine has played this track to its end and has
+   * nothing after it (`EndOfTrack` with the one-element Rust queue exhausted).
+   * It is what lets a surface with its own queue hand the engine the next
+   * track; cleared by the next load or the next position the engine reports.
+   * Always false for a snapshot of another device, whose end Atlas never sees.
+   */
+  ended: boolean;
 }
 
 export interface SearchResults {
@@ -77,19 +76,8 @@ interface MusicStatus {
   premium: boolean;
   audio_ready: boolean;
   device_name: string;
-}
-
-// --- Raw Spotify JSON shapes (partial) -------------------------------------
-
-interface RawImage { url: string; width?: number; height?: number }
-interface RawArtist { name: string }
-interface RawTrack {
-  id: string;
-  uri: string;
-  name: string;
-  duration_ms: number;
-  artists?: RawArtist[];
-  album?: { name?: string; images?: RawImage[] };
+  /** The stored grant's scopes; null when not connected or not reported. */
+  scopes?: string[] | null;
 }
 
 /** What `music_engine.rs` puts on `music:now_playing`. */
@@ -106,6 +94,28 @@ interface EnginePosition {
  * loaded" is process state, not component state.
  */
 let engineUri: string | null = null;
+
+/**
+ * Who wants to know when `engineUri` changes. The music queue store
+ * (useMusicQueue.ts) listens here so it can hold the bridge open — and keep
+ * the queue advancing on any screen — exactly while Atlas's engine holds a
+ * record, and let it close when nothing is loaded.
+ */
+const engineListeners = new Set<() => void>();
+
+function setEngineUri(uri: string | null): void {
+  if (engineUri === uri) return;
+  engineUri = uri;
+  engineListeners.forEach((fn) => fn());
+}
+
+export function subscribeEngine(fn: () => void): () => void {
+  engineListeners.add(fn);
+  return () => { engineListeners.delete(fn); };
+}
+
+/** The URI the local engine holds now, or null. */
+export const engineUriNow = (): string | null => engineUri;
 
 /**
  * Whether the local engine is DECODING right now, as opposed to merely holding
@@ -135,27 +145,11 @@ async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T
 const nowMs = () =>
   typeof performance !== 'undefined' ? performance.now() : Date.now();
 
-const firstImage = (images?: RawImage[]): string | null =>
-  images && images.length ? images[0].url : null;
-
-function normalizeTrack(t: RawTrack | null | undefined): Track | null {
-  if (!t || !t.id) return null;
-  return {
-    id: t.id,
-    uri: t.uri,
-    title: t.name,
-    artist: (t.artists ?? []).map((a) => a.name).join(', '),
-    album: t.album?.name ?? '',
-    artUrl: firstImage(t.album?.images),
-    durationMs: t.duration_ms ?? 0,
-  };
-}
-
 // ---------------------------------------------------------------------------
 // The store
 // ---------------------------------------------------------------------------
 
-interface MusicSnapshot {
+export interface MusicSnapshot {
   available: boolean;
   connected: boolean;
   premium: boolean;
@@ -165,6 +159,16 @@ interface MusicSnapshot {
   playlists: Playlist[];
   isConnecting: boolean;
   error: string | null;
+  /**
+   * The scopes the stored Spotify grant carries (from `music_status`), or
+   * null when unknown. Like and Rooms read it to offer a reconnect.
+   */
+  scopes: string[] | null;
+  /**
+   * The URI librespot last refused (`music:unavailable`): Spotify has no audio
+   * it may decode for it. Cleared by the next load.
+   */
+  unavailable: string | null;
 }
 
 let snapshot: MusicSnapshot = {
@@ -177,6 +181,8 @@ let snapshot: MusicSnapshot = {
   playlists: [],
   isConnecting: false,
   error: null,
+  scopes: null,
+  unavailable: null,
 };
 
 const subscribers = new Set<() => void>();
@@ -192,6 +198,9 @@ function patch(next: Partial<MusicSnapshot>): void {
 }
 
 const getSnapshot = () => snapshot;
+
+/** The store's current snapshot, for module code (the queue store) that is not a component. */
+export const getMusicSnapshot = (): MusicSnapshot => snapshot;
 
 /**
  * Live audio energy for the visualizer. One ref for the whole app: the feed
@@ -246,6 +255,15 @@ const clearAnchor = (): void => { anchorState = { ms: 0, at: 0, playing: false, 
 const REMOTE_LEAD_MS = 12000;
 
 /**
+ * How close to its duration the engine clock must stand for a null-position
+ * `is_playing:false` push to count as EndOfTrack rather than a TrackChanged.
+ * The engine re-anchors every 500 ms while playing, so the clock is never
+ * more than that behind when the track runs out; a freshly loaded track sits
+ * at zero. Four times the push interval leaves room for a slow frame.
+ */
+const END_WINDOW_MS = 2000;
+
+/**
  * Live position in ms. Safe to call every animation frame — it reads a module
  * value and does arithmetic; it never touches state, so it cannot cause a
  * render.
@@ -269,7 +287,12 @@ async function refreshStatus(): Promise<void> {
   if (!isTauri) return;
   try {
     const st = await invoke<MusicStatus>('music_status');
-    patch({ connected: st.connected, premium: st.premium, audioReady: st.audio_ready });
+    patch({
+      connected: st.connected,
+      premium: st.premium,
+      audioReady: st.audio_ready,
+      scopes: st.connected && Array.isArray(st.scopes) ? st.scopes : null,
+    });
   } catch (e) {
     console.error('[music] status failed:', e);
   }
@@ -321,6 +344,7 @@ async function refreshNowPlaying(): Promise<void> {
         isPlaying: !!raw.is_playing,
         positionMs: raw.progress_ms ?? 0,
         deviceName: raw.device?.name ?? null,
+        ended: false,
       },
     });
     // Restart the chain from this sync, at the cadence the answer implies: the
@@ -397,16 +421,8 @@ async function loadLibrary(offset = 0, limit = 50): Promise<void> {
 async function loadPlaylists(offset = 0, limit = 50): Promise<void> {
   if (!isTauri) return;
   try {
-    const page = await invoke<{ items?: Array<{ id: string; name: string; images?: RawImage[]; tracks?: { total?: number } }> }>(
-      'music_playlists',
-      { offset, limit },
-    );
-    const lists: Playlist[] = (page.items ?? []).map((p) => ({
-      id: p.id,
-      name: p.name,
-      imageUrl: firstImage(p.images),
-      trackCount: p.tracks?.total ?? 0,
-    }));
+    const page = await invoke<{ items?: (RawPlaylist | null)[] }>('music_playlists', { offset, limit });
+    const lists = (page.items ?? []).map(normalizePlaylist).filter((p): p is Playlist => p !== null);
     patch({ playlists: offset === 0 ? lists : [...snapshot.playlists, ...lists] });
   } catch (e) {
     patch({ error: String(e) });
@@ -429,18 +445,14 @@ async function search(query: string, limit = 20): Promise<SearchResults> {
   if (!isTauri || !query.trim()) return { tracks: [], playlists: [] };
   const raw = await invoke<{
     tracks?: { items?: RawTrack[] };
-    playlists?: { items?: Array<{ id: string; name: string; images?: RawImage[]; tracks?: { total?: number } }> };
+    // Spotify's search returns null in place of a playlist it withdrew.
+    playlists?: { items?: (RawPlaylist | null)[] };
   }>('music_search', { query, limit });
   return {
     tracks: (raw.tracks?.items ?? [])
       .map(normalizeTrack)
       .filter((t): t is Track => t !== null),
-    playlists: (raw.playlists?.items ?? []).map((p) => ({
-      id: p.id,
-      name: p.name,
-      imageUrl: firstImage(p.images),
-      trackCount: p.tracks?.total ?? 0,
-    })),
+    playlists: (raw.playlists?.items ?? []).map(normalizePlaylist).filter((p): p is Playlist => p !== null),
   };
 }
 
@@ -463,7 +475,7 @@ async function disconnect(): Promise<void> {
   if (!isTauri) return;
   try {
     await invoke('music_disconnect');
-    engineUri = null;
+    setEngineUri(null);
     enginePlaying = false;
     clearAnchor();
     patch({
@@ -473,6 +485,8 @@ async function disconnect(): Promise<void> {
       nowPlaying: null,
       library: [],
       playlists: [],
+      scopes: null,
+      unavailable: null,
     });
   } catch (e) {
     patch({ error: String(e) });
@@ -521,24 +535,73 @@ async function seek(positionMs: number): Promise<void> {
  * still-pending call; that listener's `refreshNowPlaying()` must already see
  * that Atlas owns the audio, or it pulls `/me/player` and nulls the track that
  * is about to start.
+ *
+ * `track` is the record being loaded, when it is not the one already showing.
+ * The engine's TrackChanged carries no metadata and the listener deliberately
+ * does not pull any while Atlas is decoding (`/me/player` cannot see Atlas),
+ * so a caller queuing a DIFFERENT track must say which one, or the title and
+ * artwork on every surface would stay on the previous record for the whole
+ * play. Pressing play on the track already showing leaves it out.
+ *
+ * `positionMs` starts the record part-way in — a podcast's resume point, or a
+ * record a room hands back to this Mac at the position it had reached.
  */
-async function load(uri: string): Promise<void> {
+async function load(uri: string, track?: Track, positionMs = 0): Promise<void> {
   const wasUri = engineUri;
   const wasPlaying = enginePlaying;
-  engineUri = uri;
+  const wasNowPlaying = snapshot.nowPlaying;
+  const wasUnavailable = snapshot.unavailable;
+  const start = Math.max(0, Math.floor(positionMs));
+  setEngineUri(uri);
   enginePlaying = true;
-  // `player.load(uri, start_playing = true, 0)` — loading starts playback.
-  anchor(0, true, true);
+  // `player.load(uri, start_playing = true, start)` — loading starts playback.
+  anchor(start, true, true);
+  if (track) {
+    patch({ nowPlaying: { track, isPlaying: true, positionMs: start, deviceName: null, ended: false }, unavailable: null });
+  } else if (wasNowPlaying?.ended) {
+    patch({ nowPlaying: { ...wasNowPlaying, isPlaying: true, positionMs: start, ended: false }, unavailable: null });
+  } else if (wasUnavailable) {
+    patch({ unavailable: null });
+  }
   try {
-    await cmd('music_load', { uri });
+    await cmd('music_load', start > 0 ? { uri, positionMs: start } : { uri });
   } catch (e) {
-    engineUri = wasUri;
+    setEngineUri(wasUri);
     enginePlaying = wasPlaying;
+    if (track || wasNowPlaying?.ended) patch({ nowPlaying: wasNowPlaying });
     throw e;
   }
 }
 
 const setVolume = (volume: number) => cmd('music_volume', { volume });
+
+/**
+ * Let go of the record without blanking it: pause the engine and forget that
+ * it holds anything. Used when Rooms moves playback from this Mac to a
+ * Connect speaker. Without it `engineHoldsUri` would keep claiming Atlas is
+ * the player of a track the speaker now plays, and the play button would
+ * pause Atlas's silent engine instead of the speaker.
+ */
+async function releaseEngine(): Promise<void> {
+  if (!isTauri || !engineUri) return;
+  try { if (snapshot.audioReady) await invoke('music_pause'); } catch { /* the speaker has it now either way */ }
+  setEngineUri(null);
+  enginePlaying = false;
+  const cur = snapshot.nowPlaying;
+  if (cur) patch({ nowPlaying: { ...cur, isPlaying: false } });
+  // Ask Spotify what the speaker is doing; the poll then keeps it current.
+  window.setTimeout(() => { void refreshNowPlaying(); }, 900);
+}
+
+/**
+ * Reflect a Like or an Unlike in the liked-songs list without re-reading it
+ * (a re-read would collapse the pages already loaded back to the first).
+ */
+function markLiked(track: Track, liked: boolean): void {
+  const has = snapshot.library.some((t) => t.id === track.id);
+  if (liked && !has) patch({ library: [track, ...snapshot.library] });
+  else if (!liked && has) patch({ library: snapshot.library.filter((t) => t.id !== track.id) });
+}
 
 // --- the bridge: exactly one registration, ref-counted ---------------------
 
@@ -585,7 +648,8 @@ function startBridge(): void {
           // something Atlas can no longer see.
           p.nowPlaying = null;
           p.premium = false;
-          engineUri = null;
+          p.scopes = null;
+          setEngineUri(null);
           enginePlaying = false;
           clearAnchor();
         }
@@ -618,6 +682,21 @@ function startBridge(): void {
         enginePlaying = playing;
         const pos = p && typeof p.position_ms === 'number' ? p.position_ms : null;
         if (pos == null) {
+          // A null position is either TrackChanged or EndOfTrack; the engine
+          // emits `(false, None)` for both — TrackChanged right after a load,
+          // before its Playing event, and EndOfTrack once the one-element
+          // queue is spent. The clock tells them apart: `load()` has just
+          // anchored a fresh track at zero, while a track that ran out is
+          // within a push interval of its duration. Without this the record
+          // kept saying "playing" after the audio stopped, and nothing could
+          // queue what comes next.
+          const cur = snapshot.nowPlaying;
+          const dur = cur?.track?.durationMs ?? 0;
+          if (!playing && cur && dur > 0 && readPosition() >= dur - END_WINDOW_MS) {
+            anchor(dur, false, true);
+            patch({ nowPlaying: { ...cur, isPlaying: false, positionMs: dur, ended: true } });
+            return;
+          }
           // TrackChanged. `refreshNowPlaying` no-ops while the engine is
           // decoding, which is right: the only thing librespot can have loaded
           // is the URI Atlas handed it, and Atlas already has that metadata.
@@ -628,11 +707,23 @@ function startBridge(): void {
         }
         anchor(pos, playing, true);
         const cur = snapshot.nowPlaying;
-        if (cur) patch({ nowPlaying: { ...cur, isPlaying: playing, positionMs: pos } });
+        if (cur) patch({ nowPlaying: { ...cur, isPlaying: playing, positionMs: pos, ended: false } });
       }),
       // Per-frame audio energy for the Sphere — write the ref, no re-render.
       listen<AudioLevel>('music:level', (e) => {
         levelRef.current = e.payload;
+      }),
+      // librespot refused the record: Spotify has no audio it may decode (a
+      // region lock, a withdrawn track, an episode hosted elsewhere or
+      // published as video). Stop saying it plays, and say which one, so the
+      // queue can move on and the Podcast view can offer a speaker instead.
+      listen<{ uri?: string }>('music:unavailable', (e) => {
+        const uri = e.payload?.uri ?? null;
+        if (!uri || uri !== engineUri) return;
+        enginePlaying = false;
+        anchor(readPosition(), false, true);
+        const cur = snapshot.nowPlaying;
+        patch({ unavailable: uri, nowPlaying: cur ? { ...cur, isPlaying: false } : cur });
       }),
     ]);
     if (gen !== bridgeGen) { us.forEach((u) => u()); return; }
@@ -697,7 +788,30 @@ const ACTIONS = {
   seek,
   load,
   setVolume,
+  releaseEngine,
+  markLiked,
 } as const;
+
+/**
+ * The same actions, for module code that is not a component (the queue store
+ * drives the engine from here so the queue advances on any screen).
+ */
+export const musicActions = ACTIONS;
+
+/**
+ * Hold the bridge open from module code, exactly as a mounted
+ * `useMusicPlayer` does (ref-counted; the teardown is deferred). Returns the
+ * release.
+ */
+export const subscribeMusic = (cb: () => void): (() => void) => subscribe(cb);
+
+/** Thin pass-through for the music commands the queue store and the views call directly. */
+export async function musicInvoke<T>(cmdName: string, args?: Record<string, unknown>): Promise<T> {
+  if (!isTauri) throw new Error('Music lives in the Atlas desktop app.');
+  return invoke<T>(cmdName, args);
+}
+
+export const musicBridgeAvailable = isTauri;
 
 export type MusicPlayer = MusicSnapshot & typeof ACTIONS;
 

@@ -4,6 +4,9 @@ import "./index.css";
 // Single consolidated stylesheet (base layer + Workshop design, cascade order
 // preserved from the former atlas.css + workshop.css).
 import "./styles/workshop.css";
+// Beta tokens + shell chrome. Every rule is scoped to html[data-ui="beta"],
+// which only the Beta shell sets, so loading it unconditionally is free.
+import "./styles/beta.css";
 import { startWebviewWatchdog } from "./lib/webviewWatchdog";
 
 createRoot(document.getElementById("root")!).render(<App />);

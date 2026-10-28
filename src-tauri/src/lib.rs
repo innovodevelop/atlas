@@ -16,6 +16,8 @@ mod music_engine;
 mod db;
 mod datafetch;
 mod mail;
+mod mail_flags;
+mod mail_archive;
 mod gmail;
 mod mail_imap;
 mod outlook;
@@ -35,7 +37,27 @@ mod home;
 // that works today is the Apple Health export importer. See src/health/mod.rs.
 mod health;
 mod watchdog;
+// The Clock's native half: keep the Mac awake until an alarm, ring an alarm on
+// a Home Assistant speaker, and the bridge the brain's clock tools answer on.
+mod clock;
 mod brain;
+mod system_vitals;
+// The Focus screen's optional "run my Shortcut" (Beta row 12).
+mod focus_mode;
+// Settings → This Mac (Beta F9): Wi-Fi, Bluetooth, the Mac's details, battery
+// health and history, the screen-lock check, and Restart Atlas.
+mod mac_controls;
+// School: the Lectio calendar feed and a Moodle (LearnIT) token, both kept in
+// the Keychain and read only from here. See src/school.rs.
+mod school;
+// Money: the local bank store (CSV imports) and the optional read-only
+// GoCardless Bank Account Data link. See src/bank.rs.
+mod bank;
+// Rejseplanen departures (Beta Answer + Transit widget); dormant until an access ID is stored.
+mod transit;
+// System Status's native half: disk sizes, app versions, the Home Assistant
+// check (Beta rows 75, 78, 79).
+mod system_status;
 
 /// Outcome of a sidecar spawn attempt. `integrity_error` is set when the
 /// binary failed integrity verification (and was therefore NOT spawned) — it
@@ -546,6 +568,20 @@ pub fn run() {
       music::music_seek,
       music::music_load,
       music::music_volume,
+      // Beta Music: Like, Rooms, podcasts, resume points, lyrics.
+      music::music_saved_contains,
+      music::music_save_tracks,
+      music::music_devices,
+      music::music_transfer,
+      music::music_play_on,
+      music::music_remote_pause,
+      music::music_device_volume,
+      music::music_shows,
+      music::music_show_episodes,
+      music::music_resume_get,
+      music::music_resume_set,
+      music::music_resume_recent,
+      music::music_lyrics,
       db::db_info,
       db::db_select,
       db::db_insert,
@@ -553,15 +589,54 @@ pub fn run() {
       db::db_delete,
       db::memory_recall,
       db::memory_upsert_vector,
+      // The Clock (src/clock.rs). All `#[tauri::command(async)]`: one spawns
+      // caffeinate, one calls Home Assistant on the LAN.
+      clock::clock_keep_awake,
+      clock::clock_release_awake,
+      clock::clock_speakers,
+      clock::clock_ring_speaker,
+      clock::clock_command_reply,
       datafetch::fetch_weather,
       datafetch::fetch_stocks,
       datafetch::fetch_news,
+      // Beta Home (F6): the weather place search and the Currency widget's
+      // ECB rates; the Focus screen's Shortcuts bridge.
+      datafetch::weather_geocode,
+      datafetch::fetch_fx,
+      focus_mode::focus_shortcut_list,
+      focus_mode::focus_shortcut_run,
+      focus_mode::focus_hold_set,
+      // Battery / Wi-Fi / Bluetooth for the Beta top bar. Read-only, no secrets.
+      system_vitals::system_vitals,
+      // Settings → This Mac and the status panels' switches (mac_controls.rs).
+      // All `#[tauri::command(async)]`: each spawns a macOS tool. The Wi-Fi
+      // password passes through `wifi_join` once and is never kept.
+      mac_controls::wifi_read,
+      mac_controls::wifi_set_power,
+      mac_controls::wifi_join,
+      mac_controls::wifi_forget,
+      mac_controls::bluetooth_read,
+      mac_controls::bluetooth_set_power,
+      mac_controls::bluetooth_device,
+      mac_controls::mac_read,
+      mac_controls::battery_read,
+      mac_controls::screen_locked,
+      mac_controls::system_idle_secs,
+      // Other screens invoke this one by name (a provider switch, an update).
+      mac_controls::app_restart,
+      // Beta System Status (F10): bytes on disk, app version history, and a
+      // timed check of the linked Home Assistant bridge.
+      system_status::system_storage,
+      system_status::system_app_history,
+      system_status::system_probe_home_assistant,
       mail::mail_sync,
       mail::mail_thread_fetch,
       mail::mail_mark_read,
       mail::mail_set_status,
       mail::mail_send_reply,
       mail::mail_ingest_errors,
+      mail::mail_wake_snoozes,
+      mail_archive::mail_archive_message,
       gmail::gmail_connect,
       gmail::gmail_disconnect,
       gmail::gmail_sync,
@@ -590,6 +665,15 @@ pub fn run() {
       home::home_set_autonomy,
       home::home_live_start,
       home::home_live_stop,
+      // The Beta Smart Home's extras (home/beta.rs): history, today's energy,
+      // a camera still on request, automation switches, Home/Away/Night. None
+      // is on the control port — see the header of home/beta.rs.
+      home::beta::home_history,
+      home::beta::home_energy_today,
+      home::beta::home_camera_still,
+      home::beta::home_automation_set,
+      home::beta::home_mode_map,
+      home::beta::home_mode_set,
       // HomeKit over the LAN, Lighthouse only. WITHOUT THESE TWO LINES the
       // HomeKit Lab screen is dead in the one build that compiles the feature:
       // Tauri answers an unregistered command with "Command
@@ -613,6 +697,32 @@ pub fn run() {
       health::health_series,
       health::health_workouts,
       health::health_forget,
+      // School connectors (all `async`: each one is a network round trip).
+      school::school_connections,
+      school::school_lectio_connect,
+      school::school_lectio_fetch,
+      school::school_lectio_disconnect,
+      school::school_moodle_connect,
+      school::school_moodle_call,
+      school::school_moodle_file,
+      school::school_moodle_disconnect,
+      // Money. All `#[tauri::command(async)]`: HTTP to GoCardless and SQLite.
+      // None of them can move money; GoCardless's keys stay in the Keychain.
+      bank::bank_store_transactions,
+      bank::bank_gc_status,
+      bank::bank_gc_set_keys,
+      bank::bank_gc_clear_keys,
+      bank::bank_gc_institutions,
+      bank::bank_gc_link_start,
+      bank::bank_gc_link_refresh,
+      bank::bank_gc_sync,
+      bank::bank_gc_unlink,
+      // Rejseplanen. Async: each one is an HTTPS call or a Keychain read. The
+      // access ID is written by transit_set_key and never returned.
+      transit::transit_status,
+      transit::transit_set_key,
+      transit::transit_find_stops,
+      transit::transit_departures,
     ])
     .setup(|app| {
       // ONE DATABASE, AND THIS LAUNCH'S IDENTITY — both before anything else in
@@ -668,6 +778,9 @@ pub fn run() {
         }
         app.manage(db::DbState::open(&db_path)?);
         log::info!("[db] local SQLite opened at {}", db_path.display());
+        // System Status's "since the last update": note this launch's version
+        // the first time it runs (one quick local write; never fails setup).
+        system_status::record_launch(app.handle());
       }
 
       // Sidecars come up in the BACKGROUND so the window is interactive at
@@ -787,6 +900,11 @@ pub fn run() {
           // Background Gmail sync writes the shared atlas.db too, so it runs
           // in the owner only, for the same reason.
           handle.manage(gmail::GmailAutoSync::spawn(handle.clone()));
+          // The battery history is one shared table too: one recorder per
+          // machine, in the owner, or every sample would be written twice.
+          mac_controls::start_battery_recorder(handle.clone());
+          // Linked banks are read once a day, by the owner only, for the same reason.
+          bank::spawn_daily_sync(handle.clone());
         });
       }
 
@@ -799,6 +917,11 @@ pub fn run() {
       }
 
       watchdog::start(app.handle());
+
+      // Settings → Voice → "Mute when the Mac is locked": the lock and unlock
+      // are pushed to the webview as they happen (mac_controls.rs). Every
+      // instance, not only the owner — each app's windows run a voice session.
+      mac_controls::start_lock_watcher(app.handle().clone());
 
       // Deep-link OAuth capture. In dev the scheme isn't in the app bundle's
       // Info.plist, so register it at runtime; packaged macOS builds get it

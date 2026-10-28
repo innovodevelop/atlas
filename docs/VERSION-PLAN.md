@@ -69,6 +69,11 @@ _2026-10-24: `hey_atlas.onnx` trained on permissively licensed data (Piper TTS v
 
 _2026-10-23: each turn now logs where its time went (`[latency]` lines from the voice gateway: STT final, brain response, first token, first sentence, first audio) and sends it to the client as a `latency` message. Scribe tokens are prefetched instead of minted on wake, and the final transcript is awaited on its event rather than polled. Next: read real breakdowns on the Mac and cut the largest stage._
 
+- [ ] Beta UI shell behind the beta_ui flag: tokens, veil sphere, state bus, top bar, dock, Talk to Atlas, view transitions {id: feat-026, status: in-progress, design: linked}
+
+_2026-10-27: phase 1 of the Beta redesign handoff (design/current/design_handoff_atlas_beta, plan in docs/design-sync/2026-10-27-beta-plan.md) on ws-beta-redesign. Off by default; `?beta=1` turns it on. Verified in the Vite preview, not yet in the packaged app._
+- [ ] Beta UI Home and widgets: stage band, 6-column grid, Edit Home, status panels, widget screens {id: feat-027, design: linked}
+
 ---
 
 ## v0.5.0 — Bluewater
@@ -98,6 +103,7 @@ Target: 2026-12-20
 - [ ] Atlas Teach redesign (design system compliance) {id: feat-043, design: linked}
 - [ ] Home floating memory cards {id: feat-044, design: linked}
 - [ ] E5 model extraction from sidecar binary {id: feat-045}
+- [ ] Beta UI cutover: every screen on the Beta design, beta_ui default on, old screens removed {id: feat-046, design: linked}
 
 ---
 

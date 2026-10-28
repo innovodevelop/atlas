@@ -10,6 +10,7 @@
 import { aiChatCompletion, hasAIKey } from "../../../supabase/functions/_shared/aiGateway.ts";
 import { selectModel } from "../../../supabase/functions/_shared/providerRouting.ts";
 import { scheduleAutoEmbed } from "./autoEmbed.ts";
+import { readRememberShared } from "./memorySettings.ts";
 import type { LocalDb } from "./localDb.ts";
 
 interface Deps {
@@ -367,7 +368,10 @@ export function createLearningHandlers({ db, requireUser, json }: Deps) {
       pruned = lastChanges(db);
     }
 
-    if (operation === "full" && hasAIKey()) {
+    // The insights are memories Atlas derives on its own, so "Remember things
+    // I share" switched off (memorySettings.ts) skips them; tidying above
+    // only removes rows and still runs.
+    if (operation === "full" && hasAIKey() && readRememberShared(db._db, userId)) {
       const recent = db._db
         .query(`SELECT key, value FROM ai_memory WHERE user_id = ? ORDER BY updated_at DESC LIMIT 30`)
         .all(userId) as Array<{ key: string; value: string }>;

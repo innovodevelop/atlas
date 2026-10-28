@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>(function(){window.addEventListener("unhandledrejection",function(e){var m=String(e.reason&&e.reason.message||e.reason);if(/Transition was aborted|ViewTransition/.test(m))e.preventDefault()});var top=false;try{top=window.self===window.top}catch(e){}var s=document.createElement("style");if(top){s.textContent="@view-transition{navigation:auto}";}else{s.textContent="html{animation:atlas-in .45s cubic-bezier(.22,1,.36,1) both}html.atlas-out{transition:opacity .22s ease,transform .22s ease;opacity:0;transform:scale(.988)}@keyframes atlas-in{from{opacity:0;transform:scale(1.012)}}";document.addEventListener("click",function(e){var a=e.target.closest&&e.target.closest("a[href]");if(!a||e.defaultPrevented||e.metaKey||e.ctrlKey||a.target)return;var h=a.getAttribute("href");if(!/\.dc\.html/.test(h)||/^https?:/.test(h))return;if(h.split("#")[0]===""||location.pathname.endsWith(encodeURI(h.split("#")[0]))&&h.indexOf("#")>0)return;e.preventDefault();document.documentElement.classList.add("atlas-out");setTimeout(function(){location.href=h},210)},true);}document.head.appendChild(s)})();</script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script>window.addEventListener("pagereveal",function(e){var t=e.viewTransition;if(t){["ready","finished","updateCallbackDone"].forEach(function(p){t[p]&&t[p].catch(function(){})})}});window.addEventListener("unhandledrejection",function(e){if(/Transition was aborted|ViewTransition/.test(String(e.reason&&e.reason.message||e.reason)))e.preventDefault()});</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+@keyframes spin{to{transform:rotate(360deg)}}
+::view-transition-group(*){animation-duration:.55s;animation-timing-function:cubic-bezier(.22,1,.36,1)}
+::view-transition-old(root){animation:.4s cubic-bezier(.22,1,.36,1) both vt-out}
+::view-transition-new(root){animation:.55s cubic-bezier(.22,1,.36,1) both vt-in}
+@keyframes vt-out{to{opacity:0;transform:scale(.985)}}
+@keyframes vt-in{from{opacity:0;transform:scale(1.015)}}
+*{box-sizing:border-box}
+body{margin:0;background:#f9f7f4}
+button,input,textarea{border:none;font:inherit;background:none;color:inherit}
+a{color:#3461f2;text-decoration:none}a:hover{color:#2748bd}
+::selection{background:#e8d8c2}
+::placeholder{color:#b6b1aa}
+@keyframes bpop{from{opacity:0;transform:translateY(14px) scale(.986)}to{opacity:1;transform:none}}
+</style>
+<script src="atlas-quickstart-sphere.js"></script>
+<script src="atlas-orb.js"></script>
+<script src="atlas-topbar.js"></script>
+</helmet>
+
+<div data-screen-label="Atlas Settings — Beta" style="height:100vh;display:flex;flex-direction:column;gap:12px;padding:26px 26px 88px;background:#f9f7f4;color:#1e1e24;font-family:'Geist',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden">
+
+<header data-screen-label="Settings hero" style="flex:none;view-transition-name:hero;position:relative;display:flex;align-items:center;gap:16px;padding:6px 4px 2px">
+<div style="position:relative;width:84px;height:84px;flex:none"><canvas ref="{{ sphereRef }}" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas></div>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px"><span style="font-size:11px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#6d6a67">{{ eyebrow }}</span><h1 style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:clamp(28px,3vw,42px);font-weight:500;letter-spacing:-.045em;line-height:1">{{ title }}</h1><p style="margin:0;max-width:640px;font-size:14px;line-height:1.5;color:#6d6a67">{{ intro }}</p></div>
+<a href="Atlas Dashboard Beta.dc.html" title="Back · Esc" style="height:36px;padding:0 13px;display:flex;align-items:center;border-radius:9999px;background:#f1eeea;color:#1e1e24;font-size:12.5px;font-weight:600" style-hover="background:#edebe7;color:#1e1e24">← Home</a>
+</header>
+
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:{{ cols }};grid-template-rows:{{ rowsTpl }};gap:12px">
+
+<nav aria-label="Settings sections" style="min-height:0;overflow:auto;border-radius:28px;background:#f1eeea;padding:{{ navPad }};display:flex;flex-direction:{{ navDir }};gap:{{ navGap }};animation:bpop .65s cubic-bezier(.22,1,.36,1) .04s both">
+<sc-for list="{{ groups }}" as="g" hint-placeholder-count="4">
+<div style="display:flex;flex-direction:{{ navDir }};gap:2px;flex:none">
+<sc-if value="{{ g.showLabel }}" hint-placeholder-val="{{ true }}"><p style="margin:0;padding:4px 12px 6px;font-size:11.5px;font-weight:600;color:#8b8681">{{ g.label }}</p></sc-if>
+<sc-for list="{{ g.items }}" as="it" hint-placeholder-count="3">
+<button onClick="{{ act }}" data-a="nav" data-k="{{ it.k }}" aria-current="{{ it.cur }}" style="border:none;flex:none;display:flex;align-items:center;gap:11px;height:40px;padding:0 12px;border-radius:12px;background:{{ it.bg }};color:{{ it.fg }};font-family:inherit;font-size:13px;font-weight:{{ it.fw }};text-align:left;white-space:nowrap;cursor:pointer;transition:background .2s" style-hover="background:{{ it.hov }}">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="{{ it.ico }}"></path></svg>
+<span style="flex:1">{{ it.label }}</span>
+<sc-if value="{{ it.hasBadge }}" hint-placeholder-val="{{ false }}"><span style="height:20px;padding:0 7px;display:flex;align-items:center;border-radius:9999px;background:{{ it.badgeBg }};color:{{ it.badgeFg }};font-size:10.5px;font-weight:600">{{ it.badge }}</span></sc-if>
+</button>
+</sc-for>
+</div>
+</sc-for>
+</nav>
+
+<main ref="{{ mainRef }}" style="min-height:0;overflow-y:auto;border-radius:28px;background:#f1eeea;padding:18px;display:flex;flex-direction:column;gap:12px">
+
+<sc-if value="{{ isVoice }}" hint-placeholder-val="{{ false }}">
+<div style="border-radius:24px;background:#fffdfa;padding:20px;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;align-items:flex-start;gap:12px"><div style="flex:1;min-width:0"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em">Voice output</p><p style="margin:2px 0 0;font-size:12.5px;color:#6d6a67">The voice Atlas speaks with in conversation and briefings.</p></div><button onClick="{{ act }}" data-a="preview" style="border:none;flex:none;height:36px;padding:0 16px;border-radius:9999px;background:{{ previewBg }};color:{{ previewFg }};font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s">{{ previewLabel }}</button></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px">
+<sc-for list="{{ voices }}" as="v" hint-placeholder-count="5">
+<button onClick="{{ act }}" data-a="voice" data-k="{{ v.k }}" style="border:none;display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:13px 14px;border-radius:16px;background:{{ v.bg }};font-family:inherit;text-align:left;cursor:pointer;transition:background .2s" style-hover="background:{{ v.hov }}"><span style="display:flex;align-items:center;justify-content:space-between;width:100%;font-size:13.5px;font-weight:600;color:{{ v.fg }}">{{ v.name }}<sc-if value="{{ v.on }}" hint-placeholder-val="{{ false }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></sc-if></span><span style="font-size:11.5px;color:{{ v.sub }}">{{ v.d }}</span></button>
+</sc-for>
+</div>
+<p style="margin:4px 0 0;font-size:11.5px;font-weight:600;color:#8b8681">Speech model</p>
+<div style="display:flex;gap:2px;padding:3px;border-radius:16px;background:#f1eeea;flex-wrap:wrap">
+<sc-for list="{{ models }}" as="m" hint-placeholder-count="3">
+<button onClick="{{ act }}" data-a="model" data-k="{{ m.k }}" style="border:none;flex:1 1 160px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:10px 12px;border-radius:13px;background:{{ m.bg }};box-shadow:{{ m.sh }};font-family:inherit;text-align:left;cursor:pointer;transition:background .2s"><span style="font-size:13px;font-weight:600;color:#1e1e24">{{ m.name }}</span><span style="font-size:11.5px;color:#6d6a67">{{ m.d }}</span></button>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isPersonality }}" hint-placeholder-val="{{ false }}">
+<div style="border-radius:24px;background:#fffdfa;padding:20px;display:flex;flex-direction:column;gap:6px">
+<div style="display:flex;align-items:flex-start;gap:12px;padding-bottom:8px"><div style="flex:1;min-width:0"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em">How Atlas talks to you</p><p style="margin:2px 0 0;font-size:12.5px;color:#6d6a67">{{ traitStatus }}</p></div><button onClick="{{ act }}" data-a="resetTraits" style="border:none;flex:none;height:36px;padding:0 16px;border-radius:9999px;background:#f1eeea;color:#1e1e24;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#edebe7">Reset to defaults</button></div>
+<sc-for list="{{ traits }}" as="t" hint-placeholder-count="5">
+<div style="padding:14px;border-radius:16px;background:#f9f7f4;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px"><span style="font-size:13.5px;font-weight:600">{{ t.label }}</span><span style="font-size:12px;font-weight:600;color:#2748bd;font-variant-numeric:tabular-nums">{{ t.word }}</span></div>
+<p style="margin:0;font-size:12px;line-height:1.5;color:#6d6a67;text-wrap:pretty">{{ t.d }}</p>
+<input type="range" min="0" max="100" value="{{ t.v }}" onInput="{{ setTrait }}" data-k="{{ t.k }}" aria-label="{{ t.label }}" style="border:none;width:100%;accent-color:#3461f2;margin:4px 0 0">
+<div style="display:flex;justify-content:space-between;font-size:11px;color:#8b8681"><span>{{ t.low }}</span><span>{{ t.high }}</span></div>
+</div>
+</sc-for>
+</div>
+<div style="border-radius:24px;background:#fffdfa;padding:20px;display:flex;flex-direction:column;gap:12px">
+<div><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em">Words Atlas has picked up</p><p style="margin:2px 0 0;font-size:12.5px;color:#6d6a67">Learned from how you talk. Shown so you can see exactly what Atlas noticed; it can't be edited here.</p></div>
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+<sc-for list="{{ lexicon }}" as="l" hint-placeholder-count="5"><span style="display:flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:9999px;background:#f9f7f4;font-size:12.5px"><b style="font-weight:600">{{ l.w }}</b><span style="color:#6d6a67">{{ l.m }}</span></span></sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isBattery }}" hint-placeholder-val="{{ false }}">
+<div style="border-radius:24px;background:#fffdfa;padding:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px">
+<div style="display:flex;flex-direction:column;gap:10px">
+<span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#8b8681">{{ batKicker }}</span>
+<span style="font-family:'Hanken Grotesk',sans-serif;font-size:clamp(52px,6vw,80px);font-weight:600;letter-spacing:-.05em;line-height:.9;font-variant-numeric:tabular-nums">{{ batPct }}</span>
+<span style="font-size:13.5px;color:#6d6a67">{{ batLeft }}</span>
+<div style="height:8px;margin-top:4px;border-radius:9999px;background:#edebe7;overflow:hidden"><div style="width:{{ batPct }};height:100%;border-radius:9999px;background:{{ batBarFg }};transition:width .5s,background .3s"></div></div>
+</div>
+<div style="padding:14px 14px 10px;border-radius:16px;background:#f9f7f4">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:12.5px;font-weight:600">Last 24 hours</span><span style="font-size:11px;color:#6d6a67">Charge level</span></div>
+<div style="display:flex;align-items:flex-end;gap:3px;height:92px;margin-top:12px"><sc-for list="{{ batHist }}" as="bh" hint-placeholder-count="24"><span title="{{ bh.t }}" style="flex:1;height:{{ bh.h }};border-radius:3px;background:{{ bh.c }}"></span></sc-for></div>
+<div style="display:flex;justify-content:space-between;margin-top:7px;font-size:10.5px;color:#b6b1aa"><span>Yesterday 4 PM</span><span>Midnight</span><span>Now</span></div>
+<div style="display:flex;gap:12px;margin-top:8px;font-size:11px;color:#6d6a67"><span style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:2px;background:#1e1e24"></span>On battery</span><span style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:2px;background:#0fae76"></span>Charging</span></div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isUpdate }}" hint-placeholder-val="{{ false }}">
+<div style="border-radius:24px;background:{{ upd.bg }};color:{{ upd.fg }};padding:22px;display:flex;flex-direction:column;gap:12px;transition:background .4s">
+<span style="font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:{{ upd.kick }}">{{ upd.kicker }}</span>
+<span style="font-family:'Hanken Grotesk',sans-serif;font-size:clamp(28px,3vw,40px);font-weight:600;letter-spacing:-.04em;line-height:1.05">{{ upd.title }}</span>
+<p style="margin:0;max-width:620px;font-size:13.5px;line-height:1.55;color:{{ upd.sub }};text-wrap:pretty">{{ upd.body }}</p>
+<sc-if value="{{ upd.hasProgress }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:12px"><div style="flex:1;height:6px;border-radius:9999px;background:rgba(249,247,244,.18);overflow:hidden"><div style="width:{{ upd.pct }};height:100%;border-radius:9999px;background:#f9f7f4;transition:width .3s"></div></div><span style="font-size:12px;font-weight:600;font-variant-numeric:tabular-nums">{{ upd.pct }}</span></div></sc-if>
+<sc-if value="{{ upd.hasNotes }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-direction:column;gap:6px;margin-top:2px"><sc-for list="{{ upd.notes }}" as="n" hint-placeholder-count="3"><div style="display:flex;gap:10px;padding:10px 12px;border-radius:12px;background:{{ upd.noteBg }};font-size:12.5px;line-height:1.45"><b style="flex:none;width:76px;font-weight:600">{{ n.k }}</b><span style="color:{{ upd.sub }}">{{ n.v }}</span></div></sc-for></div></sc-if>
+<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"><sc-for list="{{ upd.btns }}" as="b" hint-placeholder-count="1"><button onClick="{{ act }}" data-a="{{ b.a }}" style="border:none;height:36px;padding:0 16px;border-radius:9999px;background:{{ b.bg }};color:{{ b.fg }};font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:filter .2s" style-hover="filter:brightness(.95)">{{ b.l }}</button></sc-for></div>
+</div>
+</sc-if>
+
+<sc-for list="{{ cards }}" as="c" hint-placeholder-count="2">
+<section style="border-radius:24px;background:{{ c.bg }};padding:20px;display:flex;flex-direction:column;gap:6px;animation:bpop .5s cubic-bezier(.22,1,.36,1) both">
+<div style="display:flex;align-items:flex-start;gap:12px;padding-bottom:8px">
+<div style="flex:1;min-width:0"><p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em;color:{{ c.titleFg }}">{{ c.title }}</p><sc-if value="{{ c.hasSub }}" hint-placeholder-val="{{ true }}"><p style="margin:3px 0 0;max-width:680px;font-size:12.5px;line-height:1.5;color:{{ c.subFg }};text-wrap:pretty">{{ c.sub }}</p></sc-if></div>
+<sc-for list="{{ c.headBtns }}" as="b" hint-placeholder-count="0"><button onClick="{{ act }}" data-a="{{ b.a }}" data-k="{{ b.k }}" style="border:none;flex:none;height:34px;padding:0 14px;border-radius:9999px;background:{{ b.bg }};color:{{ b.fg }};font-family:inherit;font-size:12.5px;font-weight:600;white-space:nowrap;cursor:pointer;transition:filter .2s" style-hover="filter:brightness(.96)">{{ b.l }}</button></sc-for>
+<sc-if value="{{ c.hasSwitch }}" hint-placeholder-val="{{ false }}"><button onClick="{{ act }}" data-a="{{ c.swA }}" data-k="{{ c.swK }}" role="switch" aria-label="{{ c.title }}" style="display:flex;flex:none;width:42px;height:25px;margin-top:2px;padding:3px;border:none;border-radius:9999px;background:{{ c.swBg }};justify-content:{{ c.swPos }};cursor:pointer;transition:background .25s"><span style="width:19px;height:19px;border-radius:50%;background:#fff;box-shadow:0 2px 5px rgba(30,30,36,.22)"></span></button></sc-if>
+</div>
+<sc-if value="{{ c.hasStats }}" hint-placeholder-val="{{ false }}"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px;padding-bottom:6px"><sc-for list="{{ c.stats }}" as="s" hint-placeholder-count="3"><div style="padding:10px 12px;border-radius:12px;background:{{ c.statBg }}"><p style="margin:0;font-size:11px;color:#6d6a67">{{ s.k }}</p><p style="margin:3px 0 0;font-size:14px;font-weight:600;color:{{ s.fg }};font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.v }}</p></div></sc-for></div></sc-if>
+<sc-for list="{{ c.rows }}" as="r" hint-placeholder-count="3">
+<div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:{{ r.bg }};transition:background .25s">
+<sc-if value="{{ r.hasIcon }}" hint-placeholder-val="{{ false }}"><span style="display:flex;flex:none;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:{{ r.chipBg }};color:{{ r.chipFg }};transition:background .3s"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{ r.ico }}"></path></svg></span></sc-if>
+<div style="flex:1;min-width:0">
+<p style="margin:0;font-size:13.5px;font-weight:600;color:#1e1e24;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.t }}</p>
+<sc-if value="{{ r.hasS }}" hint-placeholder-val="{{ true }}"><p style="margin:2px 0 0;font-size:12px;line-height:1.45;color:{{ r.sFg }};text-wrap:pretty">{{ r.s }}</p></sc-if>
+<sc-if value="{{ r.hasMeter }}" hint-placeholder-val="{{ false }}"><div style="height:5px;margin-top:8px;border-radius:9999px;background:#edebe7;overflow:hidden"><div style="width:{{ r.mw }};height:100%;border-radius:9999px;background:{{ r.mfg }};transition:width .4s"></div></div></sc-if>
+</div>
+<sc-if value="{{ r.hasTrail }}" hint-placeholder-val="{{ false }}"><span style="flex:none;font-size:12px;font-weight:600;color:{{ r.trailFg }};font-variant-numeric:tabular-nums;white-space:nowrap">{{ r.trail }}</span></sc-if>
+<sc-for list="{{ r.btns }}" as="b" hint-placeholder-count="0"><button onClick="{{ act }}" data-a="{{ b.a }}" data-k="{{ b.k }}" style="border:none;flex:none;height:30px;padding:0 12px;border-radius:9999px;background:{{ b.bg }};color:{{ b.fg }};font-family:inherit;font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer;transition:filter .2s" style-hover="filter:brightness(.95)">{{ b.l }}</button></sc-for>
+<sc-if value="{{ r.isToggle }}" hint-placeholder-val="{{ false }}"><button onClick="{{ act }}" data-a="{{ r.a }}" data-k="{{ r.k }}" role="switch" aria-label="{{ r.t }}" style="display:flex;flex:none;width:42px;height:25px;padding:3px;border:none;border-radius:9999px;background:{{ r.swBg }};justify-content:{{ r.swPos }};cursor:pointer;transition:background .25s"><span style="width:19px;height:19px;border-radius:50%;background:#fff;box-shadow:0 2px 5px rgba(30,30,36,.22)"></span></button></sc-if>
+</div>
+<sc-if value="{{ r.hasConfirm }}" hint-placeholder-val="{{ false }}"><div style="margin:-2px 0 4px;padding:14px;border-radius:14px;background:#f7e6e4;display:flex;flex-direction:column;gap:10px"><p style="margin:0;font-size:12.5px;line-height:1.5;color:#1e1e24;text-wrap:pretty">{{ r.confirmText }}</p><div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ r.confirmBtns }}" as="b" hint-placeholder-count="2"><button onClick="{{ act }}" data-a="{{ b.a }}" data-k="{{ b.k }}" style="border:none;height:32px;padding:0 14px;border-radius:9999px;background:{{ b.bg }};color:{{ b.fg }};font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer">{{ b.l }}</button></sc-for></div></div></sc-if>
+</sc-for>
+<sc-if value="{{ c.hasNote }}" hint-placeholder-val="{{ false }}"><p style="margin:6px 2px 0;font-size:12px;line-height:1.5;color:{{ c.noteFg }};text-wrap:pretty">{{ c.note }}</p></sc-if>
+<sc-if value="{{ c.hasBtns }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-wrap:wrap;gap:6px;padding-top:8px"><sc-for list="{{ c.btns }}" as="b" hint-placeholder-count="1"><button onClick="{{ act }}" data-a="{{ b.a }}" data-k="{{ b.k }}" style="border:none;height:36px;padding:0 16px;border-radius:9999px;background:{{ b.bg }};color:{{ b.fg }};font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:filter .2s" style-hover="filter:brightness(.95)">{{ b.l }}</button></sc-for></div></sc-if>
+</section>
+</sc-for>
+
+<sc-if value="{{ showImap }}" hint-placeholder-val="{{ false }}">
+<div style="border-radius:24px;background:#fffdfa;padding:20px;display:flex;flex-direction:column;gap:8px">
+<p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em">Connect a mailbox over IMAP</p>
+<p style="margin:0 0 6px;font-size:12.5px;line-height:1.5;color:#6d6a67;text-wrap:pretty">For iCloud, Fastmail, Yahoo and most other providers. Atlas reads the inbox over TLS only and never changes it. Many providers need an app-specific password here, not your normal one.</p>
+<input value="{{ imap.email }}" onInput="{{ imapField }}" data-f="email" placeholder="Email address" style="border:none;outline:none;height:42px;padding:0 14px;border-radius:14px;background:#f9f7f4;color:#1e1e24;font-family:inherit;font-size:13.5px" style-focus="background:#eef2fe">
+<div style="display:flex;gap:6px"><input value="{{ imap.host }}" onInput="{{ imapField }}" data-f="host" placeholder="IMAP server, e.g. imap.mail.me.com" style="border:none;outline:none;flex:1;min-width:0;height:42px;padding:0 14px;border-radius:14px;background:#f9f7f4;color:#1e1e24;font-family:inherit;font-size:13.5px" style-focus="background:#eef2fe"><input value="{{ imap.port }}" onInput="{{ imapField }}" data-f="port" aria-label="Port" placeholder="993" style="border:none;outline:none;width:84px;height:42px;padding:0 14px;border-radius:14px;background:#f9f7f4;color:#1e1e24;font-family:inherit;font-size:13.5px;font-variant-numeric:tabular-nums" style-focus="background:#eef2fe"></div>
+<input value="{{ imap.user }}" onInput="{{ imapField }}" data-f="user" placeholder="Username (if not the email address)" style="border:none;outline:none;height:42px;padding:0 14px;border-radius:14px;background:#f9f7f4;color:#1e1e24;font-family:inherit;font-size:13.5px" style-focus="background:#eef2fe">
+<input type="password" value="{{ imap.pass }}" onInput="{{ imapField }}" data-f="pass" placeholder="Password" style="border:none;outline:none;height:42px;padding:0 14px;border-radius:14px;background:#f9f7f4;color:#1e1e24;font-family:inherit;font-size:13.5px" style-focus="background:#eef2fe">
+<sc-if value="{{ imapErr }}" hint-placeholder-val="{{ false }}"><p style="margin:0;padding:10px 12px;border-radius:12px;background:#f7e6e4;font-size:12.5px;color:#a3352c">{{ imapErrText }}</p></sc-if>
+<div style="display:flex;gap:6px;padding-top:4px"><button onClick="{{ act }}" data-a="imapSubmit" style="border:none;flex:1;height:38px;border-radius:9999px;background:{{ imapBtnBg }};color:{{ imapBtnFg }};font-family:inherit;font-size:13px;font-weight:600;cursor:{{ imapCursor }}">{{ imapBtnLabel }}</button><button onClick="{{ act }}" data-a="imapClose" style="border:none;height:38px;padding:0 16px;border-radius:9999px;background:#f1eeea;color:#1e1e24;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer" style-hover="background:#edebe7">Cancel</button></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isMemory }}" hint-placeholder-val="{{ false }}">
+<div style="border-radius:24px;background:#fffdfa;padding:20px;display:flex;flex-direction:column;gap:10px">
+<p style="margin:0;font-family:'Hanken Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:-.02em;color:#a3352c">Delete all my data</p>
+<p style="margin:0;max-width:720px;font-size:12.5px;line-height:1.55;color:#6d6a67;text-wrap:pretty">Permanently deletes everything Atlas stored for your account on this Mac: every memory, conversation, note, task, calendar event, mail account and message, agent, schedule and insight, plus Atlas's learned personality. Your account stays, and API keys in the macOS Keychain are untouched. This can't be undone.</p>
+<sc-if value="{{ erased }}" hint-placeholder-val="{{ false }}"><div style="padding:12px 14px;border-radius:14px;background:#e3f4ec;font-size:12.5px;font-weight:600;color:#0a7a53">All data deleted. Atlas is starting fresh.</div></sc-if>
+<sc-if value="{{ notErased }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"><input value="{{ eraseText }}" onInput="{{ eraseInput }}" placeholder="Type DELETE to confirm" aria-label="Type DELETE to confirm" style="border:none;outline:none;width:240px;max-width:100%;height:40px;padding:0 14px;border-radius:14px;background:#f9f7f4;color:#1e1e24;font-family:inherit;font-size:13.5px;letter-spacing:.04em" style-focus="background:#f7e6e4"><button onClick="{{ act }}" data-a="erase" style="border:none;height:40px;padding:0 16px;border-radius:9999px;background:{{ eraseBg }};color:{{ eraseFg }};font-family:inherit;font-size:13px;font-weight:600;cursor:{{ eraseCursor }};transition:background .2s">Delete everything</button></div>
+</sc-if>
+</div>
+</sc-if>
+
+</main>
+</div>
+
+<sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+<div role="status" style="position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:50;display:flex;align-items:center;gap:10px;height:42px;padding:0 18px;border-radius:9999px;background:#1e1e24;color:#f9f7f4;font-size:13px;font-weight:500;box-shadow:0 18px 40px -18px rgba(30,30,36,.5);animation:bpop .35s cubic-bezier(.22,1,.36,1) both"><span style="width:7px;height:7px;border-radius:50%;background:#0fae76"></span>{{ toast }}</div>
+</sc-if>
+
+<nav aria-label="Atlas" data-dock="beta" style="view-transition-name:atlas-dock;position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:4px;padding:6px;border-radius:9999px;background:rgba(255,253,250,.94);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:0 18px 40px -20px rgba(30,30,36,.28)">
+<a href="Atlas Dashboard Beta.dc.html" title="Home" aria-label="Home" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M3.5 10.9 10.7 4.3a2 2 0 0 1 2.6 0l7.2 6.6v6.9a3 3 0 0 1-3 3h-3v-5.4a2.5 2.5 0 0 0-5 0v5.4h-3a3 3 0 0 1-3-3z"></path></svg></a>
+<a href="Atlas Core Beta.dc.html" title="Core" aria-label="Core" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.6a8.4 8.4 0 1 1 0 16.8 8.4 8.4 0 0 1 0-16.8M12 8.8a3.2 3.2 0 1 1 0 6.4 3.2 3.2 0 0 1 0-6.4M12 3.6v5.2M12 15.2v5.2M3.6 12h5.2M15.2 12h5.2"></path></svg></a>
+<a href="Atlas Teach Beta.dc.html" title="Teach" aria-label="Teach" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 7.4a5.2 5.2 0 0 0-3.9-1.8H5a1.2 1.2 0 0 0-1.2 1.2v9.6A1.2 1.2 0 0 0 5 17.6h3.1A5.2 5.2 0 0 1 12 19.4a5.2 5.2 0 0 1 3.9-1.8H19a1.2 1.2 0 0 0 1.2-1.2V6.8A1.2 1.2 0 0 0 19 5.6h-3.1A5.2 5.2 0 0 0 12 7.4zM12 7.4v12"></path></svg></a>
+<a href="Atlas Mail Beta.dc.html" title="Mail" aria-label="Mail" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M6.6 5.6h10.8a3.2 3.2 0 0 1 3.2 3.2v6.4a3.2 3.2 0 0 1-3.2 3.2H6.6a3.2 3.2 0 0 1-3.2-3.2V8.8a3.2 3.2 0 0 1 3.2-3.2zM3.8 7.6l7 4.8a2.2 2.2 0 0 0 2.4 0l7-4.8"></path></svg></a>
+<a href="Atlas Architecture Beta.dc.html" title="Architecture" aria-label="Architecture" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.4 3.4 7.9 12 12.4l8.6-4.5zM3.4 12.1 12 16.6l8.6-4.5M3.4 16.3 12 20.8l8.6-4.5"></path></svg></a>
+<a href="Atlas Voice Beta.dc.html" title="Voice" aria-label="Voice" style="flex:none;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:9999px;color:#6d6a67;transition:background .2s" style-hover="background:#f1eeea;color:#1e1e24"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M12 3.5a2.6 2.6 0 0 1 2.6 2.6v5.4a2.6 2.6 0 0 1-5.2 0V6.1A2.6 2.6 0 0 1 12 3.5zM18.1 11.5a6.1 6.1 0 0 1-12.2 0M12 17.6v3"></path></svg></a>
+<a href="Atlas Settings Beta.dc.html" title="Marcus · Settings" aria-label="Settings" style="flex:none;display:flex;align-items:center;justify-content:center;gap:8px;height:42px;padding:0 16px 0 4px;border-radius:9999px;background:#1e1e24;color:#f9f7f4;font-size:13px;font-weight:600;white-space:nowrap"><span style="width:34px;height:34px;border-radius:50%;background:#3461f2;color:#f9f7f4;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">M</span>Settings</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;initialSection&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;voice&quot;,&quot;options&quot;:[&quot;voice&quot;,&quot;personality&quot;,&quot;memory&quot;,&quot;permissions&quot;,&quot;mail&quot;,&quot;portfolio&quot;,&quot;music&quot;,&quot;wifi&quot;,&quot;bluetooth&quot;,&quot;devices&quot;,&quot;battery&quot;,&quot;updates&quot;,&quot;budget&quot;],&quot;tsType&quot;:&quot;string&quot;},&quot;edition&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;admin&quot;,&quot;options&quot;:[&quot;admin&quot;,&quot;consumer&quot;],&quot;tsType&quot;:&quot;'admin' | 'consumer'&quot;}}">
+class Component extends DCLogic {
+  state = {
+    sec: 'voice', vw: window.innerWidth, ico: {}, toast: '',
+    voiceId: 'sarah', model: 'turbo', previewing: false,
+    tg: { wake: true, ptt: false, lockMute: true, askJoin: false, autoUpd: true, overnight: true, lowPower: false, optCharge: true, dimBat: true, mailAlerts: true, autoRemember: true, aj_home: true, aj_home24: false, aj_office: true, aj_cafe: false },
+    traits: { warmth: 70, playfulness: 40, formality: 30, verbosity: 45, directness: 60 }, traitSaved: true,
+    memories: null, tidying: false, tidyNote: '', eraseText: '', erased: false,
+    accounts: null, scanning: null, scanned: {}, confirm: null, connecting: null, imapOpen: false, imap: { email: '', host: '', port: '993', user: '', pass: '' }, imapBusy: false, imapErr: '',
+    pf: 'linked', pfSyncing: false, pfSynced: '2 hours ago',
+    sp: 'connected',
+    wifiOn: true, wifiNet: 'Fogware 5G', joining: null, known: ['Fogware 5G', 'Fogware', 'Linden-Studio', 'Café Ritual'],
+    btOn: true, btConn: { airpods: true, trackpad: true, iphone: true, watch: true, keyboard: false }, btPaired: ['airpods', 'trackpad', 'iphone', 'watch', 'keyboard'], btBusy: null, cont: {},
+    upd: 'available', updPct: 0, ver: '2.4.1',
+    estop: false
+  };
+  componentDidMount() {
+    this.onResize = () => this.setState({ vw: window.innerWidth });
+    window.addEventListener('resize', this.onResize);
+    this.onKey = (e) => { if (e.key === 'Escape' && !/INPUT|TEXTAREA/.test(document.activeElement && document.activeElement.tagName)) window.location.href = 'Atlas Dashboard Beta.dc.html'; };
+    window.addEventListener('keydown', this.onKey);
+    const h = (window.location.hash || '').slice(1);
+    const want = h || this.props.initialSection;
+    if (want && this.secs().some((s) => s.k === want)) this.setState({ sec: want });
+    fetch('atlas-icon-data.js').then((r) => r.text()).then((t) => {
+      const SET = new Function(t.replace(/export\s+const\s+SET\s*=/, 'return'))();
+      const ico = {};
+      SET.forEach((g) => g[2].forEach(([n, d]) => { ico[n] = d; }));
+      this.setState({ ico });
+    }).catch(() => {});
+  }
+  componentDidUpdate(p) { if (p.initialSection !== this.props.initialSection && this.props.initialSection) this.setState({ sec: this.props.initialSection }); }
+  componentWillUnmount() {
+    window.removeEventListener('resize', this.onResize);
+    window.removeEventListener('keydown', this.onKey);
+    (this.timers || []).forEach(clearTimeout); clearInterval(this.updTimer);
+    if (this.sph) this.sph.destroy();
+  }
+  later(fn, ms) { (this.timers = this.timers || []).push(setTimeout(fn, ms)); }
+  toast(t) { this.setState({ toast: t }); clearTimeout(this.tt); this.tt = setTimeout(() => this.setState({ toast: '' }), 2400); }
+  admin() { return (this.props.edition ?? 'admin') === 'admin'; }
+  secs() {
+    const all = [
+      { k: 'voice', g: 'Atlas', l: 'Voice', i: 'voice', intro: 'How Atlas sounds when it speaks, and how it listens for you.' },
+      { k: 'personality', g: 'Atlas', l: 'Personality', i: 'sparkle', intro: 'Tune how warm, playful, formal, detailed and direct Atlas is with you.' },
+      { k: 'memory', g: 'Atlas', l: 'Memory & Privacy', i: 'memory', intro: 'Everything Atlas remembers about you, stored on this Mac. Forget any of it at any time.' },
+      { k: 'permissions', g: 'Atlas', l: 'Permissions', i: 'lock', intro: 'What you allowed Atlas to do when it first started, and the way back to change it.' },
+      { k: 'mail', g: 'Connections', l: 'Mail', i: 'mail', intro: 'Mailboxes Atlas reads, read-only, for bills, deadlines and documents.' },
+      { k: 'portfolio', g: 'Connections', l: 'Portfolio', i: 'markets', intro: 'Your brokerage link. Holdings sync read-only and are analysed on this Mac only.' },
+      { k: 'music', g: 'Connections', l: 'Music', i: 'music', intro: 'Spotify playback through Atlas, and the control to withdraw it.' },
+      { k: 'wifi', g: 'This Mac', l: 'Wi-Fi', i: 'wi-fi', intro: 'Networks this Mac joins, and which ones it joins on its own.' },
+      { k: 'bluetooth', g: 'This Mac', l: 'Bluetooth', i: '_bt', intro: 'Headphones, input devices and everything else paired with this Mac.' },
+      { k: 'devices', g: 'This Mac', l: 'Devices', i: 'mac', intro: 'This Mac, the on-device model, and the devices Atlas works with nearby.' },
+      { k: 'battery', g: 'This Mac', l: 'Battery', i: 'battery', intro: 'Charge, what is using it, and how Atlas behaves on battery.' },
+      { k: 'updates', g: 'System', l: 'Software Update', i: 'download', intro: 'Keep Atlas current. Updates install in the background and never interrupt a conversation.' },
+      { k: 'budget', g: 'System', l: 'Budget & AI', i: 'energy', intro: 'Model spend, token usage by tier, provider health and the emergency stop.', admin: true }
+    ];
+    return this.admin() ? all : all.filter((s) => !s.admin);
+  }
+  act = (e) => {
+    const a = e.currentTarget.getAttribute('data-a'), k = e.currentTarget.getAttribute('data-k');
+    const s = this.state;
+    const set = (o) => this.setState(o);
+    switch (a) {
+      case 'nav': set({ sec: k, confirm: null }); if (this.main) this.main.scrollTop = 0; try { history.replaceState(null, '', '#' + k); } catch (x) {} break;
+      case 'tog': set({ tg: Object.assign({}, s.tg, { [k]: !s.tg[k] }) }); break;
+      case 'voice': set({ voiceId: k }); break;
+      case 'model': set({ model: k }); break;
+      case 'preview': if (!s.previewing) { set({ previewing: true }); this.later(() => set({ previewing: false }), 2600); } break;
+      case 'resetTraits': set({ traits: { warmth: 70, playfulness: 40, formality: 30, verbosity: 45, directness: 60 } }); this.toast('Personality reset to defaults'); break;
+      case 'forget': set({ memories: this.mems().filter((m) => m.id !== k) }); this.toast('Forgotten'); break;
+      case 'tidy': if (!s.tidying) { set({ tidying: true }); this.later(() => set({ tidying: false, memories: this.mems().filter((m) => m.id !== 'm7' && m.id !== 'm8'), tidyNote: 'Merged 1 duplicate and pruned 1 stale memory.' }), 1300); } break;
+      case 'erase': if (s.eraseText.trim() === 'DELETE') { set({ erased: true, memories: [], eraseText: '' }); } break;
+      case 'review': this.toast('Opening the consent screen…'); break;
+      case 'scan': set({ scanning: k }); this.later(() => set({ scanning: null, scanned: Object.assign({}, this.state.scanned, { [k]: true }) }), 1500); break;
+      case 'ask': set({ confirm: s.confirm === k ? null : k }); break;
+      case 'cancel': set({ confirm: null }); break;
+      case 'mailDisc': set({ accounts: this.accts().filter((x) => x.id !== k), confirm: null }); this.toast('Mailbox disconnected'); break;
+      case 'reconnect': set({ connecting: 'r_' + k }); this.later(() => set({ connecting: null, accounts: this.accts().map((x) => (x.id === k ? Object.assign({}, x, { status: 'active' }) : x)) }), 1600); break;
+      case 'connect': set({ connecting: k }); this.later(() => { if (this.state.connecting !== k) return; const n = this.accts().filter((x) => x.provider === k).length; set({ connecting: null, accounts: this.accts().concat([{ id: k + Date.now(), provider: k, email: k === 'gmail' ? (n ? 'marcus.work' + n + '@gmail.com' : 'marcus.hale@gmail.com') : 'marcus.hale@outlook.com', status: 'active', user: true }]) }); this.toast('Mailbox connected'); }, 1800); break;
+      case 'cancelConnect': set({ connecting: null }); break;
+      case 'imapOpen': set({ imapOpen: true, imapErr: '' }); this.later(() => { if (this.main) this.main.scrollTo({ top: this.main.scrollHeight, behavior: 'smooth' }); }, 60); break;
+      case 'imapClose': set({ imapOpen: false, imapErr: '' }); break;
+      case 'imapSubmit': {
+        const f = s.imap; if (!f.email || !f.host || !f.pass || s.imapBusy) break;
+        set({ imapBusy: true, imapErr: '' });
+        this.later(() => {
+          if (f.pass.length < 6) { set({ imapBusy: false, imapErr: 'The server rejected the password. If your provider uses app-specific passwords, create one and paste it here.' }); return; }
+          set({ imapBusy: false, imapOpen: false, imap: { email: '', host: '', port: '993', user: '', pass: '' }, accounts: this.accts().concat([{ id: 'i' + Date.now(), provider: 'imap', email: f.email, status: 'active', user: true }]) });
+          this.toast('Mailbox connected');
+        }, 1500);
+        break;
+      }
+      case 'pfSync': set({ pfSyncing: true }); this.later(() => set({ pfSyncing: false, pfSynced: 'Just now' }), 1600); break;
+      case 'pfDisc': set({ pf: 'none', confirm: null }); this.toast('Brokerage disconnected'); break;
+      case 'pfConnect': set({ pf: 'connecting' }); this.later(() => set({ pf: 'linked', pfSynced: 'Just now' }), 2000); break;
+      case 'spDisc': set({ sp: 'none', confirm: null }); this.toast('Spotify disconnected · token deleted'); break;
+      case 'spConnect': set({ sp: 'connecting' }); this.later(() => set({ sp: 'connected' }), 1800); break;
+      case 'wifi': set({ wifiOn: !s.wifiOn, joining: null, wifiNet: s.wifiOn ? s.wifiNet : (s.wifiNet || 'Fogware 5G') }); break;
+      case 'join': if (!s.joining) { set({ joining: k }); this.later(() => set({ joining: null, wifiNet: k, known: this.state.known.includes(k) ? this.state.known : this.state.known.concat([k]) }), 1200); } break;
+      case 'wifiDisc': set({ wifiNet: null }); break;
+      case 'wifiForget': set({ known: s.known.filter((n) => n !== k), wifiNet: s.wifiNet === k ? null : s.wifiNet, confirm: null }); this.toast('Network forgotten'); break;
+      case 'bt': set({ btOn: !s.btOn, btBusy: null }); break;
+      case 'btDev': {
+        if (s.btBusy) break;
+        if (s.btConn[k]) { set({ btConn: Object.assign({}, s.btConn, { [k]: false }) }); break; }
+        set({ btBusy: k });
+        this.later(() => set({ btBusy: null, btConn: Object.assign({}, this.state.btConn, { [k]: true }), btPaired: this.state.btPaired.includes(k) ? this.state.btPaired : this.state.btPaired.concat([k]) }), 1200);
+        break;
+      }
+      case 'btForget': set({ btPaired: s.btPaired.filter((x) => x !== k), btConn: Object.assign({}, s.btConn, { [k]: false }), confirm: null }); this.toast('Device removed'); break;
+      case 'cont': set({ cont: Object.assign({}, s.cont, { [k]: !s.cont[k] }) }); break;
+      case 'updCheck': set({ upd: 'checking' }); this.later(() => set({ upd: s.ver === '2.5.0' ? 'current' : 'available' }), 1400); break;
+      case 'updInstall':
+        set({ upd: 'downloading', updPct: 0 });
+        clearInterval(this.updTimer);
+        this.updTimer = setInterval(() => {
+          const p = Math.min(100, this.state.updPct + 7 + Math.round(Math.random() * 6));
+          if (p >= 100) { clearInterval(this.updTimer); set({ upd: 'ready', updPct: 100 }); } else set({ updPct: p });
+        }, 220);
+        break;
+      case 'updCancel': clearInterval(this.updTimer); set({ upd: 'available', updPct: 0 }); break;
+      case 'updRestart': set({ upd: 'restarting' }); this.later(() => set({ upd: 'current', ver: '2.5.0' }), 1600); break;
+      case 'estop': if (s.estop) set({ estop: false, confirm: null }); else set({ confirm: 'estop' }); break;
+      case 'estopGo': set({ estop: true, confirm: null }); this.toast('All model calls stopped'); break;
+    }
+  };
+  mems() {
+    return this.state.memories || [
+      { id: 'm1', key: 'Partner', v: 'Sam, works at Linden Studio', cat: 'Person', n: 14 },
+      { id: 'm2', key: 'Paris trip', v: 'Flying 31 Oct, staying in Le Marais', cat: 'Travel', n: 6 },
+      { id: 'm3', key: 'Maya Reyes', v: 'Direct report, 1:1 every Sunday at 3 PM', cat: 'Work', n: 9 },
+      { id: 'm4', key: 'Standup', v: 'Means the 9:30 team sync, not a stand-up desk', cat: 'Language', n: 22 },
+      { id: 'm5', key: 'Coffee order', v: 'Flat white, oat milk', cat: 'Preference', n: 4 },
+      { id: 'm6', key: 'Allergy', v: 'Shellfish. Mention it when booking restaurants.', cat: 'Health', n: 3 },
+      { id: 'm7', key: 'Paris trip', v: 'Trip to Paris end of October', cat: 'Travel', n: 1 },
+      { id: 'm8', key: 'Old gym', v: 'Used to go to Equinox Sutter St', cat: 'Place', n: 1 }
+    ];
+  }
+  accts() {
+    return this.state.accounts || [
+      { id: 'a1', provider: 'gmail', email: 'marcus.hale@gmail.com', status: 'active', user: true },
+      { id: 'a2', provider: 'outlook', email: 'marcus@fogware.com', status: 'expired', user: true },
+      { id: 'a3', provider: 'imap', email: 'atlas-admin@fogware.com', status: 'active', user: false }
+    ];
+  }
+  renderVals() {
+    const st = this.state, I = st.ico;
+    const ic = (n) => (n === '_bt' ? 'M7 7l10 10-5 4V3l5 4L7 17' : I[n] || '');
+    const SW = (on) => ({ swBg: on ? '#3461f2' : '#d8d4cd', swPos: on ? 'flex-end' : 'flex-start' });
+    const TONE = { pri: ['#3461f2', '#fffdfa'], tint: ['#eef2fe', '#2748bd'], sec: ['#f1eeea', '#1e1e24'], card: ['#fffdfa', '#1e1e24'], ghost: ['transparent', '#6d6a67'], danger: ['#f1eeea', '#a3352c'], red: ['#d0453a', '#fffdfa'], off: ['#f1eeea', '#b6b1aa'] };
+    const B = (l, a, k, t) => ({ l, a, k: k || '', bg: TONE[t || 'sec'][0], fg: TONE[t || 'sec'][1] });
+    const row = (o) => Object.assign({ bg: '#f9f7f4', chipBg: '#f1eeea', chipFg: '#6d6a67', sFg: '#6d6a67', trailFg: '#6d6a67', btns: [], isToggle: false, hasMeter: false, hasConfirm: false, confirmBtns: [], a: 'tog', k: '' }, o, {
+      hasIcon: !!o.ico, ico: o.ico ? ic(o.ico) : '', hasS: !!o.s, hasTrail: !!o.trail
+    }, o.isToggle ? SW(o.on) : {});
+    const tg = (k, t, s) => row({ t, s, isToggle: true, on: !!st.tg[k], k });
+    const card = (o) => Object.assign({ bg: '#fffdfa', titleFg: '#1e1e24', subFg: '#6d6a67', statBg: '#f9f7f4', noteFg: '#6d6a67', rows: [], stats: [], btns: [], headBtns: [], hasSwitch: false, swA: 'tog', swK: '' }, o, {
+      hasSub: !!o.sub, hasStats: !!(o.stats && o.stats.length), hasNote: !!o.note, hasBtns: !!(o.btns && o.btns.length)
+    }, o.hasSwitch ? SW(o.swOn) : {});
+    const confirmOf = (key, text, goLabel, goA, goK) => (st.confirm === key ? { hasConfirm: true, confirmText: text, confirmBtns: [B(goLabel, goA, goK, 'red'), B('Keep', 'cancel', '', 'card')] } : {});
+    const secs = this.secs(), sec = secs.find((s) => s.k === st.sec) || secs[0];
+    const narrow = st.vw < 900;
+    const D = {
+      airpods: 'airpods', trackpad: 'trackpad', iphone: 'iphone', watch: 'watch', keyboard: 'keyboard', sony: 'airpods', speaker: 'speaker'
+    };
+    let cards = [];
+    const S = sec.k;
+
+    if (S === 'voice') {
+      cards = [card({ title: 'Voice input', sub: 'How Atlas listens. The microphone permission is managed under Permissions.', rows: [
+        row({ ico: 'mic', t: 'Microphone', s: 'MacBook Pro Microphone · system default', trail: 'Allowed', trailFg: '#0a7a53', chipBg: '#eef2fe', chipFg: '#2748bd' }),
+        tg('wake', 'Listen for “Hey Atlas”', 'Wake word is detected on-device. Nothing is sent until Atlas wakes.'),
+        tg('ptt', 'Push to talk', 'Hold fn to speak, release to send. Works alongside the wake word.'),
+        tg('lockMute', 'Mute when the Mac is locked', 'Atlas stops listening the moment the screen locks.')
+      ] })];
+    }
+    if (S === 'memory') {
+      const ms = this.mems();
+      cards = [
+        card({ title: 'Remembering', rows: [tg('autoRemember', 'Remember things I share', 'Atlas saves facts from conversation, like names, plans and preferences. Off means it only remembers what you ask it to.')] }),
+        card({ title: 'What Atlas remembers', sub: ms.length ? ms.length + ' memories on this Mac' : 'No memories stored yet. Atlas saves facts you share in conversation.',
+          headBtns: [B(st.tidying ? 'Tidying…' : 'Tidy up', 'tidy', '', 'tint')],
+          note: st.tidyNote || 'Tidy up merges memories saved twice under the same name, keeping the newest, and prunes ones over 90 days old that were mentioned once. It never contacts a model, but it does delete rows and can’t be undone.',
+          noteFg: st.tidyNote ? '#0a7a53' : '#6d6a67',
+          rows: ms.map((m) => row({ t: m.key, s: m.v + ' · mentioned ' + m.n + '×', trail: m.cat, trailFg: '#8b8681', btns: [B('Forget', 'forget', m.id, 'danger')] })) })
+      ];
+    }
+    if (S === 'permissions') {
+      const P = [
+        ['microphone', 'mic', 'Microphone', 'So we can just talk, instead of you typing everything.', 'Voice conversations are unavailable. Typing works exactly as well.', true],
+        ['notifications', 'bell', 'Notifications', 'So I can tell you when something actually matters — not for the sake of it.', 'Alerts appear inside Atlas only, when you open it.', true],
+        ['liveData', 'cloud', 'Live data', 'Weather, markets and news on your dashboard, fetched as you look at them.', 'Those cards stay empty. Nothing else changes.', true],
+        ['proactive', 'sparkle', 'Proactive digest', 'A short digest of what changed, prepared while you are away.', 'I only ever respond when you ask. Nothing runs on its own.', false]
+      ];
+      cards = [card({ title: 'What Atlas may do', sub: 'These are the answers you gave when Atlas first started. Reviewing them reopens that same screen. Nothing changes until you choose it there, and switching one back on re-asks macOS.',
+        rows: P.map(([id, i, t, on, off, v]) => row({ ico: i, t, s: v ? on : off, trail: v ? 'Allowed' : 'Off', trailFg: v ? '#0a7a53' : '#8b8681', chipBg: v ? '#eef2fe' : '#f1eeea', chipFg: v ? '#2748bd' : '#8b8681' })),
+        note: 'Answered 3 August 2026.', btns: [B('Review permissions', 'review', '', 'pri')] })];
+    }
+    if (S === 'mail') {
+      const acc = this.accts();
+      const PV = { gmail: 'Gmail', outlook: 'Outlook', imap: 'IMAP' };
+      cards = [card({ title: 'Connected mailboxes', sub: 'Atlas scans connected mailboxes read-only, every 15 minutes while it is open, and alerts you to bills, deadlines and documents. Your mailbox is never modified.',
+        rows: acc.map((x) => {
+          const ok = x.status === 'active', sc = st.scanning === x.id, rc = st.connecting === 'r_' + x.id;
+          const s = !x.user ? 'Admin mailbox · managed by Atlas, can’t be removed here' : rc ? 'Waiting for Microsoft…' : sc ? 'Scanning…' : ok ? (st.scanned[x.id] ? 'Active · read-only · scanned just now' : 'Active · read-only · scanned 6 min ago') : 'Sign-in expired. Reconnect to resume scanning.';
+          const btns = !x.user ? [] : [ok ? B(sc ? 'Scanning…' : 'Scan now', 'scan', x.id, 'tint') : B(rc ? 'Waiting…' : 'Reconnect', 'reconnect', x.id, 'pri'), B('Disconnect', 'ask', 'm_' + x.id, 'danger')];
+          return row(Object.assign({ ico: 'inbox', t: x.email, s, sFg: !x.user ? '#6d6a67' : ok ? '#0a7a53' : '#a3352c', trail: PV[x.provider], trailFg: '#8b8681', chipBg: ok ? '#1e1e24' : '#f7e6e4', chipFg: ok ? '#f9f7f4' : '#a3352c', btns },
+            confirmOf('m_' + x.id, 'Disconnect ' + x.email + '? Atlas stops scanning it and deletes the mail it stored from this mailbox. The mailbox itself is untouched.', 'Disconnect', 'mailDisc', x.id)));
+        }),
+        btns: st.connecting && !String(st.connecting).startsWith('r_')
+          ? [B(st.connecting === 'gmail' ? 'Waiting for Google…' : 'Waiting for Microsoft…', '', '', 'off'), B('Cancel', 'cancelConnect', '', 'ghost')]
+          : [B(acc.some((x) => x.provider === 'gmail') ? 'Connect another Gmail' : 'Connect Gmail', 'connect', 'gmail', 'pri'), B(acc.some((x) => x.provider === 'outlook') ? 'Connect another Outlook' : 'Connect Outlook / Microsoft 365', 'connect', 'outlook', 'tint')].concat(st.imapOpen ? [] : [B('Connect another mailbox (IMAP)', 'imapOpen', '', 'sec')]) }),
+        card({ title: 'Alerts', rows: [tg('mailAlerts', 'Tell me about bills and deadlines', 'A notification when Atlas finds something due in the next 7 days.')] })];
+    }
+    if (S === 'portfolio') {
+      const pf = st.pf;
+      cards = [card({ title: 'Brokerage connection', sub: 'Holdings and transactions are pulled read-only and stored and analysed locally on this Mac, never in the cloud. You sign in inside your broker’s own window, so Atlas never sees your password.',
+        stats: pf === 'linked' ? [{ k: 'Accounts', v: '3', fg: '#1e1e24' }, { k: 'Holdings', v: '41', fg: '#1e1e24' }, { k: 'Last sync', v: st.pfSyncing ? 'Syncing…' : st.pfSynced, fg: '#1e1e24' }] : [],
+        rows: pf === 'linked' ? [row(Object.assign({ ico: 'banking', t: 'Brokerage linked', s: 'Read-only · via SnapTrade', sFg: '#0a7a53', chipBg: '#1e1e24', chipFg: '#f9f7f4', btns: [B(st.pfSyncing ? 'Syncing…' : 'Sync now', 'pfSync', '', 'tint'), B('Disconnect', 'ask', 'pf', 'danger')] },
+          confirmOf('pf', 'Disconnect your brokerage? Atlas deletes the synced holdings and history from this Mac. Your brokerage account is untouched.', 'Disconnect', 'pfDisc', '')))]
+          : [row({ ico: 'banking', t: pf === 'connecting' ? 'Opening your broker…' : 'No brokerage linked', s: pf === 'connecting' ? 'Finish signing in in the broker’s window.' : 'Portfolio and Money widgets stay empty until you link one.' })],
+        btns: pf === 'none' ? [B('Connect a brokerage', 'pfConnect', '', 'pri')] : [] })];
+    }
+    if (S === 'music') {
+      const sp = st.sp;
+      cards = [card({ title: 'Spotify connection', sub: 'Play your own library through Atlas. You sign in on Spotify’s own page, and Atlas keeps only an access token in this Mac’s Keychain. Playback happens with your consent, and you can withdraw it here at any time.',
+        rows: sp === 'connected' ? [row(Object.assign({ ico: 'music', t: 'Spotify connected', s: 'Premium account · plays inside Atlas', sFg: '#0a7a53', chipBg: '#1e1e24', chipFg: '#f9f7f4', btns: [B('Disconnect', 'ask', 'sp', 'danger')] },
+          confirmOf('sp', 'Disconnecting stops playback and deletes your Spotify token from this Mac’s Keychain. Your Spotify account, library and playlists are untouched. To also remove Atlas from your Spotify account’s app list, do that on Spotify’s website.', 'Disconnect Spotify', 'spDisc', '')))]
+          : [row({ ico: 'music', t: sp === 'connecting' ? 'Waiting for Spotify…' : 'Not connected', s: sp === 'connecting' ? 'Approve Atlas on Spotify’s page.' : 'Spotify Premium is needed for playback.' })],
+        btns: sp === 'none' ? [B('Connect Spotify', 'spConnect', '', 'pri')] : [] })];
+    }
+    if (S === 'wifi') {
+      const NETS = {
+        'Fogware 5G': { sec: 'WPA3', band: '5 GHz', s: 3, dbm: '−48 dBm', rate: '1.2 Gbps', ip: '192.168.1.24' },
+        'Fogware': { sec: 'WPA3', band: '2.4 GHz', s: 3, dbm: '−52 dBm', rate: '144 Mbps', ip: '192.168.1.24' },
+        'Linden-Studio': { sec: 'WPA2', band: '5 GHz', s: 2, dbm: '−66 dBm', rate: '480 Mbps', ip: '10.0.0.41' },
+        'Café Ritual': { sec: '', band: '2.4 GHz', s: 0, away: true },
+        'iPhone 15 Pro': { sec: 'Hotspot', band: '5G', s: 2, dbm: '−61 dBm', rate: '310 Mbps', ip: '172.20.10.3' },
+        'Sutter Guest': { sec: '', band: '2.4 GHz', s: 1, dbm: '−79 dBm', rate: '24 Mbps', ip: '10.12.0.88' },
+        'NETGEAR-7F': { sec: 'WPA2', band: '2.4 GHz', s: 1, dbm: '−82 dBm', rate: '18 Mbps', ip: '' }
+      };
+      const cur = st.wifiOn && st.wifiNet ? Object.assign({ n: st.wifiNet }, NETS[st.wifiNet]) : null;
+      const bars = (s) => ['', 'Weak', 'Good', 'Strong'][s] || 'Out of range';
+      const ajKey = (n) => 'aj_' + ({ 'Fogware 5G': 'home', 'Fogware': 'home24', 'Linden-Studio': 'office', 'Café Ritual': 'cafe' }[n] || n);
+      cards.push(card({ title: 'Wi-Fi', sub: !st.wifiOn ? 'Off. Atlas keeps working on-device; mail and sync resume when you reconnect.' : st.joining ? 'Joining ' + st.joining + '…' : cur ? 'Connected to ' + cur.n : 'On · not connected', hasSwitch: true, swOn: st.wifiOn, swA: 'wifi' }));
+      if (st.wifiOn) {
+        if (cur) cards.push(card({ bg: '#eef2fe', title: cur.n, titleFg: '#1e1e24', sub: 'Connected · ' + (cur.sec || 'Open') + ' · ' + cur.band, subFg: '#2748bd', statBg: 'rgba(255,253,250,.78)', headBtns: [B('Disconnect', 'wifiDisc', '', 'card')],
+          stats: [{ k: 'Signal', v: bars(cur.s) + ' · ' + cur.dbm, fg: '#1e1e24' }, { k: 'Speed', v: cur.rate, fg: '#1e1e24' }, { k: 'IP address', v: cur.ip, fg: '#1e1e24' }, { k: 'Router', v: '192.168.1.1', fg: '#1e1e24' }] }));
+        const known = st.known.filter((n) => !cur || n !== cur.n);
+        if (known.length) cards.push(card({ title: 'Known networks', sub: 'Auto-join lets this Mac connect without asking when the network is in range.',
+          rows: known.map((n) => { const d = NETS[n] || { s: 1, band: '' }; const j = st.joining === n; return row(Object.assign({ ico: 'wi-fi', t: n, s: j ? 'Joining…' : d.away ? 'Not in range' : bars(d.s) + ' · ' + (d.sec || 'Open') + ' · ' + d.band, sFg: j ? '#2748bd' : '#6d6a67', chipBg: d.away ? '#f1eeea' : '#fffdfa', chipFg: d.away ? '#b6b1aa' : '#1e1e24',
+            btns: (d.away ? [] : [B(j ? 'Joining…' : 'Join', 'join', n, 'tint')]).concat([B('Forget', 'ask', 'wf_' + n, 'ghost')]), isToggle: true, on: !!st.tg[ajKey(n)], k: ajKey(n) },
+            confirmOf('wf_' + n, 'Forget ' + n + '? This Mac won’t join it again until you enter the password.', 'Forget network', 'wifiForget', n))); }) }));
+        const others = Object.keys(NETS).filter((n) => !st.known.includes(n));
+        cards.push(card({ title: 'Other networks', rows: others.map((n) => { const d = NETS[n]; const j = st.joining === n; return row({ ico: 'wi-fi', t: n, s: j ? 'Joining…' : (d.sec === 'Hotspot' ? 'Personal hotspot · ' : (d.sec ? 'Secured · ' : 'Open · ')) + bars(d.s) + ' · ' + d.band, sFg: j ? '#2748bd' : '#6d6a67', chipBg: '#fffdfa', chipFg: '#1e1e24', btns: [B(j ? 'Joining…' : 'Join', 'join', n, 'tint')] }); }) }));
+        cards.push(card({ title: 'Options', rows: [tg('askJoin', 'Ask to join new networks', 'Show a prompt when no known network is in range.')] }));
+      }
+    }
+    if (S === 'bluetooth') {
+      const BT = {
+        airpods: ['AirPods Pro', 'In your ears', 82], trackpad: ['Magic Trackpad', 'In use now', 64], iphone: ['iPhone 15 Pro', 'Handoff and hotspot', 48],
+        watch: ['Apple Watch', 'Unlocks this Mac', 71], keyboard: ['Magic Keyboard', 'Connected', 12], sony: ['WH-1000XM5', 'Connected', 90], speaker: ['Kitchen speaker', 'Connected', 0]
+      };
+      const NEAR = { sony: 'Headphones · ready to pair', speaker: 'Speaker · about 4 m away' };
+      const conn = st.btConn;
+      const mk = (k, paired) => { const [n, on, bat] = BT[k]; const c = !!conn[k], busy = st.btBusy === k;
+        return row(Object.assign({ ico: D[k], t: n, s: busy ? (paired ? 'Connecting…' : 'Pairing…') : c ? on : paired ? 'Not connected' : NEAR[k], sFg: busy ? '#2748bd' : '#6d6a67',
+          chipBg: c ? '#1e1e24' : '#fffdfa', chipFg: c ? '#f9f7f4' : '#8b8681', trail: c && bat ? bat + '%' : '', trailFg: bat <= 15 ? '#a3352c' : '#1e1e24',
+          btns: [B(busy ? '…' : c ? 'Disconnect' : paired ? 'Connect' : 'Pair', 'btDev', k, c ? 'card' : 'tint')].concat(paired ? [B('Forget', 'ask', 'bf_' + k, 'ghost')] : []) },
+          confirmOf('bf_' + k, 'Remove ' + n + '? You’ll need to pair it again to use it with this Mac.', 'Remove device', 'btForget', k))); };
+      const mine = st.btPaired, near = Object.keys(NEAR).filter((k) => !mine.includes(k));
+      const nConn = mine.filter((k) => conn[k]).length;
+      cards.push(card({ title: 'Bluetooth', sub: st.btOn ? nConn + ' connected · discoverable as “Studio Mac” while this screen is open' : 'Off. AirPods, trackpad and Apple Watch unlock are paused until you turn it back on.', hasSwitch: true, swOn: st.btOn, swA: 'bt' }));
+      if (st.btOn) {
+        cards.push(card({ title: 'My devices', rows: mine.map((k) => mk(k, true)), note: conn.keyboard && BT.keyboard[2] <= 15 ? 'Magic Keyboard is at 12%. Charge it soon.' : '', noteFg: '#a3352c' }));
+        if (near.length) cards.push(card({ title: 'Nearby', sub: 'Put a device in pairing mode to see it here.', rows: near.map((k) => mk(k, false)) }));
+      }
+    }
+    if (S === 'devices') {
+      const lp = st.tg.lowPower;
+      cards = [
+        card({ title: 'MacBook Pro 16"', sub: 'This Mac · up 6 days', stats: [{ k: 'Chip', v: 'Apple M3 Max', fg: '#1e1e24' }, { k: 'Memory', v: '36 GB', fg: '#1e1e24' }, { k: 'macOS', v: '26.1', fg: '#1e1e24' }, { k: 'Atlas', v: st.ver, fg: '#1e1e24' }],
+          rows: [
+            row({ t: 'Processor', s: (lp ? '14' : '23') + '% in use · Atlas uses ' + (lp ? '2' : '6') + '%', hasMeter: true, mw: lp ? '14%' : '23%', mfg: '#1e1e24' }),
+            row({ t: 'Memory', s: '18.2 of 36 GB · pressure normal', hasMeter: true, mw: '51%', mfg: '#0fae76' }),
+            row({ t: 'Storage', s: '588 of 1,000 GB · Atlas data 6.8 GB', hasMeter: true, mw: '59%', mfg: '#1e1e24' })
+          ] }),
+        card({ title: 'On-device model', rows: [row({ ico: 'cpu', t: 'Atlas local model', s: 'Handles the wake word, memory search and offline answers. 4.2 GB.', trail: 'Ready', trailFg: '#0a7a53', chipBg: '#e3f4ec', chipFg: '#0a7a53' })] }),
+        card({ title: 'Continuity', sub: 'Devices signed in to the same account and close enough to hand work back and forth.',
+          rows: [['iphone', 'iPhone 15 Pro', 'Safari · Lisbon flights', 'Open here', 'Opened', true], ['watch', 'Apple Watch', 'On your wrist · unlocks this Mac', 'Ping', 'Pinged', true], ['display', 'iPad Air', 'Sidecar available', 'Extend display', 'Extended', false]].map(([k, n, on, a, done, bt]) => {
+            const ok = !bt || st.btOn, d = !!st.cont[k];
+            return row({ ico: k, t: n, s: ok ? on : 'Needs Bluetooth', chipBg: ok ? '#1e1e24' : '#fffdfa', chipFg: ok ? '#f9f7f4' : '#b6b1aa', btns: ok ? [B(d ? done : a, 'cont', k, d ? 'card' : 'tint')] : [B('Unavailable', '', '', 'off')] });
+          }) })
+      ];
+    }
+    let bat = {};
+    if (S === 'battery') {
+      const lp = st.tg.lowPower, pct = 68;
+      bat = { batPct: pct + '%', batKicker: lp ? 'Low Power Mode' : 'On battery', batLeft: lp ? 'About 6 hours 10 minutes left' : 'About 4 hours 20 minutes left', batBarFg: lp ? '#e0a21f' : '#0fae76',
+        batHist: [100, 100, 97, 93, 88, 84, 80, 77, 74, 72, 72, 72, 72, 72, 80, 92, 100, 100, 96, 91, 85, 79, 73, pct].map((v, i) => ({ h: Math.max(4, Math.round(v / 100 * 92)) + 'px', c: (i >= 14 && i <= 17) ? '#0fae76' : i === 23 ? '#3461f2' : '#1e1e24', t: v + '%' })) };
+      cards = [
+        card({ title: 'Using significant energy', sub: 'Since unplugged at 11:40 AM', rows: (lp ? [['Screen', 'Brightness 45%', 24], ['Atlas', 'Voice only · background sync paused', 5], ['Safari', '3 tabs', 18], ['Everything else', '14 processes', 23]] : [['Screen', 'Brightness 72%', 31], ['Atlas', 'Voice and background sync', 12], ['Safari', '3 tabs', 22], ['Everything else', '14 processes', 35]]).map(([t, s, v]) => row({ t, s, hasMeter: true, mw: v + '%', mfg: t === 'Atlas' ? '#3461f2' : '#1e1e24', trail: v + '%', trailFg: '#1e1e24' })) }),
+        card({ title: 'Power', rows: [
+          tg('lowPower', 'Low Power Mode', 'Dims the screen and pauses Atlas background sync. Voice keeps working.'),
+          tg('dimBat', 'Pause the sphere on battery below 20%', 'The Veil sphere holds still to save energy. It wakes the moment you talk.'),
+          tg('optCharge', 'Optimised charging', 'Holds at 80% while plugged in overnight, and learns your routine.')
+        ] }),
+        card({ title: 'Battery health', stats: [{ k: 'Maximum capacity', v: '94%', fg: '#1e1e24' }, { k: 'Cycle count', v: '212', fg: '#1e1e24' }, { k: 'Condition', v: 'Normal', fg: '#0a7a53' }] })
+      ];
+    }
+    let upd = {};
+    if (S === 'updates') {
+      const p = st.upd, notes = [{ k: 'Sphere', v: 'Veil motion on every surface, and smoother state changes.' }, { k: 'Mail', v: 'Folders as tiles, multi-select and quick reply.' }, { k: 'Fixes', v: 'Wi-Fi panel signal readout and 14 other fixes.' }];
+      const M = {
+        available: { kicker: 'Update available', title: 'Atlas 2.5.0', body: 'About 180 MB. It downloads in the background, and Atlas restarts only when you say so. Conversations and memories carry over.', notes, btns: [B('Download and install', 'updInstall', '', 'pri'), B('Later', 'updCheck', '', 'sec')] },
+        checking: { kicker: 'Checking', title: 'Looking for updates…', body: 'This takes a few seconds.', btns: [] },
+        downloading: { kicker: 'Downloading', title: 'Atlas 2.5.0', body: 'Keep working; Atlas will let you know when it’s ready.', prog: true, btns: [B('Cancel', 'updCancel', '', 'ghost')], ink: true },
+        ready: { kicker: 'Ready to install', title: 'Restart Atlas to finish', body: 'Takes about 10 seconds. The conversation drawer will reopen where you left it.', btns: [B('Restart Atlas', 'updRestart', '', 'card')], ink: true },
+        restarting: { kicker: 'Installing', title: 'Restarting…', body: 'Atlas will be back in a moment.', btns: [], ink: true },
+        current: { kicker: 'Up to date', title: 'Atlas ' + st.ver, body: 'You have the latest version. Last checked just now.', btns: [B('Check for updates', 'updCheck', '', 'sec')] }
+      }[p];
+      upd = { kicker: M.kicker, title: M.title, body: M.body, btns: M.btns, hasNotes: !!M.notes, notes: M.notes || [], hasProgress: !!M.prog, pct: st.updPct + '%',
+        bg: M.ink ? '#1e1e24' : p === 'current' ? '#e3f4ec' : '#eef2fe', fg: M.ink ? '#f9f7f4' : '#1e1e24', kick: M.ink ? 'rgba(249,247,244,.62)' : p === 'current' ? '#0a7a53' : '#2748bd', sub: M.ink ? 'rgba(249,247,244,.78)' : '#1e1e24', noteBg: 'rgba(255,253,250,.7)' };
+      cards = [card({ title: 'Automatic updates', rows: [tg('autoUpd', 'Download updates automatically', 'New versions download in the background on Wi-Fi.'), tg('overnight', 'Install overnight', 'When plugged in and idle between 2 and 5 AM.')] }),
+        card({ title: 'Current version', stats: [{ k: 'Atlas', v: st.ver, fg: '#1e1e24' }, { k: 'Channel', v: 'Beta', fg: '#1e1e24' }, { k: 'Installed', v: st.ver === '2.5.0' ? 'Today' : '9 October', fg: '#1e1e24' }] })];
+    }
+    if (S === 'budget') {
+      const stop = st.estop;
+      cards = [
+        card({ title: 'Spend', sub: 'Last 30 days, across all providers', stats: [{ k: 'Spent', v: '$41.20', fg: '#1e1e24' }, { k: 'Monthly cap', v: '$60.00', fg: '#1e1e24' }, { k: 'Projected', v: '$52.80', fg: '#1e1e24' }, { k: 'Tokens', v: '18.4M', fg: '#1e1e24' }],
+          rows: [row({ t: 'Budget used', s: '69% of cap · resets 1 November', hasMeter: true, mw: '69%', mfg: '#3461f2' })] }),
+        card({ title: 'Token usage by tier', rows: [['Conversation', 'Chat turns and web search', 58, '10.7M'], ['Background', 'Digest, mail triage, insights', 31, '5.7M'], ['On-device', 'Wake word, memory search · free', 11, '2.0M']].map(([t, s, v, n]) => row({ t, s, hasMeter: true, mw: v + '%', mfg: t === 'On-device' ? '#0fae76' : '#1e1e24', trail: n, trailFg: '#1e1e24' })) }),
+        card({ title: 'Provider health', rows: [['Anthropic', 'Chat turns · US', 'Healthy · 410 ms', '#0a7a53'], ['Amazon Bedrock', 'Background work · EU', 'Degraded · 1.8 s', '#a3352c'], ['ElevenLabs', 'Voice output', 'Healthy · 140 ms', '#0a7a53']].map(([t, s, tr, c]) => row({ ico: 'activity', t, s, trail: tr, trailFg: c, chipBg: c === '#a3352c' ? '#f7e6e4' : '#e3f4ec', chipFg: c })) }),
+        card(Object.assign({ bg: stop ? '#f7e6e4' : '#fffdfa', title: 'Emergency stop', titleFg: stop ? '#a3352c' : '#1e1e24', sub: stop ? 'Every model call is blocked. Atlas answers from on-device only until you switch this off.' : 'Blocks every paid model call immediately, for all tiers.', hasSwitch: true, swOn: stop, swA: 'estop' },
+          { rows: st.confirm === 'estop' ? [row({ t: 'Stop all model calls?', s: 'Conversations fall back to the on-device model, and background work pauses.', bg: '#f7e6e4', btns: [B('Stop now', 'estopGo', '', 'red'), B('Keep running', 'cancel', '', 'card')] })] : [] }))
+      ];
+    }
+
+    const cur = sec.k;
+    const groups = [];
+    secs.forEach((s) => { let g = groups.find((x) => x.label === s.g); if (!g) groups.push(g = { label: s.g, items: [] });
+      const on = s.k === cur;
+      const badge = s.k === 'mail' && this.accts().some((x) => x.status !== 'active') ? ['1', '#f7e6e4', '#a3352c'] : s.k === 'updates' && st.upd === 'available' ? ['New', '#eef2fe', '#2748bd'] : s.admin ? ['Admin', '#f9f7f4', '#6d6a67'] : null;
+      g.items.push({ k: s.k, label: s.l, ico: ic(s.i), cur: on ? 'page' : 'false', bg: on ? '#fffdfa' : 'transparent', fg: on ? '#1e1e24' : '#6d6a67', fw: on ? 600 : 500, hov: on ? '#fffdfa' : '#edebe7', hasBadge: !!badge, badge: badge ? badge[0] : '', badgeBg: badge ? badge[1] : '', badgeFg: badge ? badge[2] : '' });
+    });
+    groups.forEach((g) => { g.showLabel = !narrow; });
+
+    const f = st.imap, imapReady = f.email && f.host && f.pass && !st.imapBusy;
+    const eraseOk = st.eraseText.trim() === 'DELETE';
+    const V = [['sarah', 'Sarah', 'Soft, warm · default'], ['george', 'George', 'Calm, British'], ['daniel', 'Daniel', 'Deep, authoritative'], ['lily', 'Lily', 'Clear, velvety'], ['antoni', 'Antoni', 'Well-rounded, friendly']];
+    const TR = [['warmth', 'Warmth', 'How caring and encouraging Atlas is with you.', 'Matter-of-fact', 'Very warm'], ['playfulness', 'Playfulness', 'How much humour Atlas mixes in. It tones this down on its own when the moment is serious.', 'Strictly serious', 'Playful'], ['formality', 'Formality', 'Relaxed and casual, or polished and professional.', 'Casual', 'Formal'], ['verbosity', 'Detail', 'Quick and to the point, or thorough with context.', 'Brief', 'Detailed'], ['directness', 'Directness', 'Gentle suggestions, or straight answers.', 'Gentle', 'Direct']];
+    const word = (v, lo, hi) => (v < 20 ? lo : v > 80 ? hi : v < 42 ? 'Leaning ' + lo.toLowerCase() : v > 58 ? 'Leaning ' + hi.toLowerCase() : 'Balanced');
+    return Object.assign({
+      sphereRef: (el) => {
+        if (!el || el.__q) return;
+        const go = () => { if (el.__q || !el.isConnected) return; if (!window.QuickSphere) return setTimeout(go, 60);
+          el.__q = this.sph = window.QuickSphere.mount(el, { mode: 'veil', bg: 'transparent', dust: [122, 148, 246], strand: [52, 97, 242], blend: 'source-over', alpha: 0.7, seed: 11, count: 9000, scale: 0.42, state: 'idle' }); };
+        go();
+      },
+      mainRef: (el) => { this.main = el; },
+      eyebrow: 'Settings · ' + sec.g, title: sec.l, intro: sec.intro,
+      cols: narrow ? 'minmax(0,1fr)' : 'minmax(220px,260px) minmax(0,1fr)', rowsTpl: narrow ? 'auto minmax(0,1fr)' : 'minmax(0,1fr)',
+      navDir: narrow ? 'row' : 'column', navPad: narrow ? '6px' : '12px', navGap: narrow ? '2px' : '14px',
+      groups, act: this.act, cards,
+      isVoice: S === 'voice', isPersonality: S === 'personality', isMemory: S === 'memory', isBattery: S === 'battery', isUpdate: S === 'updates',
+      voices: V.map(([k, name, d]) => { const on = st.voiceId === k; return { k, name, d, on, bg: on ? '#eef2fe' : '#f9f7f4', hov: on ? '#eef2fe' : '#edebe7', fg: on ? '#2748bd' : '#1e1e24', sub: on ? '#2748bd' : '#6d6a67' }; }),
+      previewLabel: st.previewing ? 'Playing ' + V.find((v) => v[0] === st.voiceId)[1] + '…' : 'Preview voice', previewBg: st.previewing ? '#1e1e24' : '#eef2fe', previewFg: st.previewing ? '#f9f7f4' : '#2748bd',
+      models: [['turbo', 'Turbo v2.5', 'Fast, great quality · default'], ['flash', 'Flash v2.5', 'Lowest latency, about 75 ms'], ['multi', 'Multilingual v2', 'Highest quality, slower']].map(([k, name, d]) => { const on = st.model === k; return { k, name, d, bg: on ? '#fffdfa' : 'transparent', sh: on ? '0 2px 8px -3px rgba(30,30,36,.18)' : 'none' }; }),
+      traits: TR.map(([k, label, d, low, high]) => ({ k, label, d, low, high, v: st.traits[k], word: word(st.traits[k], low, high) })),
+      setTrait: (e) => { const k = e.currentTarget.getAttribute('data-k'), v = +e.currentTarget.value; this.setState((s) => ({ traits: Object.assign({}, s.traits, { [k]: v }), traitSaved: false })); clearTimeout(this.ts); this.ts = setTimeout(() => this.setState({ traitSaved: true }), 700); },
+      traitStatus: st.traitSaved ? 'Saved. Changes apply from your next message.' : 'Saving…',
+      lexicon: [{ w: 'standup', m: 'the 9:30 team sync' }, { w: 'Mae', m: 'Maya Reyes' }, { w: 'the studio', m: 'Linden Studio' }, { w: 'deep work', m: 'blocks with no meetings' }, { w: 'ship it', m: 'approve and send' }],
+      showImap: S === 'mail' && st.imapOpen, imap: f,
+      imapField: (e) => { const k = e.currentTarget.getAttribute('data-f'); let v = e.currentTarget.value; if (k === 'port') v = v.replace(/\D/g, ''); this.setState((s) => ({ imap: Object.assign({}, s.imap, { [k]: v }), imapErr: '' })); },
+      imapErr: !!st.imapErr, imapErrText: st.imapErr,
+      imapBtnLabel: st.imapBusy ? 'Signing in…' : 'Connect', imapBtnBg: imapReady || st.imapBusy ? '#3461f2' : '#f1eeea', imapBtnFg: imapReady || st.imapBusy ? '#fffdfa' : '#b6b1aa', imapCursor: imapReady ? 'pointer' : 'default',
+      erased: st.erased, notErased: !st.erased, eraseText: st.eraseText,
+      eraseInput: (e) => this.setState({ eraseText: e.currentTarget.value }),
+      eraseBg: eraseOk ? '#d0453a' : '#f1eeea', eraseFg: eraseOk ? '#fffdfa' : '#b6b1aa', eraseCursor: eraseOk ? 'pointer' : 'default',
+      upd, hasToast: !!st.toast, toast: st.toast
+    }, bat);
+  }
+}
+</script>
+</body>
+</html>

@@ -314,6 +314,11 @@ struct InvokeBody {
     profile: Option<Profile>,
     #[serde(default)]
     request_id: Option<String>,
+    /// The agent run making this call (`runs.id`), sent by the brain's runner
+    /// and by nothing else. Checked against the caller's own runs before it is
+    /// written anywhere (`audit::owned_run`).
+    #[serde(default)]
+    run_id: Option<String>,
 }
 
 impl InvokeBody {
@@ -669,9 +674,21 @@ fn invoke(app: &AppHandle, body: &[u8]) -> ControlResult {
     // verbatim text (audit.rs explains what the threshold buys).
     let redacted = audit::redact(&parsed.args);
 
+    // The rows an agent run's call writes are filed under that run, so the
+    // Agent View can show them, and the questions they raise, inside its plan.
+    // Only a run of this caller's counts; reads write no row, so they skip the
+    // lookup.
+    let run_id = if matches!(decision, policy::Decision::Run) {
+        None
+    } else {
+        audit::owned_run(app, &ctx.user_id, parsed.run_id.as_deref())
+    };
+
     match decision {
-        policy::Decision::Queue(reason) => queue_for_approval(app, &ctx, op, &parsed.args, &redacted, reason),
-        _ => execute(app, &ctx, op, &parsed.args, &redacted, decision),
+        policy::Decision::Queue(reason) => {
+            queue_for_approval(app, &ctx, op, &parsed.args, &redacted, reason, run_id.as_deref())
+        }
+        _ => execute(app, &ctx, op, &parsed.args, &redacted, decision, run_id.as_deref()),
     }
 }
 
@@ -683,13 +700,14 @@ fn execute(
     args: &Value,
     redacted: &Value,
     decision: policy::Decision,
+    run_id: Option<&str>,
 ) -> ControlResult {
     // BEFORE dispatch, and fail closed. If the trail cannot be written the op
     // does not run: an unauditable write is indistinguishable from one somebody
     // wanted hidden, and the caller here is a model reading attacker-authored
     // text, so "skip the log this once" must not be a reachable state.
     let tool_call_id = if decision.audited() {
-        match audit::record_running(app, ctx, op, redacted) {
+        match audit::record_running(app, ctx, op, redacted, run_id) {
             Ok(id) => {
                 // The ONLY place the request and the row it produced are ever
                 // written down together: `tool_calls` has no column for a
@@ -755,6 +773,7 @@ fn queue_for_approval(
     args: &Value,
     redacted: &Value,
     reason: policy::ApprovalReason,
+    run_id: Option<&str>,
 ) -> ControlResult {
     // FAIL CLOSED ON AN OP THAT DECLARES NO CARD. The approvals card is the
     // whole consent mechanism, and `Op::summary_keys: None` means nobody has
@@ -834,7 +853,7 @@ fn queue_for_approval(
         };
     }
 
-    let queued = match audit::queue(app, ctx, op, redacted, object.as_ref(), reason.message()) {
+    let queued = match audit::queue(app, ctx, op, redacted, object.as_ref(), reason.message(), run_id) {
         Ok(q) => q,
         Err(e) => {
             return ControlResult::Err {
@@ -1360,6 +1379,15 @@ mod tests {
             policy::Decision::Queue(policy::ApprovalReason::BackgroundProfileDowngrade),
             "a body with no profile must not be able to actuate"
         );
+    }
+
+    /// The brain's runner sends `run_id` (services/atlas-brain/src/control.ts,
+    /// `CallOpts.runId`); every other caller leaves it out. Both must parse.
+    #[test]
+    fn a_run_id_is_read_off_the_envelope_and_optional() {
+        assert_eq!(body(r#"{"op":"tasks.create","run_id":"r1"}"#).run_id.as_deref(), Some("r1"));
+        assert_eq!(body(r#"{"op":"tasks.create"}"#).run_id, None);
+        assert_eq!(body(r#"{"op":"tasks.create","run_id":null}"#).run_id, None);
     }
 
     #[test]

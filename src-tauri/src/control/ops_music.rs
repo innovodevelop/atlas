@@ -231,7 +231,7 @@ pub fn play(app: &AppHandle, args: &Value, _ctx: &Ctx) -> Result<Value, String> 
             // starts playback, so sending Play afterwards would be a second
             // command doing nothing — and on a slow load it can race ahead of
             // the track it was meant to start.
-            crate::music::music_load(app.clone(), music(app)?, uri.clone())?;
+            crate::music::music_load(app.clone(), music(app)?, uri.clone(), None)?;
             Ok(json!({ "requested": "play", "uri": uri }))
         }
     }

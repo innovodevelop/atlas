@@ -19,6 +19,9 @@ export const VIEW_LABELS: Record<MailView, string> = {
   handled: 'Handled by Atlas',
   handoff: 'With humans',
   sent_today: 'Sent today',
+  needs_you: 'Needs you',
+  inbox: 'Inbox',
+  archive: 'Archive',
 };
 
 export const STATUS_LABELS: Record<MailThreadStatus, string> = {

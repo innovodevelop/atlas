@@ -109,6 +109,15 @@ export interface ChatDeps {
    * DEFAULT_PERSONALITY and behave exactly as before Phase 4.
    */
   personality?: PersonalityState;
+  /**
+   * Settings → "Remember things I share" (atlas_memory_settings, read by the
+   * brain sidecar). `false`: no conversation summaries, the prompt stops
+   * asking the model to capture what the user shares, and memory_store saves
+   * only on a turn where the user explicitly asked Atlas to remember. Absent
+   * (voice gateway, edge fns, tests) means on — the behaviour before the
+   * switch existed.
+   */
+  rememberShared?: boolean;
 }
 
 export interface ChatOptions {
@@ -280,9 +289,9 @@ export const ATLAS_TOOLS: ToolDecl[] = [
 // ---------------------------------------------------------------------------
 // Desktop tools (the Rust control port)
 //
-// FIVE DOMAIN TOOLS, NOT THIRTY-ONE OPS. The control port exposes 31 ops (20
-// read, 6 write, 3 actuate, 2 approval), and declaring one tool each would be
-// the obvious translation and the wrong one:
+// A FEW DOMAIN TOOLS, NOT ONE PER OP. The control port exposes over thirty
+// ops across the read, write, actuate and approval tiers, and declaring one
+// tool each would be the obvious translation and the wrong one:
 //
 //   - Cost. Thirty-one verbose schemas is several thousand prompt tokens on
 //     EVERY turn, against ~1.5k for five.
@@ -347,6 +356,16 @@ const ATLAS_TOOL_OPS: Record<string, Record<string, string>> = {
     create_event: "events.create",
     add_to_watchlist: "watchlist.add",
   },
+  // A sixth domain, kept apart from atlas_lists because the alarms are not
+  // rows: they live in the webview's clock store. The port's clock.* ops check
+  // the arguments in Rust and ask that store, which answers for itself
+  // (src-tauri/src/control/ops_clock.rs). All three change something, so a
+  // read-only context never sees this tool at all.
+  atlas_clock: {
+    set_alarm: "clock.set_alarm",
+    stop_alarm: "clock.stop_alarm",
+    snooze_alarm: "clock.snooze_alarm",
+  },
 };
 
 /**
@@ -370,6 +389,7 @@ const ATLAS_MUTATING_OPS: ReadonlySet<string> = new Set([
   "watchlist.add",
   "music.play", "music.pause", "music.volume",
   "mail.archive", "mail.mark_read",
+  "clock.set_alarm", "clock.stop_alarm", "clock.snooze_alarm",
 ]);
 
 /**
@@ -403,6 +423,12 @@ const ATLAS_TOOL_DESCRIPTIONS: Record<string, { read: string; write: string }> =
   atlas_lists: {
     read: "Read the user's own tasks, notes, calendar events or stock watchlist from the local database.",
     write: "Read and edit the user's own tasks, notes, calendar events and stock watchlist in the local database. Creating and updating take effect immediately and are recorded; there is no delete here, so removing something is the user's own job.",
+  },
+  // Every action here mutates, so the `read` variant is never chosen; it exists
+  // to keep this record total and says only what the domain is.
+  atlas_clock: {
+    read: "The Clock in Atlas, whose alarms ring on this Mac.",
+    write: "Set an alarm on the Clock in Atlas (\"wake me at seven\"), or stop or snooze the alarm that is ringing right now. Alarms ring on this Mac, only while Atlas is running and the Mac is awake — say so when you set one. Repeat the tool's reply faithfully: when it says nothing is ringing, or that the Clock did not answer, nothing changed.",
   },
 };
 
@@ -491,6 +517,28 @@ const ATLAS_TOOL_PARAMS: Record<string, Record<string, AtlasParam>> = {
     attendees: { for: ["create_event"], schema: { type: "array", items: { type: "string" }, description: "Only for action=create_event. Up to 25 names or addresses." } },
     symbol: { for: ["add_to_watchlist"], schema: { type: "string", description: "Only for action=add_to_watchlist. A ticker such as AAPL or BRK.B." } },
     name: { for: ["add_to_watchlist"], schema: { type: "string", description: "Only for action=add_to_watchlist. The company name, if known." } },
+  },
+  atlas_clock: {
+    time: {
+      for: ["set_alarm"],
+      schema: {
+        type: "string",
+        description: "Required for action=set_alarm. 24-hour HH:MM on the user's own clock: \"wake me at seven\" is 07:00, \"half past seven tonight\" is 19:30. When morning or evening is unclear, ask rather than guess.",
+      },
+    },
+    label: { for: ["set_alarm"], schema: { type: "string", description: "Only for action=set_alarm. Optional short name, up to 60 characters, such as \"Gym\"." } },
+    days: {
+      for: ["set_alarm"],
+      schema: {
+        type: "array",
+        items: { type: "string", enum: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] },
+        description: "Only for action=set_alarm. The weekdays it repeats on; leave it out for a one-off alarm.",
+      },
+    },
+    minutes: {
+      for: ["snooze_alarm"],
+      schema: { type: "number", minimum: 1, maximum: 30, description: "Only for action=snooze_alarm. Minutes to snooze, 1 to 30; nine when left out." },
+    },
   },
 };
 
@@ -676,7 +724,8 @@ export function buildPersonalizedPrompt(
   styleNotes: Array<{ key: string; value: unknown }> = [],
   conversationSummaries: Array<{ key: string; value: unknown; created_at: string }> = [],
   personality: PersonalityState = DEFAULT_PERSONALITY,
-  personalityCtx: PersonalityContext = {}
+  personalityCtx: PersonalityContext = {},
+  rememberShared = true,
 ): string {
   const userName = profile?.nickname || profile?.first_name || "there";
   const timeOfDay = profile?.timezone ? getTimeOfDay(profile.timezone) : "day";
@@ -714,6 +763,22 @@ export function buildPersonalizedPrompt(
     }
   }
 
+  // "Remember things I share" (ChatDeps.rememberShared). Off, memory_store
+  // stays declared — "remember that…" must still work — but the prompt stops
+  // inviting the model to capture what the user mentions in passing, and the
+  // tool itself refuses anything the user did not ask for (executeTool).
+  // On, both texts are byte-for-byte what they were: system[0] is the cached
+  // prefix, and the golden test in orchestrator.test.ts pins it.
+  const memoryToolLines = rememberShared
+    ? `3. **memory_store**: Save important facts about the user.
+   - USE THIS when they share: personal details, preferences, names, dates, important events`
+    : `3. **memory_store**: Save a fact about the user.
+   - ONLY when they explicitly ask you to remember something. They have switched off automatic remembering.`;
+  const memoryInstructions = rememberShared ? memoryInstructionsOn(userName) : `## Memory Instructions
+${userName} has switched off "Remember things I share". Do not save what they mention in passing. Call memory_store only when they explicitly ask you to remember something, and save exactly that.
+
+Be genuine, warm, and emotionally attentive all the same.`;
+
   const toolInstructions = hasTools ? `
 ## Tools Available
 You have access to powerful tools that you SHOULD USE ACTIVELY:
@@ -728,8 +793,7 @@ You have access to powerful tools that you SHOULD USE ACTIVELY:
    - USE THIS when asked to: research, investigate, analyze, compare, "tell me everything about"
    - USE THIS for complex questions requiring thorough analysis
 
-3. **memory_store**: Save important facts about the user.
-   - USE THIS when they share: personal details, preferences, names, dates, important events
+${memoryToolLines}
 
 CRITICAL INSTRUCTIONS:
 - DO NOT make up information. If you're unsure, USE web_search.
@@ -766,7 +830,12 @@ ${eventsContext}
 - Remembering personal details and following up on life events
 - Research and deep learning on topics (use tools when needed!)
 
-## Memory Instructions
+${memoryInstructions}`;
+}
+
+/** The prompt's memory section while "Remember things I share" is on — the text it has always had. */
+function memoryInstructionsOn(userName: string): string {
+  return `## Memory Instructions
 Pay deep attention to what ${userName} shares. Use memory_store to capture:
 
 **Identity & Soul:**
@@ -840,7 +909,32 @@ export interface ToolContext {
    * digest. Defaults to allowed, so every existing caller is unchanged.
    */
   allowMutating?: boolean;
+  /**
+   * "Remember things I share" (ChatDeps.rememberShared). `false` refuses
+   * memory_store unless `explicitRemember` is set. Absent means on.
+   */
+  rememberShared?: boolean;
+  /** The user's latest message explicitly asks Atlas to remember something (asksToRemember). */
+  explicitRemember?: boolean;
 }
+
+/**
+ * Does this message explicitly ask Atlas to remember something? The same
+ * anchored patterns as detectLearningIntent's "remember" and "teach", plus
+ * "don't forget" and "keep in mind" — asks, never a passing mention, so "do
+ * you remember the name of…" is a question and not consent to store.
+ */
+export function asksToRemember(text: string): boolean {
+  const intent = detectLearningIntent(text);
+  if (intent.hasIntent && (intent.intentType === "remember" || intent.intentType === "teach")) return true;
+  return /^(?:atlas[,!]?\s+)?(?:please\s+)?(?:don'?t forget|do not forget|keep in mind|make a note)\b/i.test(text.trim());
+}
+
+/** What memory_store answers when "Remember things I share" is off and nobody asked. */
+export const MEMORY_OFF_RESULT = {
+  skipped: true,
+  message: "Not saved: the user has switched off \"Remember things I share\". Only store something when they explicitly ask you to remember it.",
+} as const;
 
 export async function executeTool(
   toolCall: ToolCall,
@@ -938,6 +1032,11 @@ export async function executeTool(
     }
 
     case "memory_store": {
+      // Checked here, at the write, not only in the prompt: a model can call
+      // a declared tool whatever the prompt says.
+      if (ctx.rememberShared === false && !ctx.explicitRemember) {
+        return { name, result: MEMORY_OFF_RESULT };
+      }
       if (userId) {
         const { error } = await supabase.from("ai_memory").upsert({
           user_id: userId,
@@ -1304,7 +1403,7 @@ export async function buildTurnContext(deps: ChatDeps, opts: ChatOptions): Promi
     seriousTopic: detectSeriousTopic(recentUserTexts[recentUserTexts.length - 1] ?? ""),
   };
 
-  const systemPrompt = systemPromptOverride || buildPersonalizedPrompt(profile, memories, upcomingEvents, recentEvents, knowledgeBank, hasTools, styleNotes, conversationSummaries, deps.personality ?? DEFAULT_PERSONALITY, personalityCtx);
+  const systemPrompt = systemPromptOverride || buildPersonalizedPrompt(profile, memories, upcomingEvents, recentEvents, knowledgeBank, hasTools, styleNotes, conversationSummaries, deps.personality ?? DEFAULT_PERSONALITY, personalityCtx, deps.rememberShared !== false);
 
   // Per-turn context goes in a SECOND system message, never onto systemPrompt.
   //
@@ -1400,11 +1499,14 @@ export async function runToolLoop(args: {
   /** Absolute epoch-ms ceiling for ALL tool work in this turn. */
   deadline: number;
   chat?: typeof aiChatCompletion;
+  /** "Remember things I share" — see ToolContext. Absent means on. */
+  rememberShared?: boolean;
+  explicitRemember?: boolean;
 }): Promise<ToolLoopOutcome> {
   const {
     supabase, systemDb, userId, userToken, control,
     model, tools: chatTools, conversationMessages, deadline: turnDeadline,
-    chat = aiChatCompletion,
+    chat = aiChatCompletion, rememberShared, explicitRemember,
   } = args;
 
   const allToolResults: Array<{ name: string; result: unknown; citations?: string[] }> = [];
@@ -1490,6 +1592,8 @@ export async function runToolLoop(args: {
               // "play this" into an approval card the user has to tap while
               // already sitting in front of the app.
               profile: "interactive",
+              rememberShared,
+              explicitRemember,
             });
 
       if (result.result && typeof result.result === "object" && "citations" in result.result) {
@@ -1561,11 +1665,14 @@ async function streamAndCapture(args: {
   capturedSystemPrompt: string;
   toolMessages: Array<{ role: string; content: string; tool_calls?: unknown }>;
   learningIntent: ReturnType<typeof detectLearningIntent>;
+  /** "Remember things I share" — off skips the conversation summary. Absent means on. */
+  rememberShared?: boolean;
 }): Promise<ChatResult> {
   const {
     supabase, systemDb, userId, sessionId, conversationId, messages,
     model: chatModel, currentMessages, anthropicTools,
     citations: allCitations, capturedSystemPrompt, toolMessages, learningIntent,
+    rememberShared,
   } = args;
 
   // Now stream the final response — the pass that may run native web search.
@@ -1593,9 +1700,13 @@ async function streamAndCapture(args: {
   trackSessionContext(supabase, userId, sessionId, messages).catch(e =>
     console.log("[orchestrator] Session tracking error:", e)
   );
-  summarizeConversation(supabase, userId, conversationId, messages).catch(e =>
-    console.log("[orchestrator] Summary error:", e)
-  );
+  // A summary is a memory Atlas writes on its own, so "Remember things I
+  // share" switched off skips it.
+  if (rememberShared !== false) {
+    summarizeConversation(supabase, userId, conversationId, messages).catch(e =>
+      console.log("[orchestrator] Summary error:", e)
+    );
+  }
 
   // Prepend citations as a custom SSE event, then pass the AI stream through.
   const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
@@ -1796,6 +1907,8 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
     conversationMessages,
     maxIterations: maxToolIterations,
     deadline: turnDeadline,
+    rememberShared: deps.rememberShared,
+    explicitRemember: latestUserMessage ? asksToRemember(latestUserMessage.content) : false,
   });
   if (!loop.ok) return loop.error;
 
@@ -1820,5 +1933,6 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
     capturedSystemPrompt,
     toolMessages: loop.toolMessages,
     learningIntent,
+    rememberShared: deps.rememberShared,
   });
 }
