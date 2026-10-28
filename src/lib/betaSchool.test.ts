@@ -3,7 +3,7 @@ import {
   DAY, EMPTY_SCHOOL, FOCUS_SECONDS, FRESH_FOCUS, HOUR, MIN, MIN_EASE, START_EASE,
   addDays, cardsPrompt, cleanRewrite, clock, deadlineProgress, dueCards, dueIn, dueLabel,
   evaluateSheet, focusLeft, forecast, formatCell, formatInterval, fromInputs, gradePreview,
-  inRanges, isoWeek, lengthState, literal, marginPrompt, moveRef, newCard, nextColour,
+  inRanges, isoWeek, lengthState, literal, moveRef, newCard, nextColour,
   nextDueAt, nextHintLevel, parseCardDrafts, parseNotes, parseSchool, pauseFocus, rangesIn,
   rewritePrompt, schedule, sheetPrompt, sheetText, spreadSessions, startFocus, startOfDay,
   todayRibbon, tutorPrompt, tutorTitle, upcomingDeadlines, weekStart, wordCount,
@@ -207,10 +207,9 @@ describe('writing', () => {
     expect(lengthState(1300, 900, 1200)).toBe('over');
     expect(lengthState(10, null, null)).toBe('none');
   });
-  test('rewrite and margin prompts say what they may not do', () => {
+  test('the rewrite prompt says what it may not do', () => {
     expect(rewritePrompt('My text.', 'formal')).toContain('more formal');
     expect(rewritePrompt('My text.', 'shorter').endsWith('My text.')).toBe(true);
-    expect(marginPrompt('T', 'Body')).toContain('Never rewrite their sentences');
   });
   test('cleans what models wrap around a rewrite', () => {
     expect(cleanRewrite('Here is the rewritten passage:\n"Short and clear."')).toBe('Short and clear.');

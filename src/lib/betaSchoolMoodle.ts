@@ -56,7 +56,7 @@ export function htmlToText(html: string): string {
       .replace(/<\/(div|tr|section|article)>/gi, '\n')
       .replace(/<[^>]+>/g, ''),
   )
-    .replace(/[ \t ]+/g, ' ')
+    .replace(/[ \t\u00A0]+/g, ' ')
     .replace(/ *\n */g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();

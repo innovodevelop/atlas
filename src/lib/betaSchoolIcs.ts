@@ -35,7 +35,7 @@ interface Prop { name: string; params: Record<string, string>; value: string }
 /** Lines with continuations joined (RFC 5545 §3.1: a line break followed by a space or a tab). */
 export function unfoldIcs(text: string): string[] {
   const out: string[] = [];
-  for (const line of text.replace(/^﻿/, '').split(/\r\n|\n|\r/)) {
+  for (const line of text.replace(/^\uFEFF/, '').split(/\r\n|\n|\r/)) {
     if ((line.startsWith(' ') || line.startsWith('\t')) && out.length) out[out.length - 1] += line.slice(1);
     else out.push(line);
   }

@@ -17,7 +17,7 @@
  */
 
 import {
-  SHEET_COLS, SHEET_FUNCTIONS, SHEET_ROWS, dueLabel, evaluateSheet, isError, parseRef, refOf,
+  SHEET_COLS, SHEET_FUNCTIONS, SHEET_ROWS, dueLabel, evaluateSheet, isError, parseNotes, parseRef, refOf,
   type CellValue, type Session, type TutorTurn,
 } from './betaSchool';
 
@@ -259,5 +259,7 @@ export function parseAnchoredNotes(text: string, count: number, max = 3): { text
     const n = a ? Number(a[1]) : null;
     out.push({ text: (a ? a[2] : body).trim(), section: n !== null && n >= 1 && n <= count ? n : null });
   }
-  return out.filter((x) => x.text).slice(0, max);
+  const notes = out.filter((x) => x.text);
+  // An answer with no list at all still carries its questions; they come back unanchored.
+  return (notes.length ? notes : parseNotes(text, max).map((t) => ({ text: t, section: null }))).slice(0, max);
 }

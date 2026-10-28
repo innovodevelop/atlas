@@ -96,9 +96,10 @@ fn decode_text(bytes: &[u8], charset: Option<&str>) -> String {
 
 fn charset_of(resp: &ureq::Response) -> Option<String> {
     resp.header("content-type").and_then(|ct| {
-        ct.split(';')
-            .map(str::trim)
-            .find_map(|p| p.strip_prefix("charset=").map(|c| c.trim_matches('"').to_string()))
+        ct.split(';').map(str::trim).find_map(|p| {
+            p.strip_prefix("charset=")
+                .map(|c| c.trim_matches('"').to_string())
+        })
     })
 }
 
@@ -124,18 +125,31 @@ pub(crate) fn normalise_lectio_link(raw: &str) -> Result<String, String> {
     {
         format!("https://{rest}")
     } else {
-        return Err("That isn't a link. It starts with webcal:// or https:// in Lectio.".to_string());
+        return Err(
+            "That isn't a link. It starts with webcal:// or https:// in Lectio.".to_string(),
+        );
     };
-    let url = url::Url::parse(&https)
-        .map_err(|_| "That link can't be read. Copy it again from Lectio → Skema → Abonnér.".to_string())?;
+    let url = url::Url::parse(&https).map_err(|_| {
+        "That link can't be read. Copy it again from Lectio → Skema → Abonnér.".to_string()
+    })?;
     if !url.username().is_empty() || url.password().is_some() || url.port().is_some() {
         return Err("That isn't a Lectio calendar link.".to_string());
     }
-    let host = url.host_str().unwrap_or("").to_ascii_lowercase();
-    if host != "lectio.dk" && !host.ends_with(".lectio.dk") {
+    if !is_lectio_host(url.as_str()) {
         return Err("That isn't a Lectio link. It should be on lectio.dk.".to_string());
     }
     Ok(url.to_string())
+}
+
+/// True for an https address on lectio.dk or one of its subdomains.
+fn is_lectio_host(address: &str) -> bool {
+    match url::Url::parse(address) {
+        Ok(u) => {
+            let host = u.host_str().unwrap_or("").to_ascii_lowercase();
+            u.scheme() == "https" && (host == "lectio.dk" || host.ends_with(".lectio.dk"))
+        }
+        Err(_) => false,
+    }
 }
 
 fn fetch_ics(url: &str) -> Result<String, String> {
@@ -144,12 +158,21 @@ fn fetch_ics(url: &str) -> Result<String, String> {
         .set("Accept", "text/calendar, text/plain;q=0.5")
         .call()
         .map_err(redact)?;
+    // The agent follows redirects; the calendar must still come from Lectio,
+    // so a link that bounces elsewhere is read as no calendar at all.
+    if !is_lectio_host(resp.get_url()) {
+        return Err("not-a-calendar".to_string());
+    }
     let charset = charset_of(&resp);
     let bytes = read_capped(resp, ICS_CAP, false)?;
     let text = decode_text(&bytes, charset.as_deref());
     // A link Lectio no longer knows answers with its login page, not an error.
     let head = text.trim_start_matches('\u{feff}').trim_start();
-    if !head.get(..15).unwrap_or("").eq_ignore_ascii_case("BEGIN:VCALENDAR") {
+    if !head
+        .get(..15)
+        .unwrap_or("")
+        .eq_ignore_ascii_case("BEGIN:VCALENDAR")
+    {
         return Err("not-a-calendar".to_string());
     }
     Ok(text)
@@ -195,7 +218,11 @@ pub fn school_lectio_disconnect() -> Result<(), String> {
 /// path (`https://school.dk/moodle`), so the path is kept.
 pub(crate) fn validate_moodle_site(raw: &str) -> Result<String, String> {
     let t = raw.trim();
-    let with_scheme = if t.contains("://") { t.to_string() } else { format!("https://{t}") };
+    let with_scheme = if t.contains("://") {
+        t.to_string()
+    } else {
+        format!("https://{t}")
+    };
     let url = url::Url::parse(&with_scheme).map_err(|_| "That isn't a web address.".to_string())?;
     if url.scheme() != "https" {
         return Err("The site must use https.".to_string());
@@ -217,7 +244,10 @@ pub(crate) fn validate_moodle_site(raw: &str) -> Result<String, String> {
 pub(crate) fn validate_token(raw: &str) -> Result<String, String> {
     let t = raw.trim();
     if t.len() < 16 || t.len() > 128 || !t.chars().all(|c| c.is_ascii_alphanumeric()) {
-        return Err("That doesn't look like a Moodle security key. Copy the key itself, not your password.".to_string());
+        return Err(
+            "That doesn't look like a Moodle security key. Copy the key itself, not your password."
+                .to_string(),
+        );
     }
     Ok(t.to_string())
 }
@@ -227,15 +257,21 @@ pub(crate) fn validate_token(raw: &str) -> Result<String, String> {
 pub(crate) fn param_ok(key: &str, value: &str) -> bool {
     let key_ok = !key.is_empty()
         && key.len() <= 48
-        && key.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '_' | '[' | ']'))
+        && key
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '_' | '[' | ']'))
         && key.chars().next().is_some_and(|c| c.is_ascii_lowercase());
-    let value_ok = value.len() <= 64 && value.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-'));
+    let value_ok = value.len() <= 64
+        && value
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-'));
     key_ok && value_ok && !matches!(key, "wstoken" | "wsfunction" | "moodlewsrestformat")
 }
 
 fn moodle_credentials() -> Result<(String, String), String> {
     let site = secrets::core_key(MOODLE_SITE_ACCOUNT).ok_or_else(|| "not-connected".to_string())?;
-    let token = secrets::core_key(MOODLE_TOKEN_ACCOUNT).ok_or_else(|| "not-connected".to_string())?;
+    let token =
+        secrets::core_key(MOODLE_TOKEN_ACCOUNT).ok_or_else(|| "not-connected".to_string())?;
     Ok((site, token))
 }
 
@@ -243,19 +279,31 @@ fn moodle_credentials() -> Result<(String, String), String> {
 /// Moodle reports its own errors as HTTP 200 with an `exception` object; those
 /// come back as `moodle:<errorcode>:<message>`, with the token scrubbed from
 /// the message in case a site ever echoes it.
-fn moodle_call(site: &str, token: &str, function: &str, params: &[(String, String)]) -> Result<Value, String> {
+fn moodle_call(
+    site: &str,
+    token: &str,
+    function: &str,
+    params: &[(String, String)],
+) -> Result<Value, String> {
     if !MOODLE_FUNCTIONS.contains(&function) {
         return Err(format!("not-allowed:{function}"));
     }
     let endpoint = format!("{site}/webservice/rest/server.php");
-    let mut form: Vec<(&str, &str)> = vec![("wstoken", token), ("wsfunction", function), ("moodlewsrestformat", "json")];
+    let mut form: Vec<(&str, &str)> = vec![
+        ("wstoken", token),
+        ("wsfunction", function),
+        ("moodlewsrestformat", "json"),
+    ];
     for (k, v) in params {
         if !param_ok(k, v) {
             return Err(format!("bad-param:{k}"));
         }
         form.push((k.as_str(), v.as_str()));
     }
-    let resp = crate::http::agent().post(&endpoint).send_form(&form).map_err(redact)?;
+    let resp = crate::http::agent()
+        .post(&endpoint)
+        .send_form(&form)
+        .map_err(redact)?;
     let bytes = read_capped(resp, MOODLE_CAP, false)?;
     let value: Value = serde_json::from_slice(&bytes).map_err(|_| "not-moodle".to_string())?;
     if let Some(obj) = value.as_object() {
@@ -318,12 +366,19 @@ pub fn school_moodle_connect(site: String, token: String) -> Result<Value, Strin
 /// A read-only call with the stored token. The site info comes back trimmed
 /// to `site_summary`, the rest as Moodle sent it.
 #[tauri::command(async)]
-pub fn school_moodle_call(function: String, params: Option<HashMap<String, String>>) -> Result<Value, String> {
+pub fn school_moodle_call(
+    function: String,
+    params: Option<HashMap<String, String>>,
+) -> Result<Value, String> {
     let (site, token) = moodle_credentials()?;
     let mut pairs: Vec<(String, String)> = params.unwrap_or_default().into_iter().collect();
     pairs.sort();
     let value = moodle_call(&site, &token, &function, &pairs)?;
-    Ok(if function == "core_webservice_get_site_info" { site_summary(&value) } else { value })
+    Ok(if function == "core_webservice_get_site_info" {
+        site_summary(&value)
+    } else {
+        value
+    })
 }
 
 /// The text of one material, for cards. Only files on the connected site's own
@@ -348,9 +403,12 @@ pub fn school_moodle_file(url: String) -> Result<Value, String> {
     if !path.contains("/webservice/pluginfile.php/") {
         file.set_path(&path.replacen("/pluginfile.php/", "/webservice/pluginfile.php/", 1));
     }
+    // `forcedownload=1` (which course contents put on every file URL) makes
+    // Moodle answer with a download type instead of the file's own, and a text
+    // file would then be refused below as not text.
     let kept: Vec<(String, String)> = file
         .query_pairs()
-        .filter(|(k, _)| k != "token")
+        .filter(|(k, _)| k != "token" && k != "forcedownload")
         .map(|(k, v)| (k.into_owned(), v.into_owned()))
         .collect();
     {
@@ -361,7 +419,10 @@ pub fn school_moodle_file(url: String) -> Result<Value, String> {
         }
         q.append_pair("token", &token);
     }
-    let resp = crate::http::agent().get(file.as_str()).call().map_err(redact)?;
+    let resp = crate::http::agent()
+        .get(file.as_str())
+        .call()
+        .map_err(redact)?;
     let mime = resp.content_type().to_ascii_lowercase();
     let readable = mime.starts_with("text/") || mime == "application/xhtml+xml";
     if !readable {
@@ -388,7 +449,10 @@ mod tests {
             normalise_lectio_link(" webcal://www.lectio.dk/lectio/123/ical.aspx?id=9 ").unwrap(),
             "https://www.lectio.dk/lectio/123/ical.aspx?id=9"
         );
-        assert_eq!(normalise_lectio_link("HTTP://lectio.dk/x").unwrap(), "https://lectio.dk/x");
+        assert_eq!(
+            normalise_lectio_link("HTTP://lectio.dk/x").unwrap(),
+            "https://lectio.dk/x"
+        );
         assert!(normalise_lectio_link("https://evil.example/lectio.dk").is_err());
         assert!(normalise_lectio_link("https://lectio.dk.evil.example/x").is_err());
         assert!(normalise_lectio_link("https://user:pw@www.lectio.dk/x").is_err());
@@ -398,10 +462,27 @@ mod tests {
     }
 
     #[test]
+    fn a_redirect_off_lectio_is_not_lectio() {
+        assert!(is_lectio_host("https://www.lectio.dk/lectio/1/ical.aspx"));
+        assert!(!is_lectio_host("http://www.lectio.dk/x"));
+        assert!(!is_lectio_host("https://login.example.com/lectio.dk"));
+        assert!(!is_lectio_host("not a url"));
+    }
+
+    #[test]
     fn moodle_sites_are_https_addresses_without_extras() {
-        assert_eq!(validate_moodle_site("https://learnit.itu.dk/").unwrap(), "https://learnit.itu.dk");
-        assert_eq!(validate_moodle_site("learnit.itu.dk").unwrap(), "https://learnit.itu.dk");
-        assert_eq!(validate_moodle_site("https://school.dk/moodle/").unwrap(), "https://school.dk/moodle");
+        assert_eq!(
+            validate_moodle_site("https://learnit.itu.dk/").unwrap(),
+            "https://learnit.itu.dk"
+        );
+        assert_eq!(
+            validate_moodle_site("learnit.itu.dk").unwrap(),
+            "https://learnit.itu.dk"
+        );
+        assert_eq!(
+            validate_moodle_site("https://school.dk/moodle/").unwrap(),
+            "https://school.dk/moodle"
+        );
         assert!(validate_moodle_site("http://learnit.itu.dk").is_err());
         assert!(validate_moodle_site("https://learnit.itu.dk/?x=1").is_err());
         assert!(validate_moodle_site("https://me:pw@learnit.itu.dk").is_err());
@@ -427,13 +508,20 @@ mod tests {
 
     #[test]
     fn only_read_functions_are_called() {
-        let err = moodle_call("https://127.0.0.1:1", "x", "core_user_update_users", &[]).unwrap_err();
+        let err =
+            moodle_call("https://127.0.0.1:1", "x", "core_user_update_users", &[]).unwrap_err();
         assert!(err.starts_with("not-allowed"));
     }
 
     #[test]
     fn latin1_is_read_as_latin1() {
-        assert_eq!(decode_text(&[0x53, 0x6b, 0x65, 0x6d, 0x61, 0x20, 0xe6, 0xf8, 0xe5], None), "Skema æøå");
+        assert_eq!(
+            decode_text(
+                &[0x53, 0x6b, 0x65, 0x6d, 0x61, 0x20, 0xe6, 0xf8, 0xe5],
+                None
+            ),
+            "Skema æøå"
+        );
         assert_eq!(decode_text("æøå".as_bytes(), Some("utf-8")), "æøå");
         assert_eq!(decode_text(&[0xe6], Some("ISO-8859-1")), "æ");
     }

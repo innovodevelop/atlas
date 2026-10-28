@@ -9,7 +9,10 @@
  * ring, a paler blue for the ranges the selected formula reads.
  *
  * Atlas can explain a cell or look for anything odd; it reads the sheet and
- * answers beside it, and never types into a cell.
+ * answers beside it, and never types into a cell. "Suggest a column" asks for
+ * a header and formulas for the next empty column: they show in the grid as a
+ * pale draft, computed like the rest, and reach the sheet only on "Keep
+ * column" (betaSchoolAtlas.ts checks Atlas can write nowhere else).
  *
  * Keys on the grid: arrows move, Enter edits, typing starts an edit, Delete
  * clears. In the bar: Enter commits and moves down, Tab moves right, Esc
@@ -20,12 +23,15 @@ import {
   SHEET_COLS, SHEET_FUNCTIONS, SHEET_ROWS, evaluateSheet, formatCell, inRanges, isError, moveRef,
   parseRef, rangesIn, refOf, sheetPrompt, sheetText, type SheetAsk,
 } from '@/lib/betaSchool';
+import { columnPrompt, columnTaken, dataRows, nextEmptyColumn, parseColumn, previewColumn, type ColumnDraft } from '@/lib/betaSchoolAtlas';
 import { updateSchool, useSchool } from '@/lib/betaSchoolStore';
 import { useAsk, type SchoolToast } from './useSchoolHooks';
 
 export function SchoolSheet({ onToast }: { onToast: SchoolToast }) {
   const { sheet } = useSchool();
-  const values = useMemo(() => evaluateSheet(sheet), [sheet]);
+  const [column, setColumn] = useState<ColumnDraft | null>(null);
+  const preview = useMemo(() => (column ? previewColumn(sheet, column) : null), [sheet, column]);
+  const values = useMemo(() => preview?.values ?? evaluateSheet(sheet), [sheet, preview]);
   const [sel, setSel] = useState('A1');
   const [edit, setEditState] = useState<string | null>(null);
   // Mirrored in a ref: the bar's blur fires inside the same event as Esc or
@@ -96,20 +102,52 @@ export function SchoolSheet({ onToast }: { onToast: SchoolToast }) {
 
   const ask = async (kind: SheetAsk) => {
     const title = kind === 'explain' ? `What ${sel} does` : 'Anything odd?';
+    // A new question drops a column draft still waiting: the answer box holds one thing at a time.
+    setColumn(null);
     setAnswer({ title, text: '' });
     const text = await atlas.ask(
-      sheetPrompt(kind, sheetText(sheet, values), kind === 'explain' ? { ref: sel, raw, value: formatCell(selValue) } : null),
+      sheetPrompt(kind, sheetText(sheet, evaluateSheet(sheet)), kind === 'explain' ? { ref: sel, raw, value: formatCell(selValue) } : null),
       (partial) => setAnswer({ title, text: partial }),
     );
     if (text === null) { setAnswer(null); return; }
     setAnswer({ title, text: text.trim() });
   };
 
+  const nextCol = nextEmptyColumn(sheet);
+
+  const suggest = async () => {
+    if (nextCol === null) return;
+    setColumn(null);
+    const title = `A column for ${SHEET_COLS[nextCol]}`;
+    setAnswer({ title, text: '' });
+    const plain = evaluateSheet(sheet);
+    const text = await atlas.ask(columnPrompt(sheetText(sheet, plain), nextCol, dataRows(sheet)));
+    if (text === null) { setAnswer(null); return; }
+    const parsed = parseColumn(text, nextCol);
+    if (!parsed) { setAnswer({ title, text: 'Atlas answered, but not as a column it could draft. Try again.' }); return; }
+    setColumn(parsed);
+    setAnswer({ title: `Draft: ${parsed.header}`, text: parsed.why || `A new column ${SHEET_COLS[nextCol]}, pale until you keep it.` });
+  };
+
+  const keepColumn = () => {
+    if (!column) return;
+    if (columnTaken(sheet, column)) { onToast('You have typed in that column since. Atlas will not write over it.'); setColumn(null); return; }
+    const before = sheet;
+    const draft = column;
+    updateSchool((s) => ({ ...s, sheet: { ...s.sheet, [refOf(draft.col, 1)]: draft.header, ...draft.cells } }));
+    setColumn(null);
+    setAnswer(null);
+    onToast(`Column ${SHEET_COLS[draft.col]} is yours now`, () => updateSchool((s) => ({ ...s, sheet: before })));
+  };
+
+  const discardColumn = () => { setColumn(null); setAnswer(null); };
+
   const clear = () => {
     const before = sheet;
     updateSchool((s) => ({ ...s, sheet: {} }));
     setEdit(null);
     setAnswer(null);
+    setColumn(null);
     onToast('Sheet cleared', () => updateSchool((s) => ({ ...s, sheet: before })));
   };
 
@@ -149,9 +187,11 @@ export function SchoolSheet({ onToast }: { onToast: SchoolToast }) {
                 {SHEET_COLS.map((_, col) => {
                   const ref = refOf(col, row);
                   const v = values[ref];
-                  const cellRaw = sheet[ref] ?? '';
+                  const drafted = column ? (row === 1 && col === column.col ? column.header : column.cells[ref]) : undefined;
+                  const cellRaw = sheet[ref] ?? drafted ?? '';
                   const cls = [
                     'b-sc-cell',
+                    drafted !== undefined && !sheet[ref] ? 'draft' : '',
                     ref === sel ? 'sel' : inRanges(ref, ranges) ? 'range' : '',
                     typeof v === 'number' ? 'num' : '',
                     v !== undefined && isError(v) ? 'err' : '',
@@ -187,20 +227,31 @@ export function SchoolSheet({ onToast }: { onToast: SchoolToast }) {
       <aside className="b-sc-side">
         <section className="b-sc-list" aria-label="Ask Atlas about this sheet">
           <span className="b-sc-h3">Ask Atlas about this sheet</span>
-          <p className="b-sc-muted">Atlas reads the sheet and answers here. It never types into your cells.</p>
+          <p className="b-sc-muted">Atlas explains and proposes. Anything it suggests appears as a pale draft you keep or discard; it never types into your cells.</p>
           <button type="button" className="b-sc-askrow" disabled={atlas.busy || !raw} onClick={() => void ask('explain')}>
             <span>Explain {sel}</span><small>{raw ? 'Read-only' : 'Pick a filled cell'}</small>
           </button>
           <button type="button" className="b-sc-askrow" disabled={atlas.busy || empty} onClick={() => void ask('check')}>
             <span>Anything odd in my data?</span><small>{empty ? 'The sheet is empty' : 'Read-only'}</small>
           </button>
+          <button type="button" className="b-sc-askrow" disabled={atlas.busy || empty || nextCol === null} onClick={() => void suggest()}>
+            <span>Suggest a column</span><small>{empty ? 'The sheet is empty' : nextCol === null ? 'The sheet is full to F' : `A draft in ${SHEET_COLS[nextCol]}`}</small>
+          </button>
         </section>
         {answer ? (
           <section className="b-sc-note b-sc-note--emphasis b-sc-answer" aria-live="polite">
             <span className="b-sc-label">{answer.title}</span>
             <p>{answer.text || 'Atlas is reading the sheet…'}</p>
+            {column && preview?.errors ? <p className="b-sc-muted">{preview.errors} of its {Object.keys(column.cells).length} formulas give an error. Keep it only if you will fix them.</p> : null}
             <div className="b-sc-row-actions">
-              <button type="button" className="b-btn b-btn--card b-btn--row" onClick={() => { atlas.cancel(); setAnswer(null); }}>{atlas.busy ? 'Stop' : 'Close'}</button>
+              {column ? (
+                <>
+                  <button type="button" className="b-btn b-btn--primary b-btn--row" onClick={keepColumn}>Keep column</button>
+                  <button type="button" className="b-btn b-btn--card b-btn--row" onClick={discardColumn}>Discard</button>
+                </>
+              ) : (
+                <button type="button" className="b-btn b-btn--card b-btn--row" onClick={() => { atlas.cancel(); setAnswer(null); }}>{atlas.busy ? 'Stop' : 'Close'}</button>
+              )}
             </div>
           </section>
         ) : null}

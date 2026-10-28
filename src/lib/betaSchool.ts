@@ -541,21 +541,10 @@ export function cleanRewrite(text: string): string {
   return (q ? q[1] : t).trim();
 }
 
-export function marginPrompt(title: string, body: string): string {
-  return [
-    "You are Atlas, reading a student's draft as a writing tutor.",
-    'Leave at most three notes in the margin: questions or pointers that help them improve it themselves.',
-    'Never rewrite their sentences and never suggest replacement text.',
-    'Write each note on its own line starting with "- ". Nothing else.',
-    'Write in the language the draft is written in.',
-    '',
-    `Title: ${title.trim() || '(untitled)'}`,
-    '',
-    body.trim(),
-  ].join('\n');
-}
-
-/** The margin notes out of the brain's answer: bullet lines, or else its questions. */
+/**
+ * Margin notes out of the brain's answer: bullet lines, or else its questions.
+ * The prompt that asks for them anchors each to a section (betaSchoolAtlas.ts).
+ */
 export function parseNotes(text: string, max = 3): string[] {
   const bullets = text.split(/\r?\n/).map((l) => l.match(/^\s*(?:[-*•]|\d+[.)])\s+(.+)$/)?.[1]?.replace(/\*\*/g, '').trim()).filter((l): l is string => !!l);
   if (bullets.length) return bullets.slice(0, max);

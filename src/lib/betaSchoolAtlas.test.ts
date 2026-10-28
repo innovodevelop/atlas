@@ -114,4 +114,10 @@ describe('Margin notes, anchored', () => {
     expect(parseAnchoredNotes('- [2] Where is your question?\n- [9] Out of range\n* No anchor here\nnot a bullet\n- [§1]: Cite it', 2, 5))
       .toEqual([{ text: 'Where is your question?', section: 2 }, { text: 'Out of range', section: null }, { text: 'No anchor here', section: null }, { text: 'Cite it', section: 1 }]);
   });
+
+  test('the prompt says what it may not do, and an answer without a list keeps its questions', () => {
+    expect(anchoredMarginPrompt('T', '[1] A\nx', 1)).toContain('Never rewrite their sentences');
+    expect(parseAnchoredNotes('Good start. What is your claim? Where is the source?', 2))
+      .toEqual([{ text: 'What is your claim?', section: null }, { text: 'Where is the source?', section: null }]);
+  });
 });
