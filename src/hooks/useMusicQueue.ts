@@ -362,6 +362,9 @@ async function likedPool(): Promise<Track[]> {
   return out;
 }
 
+/** How long a station pick may take before the row gives up and says so. */
+const STATION_TIMEOUT_MS = 60_000;
+
 /**
  * One plain question to the brain's `/chat` — no memory, no tools, nothing
  * written anywhere — streamed and joined. The answer is a list of numbers.
@@ -371,34 +374,50 @@ async function askBrainPlain(prompt: string): Promise<string> {
   if (!token) throw new Error('Sign in to Atlas so it can pick a station.');
   const brain = await getBrainEndpoint();
   if (!brain) throw new Error('Stations are picked by Atlas in the desktop app.');
-  const res = await fetch(`${brain.baseUrl}/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'x-sidecar-token': brain.token },
-    body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] }),
-  });
-  if (!res.ok) {
-    if (res.status === 429) throw new Error('Atlas is rate-limited right now. Try again in a moment.');
-    throw new Error(`Atlas did not answer (HTTP ${res.status}).`);
-  }
-  if (!res.body) throw new Error('Atlas sent an empty reply.');
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let text = '';
-  outer: for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    let nl: number;
-    while ((nl = buffer.indexOf('\n')) !== -1) {
-      const ev = parseBrainLine(buffer.slice(0, nl));
-      buffer = buffer.slice(nl + 1);
-      if (!ev) continue;
-      if (ev.kind === 'done') break outer;
-      if (ev.kind === 'text') text += ev.delta;
+  // A stalled brain must not leave the station row saying "picking" for the
+  // rest of the run: give up after a minute, and close the stream either way.
+  const abort = new AbortController();
+  const timer = window.setTimeout(() => abort.abort(), STATION_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${brain.baseUrl}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'x-sidecar-token': brain.token },
+      body: JSON.stringify({ messages: [{ role: 'user', content: prompt }] }),
+      signal: abort.signal,
+    });
+    if (!res.ok) {
+      if (res.status === 429) throw new Error('Atlas is rate-limited right now. Try again in a moment.');
+      throw new Error(`Atlas did not answer (HTTP ${res.status}).`);
     }
+    if (!res.body) throw new Error('Atlas sent an empty reply.');
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let text = '';
+    try {
+      outer: for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let nl: number;
+        while ((nl = buffer.indexOf('\n')) !== -1) {
+          const ev = parseBrainLine(buffer.slice(0, nl));
+          buffer = buffer.slice(nl + 1);
+          if (!ev) continue;
+          if (ev.kind === 'done') break outer;
+          if (ev.kind === 'text') text += ev.delta;
+        }
+      }
+    } finally {
+      reader.cancel().catch(() => { /* already closed */ });
+    }
+    return text;
+  } catch (e) {
+    if (abort.signal.aborted) throw new Error('Atlas took too long to pick. Try again in a moment.');
+    throw e;
+  } finally {
+    window.clearTimeout(timer);
   }
-  return text;
 }
 
 /** The last picks per station, for this run: tapping a station again re-picks. */
