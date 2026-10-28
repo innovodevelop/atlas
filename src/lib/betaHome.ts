@@ -70,6 +70,12 @@ export const WIDGETS: readonly WidgetDef[] = [
   { id: 'steps', label: 'Steps', meta: 'Today and the last seven days', group: 'Body', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/health' } },
   { id: 'sleep', label: 'Sleep', meta: 'Last night, by stage', group: 'Body', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/health' } },
   { id: 'home', label: 'Home', meta: 'Rooms, temperatures, the front door', group: 'Home', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/smart-home' } },
+  // Smart Home (F3): one light, the lights, and the door camera, through Home Assistant.
+  { id: 'lamp', label: 'Lamp', meta: 'A colour light, on or off, with its swatches', group: 'Home', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/smart-home' } },
+  { id: 'lights', label: 'Lights', meta: 'Which lights are on, and all off', group: 'Home', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/smart-home' } },
+  { id: 'bulb', label: 'Bulb', meta: 'One light and its brightness', group: 'Home', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/smart-home' } },
+  { id: 'floorlamp', label: 'Floor lamp', meta: 'The light named a floor lamp', group: 'Home', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/smart-home' } },
+  { id: 'frontdoor', label: 'Front door', meta: 'The door camera and its last motion', group: 'Home', sizes: ['S', 'M', 'L'], defaultSize: 'L', source: 'live', opens: { route: '/smart-home' } },
   { id: 'energy', label: 'Energy', meta: 'No energy meter is connected yet', group: 'Home', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'unwired', opens: { route: '/smart-home' } },
   { id: 'podcast', label: 'Podcast', meta: 'No podcast source yet', group: 'Media', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'unwired', opens: null },
   { id: 'focus', label: 'Focus', meta: 'Focus sessions arrive with the Focus screen', group: 'Day', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'unwired', opens: null },

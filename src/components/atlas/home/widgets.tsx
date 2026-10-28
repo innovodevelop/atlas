@@ -13,7 +13,7 @@
  * caller's `previewCopy` fills the rest. With `preview` undefined nothing
  * here runs and Home draws exactly what it drew before.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { WidgetFace, type FacePreview, type FacePreviewCopy, type FaceProps, type FaceRow, type FaceTone } from './WidgetFace';
 import { AtlasIcon } from '../AtlasIcon';
 import { WIDGET_BY_ID, type WidgetSize } from '@/lib/betaHome';
@@ -35,6 +35,11 @@ import { useHealth } from '@/hooks/useHealth';
 import { cityTimes } from '@/lib/worldClock';
 import { WATCHLIST, fmtPct } from '@/pages/atlas/atlasHelpers';
 import { eventTime, focusEvent, focusIn, thenEvents, todaysEvents } from '@/lib/stageFocus';
+import {
+  SWATCHES, cameraEventLine, cameraSensors, colourName, lastMotion, lightsSummary, pickDoorCamera, pickLight, powerValue,
+  type HistoryEvent, type LightWidget,
+} from '@/lib/betaSmartHome';
+import '@/styles/beta/smartHome.css';
 
 export interface WidgetProps {
   size: WidgetSize;
@@ -396,7 +401,8 @@ export function SleepWidget(p: WidgetProps) {
 export function HomeKitWidget(p: WidgetProps) {
   const { snapshot, usable } = useSmartHome();
   const devices = snapshot?.rooms.flatMap((r) => r.devices) ?? [];
-  const thermostats = devices.filter((d) => d.kind === 'thermostat' && d.control === 'stepper');
+  // A water heater's tank is not the inside temperature (Smart Home row 47).
+  const thermostats = devices.filter((d) => d.kind === 'thermostat' && d.control === 'stepper' && d.domain !== 'water_heater');
   const avg = thermostats.length ? thermostats.reduce((a, d) => a + d.value, 0) / thermostats.length : null;
   const lock = devices.find((d) => d.kind === 'lock');
   const face: Face = {
@@ -412,6 +418,196 @@ export function HomeKitWidget(p: WidgetProps) {
     chips: snapshot && snapshot.counts.unavailable > 0 ? [{ t: `${snapshot.counts.unavailable} unreachable`, tone: 'muted' }] : undefined,
   };
   return <Card p={p} face={face} />;
+}
+
+// --- Smart Home: lamps, lights, the door camera ------------------------------------
+
+/** Clicks and keys inside a widget's own controls must not also open the widget. */
+const keep = {
+  onClick: (e: { stopPropagation: () => void }) => e.stopPropagation(),
+  onKeyDown: (e: { stopPropagation: () => void }) => e.stopPropagation(),
+};
+
+/** The design's three lamp drawings; `glass` is the light's colour, or unlit paper. */
+function LampArt({ which, glass, lit }: { which: LightWidget; glass: string; lit: boolean }) {
+  const cone = lit ? 0.55 : 0;
+  if (which === 'bulb') {
+    return (
+      <svg height="72" viewBox="0 0 64 84" fill="none" aria-hidden>
+        <path d="M32 6C20 6 12 15 12 26c0 8 5 12 8 17 2 3 3 5 3 8h18c0-3 1-5 3-8 3-5 8-9 8-17C52 15 44 6 32 6z" fill={glass} />
+        <path d="M27 47c0-5-3-8-3-12m13 12c0-5 3-8 3-12" stroke="#b6b1aa" strokeWidth="1.6" strokeLinecap="round" />
+        <rect x="24" y="55" width="16" height="3.5" rx="1.75" fill="#b6b1aa" />
+        <rect x="25" y="60" width="14" height="3.5" rx="1.75" fill="#c9c3ba" />
+        <path d="M27 66h10l-3 5h-4z" fill="#b6b1aa" />
+      </svg>
+    );
+  }
+  if (which === 'floorlamp') {
+    return (
+      <svg height="80" viewBox="0 0 64 96" fill="none" aria-hidden>
+        <path d="M22 28 L42 28 L48 88 L16 88 Z" fill={glass} opacity={cone} />
+        <rect x="18" y="8" width="28" height="20" rx="5" fill="#55524b" />
+        <rect x="21" y="24" width="22" height="4" rx="2" fill={glass} />
+        <rect x="31" y="28" width="2.4" height="58" fill="#8b8681" />
+        <rect x="20" y="86" width="24" height="4" rx="2" fill="#b6b1aa" />
+      </svg>
+    );
+  }
+  return (
+    <svg height="72" viewBox="0 0 84 84" fill="none" aria-hidden>
+      <path d="M40 40 L52 40 L64 76 L28 76 Z" fill={glass} opacity={cone} />
+      <ellipse cx="24" cy="76" rx="14" ry="3.5" fill="#c9c3ba" />
+      <path d="M24 74 36 48 45 31" stroke="#8b8681" strokeWidth="3" strokeLinecap="round" />
+      <path d="M34 26h24l-6 15H40z" fill="#55524b" />
+      <circle cx="46" cy="43" r="4.5" fill={glass} />
+    </svg>
+  );
+}
+
+const UNLIT = '#e8e4de';
+const LIGHT_LABEL: Record<LightWidget, string> = { lamp: 'Lamp', bulb: 'Bulb', floorlamp: 'Floor lamp' };
+
+/**
+ * Lamp, Bulb and Floor lamp: one real light from Home Assistant, the design's
+ * drawing of it, a tap on the drawing to switch it, and — for a colour light —
+ * the swatches, which go through `setDeviceColour` like the Smart Home stage's.
+ */
+function LightCard({ p, which }: { p: WidgetProps; which: LightWidget }) {
+  const { snapshot, usable, setDeviceValue, setDeviceColour } = useSmartHome();
+  const devices = snapshot.rooms.flatMap((r) => r.devices);
+  const d = pickLight(devices, which);
+  // The level the light last ran at, so a tap brings it back there.
+  const lastOn = useRef<Record<string, number>>({});
+  if (d && d.value > 0 && d.control !== 'toggle' && !d.pending) lastOn.current[d.id] = d.value;
+  const hasBridge = snapshot.bridgeState !== 'none';
+  const inert = !usable || (hasBridge && snapshot.bridgeState !== 'connected') || !d || !d.available;
+  const on = !!d && d.available && d.value > 0;
+  const glass = on ? d?.colour ?? '#ffd9a0' : UNLIT;
+  const status = !d
+    ? !usable ? 'Mac app only' : !hasBridge ? 'Link Home Assistant in Smart Home' : which === 'floorlamp' ? 'No light is named a floor lamp' : 'Your bridge reports no light'
+    : !d.available ? 'Not responding'
+      : d.pending || d.note ? d.state
+        : on ? (d.control === 'toggle' ? 'On' : `${colourName(d.colour) ?? 'On'} · ${Math.round(d.value)}%`) : 'Off · tap the lamp';
+  const face: Face = {
+    label: LIGHT_LABEL[which],
+    meta: d ? [d.name, d.roomName].filter(Boolean).join(' · ') : snapshot.hub?.name ?? (usable ? 'No hub' : 'Mac app only'),
+    children: (
+      <span className="bw-sh-lamp">
+        <span className="bw-sh-lamp-glow" style={{ background: `radial-gradient(closest-side, ${glass}, transparent 70%)`, opacity: on ? 0.9 : 0 }} />
+        <button
+          type="button" className="bw-sh-lamp-btn" onKeyDown={keep.onKeyDown} disabled={inert}
+          aria-label={d ? `${d.name}: ${on ? 'turn off' : 'turn on'}` : LIGHT_LABEL[which]} aria-pressed={on}
+          onClick={(e) => { e.stopPropagation(); if (d) setDeviceValue(d.id, powerValue(d, lastOn.current[d.id])); }}
+        >
+          <LampArt which={which} glass={glass} lit={on} />
+        </button>
+        <span className="bw-sh-lamp-status">{status}</span>
+        {d && d.control === 'colour' ? (
+          <span className="bw-sh-swatches" {...keep}>
+            {SWATCHES.map((w) => (
+              <button
+                type="button" key={w.c} aria-label={w.l} title={w.l} aria-pressed={d.colour?.toLowerCase() === w.c} disabled={inert}
+                style={{ background: w.c }} onClick={(e) => { e.stopPropagation(); setDeviceColour(d.id, w.c); }}
+              />
+            ))}
+          </span>
+        ) : null}
+      </span>
+    ),
+  };
+  return <Card p={p} face={face} />;
+}
+
+export const LampWidget = (p: WidgetProps) => <LightCard p={p} which="lamp" />;
+export const BulbWidget = (p: WidgetProps) => <LightCard p={p} which="bulb" />;
+export const FloorLampWidget = (p: WidgetProps) => <LightCard p={p} which="floorlamp" />;
+
+/** Lights: how many are on and where, each one switchable, and All off. */
+export function LightsWidget(p: WidgetProps) {
+  const { snapshot, usable, setDeviceValue } = useSmartHome();
+  const devices = snapshot.rooms.flatMap((r) => r.devices);
+  const sum = lightsSummary(devices);
+  const hasBridge = snapshot.bridgeState !== 'none';
+  const inert = !usable || (hasBridge && snapshot.bridgeState !== 'connected');
+  const face: Face = {
+    label: 'Lights',
+    meta: sum.total ? `${sum.on.length} of ${sum.total} on` : snapshot.hub?.name ?? (usable ? 'No hub' : 'Mac app only'),
+    value: sum.total ? (sum.on.length ? (sum.brightness != null ? `${sum.brightness}%` : 'On') : 'Off') : '—',
+    sub: !usable ? 'Smart home runs in the Mac app'
+      : !hasBridge ? 'Link Home Assistant in Smart Home'
+        : !sum.total ? 'Your bridge reports no lights'
+          : sum.on.length ? `${sum.on.length} on in ${sum.rooms} ${sum.rooms === 1 ? 'room' : 'rooms'}` : 'Every light is off',
+    bar: sum.brightness != null ? { fraction: sum.brightness / 100, colour: '#ffd9a0' } : undefined,
+    // A row is a light that is on; tapping it switches that light off.
+    rows: sum.on.slice(0, 4).map<FaceRow>((d) => ({
+      key: d.id, leadKind: 'dot', dotOn: true, title: d.name, sub: d.roomName,
+      value: d.control === 'toggle' ? 'On' : `${Math.round(d.value)}%`, valueTone: 'muted',
+      onClick: inert ? undefined : () => setDeviceValue(d.id, 0),
+    })),
+    tail: sum.on.length && !inert ? (
+      <button type="button" className="b-btn b-btn--card b-btn--row" onKeyDown={keep.onKeyDown} onClick={(e) => { e.stopPropagation(); for (const d of sum.on) setDeviceValue(d.id, 0); }}>
+        All off
+      </button>
+    ) : undefined,
+  };
+  return <Card p={p} face={face} />;
+}
+
+/**
+ * Front door: the door camera, the last motion its own sensors saw, and a
+ * still frame on request. The frame is fetched from the hub when asked and
+ * lives only as long as this card; nothing is polled or kept.
+ */
+export function FrontDoorWidget(p: WidgetProps) {
+  const { snapshot, usable, loadHistory, cameraStill } = useSmartHome();
+  const devices = useMemo(() => snapshot.rooms.flatMap((r) => r.devices), [snapshot.rooms]);
+  const cam = pickDoorCamera(devices);
+  const sensors = useMemo(() => (cam ? cameraSensors(cam, devices) : []), [cam, devices]);
+  const sensorKey = sensors.map((s) => `${s.id}:${s.value}`).join('|');
+  const [events, setEvents] = useState<HistoryEvent[]>([]);
+  const [shot, setShot] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const now = useTick(30000, !!cam);
+  const hasBridge = snapshot.bridgeState !== 'none';
+  useEffect(() => {
+    if (!usable || !hasBridge || !sensorKey) return;
+    let on = true;
+    loadHistory({ since: new Date(Date.now() - 7 * 86_400_000).toISOString(), limit: 200 })
+      .then((h) => { if (on) setEvents(h.events); })
+      .catch(() => { /* the card still says what the sensors say now */ });
+    return () => { on = false; };
+  }, [usable, hasBridge, sensorKey, loadHistory]);
+  const line = cam ? cameraEventLine(lastMotion(sensors, events), now) : null;
+  const inert = !usable || !cam || (hasBridge && snapshot.bridgeState !== 'connected');
+  const face: Face = {
+    label: 'Front door',
+    meta: cam ? cam.name : snapshot.hub?.name ?? (usable ? 'No hub' : 'Mac app only'),
+    value: cam ? (cam.available ? 'Camera' : 'Offline') : '—',
+    sub: !usable ? 'Smart home runs in the Mac app'
+      : !hasBridge ? 'Link Home Assistant in Smart Home'
+        : !cam ? 'Your bridge reports no camera'
+          : line ?? (sensors.length ? 'No motion seen this week' : 'No motion sensor on this camera'),
+    bleed: shot ? <img className="bw-sh-cam" src={shot} alt={cam ? `${cam.name}, still frame` : ''} /> : null,
+    tail: cam ? (
+      <span className="bw-sh-cam-row" {...keep}>
+        <button
+          type="button" className="b-btn b-btn--onink b-btn--row" disabled={inert || busy}
+          onClick={(e) => {
+            e.stopPropagation();
+            setBusy(true);
+            setErr(null);
+            cameraStill(cam.id)
+              .then((r) => setShot(r.dataUrl))
+              .catch((x) => setErr(x instanceof Error ? x.message : String(x)))
+              .finally(() => setBusy(false));
+          }}
+        >{busy ? 'Fetching…' : shot ? 'New still' : 'Show a still'}</button>
+        {err ? <span className="bw-sh-cam-err">{err}</span> : null}
+      </span>
+    ) : undefined,
+  };
+  return <Card p={p} face={face} tone="ink" />;
 }
 
 // --- Not wired yet -----------------------------------------------------------------
@@ -441,6 +637,11 @@ const BY_ID: Record<string, (p: WidgetProps) => JSX.Element> = {
   steps: StepsWidget,
   sleep: SleepWidget,
   home: HomeKitWidget,
+  lamp: LampWidget,
+  lights: LightsWidget,
+  bulb: BulbWidget,
+  floorlamp: FloorLampWidget,
+  frontdoor: FrontDoorWidget,
 };
 
 export function HomeWidget({ id, ...p }: WidgetProps & { id: string }) {

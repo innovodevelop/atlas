@@ -225,6 +225,12 @@ export const EMPTY_COPY: Record<string, EmptySpec> = {
   sleep: { title: 'No sleep yet', hint: 'Import a Health export and last night shows here, stage by stage.', action: { label: 'Open Health', route: '/health' } },
   home: { title: 'No home hub', hint: 'Connect Home Assistant and your rooms, temperatures and the front door show here.', action: { label: 'Open Smart Home', route: '/smart-home' } },
   energy: { title: 'Not wired yet', hint: 'No energy meter is connected yet; this widget arrives with one.' },
+  // Smart Home (F3): the lamp, light and camera widgets, all from Home Assistant.
+  lamp: { title: 'No lamp yet', hint: 'Link Home Assistant and a colour light shows here, with its swatches.', action: { label: 'Open Smart Home', route: '/smart-home' } },
+  lights: { title: 'No lights yet', hint: 'Link Home Assistant and the lights that are on show here, room by room.', action: { label: 'Open Smart Home', route: '/smart-home' } },
+  bulb: { title: 'No bulb yet', hint: 'Link Home Assistant and a light shows here, with its brightness.', action: { label: 'Open Smart Home', route: '/smart-home' } },
+  floorlamp: { title: 'No floor lamp', hint: 'Atlas looks for a light whose name says floor lamp. Rename one in Home Assistant and it shows here.', action: { label: 'Open Smart Home', route: '/smart-home' } },
+  frontdoor: { title: 'No camera yet', hint: 'Link Home Assistant and its door camera shows here, with the last motion it saw.', action: { label: 'Open Smart Home', route: '/smart-home' } },
   podcast: { title: 'Not wired yet', hint: 'There is no podcast source in Atlas yet.' },
   focus: { title: 'Not wired yet', hint: 'Focus sessions arrive with the Focus screen.' },
 };
