@@ -184,6 +184,26 @@
 .b-ml-empty { padding: 18px 16px; border-radius: var(--b-r-small); background: var(--b-card); font-size: 12.5px; line-height: 1.55; color: var(--b-ink2); text-wrap: pretty; }
 .b-ml-empty b { font-weight: 600; color: var(--b-ink); }
 
+/* ---- F10: the provider switch, a switch waiting on a restart, p95 per lane --
+   Not in the design (its lane cards are read-only); built from the card's own
+   parts — a tinted pill to start, the ink pill to commit, small grey copy that
+   says what leaves the Mac. */
+/* `.b-ml button` inherits colour, which would put ink text on the ink pill. */
+.b-ml .b-btn--ink { color: var(--b-on-ink); }
+.b-ml .b-btn--tinted { color: var(--b-blue-deep); }
+.b-ml .b-btn:disabled { opacity: .55; cursor: default; }
+.b-ml-switch { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 2px; }
+.b-ml-switch-note { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--b-ink2); text-wrap: pretty; }
+.b-ml-switch-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.b-ml-err { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--b-red-deep); overflow-wrap: anywhere; }
+.b-ml-pending { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 16px 18px; border-radius: var(--b-r-card); background: var(--b-emphasis); }
+.b-ml-pending > p:first-child { flex: 1; min-width: min(260px, 100%); margin: 0; font-size: 13px; line-height: 1.55; color: var(--b-ink); text-wrap: pretty; }
+.b-ml-pending > p:first-child b { font-weight: 600; }
+.b-ml-pending .b-ml-err { flex-basis: 100%; }
+.b-ml-lat { grid-template-columns: 150px minmax(0, 1fr) minmax(0, 220px); }
+.b-ml-lat .b-ml-use-v { overflow: hidden; text-overflow: ellipsis; }
+.b-ml-lat .b-ml-use-v b { font-weight: 600; color: var(--b-ink); }
+
 .b-ml-foot { margin: 0; padding: 0 6px; font-size: 11.5px; line-height: 1.55; color: var(--b-ink2); text-wrap: pretty; }
 .b-ml-foot code { font-family: var(--b-font-mono); font-size: 11px; color: var(--b-ink); }
 
@@ -199,6 +219,7 @@
   .b-ml-fact > span:first-child { width: 104px; }
   .b-ml-use { grid-template-columns: minmax(0, 1fr) auto; row-gap: 8px; }
   .b-ml-use-bar { grid-column: 1 / -1; grid-row: 2; }
+  .b-ml-lat { grid-template-columns: minmax(0, 1fr) minmax(0, auto); }
 }
 
 @media (prefers-reduced-motion: reduce) {

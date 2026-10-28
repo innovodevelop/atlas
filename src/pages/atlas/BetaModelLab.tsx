@@ -12,17 +12,19 @@
  *   Routing, detail, Compare  — `src/lib/mocks/modelLab.ts`, the build-time
  *                               transcription of the gateway source. The
  *                               webview cannot import those Deno/Bun modules.
- *   The live lane, the keys   — `brain_ai_status` + `atlas_brain_info` (Tauri),
+ *   The stored lane, the keys — `brain_ai_status` + `atlas_brain_info` (Tauri),
  *                               via the Workshop's `useModelLabRuntime`.
- *   Usage and latency         — `atlas_usage_history` / `atlas_provider_status`,
- *                               read once (`useModelLabReadings`). Per model,
- *                               nothing is recorded, so the design's per-model
- *                               bars become per-provider lines, or an empty
- *                               state that says nothing has been recorded.
+ *   Usage, latency, the lane  — the brain's model-call ledger
+ *   the brain runs on           (`GET /admin/model-calls`, polled by
+ *                               `useModelLabReadings`): tokens and list-price
+ *                               cost per model, p95 latency per lane.
  *
- * The lane switch is a lens, as in the design: it shows how every tier
- * resolves on that lane. It does not change `atlas_ai_provider` — the live
- * lane is marked LIVE and only changes when the stored preference does.
+ * The lane switch in the bar is a lens, as in the design: it shows how every
+ * tier resolves on that lane and changes nothing. The provider switch is on
+ * the Providers view: it writes `atlas_ai_provider` to the Keychain through
+ * `brain_set_ai_key` (the same path Settings uses), which the brain reads when
+ * it is spawned, so it takes effect on the next start — the card says so and
+ * offers Restart (`app_restart`). LIVE marks the lane the running brain is on.
  *
  * Esc walks back one level at a time (detail → the view → Routing → Home),
  * and the headline does the same.
@@ -32,8 +34,8 @@ import { activeLane, useModelLabRuntime, type ModelLabRuntime } from '@/componen
 import { useModelLabReadings, type ModelLabReadings } from '@/hooks/useModelLabReadings';
 import { OPUS5_RECHECK_ON, SOURCES, TIERS, UNKNOWN_ID_FALLBACK, VERIFIED_ON, tierById } from '@/lib/mocks/modelLab';
 import {
-  GATEWAY_RULES, LANES, LANE_LABEL, compareRows, dayLabel, detailOf, factsOf, invokedOn, isBad, isUnmapped, laneFacts, laneInfo,
-  laneName, laneStatus, latencyOf, namedOn, substitutedCount, tagOf, usageByProvider, usd, type Lane,
+  GATEWAY_RULES, LANES, LANE_LABEL, compareRows, dayLabel, detailOf, factsOf, invokedOn, isBad, isUnmapped, laneFacts, laneInfo, laneModels,
+  laneName, laneP95, laneStatus, latencyFact, latencyLines, namedOn, runningLaneOf, substitutedCount, switchPlan, tagOf, usageByModel, usd, type Lane,
 } from '@/lib/betaModelLab';
 import { VeilSphere } from '@/components/atlas/VeilSphere';
 import { useBetaNavigate } from '@/lib/viewTransitions';
@@ -54,7 +56,13 @@ const BetaModelLab = () => {
   // One runtime read for the whole page (two Tauri IPC calls); the views take it as data.
   const runtime = useModelLabRuntime();
   const readings = useModelLabReadings();
-  const live = activeLane(runtime.status);
+  // Two different facts: the lane stored in the Keychain (what the brain starts
+  // on) and the lane the running brain reports. They differ between a switch
+  // and the next start; LIVE belongs to the one answering now.
+  const stored = activeLane(runtime.status);
+  const running = runningLaneOf(readings.summary);
+  const live = running ?? stored;
+  const pending = stored && running && stored !== running ? stored : null;
 
   const [view, setView] = useState<View>('routing');
   const [open, setOpen] = useState<string | null>(null);
@@ -168,6 +176,7 @@ const BetaModelLab = () => {
               <button type="button" key={k} role="radio" aria-checked={lane === k} className={lane === k ? 'on' : ''} title={laneInfo(k).host} onClick={() => setPicked(k)}>
                 {LANE_LABEL[k]}
                 {live === k ? <span className={`b-ml-live${brainRunning ? '' : ' off'}`}>{brainRunning ? 'LIVE' : 'SELECTED'}</span> : null}
+                {pending === k ? <span className="b-ml-live off" title="Stored as the provider; the brain switches when Atlas restarts">NEXT START</span> : null}
               </button>
             ))}
           </div>
@@ -215,14 +224,14 @@ const BetaModelLab = () => {
           ) : view === 'compare' ? (
             <CompareView lane={lane} onOpen={openTier} />
           ) : (
-            <ProvidersView runtime={runtime} readings={readings} live={live} brainRunning={brainRunning} />
+            <ProvidersView runtime={runtime} readings={readings} stored={stored} running={running} live={live} brainRunning={brainRunning} />
           )}
       </div>
 
       <p className="b-ml-foot">
         Routing and Compare are transcribed from the gateway source at build time
         ({SOURCES.map((s, i) => <Fragment key={s.path}>{i ? ', ' : ''}<code title={s.what}>{s.path.split('/').pop()}</code></Fragment>)});
-        the webview can’t import it. Providers are read live from the Keychain and the brain sidecar, usage and latency from the app’s own tables. Nothing here is a guess.
+        the webview can’t import it. Providers are read live from the Keychain and the brain sidecar, usage and latency from the brain’s record of every model call. Nothing here is a guess.
       </p>
     </div>
   );
@@ -290,25 +299,111 @@ function CompareView({ lane, onOpen }: { lane: Lane; onOpen: (id: string) => voi
   );
 }
 
-function ProvidersView({ runtime, readings, live, brainRunning }: {
+/**
+ * Write the stored provider. `brain_set_ai_key` is the command Settings stores
+ * keys with; `atlas_ai_provider` is one of the accounts it accepts, and the
+ * brain reads it when Rust spawns it, so the answer only matters from the next
+ * start.
+ */
+async function storeProvider(lane: Lane): Promise<void> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  await invoke('brain_set_ai_key', { provider: 'atlas_ai_provider', key: lane });
+}
+
+/**
+ * Restart through the Rust command `app_restart` (AppHandle::restart). Settings
+ * adds it; a build without it answers with Tauri's "not found" error, which the
+ * card shows as it is rather than pretending the restart happened.
+ */
+async function restartAtlas(): Promise<void> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  await invoke('app_restart');
+}
+
+const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+function ProvidersView({ runtime, readings, stored, running, live, brainRunning }: {
   runtime: ModelLabRuntime;
   readings: ModelLabReadings;
+  stored: Lane | null;
+  running: Lane | null;
   live: Lane | null;
   brainRunning: boolean | null;
 }) {
-  const usage = useMemo(() => usageByProvider(readings.usage), [readings.usage]);
+  const summary = readings.summary;
+  const usage = useMemo(() => usageByModel(summary, live ? laneModels(live) : []), [summary, live]);
+  const latency = useMemo(() => latencyLines(summary), [summary]);
+  const [confirm, setConfirm] = useState<Lane | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [switchError, setSwitchError] = useState<string | null>(null);
+  const [restartError, setRestartError] = useState<string | null>(null);
+  // The switch can only be offered where the Keychain answered: in a browser
+  // there is nothing to write, and while it is being read nothing is known.
+  const canSwitch = runtime.available && !runtime.loading && !!runtime.status;
+  // The lane stored here this visit. When the brain cannot say which lane it
+  // runs on (it is down), this is still enough to know a restart is owed.
+  const [switched, setSwitched] = useState<Lane | null>(null);
+  const pending = stored && running && stored !== running
+    ? stored
+    : stored && !running && switched === stored ? stored : null;
+
+  const doSwitch = async (k: Lane) => {
+    setBusy(true);
+    setSwitchError(null);
+    setRestartError(null);
+    try {
+      await storeProvider(k);
+      setConfirm(null);
+      setSwitched(k);
+      runtime.reload();
+    } catch (e) {
+      setSwitchError(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doRestart = async () => {
+    setBusy(true);
+    setRestartError(null);
+    try {
+      await restartAtlas();
+    } catch (e) {
+      setRestartError(errText(e));
+      setBusy(false);
+    }
+  };
+
+  const recordedSince = summary?.recording_since && summary.recording_since > summary.since ? summary.recording_since : null;
+
   return (
     <>
+      {pending ? (
+        <section className="b-ml-pending" aria-label="Provider switch waiting for a restart" aria-live="polite">
+          <p>
+            <b>Atlas starts on {LANE_LABEL[pending]} next time.</b>{' '}
+            {running ? `The brain still runs on ${LANE_LABEL[running]} until Atlas restarts.` : 'The brain reads the provider when it starts, so it applies after a restart.'}
+          </p>
+          <button type="button" className="b-btn b-btn--ink" disabled={busy} onClick={() => void doRestart()}>{busy ? 'Restarting…' : 'Restart Atlas'}</button>
+          {restartError ? <p className="b-ml-err" role="alert">Couldn’t restart: {restartError}. Quit and reopen Atlas instead.</p> : null}
+        </section>
+      ) : null}
+
       <div className="b-ml-lanecards">
         {LANES.map((k) => {
-          const selected = live === k;
+          const selected = stored === k;
           const keyPresent = runtime.status ? (k === 'anthropic' ? runtime.status.anthropic : runtime.status.bedrock) : null;
-          const st = laneStatus({ available: runtime.available, loading: runtime.loading, keyPresent, selected, brainRunning });
-          const facts = laneFacts(k, readings.available ? latencyOf(k, readings.health) : 'readable in the desktop app');
-          if (selected) {
+          const p95 = laneP95(summary, k)?.p95_ms ?? null;
+          const st = laneStatus({
+            available: runtime.available, loading: runtime.loading, keyPresent, selected, brainRunning,
+            running: running == null ? null : running === k, p95Ms: p95,
+          });
+          const facts = laneFacts(k, readings.available ? (readings.error && !summary ? 'couldn’t be read' : latencyFact(summary, k)) : 'readable in the desktop app');
+          if (live === k) {
             facts.push({ k: 'Brain sidecar', v: brainRunning === null ? 'unknown' : brainRunning ? 'running' : 'not running' });
             if (runtime.brain?.integrity_error) facts.push({ k: 'Integrity', v: runtime.brain.integrity_error });
           }
+          const plan = switchPlan(k, keyPresent);
           return (
             <section key={k} className={`b-ml-lanecard${selected ? ' ink' : ''}`} aria-label={`${LANE_LABEL[k]} lane`}>
               <div className="b-ml-lanecard-head">
@@ -319,13 +414,33 @@ function ProvidersView({ runtime, readings, live, brainRunning }: {
               {facts.map((f) => (
                 <div key={f.k} className="b-ml-lanefact"><span>{f.k}</span><span>{f.v}</span></div>
               ))}
+              {canSwitch && !selected ? (
+                <div className="b-ml-switch">
+                  {!plan.allowed ? (
+                    <p className="b-ml-switch-note">{plan.reason}</p>
+                  ) : confirm === k ? (
+                    <>
+                      <p className="b-ml-switch-note">{plan.effect}</p>
+                      <span className="b-ml-switch-row">
+                        <button type="button" className="b-btn b-btn--ink" disabled={busy} onClick={() => void doSwitch(k)}>{busy ? 'Switching…' : `Switch to ${LANE_LABEL[k]}`}</button>
+                        <button type="button" className="b-btn b-btn--card" disabled={busy} onClick={() => { setConfirm(null); setSwitchError(null); }}>Cancel</button>
+                      </span>
+                    </>
+                  ) : (
+                    <button type="button" className="b-btn b-btn--tinted" onClick={() => { setConfirm(k); setSwitchError(null); }}>
+                      Use {LANE_LABEL[k]} from the next start
+                    </button>
+                  )}
+                  {confirm === k && switchError ? <p className="b-ml-err" role="alert">Couldn’t store the provider: {switchError}</p> : null}
+                </div>
+              ) : null}
             </section>
           );
         })}
       </div>
 
       {!runtime.available ? (
-        <p className="b-ml-alert">The active lane and the key inventory live in the macOS Keychain and the brain sidecar. A browser can see neither, so this reports nothing rather than reporting “no key”.</p>
+        <p className="b-ml-alert">The active lane and the key inventory live in the macOS Keychain and the brain sidecar. A browser can see neither, so this reports nothing rather than reporting “no key”, and offers no switch.</p>
       ) : runtime.error ? (
         <p className="b-ml-alert">
           Couldn’t read the runtime: {runtime.error}{' '}
@@ -340,39 +455,57 @@ function ProvidersView({ runtime, readings, live, brainRunning }: {
         ))}
       </section>
 
-      <section className="b-ml-usage" aria-label="Usage, last 30 days">
+      <section className="b-ml-usage" aria-label={`Usage, last ${summary?.days ?? 30} days`}>
         <div className="b-ml-usage-head">
-          <p className="b-ml-h">Usage, last 30 days</p>
-          <span>{readings.available ? 'per provider · atlas_usage_history' : 'desktop app only'}</span>
+          <p className="b-ml-h">Usage, last {summary?.days ?? 30} days</p>
+          <span>{readings.available ? 'per model · every call the brain made' : 'desktop app only'}</span>
         </div>
         {!readings.available ? (
-          <div className="b-ml-empty">Usage lives in the desktop app’s database. A browser can’t read it, so nothing here says zero.</div>
-        ) : readings.usageLoading ? (
-          <div className="b-ml-empty">Reading atlas_usage_history…</div>
-        ) : readings.usageError ? (
+          <div className="b-ml-empty">Usage is recorded by the brain sidecar in the desktop app’s database. A browser can’t read it, so nothing here says zero.</div>
+        ) : readings.loading ? (
+          <div className="b-ml-empty">Reading the brain’s record of model calls…</div>
+        ) : readings.error && !summary ? (
           <div className="b-ml-empty">
-            Couldn’t read usage: {readings.usageError}{' '}
+            Couldn’t read usage: {readings.error}{' '}
             <button type="button" className="b-ml-link" onClick={readings.reload}>Try again</button>
           </div>
-        ) : !usage.lines.length ? (
+        ) : !usage.calls ? (
           <div className="b-ml-empty">
-            <b>Nothing recorded yet.</b> atlas_usage_history has no rows for the last thirty days, and Atlas doesn’t record calls per model, so there is no cost to show and none is estimated.
+            <b>No model calls recorded yet.</b> The brain writes one row per call as Atlas answers, plans and learns; usage and cost appear here after the first one.
           </div>
         ) : (
           <>
             {usage.lines.map((u) => (
-              <div key={u.provider} className="b-ml-use">
+              <div key={u.label} className="b-ml-use">
                 <span className="b-ml-use-t">{u.label}</span>
                 <span className="b-ml-use-bar"><i style={{ width: `${Math.round(u.share * 100)}%`, background: u.colour }} /></span>
                 <span className="b-ml-use-v">{u.value}</span>
               </div>
             ))}
             <p className="b-ml-use-foot">
-              {usd(usage.cost)} estimated across {usage.days} {usage.days === 1 ? 'day' : 'days'} with rows. Recorded per provider, never per model, so no tier can be priced from it.
+              {usage.cost == null ? 'No cost could be estimated' : `${usd(usage.cost)} estimated`} at Anthropic’s list prices of {dayLabel(summary!.prices_as_of)}, across {usage.calls.toLocaleString()} {usage.calls === 1 ? 'call' : 'calls'}
+              {usage.unpricedCalls ? ` (${usage.unpricedCalls} without a price or token count)` : ''}. Bedrock bills its own rates.
+              {recordedSince ? ` Recorded since ${dayLabel(recordedSince)}.` : ''}
             </p>
           </>
         )}
       </section>
+
+      {readings.available && latency.length ? (
+        <section className="b-ml-usage" aria-label="Latency, p95 per lane">
+          <div className="b-ml-usage-head">
+            <p className="b-ml-h">Latency, p95 per lane</p>
+            <span>until the provider answered · calls that worked</span>
+          </div>
+          {latency.map((l) => (
+            <div key={l.lane} className="b-ml-use b-ml-lat">
+              <span className="b-ml-use-t" title={l.detail}>{l.label}</span>
+              <span className="b-ml-use-bar"><i style={{ width: `${Math.round(l.share * 100)}%`, background: 'var(--b-ink)' }} /></span>
+              <span className="b-ml-use-v"><b>{l.p95}</b> · {l.detail}</span>
+            </div>
+          ))}
+        </section>
+      ) : null}
     </>
   );
 }

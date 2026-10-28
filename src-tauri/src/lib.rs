@@ -42,6 +42,9 @@ mod brain;
 mod system_vitals;
 // The Focus screen's optional "run my Shortcut" (Beta row 12).
 mod focus_mode;
+// System Status's native half: disk sizes, app versions, the Home Assistant
+// check (Beta rows 75, 78, 79).
+mod system_status;
 
 /// Outcome of a sidecar spawn attempt. `integrity_error` is set when the
 /// binary failed integrity verification (and was therefore NOT spawned) — it
@@ -577,6 +580,11 @@ pub fn run() {
       focus_mode::focus_shortcut_run,
       // Battery / Wi-Fi / Bluetooth for the Beta top bar. Read-only, no secrets.
       system_vitals::system_vitals,
+      // Beta System Status (F10): bytes on disk, app version history, and a
+      // timed check of the linked Home Assistant bridge.
+      system_status::system_storage,
+      system_status::system_app_history,
+      system_status::system_probe_home_assistant,
       mail::mail_sync,
       mail::mail_thread_fetch,
       mail::mail_mark_read,
@@ -689,6 +697,9 @@ pub fn run() {
         }
         app.manage(db::DbState::open(&db_path)?);
         log::info!("[db] local SQLite opened at {}", db_path.display());
+        // System Status's "since the last update": note this launch's version
+        // the first time it runs (one quick local write; never fails setup).
+        system_status::record_launch(app.handle());
       }
 
       // Sidecars come up in the BACKGROUND so the window is interactive at

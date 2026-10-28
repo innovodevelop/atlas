@@ -4,74 +4,140 @@
  *
  * The health headline with the sphere (success when every probe passes,
  * alert when one fails, working while re-checking), four tiles, the battery
- * rings for this Mac and its Bluetooth devices, the two services the brain
- * probes with latency bars from this session's checks, what is in atlas.db,
- * and a Recently feed of errors, actions and repairs. Everything comes from
- * the Workshop page's hooks (`useSystemStatus`), the vitals command the top
- * bar uses, the `tool_calls` audit trail and `db_info`; nothing is invented.
+ * rings for this Mac and its Bluetooth devices, the services with latency bars
+ * from the checks this Mac made (kept across reloads), what Atlas takes on
+ * disk, and a Recently feed of errors, actions, repairs and installs.
  *
- * Where the design shows a figure Atlas has no source for, the tile says so:
- * model calls read the app's own `atlas_usage_history` counter, which nothing
- * has written since the brain moved on-device, and "On this Mac" shows rows
- * per table because no command measures bytes yet.
+ * Where each figure comes from — nothing is invented:
+ *   Brain, Voice, Reasoning  the brain's health route (`/admin/system/health`);
+ *                            Reasoning is the AI provider, checked by the brain
+ *                            without spending tokens.
+ *   Mail                     `mail_accounts`, as the sync left it.
+ *   Home Assistant           `system_probe_home_assistant`, a timed GET of the
+ *                            linked bridge, once a minute while this is open.
+ *   Uptime                   `system_app_history`: since this version first ran.
+ *   Model calls              the brain's model-call ledger (`/admin/model-calls`).
+ *   Actions today            the `tool_calls` audit trail Rust writes.
+ *   On this Mac              `system_storage`: bytes on disk, SQLite's own pages.
+ * Calendar is not a row: calendars live on this Mac (`user_events`) and no
+ * sync exists to check.
  */
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
-import { adminGet, ADMIN_QUERY_OPTIONS } from '@/hooks/useAdminApi';
+import { adminGet, ADMIN_QUERY_OPTIONS, ADMIN_REFETCH_INTERVAL_MS } from '@/hooks/useAdminApi';
 import { useErrorLogs, useInitiateRepair, useRepairAttempts, useResolveError, useScanErrors, type SystemHealthSnapshot } from '@/hooks/useSystemStatus';
 import { useSystemVitals } from '@/hooks/useSystemVitals';
 import { isTauri, localClient } from '@/integrations/local/localClient';
 import { VeilSphere } from '@/components/atlas/VeilSphere';
 import { AtlasIcon } from '@/components/atlas/AtlasIcon';
 import {
-  barsOf, batteryColour, batteryState, clockText, countText, countToday, dayKey, deviceIcon, deviceLine, getProbeHistory, latencyText, macLine,
-  recentEvents, recordProbe, ringOffset, samplesCaption, serviceDown, serviceMeta, sphereStateFor, storageBars, subscribeProbeHistory,
-  summarise, sumUsage, uptimeText, withRoundTrip, type TableInfo, type ToolCallRow, type UsageRow,
+  barsOf, batteryColour, batteryState, clockText, countText, countToday, deviceIcon, deviceLine, getProbeHistory, homeAssistantService, macLine,
+  mailService, modelCallsTile, recentEvents, recordProbe, ringOffset, samplesCaption, serviceDesc, serviceDown, serviceMeta, sphereStateFor,
+  storageBars, subscribeProbeHistory, summarise, uptimeText, valueText, versionUptime, withRoundTrip,
+  type AppHistory, type HaProbe, type MailAccountRow, type ModelCallsToday, type ProbeService, type StorageReport, type ToolCallRow,
 } from '@/lib/betaSystemStatus';
 import { useBetaNavigate } from '@/lib/viewTransitions';
 import { openTalk, setTalkAnchor } from '@/lib/talkBus';
 import { isTyping } from './atlasHelpers';
 import '@/styles/beta/systemStatus.css';
 
-type TimedHealth = SystemHealthSnapshot & { roundtrip_ms: number };
+/** The brain's answer, its services in the richer shape the AI provider row carries, plus the measured round trip. */
+type TimedHealth = Omit<SystemHealthSnapshot, 'services'> & { roundtrip_ms: number; services: ProbeService[] };
+
+async function invokeCommand<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<T>(cmd, args);
+}
 
 /**
  * The Workshop's `useSystemHealth` hides how long the brain took to answer,
  * and the brain reports its own latency as 0. Same endpoint, same transport,
  * same cadence — plus the round trip, which is the one real latency figure
- * this window can measure for the brain.
+ * this window can measure for the brain. `refetchFresh` (Check again) asks the
+ * brain to re-probe the AI provider instead of answering from its minute-long
+ * cache.
  */
 function useTimedHealth() {
-  return useQuery({
+  const fresh = useRef(false);
+  const q = useQuery({
     queryKey: ['admin', 'system-health', 'timed'],
     queryFn: async (): Promise<TimedHealth> => {
+      const f = fresh.current;
+      fresh.current = false;
       const t0 = performance.now();
-      const h = await adminGet<SystemHealthSnapshot>('/admin/system/health');
+      const h = await adminGet<TimedHealth>(`/admin/system/health${f ? '?fresh=1' : ''}`);
       return { ...h, roundtrip_ms: Math.round(performance.now() - t0) };
     },
     staleTime: 5_000,
     refetchInterval: 10_000,
     ...ADMIN_QUERY_OPTIONS,
   });
+  const { refetch } = q;
+  const refetchFresh = useCallback(() => { fresh.current = true; return refetch(); }, [refetch]);
+  return [q, refetchFresh] as const;
 }
 
 /**
- * Every table in atlas.db with its row count — the only "on this Mac" measure
- * a command gives. Read once per visit and on Re-check, never on a timer:
- * `db_info` is a synchronous command that holds the database lock while it
- * counts every table, and row counts do not move fast enough to be worth it.
+ * Bytes on disk (row 79). Read once per visit and on Check again, never on a
+ * timer: the page walk is proportional to the database, and sizes do not move
+ * fast enough to be worth more.
  */
-function useDbTables() {
+function useStorage() {
   return useQuery({
-    queryKey: ['beta', 'db-tables'],
+    queryKey: ['beta', 'system-storage'],
     enabled: isTauri(),
-    queryFn: async (): Promise<TableInfo[]> => {
-      const { invoke } = await import('@tauri-apps/api/core');
-      return invoke<TableInfo[]>('db_info');
-    },
+    queryFn: () => invokeCommand<StorageReport>('system_storage'),
     staleTime: 5 * 60_000,
+  });
+}
+
+/** This app's version history (row 78). Recorded once per launch, so read once. */
+function useAppHistory() {
+  return useQuery({
+    queryKey: ['beta', 'app-history'],
+    enabled: isTauri(),
+    queryFn: () => invokeCommand<AppHistory>('system_app_history'),
+    staleTime: 10 * 60_000,
+  });
+}
+
+/** The linked Home Assistant bridge, checked once a minute while this screen is open (row 75). */
+function useHomeAssistantProbe(userId: string | null) {
+  return useQuery({
+    queryKey: ['beta', 'ha-probe', userId],
+    enabled: isTauri() && !!userId,
+    queryFn: () => invokeCommand<HaProbe>('system_probe_home_assistant', { userId }),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+}
+
+/** The mailboxes as the sync left them (row 75); re-read every minute. */
+function useMailAccounts(userId: string | null) {
+  return useQuery({
+    queryKey: ['beta', 'mail-accounts-status', userId],
+    enabled: isTauri() && !!userId,
+    queryFn: async (): Promise<MailAccountRow[]> => {
+      const { data, error } = await localClient.from('mail_accounts').select('email_address, provider, status, last_error, last_synced_at').eq('user_id', userId!);
+      if (error) throw new Error(error.message);
+      return (data ?? []) as MailAccountRow[];
+    },
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+}
+
+/** Today's model calls from the brain's ledger (rows 72, 77). */
+function useModelCallsToday() {
+  return useQuery({
+    queryKey: ['beta', 'model-calls-today'],
+    enabled: isTauri(),
+    queryFn: () => adminGet<ModelCallsToday>('/admin/model-calls?days=1'),
+    staleTime: 15_000,
+    refetchInterval: ADMIN_REFETCH_INTERVAL_MS,
+    ...ADMIN_QUERY_OPTIONS,
   });
 }
 
@@ -103,24 +169,6 @@ function useToolCallRows(userId: string | null) {
   });
 }
 
-/**
- * Today's row per provider in the app's model-call counter table. Nothing
- * writes it at the moment (see the header), so it is read once per visit and
- * on Re-check rather than polled.
- */
-function useUsageToday(day: string) {
-  return useQuery({
-    queryKey: ['beta', 'usage-today', day],
-    enabled: isTauri(),
-    queryFn: async (): Promise<UsageRow[]> => {
-      const { data, error } = await localClient.from('atlas_usage_history').select('provider, total_calls, failed_calls').eq('date', day);
-      if (error) throw new Error(error.message);
-      return (data ?? []) as UsageRow[];
-    },
-    staleTime: 60_000,
-  });
-}
-
 /** How long the sphere stays "working" at least, so a 30 ms answer still reads as a check. */
 const MIN_CHECK_MS = 900;
 
@@ -130,18 +178,21 @@ const BetaSystemStatus = () => {
   const { user, loading: authLoading } = useAuth();
   const qc = useQueryClient();
   const native = isTauri();
+  const userId = user?.id ?? null;
 
-  const healthQ = useTimedHealth();
+  const [healthQ, refetchHealthFresh] = useTimedHealth();
   const errorsQ = useErrorLogs(50);
   const { repairs } = useRepairAttempts();
   const scan = useScanErrors();
   const resolveErr = useResolveError();
   const initRepair = useInitiateRepair();
   const vitals = useSystemVitals();
-  const tablesQ = useDbTables();
-  const callsQ = useToolCallRows(user?.id ?? null);
-  const today = dayKey(new Date());
-  const usageQ = useUsageToday(today);
+  const storageQ = useStorage();
+  const appQ = useAppHistory();
+  const haQ = useHomeAssistantProbe(userId);
+  const mailQ = useMailAccounts(userId);
+  const modelCallsQ = useModelCallsToday();
+  const callsQ = useToolCallRows(userId);
   const history = useSyncExternalStore(subscribeProbeHistory, getProbeHistory, getProbeHistory);
 
   const [checking, setChecking] = useState(false);
@@ -157,31 +208,38 @@ const BetaSystemStatus = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, [navigate]);
 
-  // The brain's answer carries one probe; the sparklines need the run of them.
-  // Every successful poll is recorded once, keyed on when it arrived.
+  // The brain's answer carries one probe per service; the sparklines need the
+  // run of them. Every answer is recorded once, keyed on when it arrived; the
+  // local checks (mail, Home Assistant) run on their own clocks and record theirs.
   const health = healthQ.data ?? null;
-  const services = useMemo(() => (health ? withRoundTrip(health.services, health.roundtrip_ms) : null), [health]);
+  const brainServices = useMemo(() => (health ? withRoundTrip(health.services, health.roundtrip_ms) : null), [health]);
+  const mail = useMemo(() => (mailQ.data ? mailService(mailQ.data, new Date(mailQ.dataUpdatedAt)) : null), [mailQ.data, mailQ.dataUpdatedAt]);
+  const ha = useMemo(() => (haQ.data ? homeAssistantService(haQ.data, new Date(haQ.dataUpdatedAt)) : null), [haQ.data, haQ.dataUpdatedAt]);
   useEffect(() => {
-    if (!services || !healthQ.dataUpdatedAt) return;
-    recordProbe(services, healthQ.dataUpdatedAt);
+    if (!brainServices || !healthQ.dataUpdatedAt) return;
+    recordProbe(brainServices, healthQ.dataUpdatedAt);
     setCheckedAt(healthQ.dataUpdatedAt);
-  }, [services, healthQ.dataUpdatedAt]);
+  }, [brainServices, healthQ.dataUpdatedAt]);
+  useEffect(() => { if (mail && mailQ.dataUpdatedAt) recordProbe([mail], mailQ.dataUpdatedAt); }, [mail, mailQ.dataUpdatedAt]);
+  useEffect(() => { if (ha && haQ.dataUpdatedAt) recordProbe([ha], haQ.dataUpdatedAt); }, [ha, haQ.dataUpdatedAt]);
   useEffect(() => { if (healthQ.errorUpdatedAt) setCheckedAt((t) => Math.max(t ?? 0, healthQ.errorUpdatedAt)); }, [healthQ.errorUpdatedAt]);
 
   /**
-   * Re-check: the brain's probes, the error scan, the audit trail, the
-   * database, all at once. The local reads only run where they can — a
-   * query's refetch() ignores `enabled`, and in the browser preview there is
-   * no database to ask.
+   * Check again: the brain's probes (with a fresh AI provider check), the
+   * error scan, the local checks, the audit trail and the disk, all at once.
+   * The local reads only run where they can — a query's refetch() ignores
+   * `enabled`, and in the browser preview there is no database to ask.
    */
   const recheck = useCallback(async () => {
     if (checking) return;
     setChecking(true);
     const floor = new Promise<void>((r) => window.setTimeout(r, MIN_CHECK_MS));
-    const local = native ? [tablesQ.refetch(), usageQ.refetch(), ...(user ? [callsQ.refetch()] : [])] : [];
+    const local = native
+      ? [storageQ.refetch(), modelCallsQ.refetch(), ...(userId ? [callsQ.refetch(), mailQ.refetch(), haQ.refetch()] : [])]
+      : [];
     try {
       await Promise.allSettled([
-        healthQ.refetch(),
+        refetchHealthFresh(),
         scan.mutateAsync().then(() => errorsQ.refetch()),
         qc.invalidateQueries({ queryKey: ['admin', 'repair-attempts'] }),
         ...local,
@@ -191,8 +249,12 @@ const BetaSystemStatus = () => {
       setChecking(false);
       setCheckedAt(Date.now());
     }
-  }, [checking, native, user, healthQ, scan, errorsQ, qc, tablesQ, callsQ, usageQ]);
+  }, [checking, native, userId, refetchHealthFresh, scan, errorsQ, qc, storageQ, modelCallsQ, callsQ, mailQ, haQ]);
 
+  const services = useMemo(
+    () => (brainServices ? [...brainServices, ...(mail ? [mail] : []), ...(ha ? [ha] : [])] : null),
+    [brainServices, mail, ha],
+  );
   const healthError = healthQ.error ? (healthQ.error as Error).message : null;
   const unresolved = health ? health.error_count_24h + health.warning_count_24h : 0;
   const summaryInput = { checking, loading: healthQ.isLoading, error: healthError, services, unresolvedErrors: unresolved };
@@ -200,26 +262,30 @@ const BetaSystemStatus = () => {
   const { headline, sub } = summarise(summaryInput);
 
   // Tiles. Each one says where its number comes from, or why it has none.
+  const now = new Date();
   const todayCalls = useMemo(() => countToday(callsQ.data ?? [], new Date()), [callsQ.data]);
   const failedToday = todayCalls.filter((c) => c.status === 'failed').length;
-  const usage = useMemo(() => sumUsage(usageQ.data ?? []), [usageQ.data]);
+  const sinceUpdate = versionUptime(appQ.data ?? null, now);
+  const modelTile = modelCallsTile(native, modelCallsQ.data ?? null, modelCallsQ.error ? (modelCallsQ.error as Error).message : null);
   const battery = vitals.battery;
   // In the app the first vitals read takes a moment; until it lands, "no
   // battery" would be a claim about the Mac rather than about the wait.
   const vitalsRead = vitals.fixture || vitals.at != null;
   const macText = vitalsRead ? macLine(battery) : 'This Mac · reading the battery…';
   const tiles = [
-    { k: 'Uptime', v: health ? uptimeText(health.uptime_seconds) : '—', d: health ? 'brain sidecar, since it started' : healthError ? 'brain not reachable' : 'reading…', ink: true, stamp: false },
+    sinceUpdate
+      ? { k: 'Uptime', v: uptimeText(sinceUpdate.seconds), d: sinceUpdate.d, ink: true, stamp: false }
+      : { k: 'Uptime', v: health ? uptimeText(health.uptime_seconds) : '—', d: health ? 'brain sidecar, since it started' : healthError ? 'brain not reachable' : 'reading…', ink: true, stamp: false },
     { k: 'Actions today', v: native && user ? countText(callsQ.data ? todayCalls.length : null) : '—', d: !native ? 'Only in the Mac app' : !user ? 'Sign in to count them' : callsQ.error ? 'Audit trail unreadable' : failedToday ? `${failedToday} failed` : 'none failed · from the audit trail', ink: false, stamp: false },
-    { k: 'Model calls', v: native && usage ? countText(usage.total) : '—', d: !native ? 'Only in the Mac app' : usage ? `${usage.failed} failed · ${usage.providers} ${usage.providers === 1 ? 'provider' : 'providers'}` : 'No counter records model calls yet', ink: false, stamp: false },
+    { k: 'Model calls', v: modelTile.v, d: modelTile.d, ink: false, stamp: false },
     { k: 'Battery', v: battery ? `${battery.percent}%` : '—', d: vitalsRead ? `This Mac · ${batteryState(battery)}` : 'Reading…', ink: false, stamp: vitals.fixture },
   ];
 
   const devices = (vitals.bluetooth?.connected ?? []);
-  const store = useMemo(() => storageBars(tablesQ.data ?? []), [tablesQ.data]);
+  const store = useMemo(() => (storageQ.data ? storageBars(storageQ.data) : []), [storageQ.data]);
   const recent = useMemo(
-    () => recentEvents(errorsQ.errors, (callsQ.data ?? []).slice(0, 12), repairs, new Date()),
-    [errorsQ.errors, callsQ.data, repairs],
+    () => recentEvents(errorsQ.errors, (callsQ.data ?? []).slice(0, 12), repairs, new Date(), 8, appQ.data?.history ?? []),
+    [errorsQ.errors, callsQ.data, repairs, appQ.data],
   );
   const sampleCount = services ? Math.max(0, ...services.map((s) => (history[s.name] ?? []).length)) : 0;
 
@@ -286,12 +352,12 @@ const BetaSystemStatus = () => {
             const bars = barsOf(history[s.name] ?? []);
             return (
               <div key={s.name} className="b-ss-svc">
-                <span className={`b-ss-dot${bad ? ' b-ss-dot--bad' : ''}`} />
-                <span className="b-ss-svc-text"><b>{meta.label}</b><span>{bad && s.error ? `${meta.desc} · ${s.error}` : meta.desc}</span></span>
+                <span className={`b-ss-dot${bad ? ' b-ss-dot--bad' : s.idle ? ' b-ss-dot--idle' : ''}`} />
+                <span className="b-ss-svc-text"><b>{meta.label}</b><span title={serviceDesc(s)}>{serviceDesc(s)}</span></span>
                 <span className="b-ss-bars" aria-label={`${meta.label} latency, last ${bars.filter((b) => b.h).length} checks`}>
                   {bars.map((b, i) => <span key={i} style={{ height: b.h ?? '0%', background: b.c }} />)}
                 </span>
-                <span className={`b-ss-svc-v${bad ? ' bad' : ''}`}>{latencyText(s.latency_ms, !bad)}</span>
+                <span className={`b-ss-svc-v${bad ? ' bad' : ''}`}>{valueText(s)}</span>
               </div>
             );
           }) : (
@@ -303,19 +369,27 @@ const BetaSystemStatus = () => {
         <div className="b-ss-side">
           <section className="b-ss-mac" aria-label="On this Mac">
             <span className="b-ss-h2">On this Mac</span>
-            <span className="b-ss-mac-sub">atlas.db by table · rows, not bytes — no command measures disk yet</span>
+            <span className="b-ss-mac-sub">
+              Bytes on disk{storageQ.data ? ` · measured ${clockText(new Date(storageQ.data.measured_at).getTime())}` : ''} · memory, mail and the audit trail are parts of atlas.db
+            </span>
             {!native ? (
-              <span className="b-ss-mac-empty">Only in the Mac app. The browser preview has no database to look at.</span>
-            ) : tablesQ.error ? (
-              <span className="b-ss-mac-empty">Could not read atlas.db: {(tablesQ.error as Error).message}</span>
-            ) : store.length ? store.map((s) => (
-              <div key={s.k} className="b-ss-store">
-                <span>{s.k}</span>
-                <span className="b-ss-store-bar"><span style={{ width: s.w, background: s.c }} /></span>
-                <span className="b-ss-store-v">{s.v}</span>
-              </div>
-            )) : (
-              <span className="b-ss-mac-empty">{tablesQ.isLoading ? 'Counting rows…' : 'The database is empty.'}</span>
+              <span className="b-ss-mac-empty">Only in the Mac app. The browser preview has no disk to measure.</span>
+            ) : storageQ.error ? (
+              <span className="b-ss-mac-empty">Could not measure: {(storageQ.error as Error).message}</span>
+            ) : store.length ? (
+              <>
+                {store.map((s) => (
+                  <div key={s.k} className="b-ss-store" title={s.title}>
+                    <span>{s.k}</span>
+                    <span className="b-ss-store-bar"><span style={{ width: s.w, background: s.c }} /></span>
+                    <span className="b-ss-store-v">{s.v}</span>
+                  </div>
+                ))}
+                {storageQ.data?.parts_error ? <span className="b-ss-mac-empty">Memory, mail and the audit trail could not be split out: {storageQ.data.parts_error}</span> : null}
+                {storageQ.data && !storageQ.data.models ? <span className="b-ss-mac-empty">No model files were found beside the app to measure.</span> : null}
+              </>
+            ) : (
+              <span className="b-ss-mac-empty">Measuring…</span>
             )}
           </section>
 
@@ -335,7 +409,7 @@ const BetaSystemStatus = () => {
               </div>
             )) : (
               <div className="b-ss-empty">
-                {errorsQ.error ? `Could not read the error log: ${errorsQ.error.message}` : errorsQ.isLoading ? 'Reading…' : native ? 'Nothing yet. Errors, actions and repairs show up here.' : 'Errors, actions and repairs show up here in the Mac app.'}
+                {errorsQ.error ? `Could not read the error log: ${errorsQ.error.message}` : errorsQ.isLoading ? 'Reading…' : native ? 'Nothing yet. Errors, actions, repairs and updates show up here.' : 'Errors, actions, repairs and updates show up here in the Mac app.'}
               </div>
             )}
           </section>

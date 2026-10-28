@@ -443,6 +443,13 @@ export interface StreamOutcome {
 
 export type StreamEndHook = (outcome: StreamOutcome) => void;
 
+/**
+ * The `error` of a stream its reader stopped reading (the user pressed stop, the
+ * client went away). The provider did nothing wrong, so the gateway records the
+ * call as answered; the marker keeps it distinguishable from a full answer.
+ */
+export const STREAM_CANCELLED = "cancelled by the reader";
+
 export function createStreamTally(onEnd?: StreamEndHook) {
   const outcome: StreamOutcome = {
     inputTokens: null,
@@ -568,7 +575,7 @@ export function anthropicSSEToOpenAI(
       }
     },
     cancel(reason) {
-      tally.end("cancelled by the reader");
+      tally.end(STREAM_CANCELLED);
       reader.cancel(reason).catch(() => {});
     },
   });

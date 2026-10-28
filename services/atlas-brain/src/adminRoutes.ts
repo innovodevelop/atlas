@@ -20,6 +20,7 @@ import { applyChangelog, readGitLog } from "./changelog.ts";
 import { applyDesignSyncs, parseDesignManifest } from "./designSync.ts";
 import { readDesignScreens } from "./designScreens.ts";
 import { executeRepair, type RepairContext } from "./selfRepair.ts";
+import { aiProviderService, createProviderProbeCache } from "./providerProbe.ts";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { resolve } from "path";
 import { PROJECT_ROOT } from "./projectRoot.ts";
@@ -181,6 +182,11 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
     apply: applyVersionPlan,
     repoCandidates: defaultRepoCandidates(PROJECT_ROOT),
   });
+
+  // The AI provider probe behind System Status's Reasoning row, kept for a
+  // minute between polls (providerProbe.ts). Declared above the return for the
+  // same reason as planSync.
+  const aiProbe = createProviderProbeCache();
 
   return {
     syncVersionPlan,
@@ -568,7 +574,12 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
     }
   }
 
-  function getSystemHealth(req: Request): Response {
+  /**
+   * `fresh` (System Status's "Check again") re-probes the AI provider instead
+   * of answering from the minute-long cache; the other probes are cheap and
+   * run on every call.
+   */
+  async function getSystemHealth(req: Request, fresh = false): Promise<Response> {
     requireUser(req);
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
@@ -605,6 +616,9 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
     } catch {
       services.push({ name: "voice-gateway", status: "down", latency_ms: null, last_check: new Date().toISOString(), error: "unreachable" });
     }
+
+    // The AI provider, checked without spending tokens (providerProbe.ts).
+    services.push(aiProviderService(await aiProbe.get(fresh)));
 
     return json({
       health_score: healthScore,

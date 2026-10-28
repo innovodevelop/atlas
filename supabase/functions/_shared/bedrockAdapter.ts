@@ -23,6 +23,7 @@
 
 import {
   CLAUDE_DEFAULT_MODEL,
+  STREAM_CANCELLED,
   createStreamTally,
   fromAnthropicMessage,
   mapModelToClaude,
@@ -455,7 +456,7 @@ export function bedrockEventStreamToOpenAI(
       }
     },
     cancel(reason) {
-      tally.end("cancelled by the reader");
+      tally.end(STREAM_CANCELLED);
       reader.cancel(reason).catch(() => {});
     },
   });

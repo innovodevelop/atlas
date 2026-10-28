@@ -44,6 +44,7 @@ import { startJsonlWatcher } from "./jsonlWatcher.ts";
 import { createControlClient } from "./control.ts";
 import { embedText } from "./localEmbed.ts";
 import { AUTO_EMBED_BATCH, embedPending, scheduleAutoEmbed } from "./autoEmbed.ts";
+import { createModelCallHandlers, installModelCallRecorder } from "./modelCalls.ts";
 
 import { runChat } from "../../../supabase/functions/_shared/orchestrator.ts";
 import { aiChatCompletion, hasAIKey } from "../../../supabase/functions/_shared/aiGateway.ts";
@@ -112,6 +113,11 @@ function requireUser(req: Request): { userId: string; email: string; token: stri
 // One local DB (bun:sqlite over atlas.db) serves as both the user client and the
 // service-role client for the orchestrator — there's no RLS locally.
 const localDb = createLocalDb();
+
+// The model-call ledger (modelCalls.ts): from here on every call the AI gateway
+// makes, from any route or background loop, is written to atlas_model_calls.
+installModelCallRecorder(localDb._db);
+const modelCalls = createModelCallHandlers({ db: localDb._db, requireUser, json });
 
 // The desktop control port. Created ONCE per process, not per request: the
 // capability list is fetched lazily and cached, and a client per request would
@@ -473,7 +479,9 @@ const server = Bun.serve({
       if (url.pathname === "/admin/design-syncs/screens" && req.method === "GET") return admin.getDesignScreens(req);
       if (url.pathname === "/admin/ingest-sessions" && req.method === "POST") return admin.ingestSessions(req);
       if (url.pathname === "/admin/ci-runs" && req.method === "POST") return admin.getCiRuns(req);
-      if (url.pathname === "/admin/system/health" && req.method === "GET") return admin.getSystemHealth(req);
+      // Awaited so an auth failure inside the async handler still reaches the catch below.
+      if (url.pathname === "/admin/system/health" && req.method === "GET") return await admin.getSystemHealth(req, url.searchParams.get("fresh") === "1");
+      if (url.pathname === "/admin/model-calls" && req.method === "GET") return modelCalls.getModelCalls(req, url.searchParams.get("days"));
       if (url.pathname === "/admin/system/errors" && req.method === "GET") return admin.getErrorLogs(req, Number(url.searchParams.get("limit")) || 50);
       if (url.pathname === "/admin/system/scan" && req.method === "POST") return admin.scanErrors(req);
       if (url.pathname === "/admin/system/repairs" && req.method === "GET") return admin.getRepairs(req);

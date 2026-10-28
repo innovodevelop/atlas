@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import {
-  _resetProbeHistory, barsOf, batteryColour, batteryState, countToday, dayKey, deviceIcon, deviceLine, eventTime, getProbeHistory, latencyText, macLine,
-  pushSample, recentEvents, recordProbe, ringOffset, serviceMeta, sphereStateFor, storageBars, subscribeProbeHistory, summarise, sumUsage,
-  uptimeText, withRoundTrip, type ProbeService,
+  MAX_SAMPLE_AGE_MS, PROBE_HISTORY_KEY, _resetProbeHistory, agoText, barsOf, batteryColour, batteryState, bytesText, countToday, deviceIcon, deviceLine,
+  eventTime, getProbeHistory, homeAssistantService, latencyText, macLine, mailService, modelCallsTile, parseHistory, pushSample, recentEvents,
+  recordProbe, ringOffset, serviceDesc, serviceDown, serviceMeta, sphereStateFor, storageBars, subscribeProbeHistory, summarise, uptimeText,
+  valueText, versionMessage, versionUptime, withRoundTrip, type MailAccountRow, type ProbeService, type StorageReport,
 } from './betaSystemStatus';
 
 const ok = (name: string, latency_ms: number | null = 12): ProbeService => ({ name, status: 'healthy', latency_ms, last_check: '2026-10-28T09:00:00Z' });
@@ -27,11 +28,11 @@ describe('headline and sphere', () => {
     expect(sphereStateFor(i)).toBe('alert');
     const s = summarise(i);
     expect(s.headline).toBe("Voice isn't answering. Everything else is fine.");
-    expect(s.sub).toContain('answered HTTP 000');
+    expect(s.sub).toContain('Voice: HTTP 000.');
   });
   test('counts when several fail', () => {
     const i = { checking: false, loading: false, error: null, services: [down('atlas-brain'), down('voice-gateway')], unresolvedErrors: 0 };
-    expect(summarise(i).headline).toBe("2 services aren't answering.");
+    expect(summarise(i).headline).toBe('2 services need a look.');
   });
   test('an unreachable brain is an alert with its message', () => {
     const i = { checking: false, loading: false, error: 'Atlas brain is not running', services: null, unresolvedErrors: 0 };
@@ -178,25 +179,44 @@ describe('counters', () => {
     ];
     expect(countToday(rows, NOW).length).toBe(1);
   });
-  test('dayKey is local and zero-padded', () => {
-    expect(dayKey(new Date(2026, 0, 5))).toBe('2026-01-05');
-  });
-  test('sumUsage adds across providers and is null without rows', () => {
-    expect(sumUsage([])).toBeNull();
-    expect(sumUsage([{ provider: 'anthropic', total_calls: 10, failed_calls: 1 }, { provider: 'bedrock', total_calls: 5, failed_calls: 0 }])).toEqual({ total: 15, failed: 1, providers: 2 });
+  test('the Model calls tile reads today from the brain’s ledger, and says why it has no number', () => {
+    expect(modelCallsTile(false, null, null)).toEqual({ v: '—', d: 'Only in the Mac app' });
+    expect(modelCallsTile(true, null, null).d).toBe('Reading…');
+    expect(modelCallsTile(true, null, 'boom').d).toBe('The brain’s ledger is unreadable');
+    expect(modelCallsTile(true, { today: { since: 'x', calls: 0, failed: 0 }, recording_since: null }, null)).toEqual({ v: '0', d: 'none yet · the brain records every call' });
+    expect(modelCallsTile(true, { today: { since: 'x', calls: 1284, failed: 3 }, recording_since: 'y' }, null)).toEqual({ v: (1284).toLocaleString(), d: '3 failed · since midnight' });
+    expect(modelCallsTile(true, { today: { since: 'x', calls: 2, failed: 0 }, recording_since: 'y' }, null).d).toBe('none failed · since midnight');
   });
 });
 
-describe('storage bars', () => {
-  test('fullest first, empty tables dropped, widths against the largest', () => {
-    const bars = storageBars([{ name: 'ai_memory', rows: 50 }, { name: 'chat_turns', rows: 200 }, { name: 'runs', rows: 0 }]);
-    expect(bars.map((b) => b.k)).toEqual(['chat turns', 'ai memory']);
-    expect(bars[0].w).toBe('100%');
-    expect(bars[1].w).toBe('25%');
-    expect(bars[0].v).toBe('200 rows');
+describe('on this Mac', () => {
+  const report = (over: Partial<StorageReport> = {}): StorageReport => ({
+    database: { bytes: 600_000_000, wal_bytes: 4_000_000 },
+    parts: { memory: 412_000_000, mail: 120_000_000, audit: 88_000_000, other: 1_000 },
+    parts_error: null,
+    models: { bytes: 1_900_000_000, source: 'sidecars' },
+    measured_at: '2026-10-28T09:00:00.000Z',
+    ...over,
   });
-  test('a sliver for the smallest', () => {
-    expect(storageBars([{ name: 'a', rows: 10000 }, { name: 'b', rows: 1 }])[1].w).toBe('2%');
+  test('bytes read as Finder counts them', () => {
+    expect(bytesText(0)).toBe('0 MB');
+    expect(bytesText(300_000)).toBe('0.3 MB');
+    expect(bytesText(412_400_000)).toBe('412 MB');
+    expect(bytesText(1_900_000_000)).toBe('1.9 GB');
+  });
+  test('atlas.db, then the design’s rows, widths against the largest', () => {
+    const bars = storageBars(report());
+    expect(bars.map((b) => b.k)).toEqual(['atlas.db', 'Memory', 'Audit trail', 'Mail cache', 'Models on device']);
+    expect(bars.map((b) => b.v)).toEqual(['600 MB', '412 MB', '88 MB', '120 MB', '1.9 GB']);
+    expect(bars[4].w).toBe('100%');
+    expect(bars[0].w).toBe('32%');
+    expect(bars[4].title).toContain('sidecars');
+  });
+  test('a figure that could not be measured is left out, not drawn as zero', () => {
+    const bars = storageBars(report({ parts: null, parts_error: 'no such table: dbstat', models: null }));
+    expect(bars.map((b) => b.k)).toEqual(['atlas.db']);
+    expect(bars[0].w).toBe('100%');
+    expect(storageBars(report({ parts: { memory: 1, mail: 0, audit: 0, other: 0 } }))[3].w).toBe('2%');
   });
 });
 
@@ -223,8 +243,122 @@ describe('recently', () => {
     expect(events[3].errorId).toBeUndefined();
     expect(events[3].c).toBe('#8b8681');
   });
+  test('installs and updates are events, newest first', () => {
+    const events = recentEvents([], [], [], NOW, 8, [
+      { version: '0.9.3', previous_version: '0.9.2', first_seen_at: new Date(2026, 9, 28, 6, 2).toISOString() },
+      { version: '0.9.2', previous_version: null, first_seen_at: new Date(2026, 9, 1, 10, 0).toISOString() },
+    ]);
+    expect(events.map((e) => [e.kind, e.t, e.m])).toEqual([
+      ['update', '06:02', 'Atlas 0.9.3 installed · was 0.9.2'],
+      ['update', events[1].t, 'Atlas 0.9.2 · first launch on record'],
+    ]);
+    expect(versionMessage({ version: '1.0.0', previous_version: '1.1.0', first_seen_at: 'x' })).toBe('Atlas 1.0.0 installed · was 1.1.0');
+  });
   test('respects the limit', () => {
     const calls = Array.from({ length: 20 }, (_, i) => ({ id: `t${i}`, tool_name: 'x', status: 'completed', created_at: new Date(2026, 9, 28, 1, i).toISOString() }));
     expect(recentEvents([], calls, [], NOW).length).toBe(8);
+  });
+});
+
+describe('uptime since the last update', () => {
+  const history = (rows: Array<[string, string | null, Date]>) => ({ bundle_id: 'com.x', version: rows[0]?.[0] ?? '1.0.0', history: rows.map(([version, previous_version, at]) => ({ version, previous_version, first_seen_at: at.toISOString() })) });
+  test('counts from when this version first ran', () => {
+    const u = versionUptime(history([['0.9.3', '0.9.2', new Date(2026, 9, 14, 9, 42)]]), NOW);
+    expect(u?.seconds).toBe(14 * 86_400);
+    expect(uptimeText(u!.seconds)).toBe('14 days');
+    expect(u?.d).toBe('since the update to 0.9.3');
+    expect(versionUptime(history([['0.9.2', null, new Date(2026, 9, 28, 9, 0)]]), NOW)?.d).toBe('on 0.9.2 · since its first launch on record');
+  });
+  test('nothing recorded for the running version is no figure', () => {
+    expect(versionUptime(null, NOW)).toBeNull();
+    expect(versionUptime({ bundle_id: 'com.x', version: '1.0.0', history: [] }, NOW)).toBeNull();
+    expect(versionUptime({ ...history([['0.9.2', null, NOW]]), version: '0.9.3' }, NOW)).toBeNull();
+  });
+});
+
+describe('local services', () => {
+  const acct = (over: Partial<MailAccountRow> = {}): MailAccountRow => ({ email_address: 'me@example.com', provider: 'gmail', status: 'active', last_error: null, last_synced_at: new Date(2026, 9, 28, 9, 41).toISOString(), ...over });
+  test('mail reads the sync’s own record', () => {
+    const okRow = mailService([acct(), acct({ email_address: 'b@example.com', last_synced_at: null })], NOW);
+    expect(okRow).toMatchObject({ name: 'mail', status: 'healthy', value: 'OK', detail: '2 accounts · last fetch 1 min ago' });
+    expect(valueText(okRow)).toBe('OK');
+    const failing = mailService([acct(), acct({ email_address: 'b@example.com', status: 'error', last_error: 'token expired' })], NOW);
+    expect(failing).toMatchObject({ status: 'degraded', value: '1 failing', error: 'token expired' });
+    expect(failing.detail).toBe('1 of 2 accounts failing · b@example.com: token expired');
+    expect(serviceDown(failing)).toBe(true);
+    expect(summarise({ checking: false, loading: false, error: null, services: [ok('atlas-brain'), failing], unresolvedErrors: 0 }).headline).toBe('Mail needs a look. Everything else is fine.');
+  });
+  test('no mailbox is nothing to check, never an outage', () => {
+    const none = mailService([], NOW);
+    expect(none).toMatchObject({ idle: true, detail: 'No mailbox connected' });
+    expect(serviceDown(none)).toBe(false);
+    expect(valueText(none)).toBe('off');
+    expect(mailService([acct({ status: 'disconnected' })], NOW).detail).toContain('disconnected');
+  });
+  test('Home Assistant: timed when it answers, named when it does not', () => {
+    expect(homeAssistantService({ linked: false }, NOW)).toMatchObject({ idle: true, value: 'off' });
+    const up = homeAssistantService({ linked: true, name: 'Home', devices: 24, ok: true, latency_ms: 12, error: null }, NOW);
+    expect(up).toMatchObject({ status: 'healthy', latency_ms: 12, detail: '24 devices · Home · local network' });
+    expect(valueText(up)).toBe('12 ms');
+    const down = homeAssistantService({ linked: true, name: 'Home', devices: 1, ok: false, latency_ms: null, error: 'not reachable (Dns Failed)' }, NOW);
+    expect(down.status).toBe('down');
+    expect(serviceDesc(down)).toBe('1 device · Home · not reachable (Dns Failed)');
+    expect(valueText(down)).toBe('down');
+  });
+  test('the AI provider row brings its own sentence; a cached probe is not taken out of the round trip', () => {
+    const ai: ProbeService = { name: 'ai-provider', status: 'healthy', latency_ms: 300, last_check: 'x', detail: 'Claude first-party · key accepted', cached: true };
+    expect(serviceMeta('ai-provider').label).toBe('Reasoning');
+    expect(serviceDesc(ai)).toBe('Claude first-party · key accepted');
+    expect(withRoundTrip([ok('atlas-brain', 0), ai], 400)[0].latency_ms).toBe(400);
+    expect(withRoundTrip([ok('atlas-brain', 0), { ...ai, cached: false }], 400)[0].latency_ms).toBe(100);
+  });
+  test('ago', () => {
+    expect(agoText(null, NOW)).toBe('never');
+    expect(agoText(new Date(2026, 9, 28, 9, 41, 50).toISOString(), NOW)).toBe('now');
+    expect(agoText(new Date(2026, 9, 28, 6, 0).toISOString(), NOW)).toBe('3 h ago');
+    expect(agoText(new Date(2026, 9, 26, 9, 0).toISOString(), NOW)).toBe('2 days ago');
+  });
+});
+
+describe('probe history survives a reload', () => {
+  afterEach(() => _resetProbeHistory());
+  const memoryStore = () => {
+    const m = new Map<string, string>();
+    return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => { m.set(k, v); }, m };
+  };
+  test('what is recorded is saved, and a fresh store reads it back', () => {
+    const store = memoryStore();
+    _resetProbeHistory(store);
+    const now = Date.now();
+    recordProbe([ok('atlas-brain', 40)], now - 2000);
+    recordProbe([ok('atlas-brain', 50)], now - 1000);
+    expect(JSON.parse(store.m.get(PROBE_HISTORY_KEY)!)['atlas-brain'].length).toBe(2);
+    _resetProbeHistory(store);
+    expect(getProbeHistory()['atlas-brain'].map((s) => s.latency)).toEqual([40, 50]);
+    // The saved newest bar still guards against an older answer slipping in.
+    recordProbe([ok('atlas-brain', 99)], now - 1500);
+    expect(getProbeHistory()['atlas-brain'].length).toBe(2);
+  });
+  test('services keep their own clocks, and an idle row records nothing', () => {
+    _resetProbeHistory(memoryStore());
+    recordProbe([ok('atlas-brain')], 5000);
+    recordProbe([ok('home-assistant', 12)], 4000);
+    recordProbe([mailService([], NOW)], 6000);
+    expect(Object.keys(getProbeHistory()).sort()).toEqual(['atlas-brain', 'home-assistant']);
+  });
+  test('saved history is checked: malformed, stale and excess samples are dropped', () => {
+    const now = 10 * MAX_SAMPLE_AGE_MS;
+    expect(parseHistory('not json', now)).toEqual({});
+    expect(parseHistory('[1,2]', now)).toEqual({});
+    const raw = JSON.stringify({
+      a: [{ at: now - MAX_SAMPLE_AGE_MS - 1, latency: 1, ok: true }, { at: now - 5, latency: 'x', ok: true }, { at: now - 1, latency: null, ok: false }],
+      b: Array.from({ length: 20 }, (_, i) => ({ at: now - 100 + i, latency: i, ok: true })),
+      c: 'nope',
+    });
+    const h = parseHistory(raw, now);
+    expect(h.a).toEqual([{ at: now - 1, latency: null, ok: false }]);
+    expect(h.b.length).toBe(12);
+    expect(h.b[11].latency).toBe(19);
+    expect(h.c).toBeUndefined();
   });
 });

@@ -17,6 +17,7 @@
 import {
   ANTHROPIC_MESSAGES_URL,
   CLAUDE_DEFAULT_MODEL,
+  STREAM_CANCELLED,
   claudeChatCompletion,
   claudeDocumentExtract,
   mapModelToClaude,
@@ -465,7 +466,8 @@ async function recorded(
     report({
       ...base,
       status,
-      ok: o.error === null,
+      // A stream its reader stopped is not the provider failing (STREAM_CANCELLED).
+      ok: o.error === null || o.error === STREAM_CANCELLED,
       error: o.error,
       latencyMs: latencyMs ?? Math.round(performance.now() - t0),
       durationMs: Math.round(performance.now() - t0),
