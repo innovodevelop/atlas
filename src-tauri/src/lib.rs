@@ -37,6 +37,9 @@ mod health;
 mod watchdog;
 mod brain;
 mod system_vitals;
+// School: the Lectio calendar feed and a Moodle (LearnIT) token, both kept in
+// the Keychain and read only from here. See src/school.rs.
+mod school;
 
 /// Outcome of a sidecar spawn attempt. `integrity_error` is set when the
 /// binary failed integrity verification (and was therefore NOT spawned) — it
@@ -616,6 +619,15 @@ pub fn run() {
       health::health_series,
       health::health_workouts,
       health::health_forget,
+      // School connectors (all `async`: each one is a network round trip).
+      school::school_connections,
+      school::school_lectio_connect,
+      school::school_lectio_fetch,
+      school::school_lectio_disconnect,
+      school::school_moodle_connect,
+      school::school_moodle_call,
+      school::school_moodle_file,
+      school::school_moodle_disconnect,
     ])
     .setup(|app| {
       // ONE DATABASE, AND THIS LAUNCH'S IDENTITY — both before anything else in
