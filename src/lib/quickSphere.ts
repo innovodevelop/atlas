@@ -261,6 +261,11 @@ function changes(o: QuickSphereOpts, next: Partial<QuickSphereOpts>): boolean {
   return false;
 }
 
+/** For pages that pick a still or a moving sphere state themselves (Architecture's state rows). */
+export function reducedMotion(): boolean {
+  return typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+}
+
 const DEFAULT_OPTS: QuickSphereOpts = { count: 24000, dust: [92, 168, 255], strand: [28, 122, 240], bg: '#ffffff', blend: 'source-over', speed: 1, seed: 11, spin: 0.05, alpha: 0.62, scale: 0.36, mode: 'contour', state: 'idle' };
 
 export function mount(canvas: HTMLCanvasElement, opts: Partial<QuickSphereOpts>): QuickSphereHandle {
