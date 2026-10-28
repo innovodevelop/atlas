@@ -618,6 +618,7 @@ pub fn run() {
       mac_controls::mac_read,
       mac_controls::battery_read,
       mac_controls::screen_locked,
+      mac_controls::system_idle_secs,
       // Other screens invoke this one by name (a provider switch, an update).
       mac_controls::app_restart,
       mail::mail_sync,
@@ -905,6 +906,11 @@ pub fn run() {
       }
 
       watchdog::start(app.handle());
+
+      // Settings → Voice → "Mute when the Mac is locked": the lock and unlock
+      // are pushed to the webview as they happen (mac_controls.rs). Every
+      // instance, not only the owner — each app's windows run a voice session.
+      mac_controls::start_lock_watcher(app.handle().clone());
 
       // Deep-link OAuth capture. In dev the scheme isn't in the app bundle's
       // Info.plist, so register it at runtime; packaged macOS builds get it

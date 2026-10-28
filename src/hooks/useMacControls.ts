@@ -4,9 +4,12 @@
  *
  * Each hook reads when it mounts and then on a slow timer, and only while the
  * window is in use (`useWindowActivity`): these run macOS tools, and nobody
- * needs a fresh CPU meter on a screen they are not looking at. Outside the
- * desktop app there is no Mac to ask, so every hook reports
- * `available: false` and does nothing; the screens say so.
+ * needs a fresh CPU meter on a screen they are not looking at. A tick never
+ * starts a read while the last one is still out: `system_profiler` can hang
+ * (Rust kills it at a limit, mac_controls.rs), and a timer that kept asking
+ * would stack one stuck tool per tick. Outside the desktop app there is no
+ * Mac to ask, so every hook reports `available: false` and does nothing; the
+ * screens say so.
  *
  * The actions throw the tool's own message on failure, so the screen that
  * asked can put it next to the control that failed. A Wi-Fi password goes
@@ -33,6 +36,10 @@ function message(e: unknown): string {
 /**
  * Read `read()` now and every `everyMs` while the window is active. Returns
  * the latest value, the last read error, and a way to read again at once.
+ *
+ * One read at a time. A tick while a read is out is skipped; a `reload()`
+ * then (after a switch, which must show its result) waits for it and reads
+ * once more, shared by everyone who asked meanwhile.
  */
 function useReading<T>(available: boolean, read: () => Promise<T>, everyMs: number) {
   const active = useWindowActivity();
@@ -42,21 +49,36 @@ function useReading<T>(available: boolean, read: () => Promise<T>, everyMs: numb
   readRef.current = read;
   const alive = useRef(true);
   useEffect(() => () => { alive.current = false; }, []);
+  // The read that is out, and the one queued behind it.
+  const inFlight = useRef<Promise<void> | null>(null);
+  const queued = useRef<Promise<void> | null>(null);
 
-  const reload = useCallback(async () => {
-    if (!available) return;
+  const readNow = useCallback(async () => {
     try {
       const v = await readRef.current();
       if (alive.current) { setValue(v); setError(null); }
     } catch (e) {
       if (alive.current) setError(message(e));
     }
-  }, [available]);
+  }, []);
+
+  const reload = useCallback((): Promise<void> => {
+    if (!available) return Promise.resolve();
+    const out = inFlight.current;
+    if (out) {
+      queued.current ??= out.then(() => { queued.current = null; return reload(); });
+      return queued.current;
+    }
+    const p = readNow().finally(() => { inFlight.current = null; });
+    inFlight.current = p;
+    return p;
+  }, [available, readNow]);
 
   useEffect(() => {
     if (!available || !active) return;
-    void reload();
-    const id = window.setInterval(() => void reload(), everyMs);
+    const tick = () => { if (!inFlight.current) void reload(); };
+    tick();
+    const id = window.setInterval(tick, everyMs);
     return () => window.clearInterval(id);
   }, [available, active, everyMs, reload]);
 
@@ -85,10 +107,13 @@ export function useWifiControls({ scan: scanOnMount = false }: { scan?: boolean 
   // so a refresh every ten seconds does not empty the list of networks.
   const [profiler, setProfiler] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
+  // One scan at a time, for the same reason as useReading's one read.
+  const scanOut = useRef(false);
   const quick = useReading<WifiRaw>(available, () => call<WifiRaw>('wifi_read', { scan: false }), 10_000);
 
   const scan = useCallback(async () => {
-    if (!available) return;
+    if (!available || scanOut.current) return;
+    scanOut.current = true;
     setScanning(true);
     try {
       const raw = await call<WifiRaw>('wifi_read', { scan: true });
@@ -96,6 +121,7 @@ export function useWifiControls({ scan: scanOnMount = false }: { scan?: boolean 
     } catch {
       /* the quick read reports errors; a failed scan leaves the last list */
     } finally {
+      scanOut.current = false;
       setScanning(false);
     }
   }, [available]);

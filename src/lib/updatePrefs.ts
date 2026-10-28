@@ -7,7 +7,12 @@
  * only when the user pressed Install, and the hook's invariant said so; an
  * upgrade must not quietly change that. Turning "Install overnight" on is the
  * user's approval for installs that happen while they are away — and only
- * then, between 2 and 5 AM, on mains power, with nobody using the Mac.
+ * then, between 2 and 5 AM, on mains power, with nobody using the Mac: no
+ * keyboard, mouse or trackpad input to it, in any app, for OVERNIGHT_IDLE_SECS
+ * (macOS's own idle time, `system_idle_secs` in Rust), and Atlas's window not
+ * in use either. Atlas's window alone would not do: someone working in
+ * another app at 3 AM leaves it unfocused, and a restart would cut off
+ * whatever Atlas was doing for them.
  *
  * Every install is still the updater plugin's, which verifies the minisign
  * signature against the pinned key before a byte is written; nothing here
@@ -32,6 +37,8 @@ export const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
 /** The overnight window, local time: from 2 AM up to 5 AM. */
 export const OVERNIGHT_FROM_HOUR = 2;
 export const OVERNIGHT_TO_HOUR = 5;
+/** How long the Mac must have had no input before an overnight install or restart. */
+export const OVERNIGHT_IDLE_SECS = 15 * 60;
 
 export function parseUpdatePrefs(raw: string | null | undefined): UpdatePrefs {
   let v: Record<string, unknown> = {};
@@ -72,6 +79,15 @@ export function inOvernightWindow(now: Date): boolean {
   return h >= OVERNIGHT_FROM_HOUR && h < OVERNIGHT_TO_HOUR;
 }
 
+/**
+ * Nobody is at the Mac: no input to it for OVERNIGHT_IDLE_SECS, and Atlas's
+ * window not in use. `systemIdleSecs` null (it could not be read) never
+ * counts as idle.
+ */
+export function nobodyAtTheMac(systemIdleSecs: number | null, windowActive: boolean): boolean {
+  return !windowActive && systemIdleSecs !== null && systemIdleSecs >= OVERNIGHT_IDLE_SECS;
+}
+
 /** Mirrors `UpdaterPhase` in src/hooks/useAppUpdater.ts (not imported: src/lib stays hook-free). */
 export type AutoPhase =
   | 'idle' | 'checking' | 'upToDate' | 'available' | 'downloading' | 'downloaded' | 'installing' | 'installed' | 'error';
@@ -84,7 +100,7 @@ export interface AutoInput {
   now: Date;
   /** On mains power (or a Mac with no battery). Null when unknown, which never counts as plugged in. */
   plugged: boolean | null;
-  /** Nobody is using Atlas: the window is hidden, unfocused or input-idle. */
+  /** Nobody is at the Mac (`nobodyAtTheMac`): no input to it for a while, and Atlas's window not in use. */
   idle: boolean;
 }
 

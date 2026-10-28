@@ -12,9 +12,10 @@
  *     (Globe) key for itself (emoji, dictation) and does not deliver it to
  *     pages, so the right Option key — which macOS does deliver, and which
  *     dictation apps use for the same job — stands in.
- *   - muteWhenLocked: the microphone is gated off while the screen is locked
- *     (a Rust check, `screen_locked`), exactly like the mute button: no frame
- *     reaches the wake detector or the gateway.
+ *   - muteWhenLocked: the microphone is gated off while the screen is locked,
+ *     exactly like the mute button: no frame reaches the wake detector or the
+ *     gateway. Rust observes macOS's own lock and unlock notifications and
+ *     tells the webview at once (`mac:screen-lock`, src-tauri/src/mac_controls.rs).
  *
  * Settings writes through `setVoiceInput`, which also tells this window at
  * once (a `storage` event reaches other documents only), so the voice session
@@ -25,6 +26,12 @@
  * HOLD_MS with no other key pressed (⌥ is also the Talk shortcut's modifier,
  * ⌥ Space, and how many keyboards type @, € or |), never while typing in a
  * field, and losing the window ends it like a release.
+ *
+ * What one press tells the gateway is a second small machine, `pttPressed` /
+ * `pttReleased` / `pttActivated`, because the release and the activation can
+ * come in either order: the session sends `activate{hold}` only once the
+ * microphone is open, and the first press after launch waits for the
+ * permission, the capture worklet and the wake model.
  */
 
 export const VOICE_INPUT_KEY = 'atlas:voice_input';
@@ -122,4 +129,42 @@ export function pttStep(state: PttState, e: PttEvent): PttStep {
     default:
       return { state, action: null };
   }
+}
+
+/* ── One press, as the gateway hears it ─────────────────────────────────── */
+
+export type PttControl = { type: 'activate'; hold: true } | { type: 'end_speech' };
+
+const HOLD: PttControl = { type: 'activate', hold: true };
+const RELEASE: PttControl = { type: 'end_speech' };
+
+/** The key is down (`down`), and this press's `activate{hold}` has gone out (`activated`). */
+export interface PttPress {
+  down: boolean;
+  activated: boolean;
+}
+
+export const PTT_NO_PRESS: PttPress = { down: false, activated: false };
+
+/** pttStep said `start`: a hold began; the session is opening the microphone. */
+export function pttPressed(): PttPress {
+  return { down: true, activated: false };
+}
+
+/**
+ * pttStep said `end`. The release goes out now only when the hold has: before
+ * that the gateway has nothing to close, and a hold arriving after its own
+ * release would keep the turn listening with nobody holding the key.
+ * `pttActivated` sends that release instead.
+ */
+export function pttReleased(p: PttPress): { press: PttPress; send: PttControl[] } {
+  return { press: { down: false, activated: p.activated }, send: p.activated ? [RELEASE] : [] };
+}
+
+/**
+ * The microphone is open: send the hold — and, when the key came up while it
+ * opened, its release straight after, so the gateway closes the turn at once.
+ */
+export function pttActivated(p: PttPress): { press: PttPress; send: PttControl[] } {
+  return { press: { down: p.down, activated: true }, send: p.down ? [HOLD] : [HOLD, RELEASE] };
 }

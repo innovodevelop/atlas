@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 import { isTauri } from '@/integrations/local/localClient';
 import { isWindowActive } from '@/hooks/useWindowActivity';
-import { autoUpdateStep, readUpdatePrefs } from '@/lib/updatePrefs';
+import { autoUpdateStep, inOvernightWindow, nobodyAtTheMac, readUpdatePrefs } from '@/lib/updatePrefs';
 import type { Update } from '@tauri-apps/plugin-updater';
 
 // Verifying app updater (ship substrate). Thin state machine over
@@ -19,8 +19,8 @@ import type { Update } from '@tauri-apps/plugin-updater';
 // section's buttons) — or overnight, ONLY when the user has switched on
 // Settings → Software Update → "Install overnight", which is that approval
 // given in advance (src/lib/updatePrefs.ts holds the rules: 2–5 AM, on mains
-// power, nobody at the Mac). With that switch off this module never installs
-// on its own.
+// power, nobody at the Mac — no input to it in any app for fifteen minutes).
+// With that switch off this module never installs on its own.
 
 export type UpdaterPhase =
   | 'idle' // nothing checked yet
@@ -192,8 +192,11 @@ const AUTO_TICK_MS = 15 * 60 * 1000;
  * do — check the feed, download, install overnight, restart overnight — and
  * does at most that one thing. Does nothing at all while both switches are off.
  *
- * "Plugged in" is asked of Rust at the moment it matters (`system_vitals`);
- * "nobody at the Mac" is the window being hidden, unfocused or input-idle.
+ * "Plugged in" is asked of Rust at the moment it matters (`system_vitals`),
+ * and so is "nobody at the Mac": macOS's own idle time (`system_idle_secs`,
+ * input to any app) as well as Atlas's window not being in use. A window
+ * that is merely unfocused means nothing at 3 AM if someone is working in
+ * another app.
  */
 export function useAutoUpdate(): void {
   const supported = isTauri();
@@ -211,6 +214,15 @@ export function useAutoUpdate(): void {
         return null;
       }
     };
+    // Seconds since the last keyboard, mouse or trackpad input, in any app.
+    const systemIdleSecs = async (): Promise<number | null> => {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        return await invoke<number | null>('system_idle_secs');
+      } catch {
+        return null; // an older build without the command: never idle
+      }
+    };
     const tick = async () => {
       if (!alive || running.current) return;
       running.current = true;
@@ -221,13 +233,16 @@ export function useAutoUpdate(): void {
         for (let i = 0; i < 3 && alive; i++) {
           const prefs = readUpdatePrefs();
           if (!prefs.autoDownload && !prefs.installOvernight) return;
+          const now = new Date();
+          // Idle only matters overnight, so the Mac is only asked then.
+          const overnight = prefs.installOvernight && inOvernightWindow(now);
           const step = autoUpdateStep({
             prefs,
             phase: snap.phase,
             lastCheckAt: snap.lastCheckAt,
-            now: new Date(),
+            now,
             plugged: prefs.installOvernight ? await plugged() : null,
-            idle: !isWindowActive(),
+            idle: overnight && nobodyAtTheMac(await systemIdleSecs(), isWindowActive()),
           });
           if (step === 'check') await checkNow();
           else if (step === 'download') { if (!(await downloadNow())) return; }

@@ -1,5 +1,6 @@
 // Settings → This Mac: Wi-Fi, Bluetooth, the Mac's own details, battery
-// health and history, whether the screen is locked, and Restart Atlas.
+// health and history, whether the screen is locked (and a push when that
+// changes), how long the Mac has been idle, and Restart Atlas.
 //
 // system_vitals.rs answers the top bar's three quick questions every thirty
 // seconds. This module is what the Settings sections and the status panels
@@ -49,14 +50,22 @@
 // Every command is `#[tauri::command(async)]`: each one spawns a process, and
 // `system_profiler` can take seconds, which on the main thread is a frozen
 // window.
+//
+// TIME LIMITS. Every tool runs against a deadline and is killed when it
+// passes (`run_limited`). `system_profiler` is known to hang when a daemon
+// behind it is wedged (bluetoothd, most often), and the screens ask again
+// every few seconds; without a limit each ask would leave another stuck
+// process behind for as long as the section stayed open.
 use crate::db::DbState;
 use rusqlite::params;
 use serde::Serialize;
+use std::io::Read;
 use std::path::Path;
-use std::process::Command;
-use std::sync::{Mutex, OnceLock};
+use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{mpsc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 /// The interface macOS gives Wi-Fi on every Mac Atlas supports; used only when
 /// `networksetup -listallhardwareports` does not name one.
@@ -71,16 +80,84 @@ const HARDWARE_CACHE_SECS: u64 = 3600;
 
 // --- Running tools ---------------------------------------------------------------
 
-/// Stdout of a tool, or "" when it is missing or fails. For reads, where an
-/// empty answer is parsed as "unknown".
-fn read(cmd: &str, args: &[&str]) -> String {
-    Command::new(cmd)
+/// How long a quick read (sysctl, ipconfig, pmset, ioreg…) may take.
+const READ_LIMIT: Duration = Duration::from_secs(5);
+/// How long `system_profiler` may take: one to five seconds is normal.
+const PROFILER_LIMIT: Duration = Duration::from_secs(15);
+/// How long a switch may take: joining a network can take ten seconds or more.
+const ACT_LIMIT: Duration = Duration::from_secs(30);
+
+/// What a tool printed, and whether it exited successfully.
+pub(crate) struct Ran {
+    pub ok: bool,
+    pub stdout: String,
+    pub stderr: String,
+}
+
+/// A pipe read to its end on a thread of its own, so a tool that fills one
+/// pipe while nothing reads it cannot stall, and the caller can stop waiting.
+fn drain<R: Read + Send + 'static>(pipe: Option<R>) -> mpsc::Receiver<String> {
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        if let Some(mut p) = pipe {
+            let _ = p.read_to_end(&mut buf);
+        }
+        let _ = tx.send(String::from_utf8_lossy(&buf).into_owned());
+    });
+    rx
+}
+
+/// Run a tool and kill it if it has not finished within `limit`. The error
+/// names the tool, never its arguments (one of them can be a password).
+pub(crate) fn run_limited(cmd: &str, args: &[&str], limit: Duration) -> Result<Ran, String> {
+    let started = Instant::now();
+    let mut child = Command::new(cmd)
         .args(args)
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
-        .unwrap_or_default()
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("{cmd} could not run: {e}"))?;
+    let stdout = drain(child.stdout.take());
+    let stderr = drain(child.stderr.take());
+    // Stdout closes when the tool exits, so this is the wait.
+    let out = stdout.recv_timeout(limit).ok();
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break Some(status),
+            Ok(None) if started.elapsed() < limit => std::thread::sleep(Duration::from_millis(5)),
+            _ => break None,
+        }
+    };
+    let Some(status) = status else {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err(format!("{cmd} did not finish within {} seconds.", limit.as_secs()));
+    };
+    // A helper the tool started can hold its pipes open after it exits; what
+    // the tool printed itself is in by now, so a moment is enough.
+    let grace = Duration::from_millis(200);
+    Ok(Ran {
+        ok: status.success(),
+        stdout: out.or_else(|| stdout.recv_timeout(grace).ok()).unwrap_or_default(),
+        stderr: stderr.recv_timeout(grace).unwrap_or_default(),
+    })
+}
+
+/// Stdout of a tool, or "" when it is missing, fails or runs out of time. For
+/// reads, where an empty answer is parsed as "unknown". system_vitals.rs
+/// reads through this too.
+pub(crate) fn read(cmd: &str, args: &[&str]) -> String {
+    let limit = if cmd == "system_profiler" { PROFILER_LIMIT } else { READ_LIMIT };
+    match run_limited(cmd, args, limit) {
+        Ok(ran) if ran.ok => ran.stdout,
+        Ok(_) => String::new(),
+        Err(e) => {
+            log::warn!("[mac] {e}");
+            String::new()
+        }
+    }
 }
 
 /// `text` with `secret` replaced, so a tool that echoes its arguments cannot
@@ -97,13 +174,8 @@ fn scrub(text: &str, secret: Option<&str>) -> String {
 /// stdout with exit status 0, so the text is checked as well as the status.
 /// `secret` is removed from anything that comes back.
 fn act(cmd: &str, args: &[&str], secret: Option<&str>) -> Result<String, String> {
-    let out = Command::new(cmd)
-        .args(args)
-        .output()
-        .map_err(|e| format!("{cmd} could not run: {e}"))?;
-    let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
-    let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
-    if !out.status.success() {
+    let Ran { ok, stdout, stderr } = run_limited(cmd, args, ACT_LIMIT)?;
+    if !ok {
         let msg = if stderr.trim().is_empty() { stdout.as_str() } else { stderr.as_str() };
         let msg = scrub(msg, secret);
         return Err(if msg.is_empty() { format!("{cmd} failed") } else { msg });
@@ -640,7 +712,52 @@ pub fn start_battery_recorder(app: AppHandle) {
     });
 }
 
+// --- Idle time -----------------------------------------------------------------------
+
+/// `ioreg -c IOHIDSystem` prints `"HIDIdleTime" = <nanoseconds>`: the time
+/// since the last keyboard, mouse or trackpad input to this Mac, in any app.
+/// Whole seconds, or None when the line is missing.
+pub fn parse_hid_idle_secs(ioreg: &str) -> Option<u64> {
+    const KEY: &str = "\"HIDIdleTime\"";
+    let at = ioreg.find(KEY)?;
+    let rest = ioreg[at + KEY.len()..].trim_start().strip_prefix('=')?.trim_start();
+    let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+    digits.parse::<u64>().ok().map(|ns| ns / 1_000_000_000)
+}
+
+/// How long nobody has touched this Mac — in any app, not only Atlas. The
+/// overnight update asks before it installs and restarts
+/// (src/hooks/useAppUpdater.ts). None when it cannot be read, which never
+/// counts as idle there. `-k` keeps the dump to the one property (~4 KB).
+#[tauri::command(async)]
+pub fn system_idle_secs() -> Option<u64> {
+    parse_hid_idle_secs(&read("ioreg", &["-c", "IOHIDSystem", "-r", "-d", "1", "-k", "HIDIdleTime"]))
+}
+
 // --- Screen lock -------------------------------------------------------------------
+
+/// Sent to every window with `true` the moment the screen locks and `false`
+/// the moment it unlocks. The voice session's "Mute when the Mac is locked"
+/// gates the microphone on it (src/hooks/useVoiceSession.ts).
+pub const SCREEN_LOCK_EVENT: &str = "mac:screen-lock";
+
+/// The lock state as last seen, so an event goes out only on a change.
+static SCREEN_LOCKED: AtomicBool = AtomicBool::new(false);
+/// The notifications are observed, so SCREEN_LOCKED is current.
+static LOCK_OBSERVED: AtomicBool = AtomicBool::new(false);
+/// Where the event goes; set once, by `start_lock_watcher`.
+static LOCK_APP: OnceLock<AppHandle> = OnceLock::new();
+
+// Only the macOS notification callbacks call this.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn set_screen_locked(locked: bool) {
+    if SCREEN_LOCKED.swap(locked, Ordering::SeqCst) == locked {
+        return;
+    }
+    if let Some(app) = LOCK_APP.get() {
+        let _ = app.emit(SCREEN_LOCK_EVENT, locked);
+    }
+}
 
 /// `ioreg -n Root -d1` lists the console sessions; the one on screen carries
 /// `"CGSSessionScreenIsLocked"=Yes` while the screen is locked, and no such key
@@ -649,12 +766,151 @@ pub fn parse_screen_locked(ioreg: &str) -> bool {
     ioreg.contains("\"CGSSessionScreenIsLocked\"=Yes")
 }
 
-/// Whether the screen is locked right now. Read by the voice session's "mute
-/// when the Mac is locked". The ioreg dump is ~100 KB, so only the answer
-/// crosses to the webview.
+/// Whether the screen is locked right now: the window server's session
+/// dictionary (a call, not a process), or the same key in ioreg's dump of the
+/// console sessions when there is no dictionary to ask.
+fn read_screen_locked() -> bool {
+    #[cfg(target_os = "macos")]
+    if let Some(locked) = lock_watch::session_locked() {
+        return locked;
+    }
+    parse_screen_locked(&read("ioreg", &["-n", "Root", "-d1"]))
+}
+
+/// Start pushing SCREEN_LOCK_EVENT. Called once, in setup, in every instance:
+/// each app's own windows run a voice session.
+pub fn start_lock_watcher(app: AppHandle) {
+    if LOCK_APP.set(app).is_err() {
+        return;
+    }
+    SCREEN_LOCKED.store(read_screen_locked(), Ordering::SeqCst);
+    #[cfg(target_os = "macos")]
+    LOCK_OBSERVED.store(lock_watch::observe(), Ordering::SeqCst);
+}
+
+/// Whether the screen is locked right now. The voice session asks once when it
+/// sets up the gate, for the state before the first SCREEN_LOCK_EVENT; only
+/// the answer crosses to the webview. While the notifications are observed
+/// this is the state they keep, so it can never disagree with an event that
+/// has gone out; a fresh read otherwise.
 #[tauri::command(async)]
 pub fn screen_locked() -> Result<bool, String> {
-    Ok(parse_screen_locked(&read("ioreg", &["-n", "Root", "-d1"])))
+    if LOCK_OBSERVED.load(Ordering::SeqCst) {
+        return Ok(SCREEN_LOCKED.load(Ordering::SeqCst));
+    }
+    Ok(read_screen_locked())
+}
+
+/// macOS's own lock and unlock notifications, observed through CoreFoundation's
+/// C API: no Objective-C, no new crate. loginwindow posts
+/// `com.apple.screenIsLocked` and `com.apple.screenIsUnlocked` on the
+/// distributed notification center; CoreFoundation delivers them on the main
+/// thread's run loop — which Tauri's event loop runs — whichever thread
+/// registered (checked on this Mac with a test notification). Delivery is
+/// immediate on purpose: AppKit holds distributed notifications back from an
+/// app that is not frontmost, and a screen locks exactly when Atlas is not.
+#[cfg(target_os = "macos")]
+mod lock_watch {
+    use std::ffi::{c_char, c_void, CStr};
+    use std::ptr::null;
+
+    type CFStringRef = *const c_void;
+    type CFDictionaryRef = *const c_void;
+    type Callback = extern "C" fn(*mut c_void, *const c_void, CFStringRef, *const c_void, CFDictionaryRef);
+
+    /// kCFStringEncodingUTF8.
+    const UTF8: u32 = 0x0800_0100;
+    /// CFNotificationSuspensionBehaviorDeliverImmediately.
+    const DELIVER_IMMEDIATELY: isize = 4;
+
+    #[link(name = "CoreFoundation", kind = "framework")]
+    extern "C" {
+        fn CFNotificationCenterGetDistributedCenter() -> *mut c_void;
+        fn CFNotificationCenterAddObserver(
+            center: *mut c_void,
+            observer: *const c_void,
+            callback: Callback,
+            name: CFStringRef,
+            object: *const c_void,
+            suspension: isize,
+        );
+        fn CFStringCreateWithCString(alloc: *const c_void, s: *const c_char, encoding: u32) -> CFStringRef;
+        fn CFDictionaryGetValue(dict: CFDictionaryRef, key: *const c_void) -> *const c_void;
+        fn CFGetTypeID(value: *const c_void) -> usize;
+        fn CFBooleanGetTypeID() -> usize;
+        fn CFBooleanGetValue(value: *const c_void) -> u8;
+        fn CFRelease(value: *const c_void);
+    }
+
+    #[link(name = "CoreGraphics", kind = "framework")]
+    extern "C" {
+        fn CGSessionCopyCurrentDictionary() -> CFDictionaryRef;
+    }
+
+    /// Identifies this module's registrations to the center; never dereferenced.
+    static OBSERVER: u8 = 0;
+
+    fn cf_string(s: &CStr) -> CFStringRef {
+        // SAFETY: `s` is a valid NUL-terminated string; a null result is checked by every caller.
+        unsafe { CFStringCreateWithCString(null(), s.as_ptr(), UTF8) }
+    }
+
+    extern "C" fn on_locked(_: *mut c_void, _: *const c_void, _: CFStringRef, _: *const c_void, _: CFDictionaryRef) {
+        super::set_screen_locked(true);
+    }
+
+    extern "C" fn on_unlocked(_: *mut c_void, _: *const c_void, _: CFStringRef, _: *const c_void, _: CFDictionaryRef) {
+        super::set_screen_locked(false);
+    }
+
+    /// Start observing both notifications. False when they could not be
+    /// registered, and the lock is then read each time it is asked for.
+    pub fn observe() -> bool {
+        // SAFETY: plain CoreFoundation calls with valid arguments. The names
+        // are kept for the life of the process, as the observations are.
+        unsafe {
+            let center = CFNotificationCenterGetDistributedCenter();
+            if center.is_null() {
+                log::warn!("[mac] no distributed notification center: the lock is read only when asked");
+                return false;
+            }
+            let observer = &OBSERVER as *const u8 as *const c_void;
+            let names = [
+                (cf_string(c"com.apple.screenIsLocked"), on_locked as Callback),
+                (cf_string(c"com.apple.screenIsUnlocked"), on_unlocked as Callback),
+            ];
+            if names.iter().any(|(name, _)| name.is_null()) {
+                return false;
+            }
+            for (name, callback) in names {
+                CFNotificationCenterAddObserver(center, observer, callback, name, null(), DELIVER_IMMEDIATELY);
+            }
+            true
+        }
+    }
+
+    /// `CGSSessionScreenIsLocked` in the session dictionary: present (and true)
+    /// while the screen is locked, absent otherwise. None outside a login
+    /// session, where there is no dictionary.
+    pub fn session_locked() -> Option<bool> {
+        // SAFETY: the dictionary and key are checked for null, the value is
+        // only read as a boolean once its type says it is one, and both
+        // created objects are released exactly once.
+        unsafe {
+            let dict = CGSessionCopyCurrentDictionary();
+            if dict.is_null() {
+                return None;
+            }
+            let key = cf_string(c"CGSSessionScreenIsLocked");
+            let value = if key.is_null() { null() } else { CFDictionaryGetValue(dict, key) };
+            let locked = !value.is_null() && (CFGetTypeID(value) != CFBooleanGetTypeID() || CFBooleanGetValue(value) != 0);
+            if !key.is_null() {
+                CFRelease(key);
+            }
+            CFRelease(dict);
+            Some(locked)
+        }
+    }
 }
 
 // --- Restart Atlas -----------------------------------------------------------------
@@ -767,6 +1023,38 @@ mod tests {
         assert!(!trimmed.contains("serial") && !trimmed.contains("XYZ") && !trimmed.contains("4E71"));
         assert!(!trimmed.contains("controller_address"));
         assert_eq!(bluetooth_trim(""), "");
+    }
+
+    #[test]
+    fn tools_run_against_a_deadline() {
+        let ran = run_limited("sh", &["-c", "echo out; echo err >&2; exit 3"], Duration::from_secs(5)).unwrap();
+        assert!(!ran.ok);
+        assert_eq!(ran.stdout.trim(), "out");
+        assert_eq!(ran.stderr.trim(), "err");
+        assert_eq!(read("echo", &["hello"]).trim(), "hello");
+        // A tool that hangs is killed at the limit rather than waited on.
+        let started = Instant::now();
+        let hung = run_limited("sleep", &["30"], Duration::from_millis(300));
+        assert!(hung.is_err_and(|e| e.starts_with("sleep did not finish")));
+        assert!(started.elapsed() < Duration::from_secs(3));
+        // The error names the tool, never its arguments.
+        assert!(run_limited("no-such-tool-here", &["hunter22"], READ_LIMIT).is_err_and(|e| !e.contains("hunter22")));
+    }
+
+    #[test]
+    fn idle_time_from_hid_system() {
+        let ioreg = "+-o IOHIDSystem  <class IOHIDSystem>\n    {\n      \"HIDIdleTime\" = 42808797208\n    }\n";
+        assert_eq!(parse_hid_idle_secs(ioreg), Some(42));
+        assert_eq!(parse_hid_idle_secs("\"HIDIdleTime\" = 999999999"), Some(0));
+        assert_eq!(parse_hid_idle_secs(""), None);
+        assert_eq!(parse_hid_idle_secs("\"HIDIdleTime\" = <>"), None);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn session_lock_read() {
+        // Tests run at an unlocked screen, or outside a login session.
+        assert_ne!(lock_watch::session_locked(), Some(true));
     }
 
     #[test]

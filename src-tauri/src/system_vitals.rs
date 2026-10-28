@@ -19,7 +19,6 @@
 //
 // The parsers take the tool's text so they can be tested on fixtures.
 use serde::Serialize;
-use std::process::Command;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
@@ -155,14 +154,11 @@ pub fn parse_bluetooth(json: &str) -> Option<Bluetooth> {
 
 // --- Probes --------------------------------------------------------------------
 
+/// Through mac_controls.rs's reader, which kills a tool that runs past its
+/// limit: a hung `system_profiler` would otherwise hold `refreshing` true, and
+/// the Bluetooth answer would never refresh again.
 fn run(cmd: &str, args: &[&str]) -> String {
-    Command::new(cmd)
-        .args(args)
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
-        .unwrap_or_default()
+    crate::mac_controls::read(cmd, args)
 }
 
 fn probe_battery() -> Option<Battery> {

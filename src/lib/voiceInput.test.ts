@@ -2,8 +2,9 @@
    up a minimal `window` double on globalThis. */
 import { afterEach, describe, expect, test } from 'bun:test';
 import {
-  DEFAULT_VOICE_INPUT, PTT_CODE, VOICE_INPUT_EVENT, VOICE_INPUT_KEY, onVoiceInputChange, parseVoiceInput, pttStep, readVoiceInput, setVoiceInput,
-  type PttEvent, type PttState,
+  DEFAULT_VOICE_INPUT, PTT_CODE, PTT_NO_PRESS, VOICE_INPUT_EVENT, VOICE_INPUT_KEY, onVoiceInputChange, parseVoiceInput, pttActivated, pttPressed,
+  pttReleased, pttStep, readVoiceInput, setVoiceInput,
+  type PttControl, type PttEvent, type PttPress, type PttState,
 } from './voiceInput';
 
 describe('the stored switches', () => {
@@ -92,5 +93,71 @@ describe('push to talk', () => {
     expect(run([{ type: 'blur' }], 'talking')).toEqual({ state: 'idle', actions: ['end'] });
     expect(run([{ type: 'blur' }], 'armed')).toEqual({ state: 'idle', actions: ['disarm'] });
     expect(run([{ type: 'blur' }])).toEqual({ state: 'idle', actions: [] });
+  });
+});
+
+describe('one press, as the gateway hears it', () => {
+  // What the voice session does: pttStep's `start` opens the microphone and
+  // later reports `activated`; its `end` is the release. Returns the control
+  // messages in the order they reach the gateway.
+  function wire(events: Array<PttEvent | { type: 'activated' }>) {
+    let state: PttState = 'idle';
+    let press: PttPress = PTT_NO_PRESS;
+    const sent: PttControl['type'][] = [];
+    const out = (r: { press: PttPress; send: PttControl[] }) => {
+      press = r.press;
+      for (const m of r.send) sent.push(m.type === 'activate' ? 'activate' : 'end_speech');
+    };
+    for (const e of events) {
+      if (e.type === 'activated') { out(pttActivated(press)); continue; }
+      const step = pttStep(state, e);
+      state = step.state;
+      if (step.action === 'start') press = pttPressed();
+      if (step.action === 'end') out(pttReleased(press));
+    }
+    return sent;
+  }
+  const down: PttEvent = { type: 'down', code: PTT_CODE, typing: false };
+  const up: PttEvent = { type: 'up', code: PTT_CODE };
+  const held: PttEvent = { type: 'held' };
+
+  test('microphone already open: the hold, then the release', () => {
+    expect(wire([down, held, { type: 'activated' }, up])).toEqual(['activate', 'end_speech']);
+  });
+
+  test('released before the microphone opened: the hold goes out with its release, never alone', () => {
+    // The first press after launch: getUserMedia, the worklet and the wake
+    // model take longer than the user holds the key. Before, the release went
+    // out first (to an idle gateway, where it closed nothing) and the late
+    // hold kept the turn listening with nobody holding the key.
+    expect(wire([down, held, up, { type: 'activated' }])).toEqual(['activate', 'end_speech']);
+  });
+
+  test('losing the window mid-wait counts as the release', () => {
+    expect(wire([down, held, { type: 'blur' }, { type: 'activated' }])).toEqual(['activate', 'end_speech']);
+  });
+
+  test('a press that never opened the microphone sends nothing', () => {
+    expect(wire([down, held, up])).toEqual([]);
+  });
+
+  test('every hold that goes out is followed by its release', () => {
+    for (const events of [
+      [down, held, { type: 'activated' as const }, up],
+      [down, held, up, { type: 'activated' as const }],
+      [down, held, { type: 'blur' as const }, { type: 'activated' as const }],
+    ]) {
+      const sent = wire(events);
+      expect(sent.filter((m) => m === 'activate').length).toBe(sent.filter((m) => m === 'end_speech').length);
+      expect(sent.at(-1)).toBe('end_speech');
+    }
+  });
+
+  test('the press helpers on their own', () => {
+    expect(pttPressed()).toEqual({ down: true, activated: false });
+    expect(pttReleased(pttPressed())).toEqual({ press: { down: false, activated: false }, send: [] });
+    expect(pttActivated(pttPressed()).send).toEqual([{ type: 'activate', hold: true }]);
+    expect(pttActivated({ down: false, activated: false }).send).toEqual([{ type: 'activate', hold: true }, { type: 'end_speech' }]);
+    expect(pttReleased({ down: true, activated: true }).send).toEqual([{ type: 'end_speech' }]);
   });
 });

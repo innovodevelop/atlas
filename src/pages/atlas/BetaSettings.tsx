@@ -1227,7 +1227,7 @@ function UpdatesSection({ updater, version }: { updater: ReturnType<typeof useAp
           <Row title="Download updates automatically" sub="Atlas checks the release feed every six hours and downloads a new version in the background. Installing still waits for you, or for the night.">
             <Toggle on={prefs.autoDownload} label="Download updates automatically" onChange={flip('autoDownload')} />
           </Row>
-          <Row title="Install overnight" sub="When plugged in and idle between 2 and 5 AM. Atlas installs the update and restarts itself; conversations and memories carry over.">
+          <Row title="Install overnight" sub="Between 2 and 5 AM, when the Mac is plugged in and nobody has used it for 15 minutes. Atlas installs the update and restarts itself; conversations and memories carry over.">
             <Toggle on={prefs.installOvernight} label="Install overnight" onChange={flip('installOvernight')} />
           </Row>
         </section>

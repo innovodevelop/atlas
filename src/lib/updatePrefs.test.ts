@@ -2,8 +2,8 @@
    up a minimal `window` double on globalThis. */
 import { afterEach, describe, expect, test } from 'bun:test';
 import {
-  CHECK_EVERY_MS, DEFAULT_UPDATE_PREFS, UPDATE_PREFS_KEY, autoUpdateStep, inOvernightWindow, onUpdatePrefsChange, parseUpdatePrefs, readUpdatePrefs,
-  setUpdatePrefs, type AutoInput,
+  CHECK_EVERY_MS, DEFAULT_UPDATE_PREFS, OVERNIGHT_IDLE_SECS, UPDATE_PREFS_KEY, autoUpdateStep, inOvernightWindow, nobodyAtTheMac, onUpdatePrefsChange,
+  parseUpdatePrefs, readUpdatePrefs, setUpdatePrefs, type AutoInput,
 } from './updatePrefs';
 
 describe('the stored switches', () => {
@@ -86,5 +86,18 @@ describe('the background updater', () => {
     expect(autoUpdateStep({ ...base, phase: 'installed' })).toBeNull();
     // Automatic downloads alone never install.
     expect(autoUpdateStep({ ...base, prefs: { autoDownload: true, installOvernight: false }, phase: 'downloaded', now: night })).toBeNull();
+  });
+
+  test('nobody at the Mac means no input to it at all, not only Atlas in the background', () => {
+    // Working in another app at 3 AM: Atlas's window is not in use, but the Mac is.
+    expect(nobodyAtTheMac(4, false)).toBe(false);
+    expect(nobodyAtTheMac(OVERNIGHT_IDLE_SECS - 1, false)).toBe(false);
+    expect(nobodyAtTheMac(OVERNIGHT_IDLE_SECS, false)).toBe(true);
+    // Atlas's own window in use, or an idle time that could not be read: never.
+    expect(nobodyAtTheMac(OVERNIGHT_IDLE_SECS * 4, true)).toBe(false);
+    expect(nobodyAtTheMac(null, false)).toBe(false);
+    const working = nobodyAtTheMac(30, false);
+    expect(autoUpdateStep({ ...base, phase: 'downloaded', now: night, idle: working })).toBeNull();
+    expect(autoUpdateStep({ ...base, phase: 'installed', now: night, idle: working })).toBeNull();
   });
 });

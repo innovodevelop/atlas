@@ -18,6 +18,7 @@ import { RealtimeStt } from "./stt.ts";
 import { TtsPipeline, DirectTtsProvider } from "./tts.ts";
 import { TurnTimer, type LatencyBreakdown } from "./latency.ts";
 import { ScribeTokenCache } from "./stt.ts";
+import { PttHold, MAX_HOLD_MS } from "./pttHold.ts";
 
 // ElevenLabs key injected into the sidecar from the Keychain. Voice runs
 // directly against ElevenLabs for TTS + scribe tokens — no Supabase hop.
@@ -68,10 +69,17 @@ export class VoiceSession {
   private turnFullText = "";
   private llmAbort: AbortController | null = null;
   private awaitingBargeReport = false;
-  // Push to talk: true while the client holds its key. The VAD's end of
-  // speech is ignored then, so a pause mid-sentence does not send half of it;
-  // the release (`end_speech`) closes the utterance instead.
-  private held = false;
+  // Push to talk: while the client holds its key, the VAD's end of speech is
+  // ignored, so a pause mid-sentence does not send half of it; the release
+  // (`end_speech`) closes the utterance instead. pttHold.ts also caps a held
+  // turn at a minute and drops a hold whose release overtook it.
+  private ptt = new PttHold(() => {
+    console.warn(`[session] push to talk held past ${MAX_HOLD_MS / 1000} s — closing the utterance`);
+    void this.closeUtterance();
+  });
+  // The STT socket of the listening turn while it opens. A release can come
+  // before it is open (a short press), and the commit must wait for it.
+  private sttOpening: Promise<void> = Promise.resolve();
 
   // Per-turn latency breakdown (latency.ts): logged and sent to the client as
   // a `latency` message when the first audio of a turn arrives.
@@ -109,15 +117,15 @@ export class VoiceSession {
   handleMessage(msg: ClientMsg): void {
     switch (msg.type) {
       case "wake":
-        this.held = false;
+        this.ptt.start(false);
         void this.startListening();
         break;
       case "activate":
-        this.held = msg.hold === true;
+        this.ptt.start(msg.hold === true);
         void this.startListening();
         break;
       case "end_speech":
-        this.held = false;
+        this.ptt.release(this.state === "idle");
         void this.closeUtterance();
         break;
       case "cancel":
@@ -161,7 +169,7 @@ export class VoiceSession {
     if (this.state === "listening") return;
 
     this.vad.reset();
-    this.stt = new RealtimeStt(
+    const stt = new RealtimeStt(
       {
         onPartial: (text) => this.cfg.send({ type: "partial_transcript", text }),
         onFinal: () => { /* resolved in finish() */ },
@@ -170,13 +178,20 @@ export class VoiceSession {
       this.cfg.languageCode,
       this.sttTokens,
     );
+    this.stt = stt;
     this.setState("listening");
+    const opening = stt.start();
+    this.sttOpening = opening.catch(() => { /* reported below */ });
     try {
-      await this.stt.start();
+      await opening;
     } catch (e) {
+      // Cancelled, or already closed, while it opened: that turn is over and
+      // a newer one may be listening — leave it be.
+      if (this.stt !== stt) return;
       console.error("[session] STT start failed:", (e as Error).message);
       this.cfg.send({ type: "error", message: "Speech recognition unavailable" });
       this.stt = null;
+      this.ptt.clear();
       this.setState("idle");
     }
   }
@@ -190,17 +205,28 @@ export class VoiceSession {
   }
 
   private async onSpeechEnd(): Promise<void> {
-    if (this.held) return; // push to talk: the key's release ends the utterance
+    if (this.ptt.isHeld) return; // push to talk: the key's release ends the utterance
     await this.closeUtterance();
   }
 
-  /** Finish the STT stream and answer what was said: the VAD's end of speech, or a push-to-talk release. */
+  /**
+   * Finish the STT stream and answer what was said: the VAD's end of speech,
+   * a push-to-talk release, or the hold's cap.
+   */
   private async closeUtterance(): Promise<void> {
     if (this.state !== "listening" || !this.stt) return;
+    const stt = this.stt;
+    // A release can land while the STT socket is still opening; a commit sent
+    // then would be lost, and the words with it.
+    await this.sttOpening;
+    // Closed by the other path meanwhile (the VAD and a release can both
+    // fire), cancelled, or failed to open.
+    if (this.stt !== stt || this.state !== "listening") return;
+    this.stt = null; // claimed: nothing else closes it, or feeds it, now
     const timer = new TurnTimer(performance.now(), true);
-    const text = await this.stt.finish();
+    const text = await stt.finish();
     timer.mark("sttFinal");
-    this.stt = null;
+    if (this.state !== "listening") return; // cancelled while the transcript settled
     if (!text) {
       this.setState("idle");
       return;
@@ -419,7 +445,7 @@ export class VoiceSession {
   }
 
   private cancelTurn(_reason: string): void {
-    this.held = false;
+    this.ptt.clear();
     this.llmAbort?.abort();
     this.tts.abort();
     this.stt?.close();

@@ -83,6 +83,8 @@ export class RealtimeStt {
   private pendingFrames: Uint8Array[] = [];
   /** Wakes finish() as soon as a final transcript lands. */
   private finalArrived: (() => void) | null = null;
+  /** close() was called: a start() still waiting for its token must not open a socket nobody will close. */
+  private closed = false;
 
   constructor(
     private events: SttEvents,
@@ -93,6 +95,7 @@ export class RealtimeStt {
   /** Take a single-use token and open the WS. Resolves when ready for audio. */
   async start(): Promise<void> {
     const token = await this.tokens.take();
+    if (this.closed) throw new Error("STT closed before it opened");
 
     const params = new URLSearchParams({
       model_id: "scribe_v2_realtime",
@@ -190,6 +193,7 @@ export class RealtimeStt {
   }
 
   close(): void {
+    this.closed = true;
     try { this.ws?.close(); } catch { /* already closed */ }
     this.ws = null;
     this.open = false;

@@ -9,7 +9,8 @@
  *    gateway can truncate the assistant turn to what was actually audible.
  *  - how it listens, from Settings → Voice (src/lib/voiceInput.ts): the wake
  *    word on or off, push to talk (hold the right ⌥ key), and the microphone
- *    gated off while the Mac's screen is locked.
+ *    gated off while the Mac's screen is locked (pushed from Rust as
+ *    `mac:screen-lock`).
  *
  * Replaces useVoice, useWakeWord(Core), useStreamingTTS, useDashboardVoice,
  * useRealtimeScribeStable. Exposes the existing AIState shape so AtlasSphere
@@ -19,7 +20,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getToken } from "@/lib/authClient";
 import { WakeWordDetector } from "@/lib/wakeWord";
 import { createReconnectGovernor, type ReconnectGovernor } from "@/lib/reconnectGovernor";
-import { PTT_HOLD_MS, onVoiceInputChange, pttStep, readVoiceInput, type PttEvent, type PttState } from "@/lib/voiceInput";
+import {
+  PTT_HOLD_MS, PTT_NO_PRESS, onVoiceInputChange, pttActivated, pttPressed, pttReleased, pttStep, readVoiceInput,
+  type PttControl, type PttEvent, type PttPress, type PttState,
+} from "@/lib/voiceInput";
 import { isTypingTarget } from "@/lib/betaScreenKeys";
 import type { VoiceSettings } from "@/lib/voiceTuning";
 import type { AIState } from "@/types";
@@ -83,6 +87,8 @@ export function useVoiceSession(options?: {
   onFinalTranscript?: (text: string) => void;
 }): UseVoiceSessionResult {
   const [state, setState] = useState<AIState>("idle");
+  // The gateway's state as last reported, for code outside React's render.
+  const gatewayStateRef = useRef<AIState>("idle");
   const [connected, setConnected] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
   const [partialTranscript, setPartialTranscript] = useState("");
@@ -117,6 +123,9 @@ export function useVoiceSession(options?: {
   inputPrefsRef.current = inputPrefs;
   // True while the microphone stream is open (after the first activation).
   const [capturing, setCapturing] = useState(false);
+  // Push to talk: whether the key is down and whether this press's hold has
+  // gone to the gateway (src/lib/voiceInput.ts, pttPressed and after).
+  const pttPressRef = useRef<PttPress>(PTT_NO_PRESS);
 
   // Wake word (B2): openWakeWord runs locally on every frame while IDLE;
   // frames stream to the gateway only during an active turn. Pre-wake audio
@@ -243,6 +252,7 @@ export function useVoiceSession(options?: {
           break;
         case "state": {
           const s = msg.state as AIState;
+          gatewayStateRef.current = s;
           setState(s);
           if (s !== "listening") setPartialTranscript("");
           // Frame routing: gateway during a turn, local wake detector when idle.
@@ -301,6 +311,7 @@ export function useVoiceSession(options?: {
 
     ws.onclose = () => {
       setConnected(false);
+      gatewayStateRef.current = "idle";
       setState("idle");
       wsRef.current = null;
       // Gateway restarting (sidecar respawn) — retry quietly. Through the
@@ -417,15 +428,34 @@ export function useVoiceSession(options?: {
     });
   }, []);
 
-  /** `hold`: push to talk — the gateway keeps listening until `end_speech`. */
+  /** A control message, when the socket is open. `send` on one still connecting throws. */
+  const sendControl = useCallback((msg: PttControl | { type: string }) => {
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+  }, []);
+
+  /**
+   * `hold`: push to talk — the gateway keeps listening until `end_speech`.
+   * The first activation waits for the microphone, the worklet and the wake
+   * model, and a push-to-talk key can come up in that wait: what goes out
+   * then is pttActivated's to decide (the hold, and its release with it).
+   */
   const activate = useCallback((hold: boolean) => {
     void (async () => {
       await connect();
       inTurnRef.current = true; // route frames gateway-ward before the state round-trip
       await startCapture();
-      wsRef.current?.send(JSON.stringify(hold ? { type: "activate", hold: true } : { type: "activate" }));
-    })();
-  }, [connect, startCapture]);
+      if (!hold) { sendControl({ type: "activate" }); return; }
+      const step = pttActivated(pttPressRef.current);
+      pttPressRef.current = step.press;
+      step.send.forEach(sendControl);
+    })().catch((e: unknown) => {
+      // No microphone (permission refused, no device): no turn started, so
+      // frames go back to wherever the gateway's state says.
+      inTurnRef.current = gatewayStateRef.current !== "idle";
+      console.warn("[voice] could not start listening:", e instanceof Error ? e.message : e);
+    });
+  }, [connect, startCapture, sendControl]);
 
   const handleManualActivate = useCallback(() => activate(false), [activate]);
 
@@ -454,8 +484,17 @@ export function useVoiceSession(options?: {
       state = step.state;
       if (step.action === "arm") timer = window.setTimeout(() => feed({ type: "held" }), PTT_HOLD_MS);
       if (step.action === "disarm" || step.action === "start") window.clearTimeout(timer);
-      if (step.action === "start") activate(true);
-      if (step.action === "end") wsRef.current?.send(JSON.stringify({ type: "end_speech" }));
+      if (step.action === "start") {
+        pttPressRef.current = pttPressed();
+        activate(true);
+      }
+      if (step.action === "end") {
+        // Sent now only if the hold has gone out; otherwise activate() sends
+        // the two together once the microphone is open.
+        const released = pttReleased(pttPressRef.current);
+        pttPressRef.current = released.press;
+        released.send.forEach(sendControl);
+      }
     };
     const onDown = (e: KeyboardEvent) => feed({ type: "down", code: e.code, typing: isTypingTarget(e.target), repeat: e.repeat });
     const onUp = (e: KeyboardEvent) => feed({ type: "up", code: e.code });
@@ -471,13 +510,15 @@ export function useVoiceSession(options?: {
       window.removeEventListener("keyup", onUp, true);
       window.removeEventListener("blur", onBlur);
     };
-  }, [inputPrefs.pushToTalk, activate]);
+  }, [inputPrefs.pushToTalk, activate, sendControl]);
 
-  // Mute when the Mac is locked. Asked of Rust (`screen_locked`, an ioreg
-  // read) every five seconds, and only while the microphone is open and the
-  // window is not focused — a focused window means someone is at an unlocked
-  // screen, and with the mic closed there is nothing to mute. Runs while the
-  // window is inactive on purpose: that is exactly when a screen locks.
+  // Mute when the Mac is locked. Rust observes macOS's own lock and unlock
+  // notifications and sends `mac:screen-lock` the moment either is posted
+  // (src-tauri/src/mac_controls.rs), so there is no polling here, and no
+  // guessing from window focus either: a web view can still report focus
+  // behind a locked screen. `screen_locked` is asked once when the gate is
+  // set up, for the state before the first notification. With the microphone
+  // closed there is nothing to mute, so nothing is listened for.
   useEffect(() => {
     const native = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
     const setGate = (locked: boolean) => {
@@ -487,24 +528,30 @@ export function useVoiceSession(options?: {
       micStreamRef.current?.getAudioTracks().forEach((tr) => { tr.enabled = !(locked || mutedRef.current); });
       // Atlas stops listening the moment the screen locks: a turn that was
       // listening is cancelled, not left waiting for audio that cannot come.
-      if (locked && inTurnRef.current) wsRef.current?.send(JSON.stringify({ type: "cancel" }));
+      if (locked && inTurnRef.current) sendControl({ type: "cancel" });
     };
     if (!native || !capturing || !inputPrefs.muteWhenLocked) { setGate(false); return; }
     let alive = true;
-    const check = async () => {
-      if (document.hasFocus()) { setGate(false); return; }
-      try {
-        const { invoke } = await import("@tauri-apps/api/core");
-        const locked = await invoke<boolean>("screen_locked");
-        if (alive) setGate(locked);
-      } catch {
-        /* an older build without the command: never mute on a guess */
-      }
-    };
-    void check();
-    const id = window.setInterval(() => void check(), 5000);
-    return () => { alive = false; window.clearInterval(id); };
-  }, [capturing, inputPrefs.muteWhenLocked]);
+    let heard = false;
+    let unlisten: (() => void) | null = null;
+    void (async () => {
+      const { listen } = await import("@tauri-apps/api/event");
+      const off = await listen<boolean>("mac:screen-lock", (e) => {
+        heard = true;
+        if (alive) setGate(e.payload === true);
+      });
+      if (!alive) { off(); return; }
+      unlisten = off;
+      // Asked after listening, so a lock between the two is not missed — and
+      // ignored if an event came first, being the older of the two answers.
+      const { invoke } = await import("@tauri-apps/api/core");
+      const locked = await invoke<boolean>("screen_locked");
+      if (alive && !heard) setGate(locked);
+    })().catch(() => {
+      /* an older build without the event or the command: never mute on a guess */
+    });
+    return () => { alive = false; unlisten?.(); };
+  }, [capturing, inputPrefs.muteWhenLocked, sendControl]);
 
   const cancel = useCallback(() => {
     stopPlayback();
