@@ -1036,8 +1036,9 @@ export function TransitWidget(p: WidgetProps) {
   const { status, stop, departures } = transit;
   const [deps, setDeps] = useState<Departure[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const now = useTick(30000);
   const live = status === 'ready' && !!stop && !p.preview;
+  // The countdowns are the only thing that moves, so a dormant card does not tick.
+  const now = useTick(30000, live);
 
   useEffect(() => {
     if (!live || !stop) return;
@@ -1073,7 +1074,8 @@ export function TransitWidget(p: WidgetProps) {
         value: next ? next.expected : '—',
         delta: next ? countdown(next, new Date(now)) : undefined,
         deltaTone: next && next.delayMin > 0 ? 'down' : 'blue',
-        sub: error ?? (next ? `${next.line}${next.direction ? ` → ${next.direction}` : ''}` : deps ? 'Nothing leaves in the next two hours' : 'Asking Rejseplanen…'),
+        // A preview never asks Rejseplanen, so it must not say it is asking.
+        sub: error ?? (next ? `${next.line}${next.direction ? ` → ${next.direction}` : ''}` : deps ? 'Nothing leaves in the next two hours' : p.preview ? 'Live departures from Rejseplanen' : 'Asking Rejseplanen…'),
         rows: upcoming.filter((d) => d !== next).slice(0, 3).map<FaceRow>((d) => ({
           key: d.key, lead: d.expected, title: d.line, sub: d.direction || undefined, value: departureNote(d), valueTone: d.cancelled || d.delayMin > 0 ? 'down' : 'muted', strike: d.cancelled,
         })),

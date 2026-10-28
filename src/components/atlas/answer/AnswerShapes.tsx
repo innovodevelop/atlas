@@ -30,8 +30,9 @@ export function ComparisonView({ comparison }: { comparison: Comparison }) {
               {pick === i ? <span className="b-answer-cmp-chip">Atlas’s pick</span> : null}
             </div>
             <dl className="b-answer-cmp-rows">
-              {rows.map((r) => (
-                <div key={r.attribute} className="b-answer-cmp-row">
+              {/* By position: the model may repeat an attribute, and parseComparison keeps both. */}
+              {rows.map((r, ri) => (
+                <div key={ri} className="b-answer-cmp-row">
                   <dt>{r.attribute}</dt>
                   <dd>{r.values[i]}{r.best === i ? <i aria-label="better on this" /> : null}</dd>
                 </div>
