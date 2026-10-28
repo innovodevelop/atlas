@@ -41,11 +41,19 @@
  * UNDO. Each mutating call records its inverse with the step, where one
  * exists (`undoFor`): a task, note, calendar event or watchlist entry the run
  * created is deleted; a task or note it edited gets the edited fields back.
- * Mail, music, the Clock and anything that ran through an approval have no
- * inverse here and are recorded as such, so "Stop and undo" can list them as
- * steps that cannot be undone. Undo runs newest first. Smart-home calls are
- * not in this list because a run cannot make one: the tool layer
- * (orchestrator.ts ATLAS_TOOL_OPS) declares no home tool.
+ * Music, the Clock and anything that ran through an approval have no inverse
+ * here and are recorded as such, so "Stop and undo" can list them as steps
+ * that cannot be undone. Undo runs newest first. Smart-home calls are not in
+ * this list because a run cannot make one: the tool layer (orchestrator.ts
+ * ATLAS_TOOL_OPS) declares no home tool. The inverses write through
+ * bun:sqlite, so the other screens hear of them from the Agent View, which
+ * emits `db:changed` for each table the undo report names.
+ *
+ * NO MAIL CHANGES. A run is not handed `mail.archive` or `mail.mark_read`
+ * (RUN_WITHHELD_OPS). Both are approval-tier, and Rust runs an approved call
+ * with the credential of the caller that queued it; a run has none, so the
+ * mail worker would refuse every one of them after the user said yes. A
+ * question whose yes can only fail is not one to ask.
  *
  * WHAT IT DOES NOT DO. It does not enforce `agents.daily_budget_limit` (no
  * cost is computed for a model call anywhere in the brain), and it does not
@@ -95,6 +103,20 @@ export const MAX_PARALLEL_RUNS = 3;
  * for weeks ago.
  */
 export const STALE_PENDING_MS = 10 * 60_000;
+
+/**
+ * Ops a run is never offered, though the port advertises them. The mail
+ * mutations are approval-tier: Rust keeps the queued call with the caller's
+ * own user token and runs it with that token once approved
+ * (control/mod.rs `approval_resolve`). A run calls with no token, and the
+ * mail worker refuses a request that carries none (ops_mail.rs `user_token`),
+ * so the Approve on such a card could only ever fail. `context` leaves them
+ * out of the tools and `runControl` refuses them if a model names one anyway.
+ */
+export const RUN_WITHHELD_OPS: ReadonlySet<string> = new Set(["mail.archive", "mail.mark_read"]);
+
+const RUN_WITHHELD_MESSAGE =
+  "An agent run cannot archive mail or mark it read. Say which threads should change instead; the user does it in Mail.";
 
 const nowIso = () => new Date().toISOString();
 
@@ -290,8 +312,6 @@ const NOUN: Record<string, string> = {
 
 /** Calls that change something Atlas cannot put back, and why — the "can't be undone" list. */
 const NO_INVERSE: Record<string, { label: string; reason: string }> = {
-  "mail.archive": { label: "Archived a mail thread", reason: "Mail has no un-archive Atlas can run." },
-  "mail.mark_read": { label: "Marked a mail thread read", reason: "Mail has no mark-unread Atlas can run." },
   "music.play": { label: "Started playback", reason: "Playback cannot be put back the way it was." },
   "music.pause": { label: "Paused playback", reason: "Playback cannot be put back the way it was." },
   "music.volume": { label: "Changed the volume", reason: "The previous volume was not recorded." },
@@ -463,7 +483,12 @@ export interface RunnerDeps {
 }
 
 export interface UndoReport {
-  undone: Array<{ stepId: string; label: string; message: string }>;
+  /**
+   * What was taken back, with the table and the kind of write, so the Agent
+   * View can tell the screens showing that table (`db:changed`) — an undo
+   * writes through bun:sqlite, which tells nobody.
+   */
+  undone: Array<{ stepId: string; label: string; message: string; table: UndoTable; kind: UndoAction["kind"] }>;
   failed: Array<{ stepId: string; label: string; message: string }>;
   cannot: Array<{ stepId: string; label: string; reason: string }>;
 }
@@ -637,6 +662,12 @@ export function createAgentRunner(deps: RunnerDeps) {
           return { ok: false, error: { code: "not_permitted", message: "The run was stopped before this could run.", retryable: false } };
         }
         const a = (args && typeof args === "object" ? args : {}) as Record<string, unknown>;
+        if (RUN_WITHHELD_OPS.has(op)) {
+          // Never declared to the model (see `context`), but an action name can
+          // still be guessed. Recorded, so the log shows what was refused.
+          insertStep(runId, "tool_call", { plan_step: planStep, op, args: a }, { ok: false, error: RUN_WITHHELD_MESSAGE });
+          return { ok: false, error: { code: "not_permitted", message: RUN_WITHHELD_MESSAGE, retryable: false } };
+        }
         const before = readBefore(db, userId, op, a);
         const stepId = insertStep(runId, "tool_call", { plan_step: planStep, op, args: a }, null, { finished: false });
         const result = await control.call(op, args, { ...opts, runId });
@@ -698,10 +729,14 @@ export function createAgentRunner(deps: RunnerDeps) {
     return answer ? clip(answer, 300) : null;
   }
 
-  /** What a run's steps work with: its agent's instructions and the desktop tools the port offers now. */
+  /**
+   * What a run's steps work with: its agent's instructions and the desktop
+   * tools the port offers now, less the ops a run may not use
+   * (RUN_WITHHELD_OPS).
+   */
   async function context(run: RunRow): Promise<{ agent: AgentRow | null; tools: ToolDecl[] }> {
     const agent = db.prepare(`SELECT system_prompt, max_steps FROM agents WHERE id = ?`).get(run.agent_id) as AgentRow | null;
-    const caps = control?.available() ? await control.capabilities() : [];
+    const caps = (control?.available() ? await control.capabilities() : []).filter((op) => !RUN_WITHHELD_OPS.has(op));
     const tools = buildAtlasTools(caps, { allowMutating: true }).filter((t) => t.function.name.startsWith("atlas_"));
     return { agent, tools };
   }
@@ -732,20 +767,57 @@ export function createAgentRunner(deps: RunnerDeps) {
     }
   }
 
-  /** A run's end, however it came: an error closes it, and an undo the user asked for mid-step runs now. */
+  /**
+   * Run `what` and log what it throws instead of passing it on. For the
+   * clean-up at a run's end, which can fail for the same reason the run did:
+   * deleting an agent cascades to its runs, so a run can lose its row mid-step
+   * and every write about it then fails its foreign key. The runner's promises
+   * are held by the loop, and a rejection nobody handles ends the brain.
+   */
+  function quietly(what: string, fn: () => void): void {
+    try {
+      fn();
+    } catch (e) {
+      console.warn(`[agent-runner] ${what} failed:`, e);
+    }
+  }
+
+  /**
+   * A run's end, however it came: an error closes it, questions a stop left
+   * behind are closed, and an undo the user asked for mid-step runs now.
+   * Never throws.
+   */
   async function guarded(runId: string, body: () => Promise<void>): Promise<void> {
     try {
       await body();
     } catch (e) {
-      insertStep(runId, "error", null, { reason: String(e).slice(0, 500) });
-      setStatus(runId, "failed", { error: String(e).slice(0, 500) });
+      const reason = String(e).slice(0, 500);
+      quietly("recording the run's error", () => insertStep(runId, "error", null, { reason }));
+      quietly("closing the run", () => setStatus(runId, "failed", { error: reason }));
     } finally {
+      // A call that was already with Rust when the stop landed can queue its
+      // question after `stop` closed the rest; the run never asks it.
+      quietly("closing a stopped run's questions", () => { if (stopped(runId)) closeApprovals(runId); });
       const owner = undoAfterStop.get(runId);
-      if (owner) { undoAfterStop.delete(runId); undoRun(runId, owner); }
+      if (owner) {
+        undoAfterStop.delete(runId);
+        quietly("the undo after the stop", () => { undoRun(runId, owner); });
+      }
     }
   }
 
-  /** Execute one run from `pending` to its end. Resolves; never throws. */
+  /** The loop's copy of a run's promise: settles when the run ends, and never rejects. */
+  function held(runId: string, work: Promise<void>): Promise<void> {
+    return work
+      .catch((e) => { console.warn(`[agent-runner] run ${runId}:`, e); })
+      .finally(() => { inFlight.delete(runId); });
+  }
+
+  /**
+   * Execute one run from `pending` to its end. Resolves once it ends; a
+   * database error before the run starts (the claim) is thrown, and the loop
+   * catches it (`held`).
+   */
   async function executeRun(runId: string): Promise<void> {
     const claimed = db.prepare(`UPDATE runs SET status = 'planning', started_at = COALESCE(started_at, ?) WHERE id = ? AND status = 'pending'`).run(iso(), runId);
     if (!claimed.changes) return;
@@ -767,7 +839,7 @@ export function createAgentRunner(deps: RunnerDeps) {
   /**
    * Carry on a paused run a previous brain left (see `adoptPaused`): it waits
    * at the gate until the user resumes it, then works the steps not started.
-   * Resolves; never throws.
+   * Resolves once the run ends; the loop holds it through `held`.
    */
   async function continueRun(runId: string): Promise<void> {
     const run = readRun(runId);
@@ -806,7 +878,7 @@ export function createAgentRunner(deps: RunnerDeps) {
       const id = next.id;
       busy.push(id);
       working++;
-      inFlight.set(id, executeRun(id).finally(() => { inFlight.delete(id); }));
+      inFlight.set(id, held(id, executeRun(id)));
     }
   }
 
@@ -861,7 +933,7 @@ export function createAgentRunner(deps: RunnerDeps) {
         touched = true;
       });
       if (touched) savePlan(id, p);
-      inFlight.set(id, continueRun(id).finally(() => { inFlight.delete(id); }));
+      inFlight.set(id, held(id, continueRun(id)));
       adopted.push(id);
     }
     return adopted;
@@ -922,20 +994,22 @@ export function createAgentRunner(deps: RunnerDeps) {
         report.cannot.push({ stepId: r.id, label: undo.label, reason: undo.reason ?? "" });
         continue;
       }
+      const { table, kind } = undo.action;
       const res = applyUndo(db, userId, undo.action);
-      insertStep(runId, "tool_call", { undo_of: r.id, op: "undo", label: undo.label }, res);
-      (res.ok ? report.undone : report.failed).push({ stepId: r.id, label: undo.label, message: res.message });
+      insertStep(runId, "tool_call", { undo_of: r.id, op: "undo", label: undo.label, table, kind }, res);
+      if (res.ok) report.undone.push({ stepId: r.id, label: undo.label, message: res.message, table, kind });
+      else report.failed.push({ stepId: r.id, label: undo.label, message: res.message });
     }
     return report;
   }
 
   /**
-   * Close this run's unanswered questions. The webview answers them "no"
-   * through `approval_resolve` first (the only path that also drops Rust's
-   * in-memory payload); this is the backstop for any it could not reach. A
-   * row settled here can never be approved afterwards: `approval_resolve`
-   * compare-and-sets on `status = 'pending'` and refuses to run anything
-   * once it loses.
+   * Close this run's unanswered questions, as part of the stop itself. A row
+   * settled here can never be approved afterwards: `approval_resolve` claims
+   * the payload, then compare-and-sets on `status = 'pending'` and runs
+   * nothing once it loses. The Agent View then answers each card "no"
+   * through `approval_resolve` anyway — the only path that drops the payload
+   * Rust holds in memory — and expects "already answered" back.
    */
   function closeApprovals(runId: string): number {
     const at = iso();

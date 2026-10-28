@@ -18,10 +18,17 @@
  * The run controls are the brain's (services/atlas-brain/src/agentRoutes.ts):
  * Pause holds the run between steps and Resume carries on from the next one;
  * "Stop and undo" first lists what will be taken back and what cannot be,
- * then — on one confirmation — answers the run's open questions "no", stops
- * it and runs the recorded inverses newest first. A live CI pipeline or
- * self-repair has a Stop of its own; a Claude Code session says where to stop
- * it instead, because Atlas only reads its transcript.
+ * then — on one confirmation — stops the run (the brain closes its open
+ * questions with it) and runs the recorded inverses newest first. Only then
+ * is each question answered "no" through `approval_resolve`, so Rust drops
+ * what it held; a stop the brain refused leaves the run and its questions as
+ * they were. The undo writes through the brain, which tells no other screen,
+ * so this one emits `db:changed` for each table it touched. A live CI
+ * pipeline or self-repair has a Stop of its own; a Claude Code session says
+ * where to stop it instead, because Atlas only reads its transcript.
+ *
+ * A run's hero says what leaves the Mac for it (RUN_EGRESS_NOTE): every step
+ * is a call to the AI provider.
  *
  * The hero sphere is the screen's Talk to Atlas entry (registered as the talk
  * anchor, so the corner orb steps aside); clicking it opens the panel.
@@ -32,7 +39,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { agentRunControls, useAgentEvents, useAgentSessions, useIngestSessions, useStopSession, useSyncCiRuns } from '@/hooks/useAgentView';
+import { agentRunControls, announceTableChanges, useAgentEvents, useAgentSessions, useIngestSessions, useStopSession, useSyncCiRuns } from '@/hooks/useAgentView';
 import { useAgentRuns } from '@/hooks/useAgentRuns';
 import { useAgents } from '@/hooks/useAgents';
 import { useApprovals, describeOutcome } from '@/hooks/useApprovals';
@@ -42,9 +49,9 @@ import { AtlasIcon } from '@/components/atlas/AtlasIcon';
 import { useBetaNavigate } from '@/lib/viewTransitions';
 import { openTalk, setTalkAnchor } from '@/lib/talkBus';
 import {
-  KIND_COLOUR, SESSION_STOP, STATE_META, approvalsCard, brainError, countLive, defaultCardId, describeStop, isLive,
+  KIND_COLOUR, RUN_EGRESS_NOTE, SESSION_STOP, STATE_META, approvalsCard, brainError, countLive, defaultCardId, describeStop, isLive,
   logFromApprovals, logFromRun, logFromSession, orderCards, pauseNote, planFromApprovals, planFromRun, planFromSession,
-  runCard, runUndone, sessionCard, undoPreview,
+  runCard, runUndone, sessionCard, stopFailure, undoChanges, undoPreview, undoStepChanges,
   type LogLine, type PlanStep, type RunCard,
 } from '@/lib/betaAgentView';
 import { isTyping } from './atlasHelpers';
@@ -54,6 +61,13 @@ import '@/styles/beta/agent-view.css';
 const LIVE_MS = 5_000;
 /** The run list while any session is active. */
 const LIST_LIVE_MS = 10_000;
+/**
+ * How long an undo that waits for the step in flight is followed, and how
+ * often. A step stops within its wall clock (agentRunner.ts
+ * STEP_WALL_CLOCK_MS, 90 s) once the model call it is in returns.
+ */
+const UNDO_FOLLOW_MS = 3 * 60_000;
+const UNDO_FOLLOW_POLL_MS = 3_000;
 
 type Busy = 'pause' | 'resume' | 'stop' | null;
 
@@ -86,6 +100,8 @@ const BetaAgentView = () => {
   const { agents } = useAgents();
   const { toolCalls } = useToolCalls(60);
   const { approvals, approveRequest, rejectRequest, outcomes, dismissOutcome, resolvingId, fetchApprovals } = useApprovals();
+  /** A stop whose undo runs once the step in flight settles: followed until its rows land (see below). */
+  const [followUndo, setFollowUndo] = useState<{ runId: string; until: number } | null>(null);
   const ingest = useIngestSessions();
   const syncCi = useSyncCiRuns();
   const stopSession = useStopSession();
@@ -175,20 +191,50 @@ const BetaAgentView = () => {
     if (!run || !card || busy) return;
     setBusy('stop');
     setNotice(null);
+    const asked = pending.filter((a) => a.run_id === run.id).map((a) => a.id);
     try {
-      // Answer the run's open questions "no" first, through the one path that
-      // also drops Rust's held payload; the brain closes any that remain.
-      for (const a of pending) if (a.run_id === run.id) await rejectRequest(a.id);
+      // The brain first. Once it has the run cancelled its runner refuses every
+      // further call and closes the run's questions, so nothing the user meant
+      // to cancel can run afterwards — and a stop it refuses changes nothing.
       const result = await agentRunControls.stop(run.id, { undo });
+      // Then each question "no" through approval_resolve, the one path that
+      // drops the payload Rust holds for it. The brain has closed the rows
+      // already, so "already answered" is the expected reply, and not news.
+      for (const id of asked) {
+        const outcome = await rejectRequest(id).catch(() => null);
+        if (outcome?.kind === 'already') dismissOutcome(id);
+      }
+      if (result.undo === 'after-step') setFollowUndo({ runId: run.id, until: Date.now() + UNDO_FOLLOW_MS });
+      else if (result.undo) void announceTableChanges(undoChanges(result.undo.undone));
       setNotice({ cardId: card.id, text: describeStop(result), error: false });
       setConfirming(null);
     } catch (e) {
-      setNotice({ cardId: card.id, text: brainError(e), error: true });
+      const failure = stopFailure(e, asked.length);
+      // A stop that may have landed may have undone things too; follow it as if it waited for a step.
+      if (failure.unconfirmed && undo) setFollowUndo({ runId: run.id, until: Date.now() + UNDO_FOLLOW_MS });
+      setNotice({ cardId: card.id, text: failure.text, error: true });
     } finally {
       setBusy(null);
       void refreshRun(run.id);
     }
-  }, [run, card, busy, pending, rejectRequest, refreshRun]);
+  }, [run, card, busy, pending, rejectRequest, dismissOutcome, refreshRun]);
+
+  // An undo that waited for the step in flight runs inside the brain later,
+  // and nothing says when. While that run is open its steps are re-read until
+  // the undo's rows land; then the screens showing what it changed are told.
+  useEffect(() => {
+    if (!followUndo || followUndo.runId !== runId) return;
+    const t = window.setInterval(() => {
+      if (Date.now() > followUndo.until) { setFollowUndo(null); return; }
+      if (!document.hidden) void fetchRunSteps(followUndo.runId);
+    }, UNDO_FOLLOW_POLL_MS);
+    return () => window.clearInterval(t);
+  }, [followUndo, runId, fetchRunSteps]);
+  useEffect(() => {
+    if (!followUndo || followUndo.runId !== runId || !runUndone(stepsHere)) return;
+    setFollowUndo(null);
+    void announceTableChanges(undoStepChanges(stepsHere));
+  }, [followUndo, runId, stepsHere]);
 
   const stopThisSession = useCallback(() => {
     if (!session || !card) return;
@@ -330,6 +376,7 @@ const BetaAgentView = () => {
             {card ? (card.goal ? <p className="b-ag-goal">{card.goal}</p> : null)
               : !loading ? <p className="b-ag-goal">No agent run, Claude Code session or pipeline is being tracked right now. Sync pulls in the latest transcripts and CI runs.</p> : null}
             {card?.state === 'paused' && card.kind === 'run' ? <p className="b-ag-hint">{pauseNote(plan)}</p> : null}
+            {card?.kind === 'run' ? <p className="b-ag-hint">{RUN_EGRESS_NOTE}</p> : null}
             {card?.stopNote ? <p className="b-ag-hint">{card.stopNote}</p> : null}
             {card ? (
               <div className="b-ag-actions">
@@ -347,7 +394,7 @@ const BetaAgentView = () => {
                     <AtlasIcon name="close" size={15} weight={1.9} />{run ? 'Stop and undo' : 'Stop'}
                   </button>
                 ) : null}
-                {card.limit ? <span className="b-ag-chip">{card.kind === 'run' ? `Limit · ${card.limit}` : card.limit}</span> : null}
+                {card.limit ? <span className="b-ag-chip" title={card.limitNote ?? undefined}>{card.kind === 'run' ? `Limit · ${card.limit}` : card.limit}</span> : null}
                 {card.kind === 'run' && run ? <span className="b-ag-chip b-num">{(run.tokens_planner + run.tokens_worker + run.tokens_reasoner).toLocaleString()} tokens{run.cost_estimate ? ` · $${run.cost_estimate.toFixed(4)}` : ''}</span> : null}
                 {card.kind === 'approvals' ? <span className="b-ag-chip">{pending.length ? `${pending.length} to answer` : 'All answered'}</span> : null}
               </div>

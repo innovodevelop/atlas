@@ -30,6 +30,36 @@ export interface AgentRun {
  */
 export const LIVE_RUN_POLL_MS = 4_000;
 const LIVE_STATUSES = new Set(['pending', 'planning', 'running', 'verifying']);
+/**
+ * How long a run nobody has picked up is followed. The brain claims a pending
+ * run within seconds; one still pending after this is not being worked (the
+ * runner is off, or the brain is down), and polling for it would go on for as
+ * long as the screen stays open. The brain closes such runs when it starts.
+ */
+export const PENDING_FOLLOW_MS = 10 * 60_000;
+
+type RunStatusLike = Pick<AgentRun, 'status' | 'created_at'> & { paused_at?: string | null };
+
+/**
+ * A run Atlas is working right now: live and not paused. Home's sphere reads
+ * this as "working", so a run the user paused (possibly for days) must not
+ * count.
+ */
+export function isWorkingRun(r: RunStatusLike): boolean {
+  return LIVE_STATUSES.has(r.status) && !r.paused_at;
+}
+
+/**
+ * A run worth re-reading every few seconds: one that is working, and not a
+ * pending one nothing has picked up in PENDING_FOLLOW_MS. A paused run is left
+ * out — Resume re-reads the runs, which starts the polling again.
+ */
+export function followsRun(r: RunStatusLike, now: number = Date.now()): boolean {
+  if (!isWorkingRun(r)) return false;
+  if (r.status !== 'pending') return true;
+  const created = Date.parse(r.created_at);
+  return Number.isNaN(created) || now - created < PENDING_FOLLOW_MS;
+}
 
 export interface RunStep {
   id: string;
@@ -89,9 +119,7 @@ export function useAgentRuns(limit = 10) {
       
       setRuns(typedData);
       
-      // Find active run
-      const active = typedData.find(r => r.status === 'running' || r.status === 'pending');
-      setActiveRun(active || null);
+      setActiveRun(typedData.find((r) => isWorkingRun(r)) || null);
     } catch (error) {
       console.error('Error fetching runs:', error);
     } finally {
@@ -141,10 +169,10 @@ export function useAgentRuns(limit = 10) {
     fetchRuns();
   }, [fetchRuns]);
 
-  // While any run is live, follow it: the runs (status, plan progress, pause)
-  // and the open run's steps. Skipped while the window is hidden; nothing is
-  // polled once every run has ended.
-  const anyLive = runs.some((r) => LIVE_STATUSES.has(r.status));
+  // While any run is being worked, follow it: the runs (status, plan
+  // progress) and the open run's steps. Skipped while the window is hidden;
+  // nothing is polled once every run has ended or is paused (see followsRun).
+  const anyLive = runs.some((r) => followsRun(r));
   useEffect(() => {
     if (!user || !anyLive) return;
     const t = window.setInterval(() => {

@@ -92,7 +92,8 @@ export interface StopRunResult {
   /** Questions of the run still waiting that the stop closed unanswered. */
   approvalsClosed: number;
   undo?: {
-    undone: Array<{ stepId: string; label: string; message: string }>;
+    /** `table` and `kind` say what each inverse wrote, for `announceTableChanges`. */
+    undone: Array<{ stepId: string; label: string; message: string; table: string; kind: 'delete' | 'restore' }>;
     failed: Array<{ stepId: string; label: string; message: string }>;
     cannot: Array<{ stepId: string; label: string; reason: string }>;
   } | 'after-step';
@@ -113,6 +114,24 @@ export const agentRunControls = {
   stop: (runId: string, opts: { undo: boolean }) =>
     adminPost<StopRunResult>(`/admin/agent-runs/${encodeURIComponent(runId)}/stop${opts.undo ? '?undo=1' : ''}`),
 };
+
+/**
+ * Tell every screen that reads these tables to read them again. The brain's
+ * undo writes atlas.db through bun:sqlite, and only Rust's commands emit
+ * `db:changed`, so a task "Stop and undo" deleted stayed in Lists, Calendar
+ * and the Home widgets until something else refreshed them. This emits the
+ * same event, `{table, op}` with no row data, which every localClient channel
+ * re-queries on. Outside the desktop app there is nobody to tell.
+ */
+export async function announceTableChanges(changes: ReadonlyArray<{ table: string; op: string }>): Promise<void> {
+  if (!changes.length) return;
+  try {
+    const { emit } = await import('@tauri-apps/api/event');
+    for (const c of changes) await emit('db:changed', { table: c.table, op: c.op });
+  } catch {
+    /* not in the desktop app */
+  }
+}
 
 /** POST /admin/ci-runs — fetch GitHub Actions runs and upsert as ci-pipeline sessions. */
 export function useSyncCiRuns() {

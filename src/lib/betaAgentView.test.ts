@@ -1,8 +1,12 @@
 import { describe, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
-  APPROVALS_CARD_ID, ago, approvalsCard, brainError, clock, countLive, defaultCardId, describeStop, logFromApprovals, logFromRun,
+  APPROVALS_CARD_ID, RUN_EGRESS_NOTE, RUN_PLAN_MAX_STEPS, ago, approvalsCard, brainError, clock, countLive, defaultCardId, describeStop, logFromApprovals, logFromRun,
   logFromSession, milestoneText, orderCards, pauseNote, planFromApprovals, planFromRun, planFromSession, planFromSteps, readPlan, runCard,
-  runState, runTitle, runUndone, sessionCard, sessionState, shortPath, summarize, toolKind, truncate, undoPreview,
+  runLimit, runLimitNote, runState, runStepCap, runTitle, runUndone, sessionCard, sessionState, shortPath, summarize, toolKind, truncate,
+  stopFailure, undoChanges, undoPreview, undoStepChanges,
   type AgentLike, type ApprovalLike, type RunLike, type RunStepLike, type SessionEventLike, type SessionLike, type ToolCallLike,
 } from './betaAgentView';
 
@@ -64,13 +68,32 @@ describe('runs', () => {
     const c = runCard(run(), agent, 1, NOW);
     expect(c.state).toBe('waiting');
     expect(c.canStop).toBe(true);
-    expect(c.limit).toBe('20 steps · $5/day');
+    // The cap the runner applies, not the agent's 20; the budget nothing enforces is not on the chip.
+    expect(c.limit).toBe('12 steps');
+    expect(c.limitNote).toBe('A run of Inbox triage plans at most 12 steps. The agent allows 20; Atlas caps every plan at 12. Its $5/day budget is not enforced: Atlas does not yet work out what a run costs.');
     expect(c.title).toBe('Clear the inbox since 06:00 and hold anything about money');
     // A one-sentence goal is the heading already, so the paragraph names the agent instead.
     expect(c.goal).toBe('Run by Inbox triage.');
     expect(c.progress).toBeNull();
     expect(c.when).toBe('8m');
     expect(c.sub).toBe('Waiting for you · Inbox triage');
+  });
+  test('the step limit is what the runner applies', () => {
+    expect(runStepCap(6)).toBe(6);
+    expect(runStepCap(25)).toBe(RUN_PLAN_MAX_STEPS);
+    expect(runStepCap(0)).toBe(1);
+    expect(runStepCap(2.5)).toBe(2);
+    expect(runLimit({ ...agent, max_steps: 1 })).toBe('1 step');
+    expect(runLimitNote({ ...agent, max_steps: 6, daily_budget_limit: 0 })).toBe('A run of Inbox triage plans at most 6 steps.');
+    expect(runLimit(undefined)).toBeNull();
+    // Pinned to the runner's own constant, so the chip cannot drift from what is enforced.
+    const runner = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../services/atlas-brain/src/agentRunner.ts'), 'utf8');
+    expect(runner).toContain(`export const PLAN_MAX_STEPS = ${RUN_PLAN_MAX_STEPS};`);
+  });
+  test('the hero says what a run sends off the Mac', () => {
+    expect(RUN_EGRESS_NOTE).toContain('AI provider');
+    expect(RUN_EGRESS_NOTE).toContain('goal');
+    expect(RUN_EGRESS_NOTE).toContain('instructions');
   });
   test('a run is named by the first sentence of its goal', () => {
     expect(runTitle('Book flights to Lisbon. Stay inside the €2,000 limit.')).toBe('Book flights to Lisbon');
@@ -361,6 +384,19 @@ describe('stop and undo', () => {
     expect(runUndone(steps)).toBe(true);
     expect(runUndone([steps[0]])).toBe(false);
   });
+  test('what an undo changed, as the db:changed events the other screens re-read on', () => {
+    expect(undoChanges([
+      { table: 'user_tasks', kind: 'delete' }, { table: 'user_tasks', kind: 'delete' },
+      { table: 'user_tasks', kind: 'restore' }, { table: 'user_notes', kind: 'restore' }, { label: 'no table' } as { table?: unknown },
+    ])).toEqual([{ table: 'user_tasks', op: 'delete' }, { table: 'user_tasks', op: 'update' }, { table: 'user_notes', op: 'update' }]);
+    const steps = [
+      step({ id: 'u1', step_index: 3, kind: 'tool_call', input_json: { undo_of: 'a', op: 'undo', table: 'user_events', kind: 'delete' }, output_json: { ok: true, message: 'Removed.' } }),
+      step({ id: 'u2', step_index: 4, kind: 'tool_call', input_json: { undo_of: 'b', op: 'undo', table: 'user_notes', kind: 'restore' }, output_json: { ok: false, message: 'It no longer exists.' } }),
+      step({ id: 'c', step_index: 1, kind: 'tool_call', input_json: { op: 'tasks.create' }, output_json: { ok: true } }),
+    ];
+    expect(undoStepChanges(steps)).toEqual([{ table: 'user_events', op: 'delete' }]);
+    expect(undoStepChanges([])).toEqual([]);
+  });
   test('what the stop did, in one sentence', () => {
     expect(describeStop({ stopped: true, approvalsClosed: 0 })).toBe('Stopped. Nothing was undone.');
     expect(describeStop({ stopped: true, approvalsClosed: 2, undo: 'after-step' }))
@@ -369,6 +405,16 @@ describe('stop and undo', () => {
       .toBe('It had already ended. Undid 2 steps. 1 could not be undone: c (It no longer exists.). 1 can’t be undone.');
     expect(describeStop({ stopped: true, approvalsClosed: 1, undo: { undone: [], failed: [], cannot: [] } }))
       .toBe('Stopped. 1 waiting question was skipped; nothing in it ran. Nothing needed undoing.');
+  });
+  test('a stop the brain did not confirm says what is left as it was', () => {
+    expect(stopFailure(new Error('Atlas brain is not running.'), 2))
+      .toEqual({ text: 'The run was not stopped: Atlas brain is not running. Its 2 questions are still waiting.', unconfirmed: false });
+    expect(stopFailure(new Error('{"error":"No such run."}'), 1).text).toBe('The run was not stopped: No such run. Its question is still waiting.');
+    expect(stopFailure(new Error('x'), 0).text).toBe('The run was not stopped: x');
+    // A timeout may have stopped it after all: nothing is claimed either way.
+    const timedOut = stopFailure(new DOMException('The operation was aborted.', 'AbortError'), 1);
+    expect(timedOut.unconfirmed).toBe(true);
+    expect(timedOut.text).toContain('not confirmed');
   });
   test('the brain\'s error body is read out of a thrown admin call', () => {
     expect(brainError(new Error('{"error":"Only a run that is still going can be paused."}'))).toBe('Only a run that is still going can be paused.');

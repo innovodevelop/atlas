@@ -8,10 +8,10 @@ import { Database } from "bun:sqlite";
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { ToolCall, ToolDecl, ChatMessage } from "../../../supabase/functions/_shared/orchestrator.ts";
+import { atlasToolOpNames, type ToolCall, type ToolDecl, type ChatMessage } from "../../../supabase/functions/_shared/orchestrator.ts";
 import type { CallOpts, ControlResult } from "./control.ts";
 import {
-  MAX_PARALLEL_RUNS, STALE_PENDING_MS, createAgentRunner, ensureAgentRunSchema, parsePlan, readStoredPlan, undoFor,
+  MAX_PARALLEL_RUNS, RUN_WITHHELD_OPS, STALE_PENDING_MS, createAgentRunner, ensureAgentRunSchema, parsePlan, readStoredPlan, undoFor,
   type ModelTurn, type RunPlan, type UndoRecord,
 } from "./agentRunner.ts";
 
@@ -29,9 +29,11 @@ function freshDb(): Database {
   return db;
 }
 
-function addRun(db: Database, id = "r1", over: { status?: string; created_at?: string; user?: string } = {}): string {
-  db.query(`INSERT INTO runs (id, user_id, agent_id, goal_text, status, created_at) VALUES (?, ?, 'a1', ?, ?, ?)`)
-    .run(id, over.user ?? USER, "Tidy my week. Add a task for the dentist.", over.status ?? "pending", over.created_at ?? new Date().toISOString());
+function addRun(db: Database, id = "r1", over: { status?: string; created_at?: string; user?: string; agent?: string } = {}): string {
+  const agent = over.agent ?? "a1";
+  db.query(`INSERT OR IGNORE INTO agents (id, user_id, name, system_prompt, max_steps) VALUES (?, ?, 'Helper', 'You are Atlas.', 6)`).run(agent, USER);
+  db.query(`INSERT INTO runs (id, user_id, agent_id, goal_text, status, created_at) VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(id, over.user ?? USER, agent, "Tidy my week. Add a task for the dentist.", over.status ?? "pending", over.created_at ?? new Date().toISOString());
   return id;
 }
 
@@ -63,7 +65,7 @@ function fakeControl(db: Database) {
   return {
     calls,
     available: () => true,
-    capabilities: async () => ["tasks.list", "tasks.create", "tasks.update", "mail.archive"],
+    capabilities: async () => ["tasks.list", "tasks.create", "tasks.update", "music.play", "mail.list_threads", "mail.archive", "mail.mark_read"],
     async call(op: string, args: unknown, opts: CallOpts): Promise<ControlResult> {
       const a = (args ?? {}) as Record<string, unknown>;
       calls.push({ op, args: a, opts });
@@ -76,12 +78,13 @@ function fakeControl(db: Database) {
         db.query(`UPDATE user_tasks SET title = ? WHERE id = ?`).run(String(a.title), String(a.id));
         return { ok: true, data: { action: "updated", changed: ["title"], row: { id: a.id, title: a.title } } };
       }
-      if (op === "mail.archive") {
+      // Rust queues an actuation on the background profile (policy.rs decide).
+      if (op === "music.play" || op === "mail.archive" || op === "mail.mark_read") {
         const tc = crypto.randomUUID();
         const ap = crypto.randomUUID();
-        db.query(`INSERT INTO tool_calls (id, run_id, user_id, tool_name, status, requires_approval) VALUES (?, ?, ?, 'mail.archive', 'awaiting_approval', 1)`).run(tc, opts.runId ?? null, opts.userId ?? "");
-        db.query(`INSERT INTO approvals (id, run_id, user_id, tool_call_id, action_summary) VALUES (?, ?, ?, ?, 'Archive “Invoice 4411”')`).run(ap, opts.runId ?? null, opts.userId ?? "", tc);
-        return { ok: true, data: { status: "awaiting_approval", approval_id: ap, tool_call_id: tc, action_summary: "Archive “Invoice 4411”" } };
+        db.query(`INSERT INTO tool_calls (id, run_id, user_id, tool_name, status, requires_approval) VALUES (?, ?, ?, ?, 'awaiting_approval', 1)`).run(tc, opts.runId ?? null, opts.userId ?? "", op);
+        db.query(`INSERT INTO approvals (id, run_id, user_id, tool_call_id, action_summary) VALUES (?, ?, ?, ?, ?)`).run(ap, opts.runId ?? null, opts.userId ?? "", tc, `Queued ${op}`);
+        return { ok: true, data: { status: "awaiting_approval", approval_id: ap, tool_call_id: tc, action_summary: `Queued ${op}` } };
       }
       return { ok: true, data: { rows: [] } };
     },
@@ -131,8 +134,8 @@ describe("what a call leaves to undo", () => {
     // The Clock's "nothing is ringing" is a success that changed nothing.
     expect(undoFor("clock.stop_alarm", {}, ok({ done: false, changed_anything: false, message: "Nothing is ringing." }))).toBeNull();
   });
-  test("mail, music and the Clock say why they cannot be undone", () => {
-    for (const op of ["mail.archive", "music.play", "music.volume", "clock.set_alarm"]) {
+  test("music and the Clock say why they cannot be undone", () => {
+    for (const op of ["music.play", "music.volume", "clock.set_alarm", "clock.snooze_alarm"]) {
       const u = undoFor(op, {}, ok({ ok: true })) as UndoRecord;
       expect(u.action).toBeNull();
       expect(u.reason?.length).toBeGreaterThan(10);
@@ -140,8 +143,8 @@ describe("what a call leaves to undo", () => {
     }
   });
   test("a queued call names its approval", () => {
-    const u = undoFor("mail.archive", { thread_id: "x" }, ok({ status: "awaiting_approval", approval_id: "ap1", action_summary: "Archive “Invoice”" }));
-    expect(u).toMatchObject({ label: "Archive “Invoice”", action: null, approval_id: "ap1" });
+    const u = undoFor("music.play", { uri: "x" }, ok({ status: "awaiting_approval", approval_id: "ap1", action_summary: "Play “Blue in Green”" }));
+    expect(u).toMatchObject({ label: "Play “Blue in Green”", action: null, approval_id: "ap1" });
   });
 });
 
@@ -218,8 +221,8 @@ describe("a run", () => {
     addRun(db);
     let sleeps = 0;
     const model = scriptedModel(PLAN_2, [
-      { content: null, toolCalls: [toolCall("m1", "atlas_mail", { action: "archive", thread_id: "th1" })], tokens: 1 },
-      say("Asked to archive the invoice; it waits for you."),
+      { content: null, toolCalls: [toolCall("m1", "atlas_music", { action: "play", uri: "spotify:track:1" })], tokens: 1 },
+      say("Asked to start the music; it waits for you."),
       say("Done."),
     ]);
     const runner = createAgentRunner({
@@ -254,6 +257,94 @@ describe("a run", () => {
     expect(control.calls).toHaveLength(0);
     expect(planOf(db).steps.map((s) => s.status)).toEqual(["stopped", "todo"]);
   });
+
+  test("its agent deleted mid-step, the run ends without taking the brain down", async () => {
+    const db = freshDb();
+    addRun(db);
+    const warn = console.warn;
+    console.warn = () => {};
+    try {
+      // The cascade takes the run's row with it, so every write about the run
+      // fails its foreign key — in the step, and again while closing the run.
+      const model = scriptedModel(PLAN_2, [() => { db.query(`DELETE FROM agents WHERE id = 'a1'`).run(); return say("Done."); }]);
+      const runner = createAgentRunner({ db, control: fakeControl(db), complete: model.complete, hasKey: () => true, sleep: noSleep, pollMs: 1 });
+      await expect(runner.executeRun("r1")).resolves.toBeUndefined();
+
+      // And through the loop, which holds the promise: it settles, and nothing is left rejecting.
+      addRun(db, "r2", { agent: "a2" });
+      const rejected: unknown[] = [];
+      const onRejection = (e: unknown) => { rejected.push(e); };
+      process.on("unhandledRejection", onRejection);
+      const second = scriptedModel(PLAN_2, [() => { db.query(`DELETE FROM agents WHERE id = 'a2'`).run(); return say("Done."); }]);
+      const loop = createAgentRunner({ db, control: fakeControl(db), complete: second.complete, hasKey: () => true, sleep: noSleep, pollMs: 1 });
+      loop.tick();
+      expect(loop.inFlight).toEqual(["r2"]);
+      for (let i = 0; i < 50 && loop.inFlight.length; i++) await new Promise((r) => setTimeout(r, 1));
+      process.off("unhandledRejection", onRejection);
+      expect(loop.inFlight).toEqual([]);
+      expect(rejected).toEqual([]);
+      expect(db.query(`SELECT COUNT(*) AS n FROM runs`).get()).toEqual({ n: 0 });
+    } finally {
+      console.warn = warn;
+    }
+  });
+});
+
+describe("mail", () => {
+  test("a run is not offered a mail change, and one it names anyway queues nothing", async () => {
+    const db = freshDb();
+    addRun(db);
+    const control = fakeControl(db);
+    const offered: string[] = [];
+    let turn = 0;
+    const runner = createAgentRunner({
+      db, control, hasKey: () => true, sleep: noSleep, pollMs: 1,
+      complete: async (_m, messages, tools) => {
+        if (!tools.length && messages[0].content.includes("You plan work")) return { content: JSON.stringify([{ title: "Tidy the inbox" }]), toolCalls: [], tokens: 1 };
+        for (const t of tools) {
+          const action = (t.function.parameters as { properties?: { action?: { enum?: string[] } } }).properties?.action?.enum ?? [];
+          for (const a of action) offered.push(`${t.function.name}.${a}`);
+        }
+        // A model can still guess an action it was never shown.
+        if (turn++ === 0) return { content: null, toolCalls: [toolCall("m1", "atlas_mail", { action: "archive", thread_id: "th1" }), toolCall("m2", "atlas_mail", { action: "mark_read", thread_id: "th1" })], tokens: 1 };
+        return say("Two threads can be archived; that is yours to do in Mail.");
+      },
+    });
+    await runner.executeRun("r1");
+
+    expect(offered).toContain("atlas_mail.list_threads");
+    expect(offered).not.toContain("atlas_mail.archive");
+    expect(offered).not.toContain("atlas_mail.mark_read");
+    // Nothing reached the port, and no question waits that a yes could not answer.
+    expect(control.calls.map((c) => c.op)).toEqual([]);
+    expect(db.query(`SELECT COUNT(*) AS n FROM approvals`).get()).toEqual({ n: 0 });
+    expect(run(db).status).toBe("completed");
+    // The refusals are in the log.
+    const refused = (db.query(`SELECT output_json FROM run_steps WHERE kind = 'tool_call'`).all() as Array<{ output_json: string }>).map((r) => JSON.parse(r.output_json));
+    expect(refused).toHaveLength(2);
+    for (const r of refused) expect(r).toMatchObject({ ok: false, error: expect.stringContaining("cannot archive mail") });
+  });
+
+  test("every op a run could be offered that needs the user's own credential is withheld", () => {
+    // A run calls the port with no user token, and an approved call runs with
+    // the token it was queued with (control/mod.rs approval_resolve), so any op
+    // whose Rust side asks for one could only ever fail after a yes. Read off
+    // the Rust source, so a new such op cannot reach a run unnoticed.
+    const control = join(dirname(fileURLToPath(import.meta.url)), "../../../src-tauri/src/control");
+    const registry = readFileSync(join(control, "registry.rs"), "utf8");
+    const needsToken = new Set<string>();
+    for (const m of registry.matchAll(/name:\s*"([^"]+)"[\s\S]*?run:\s*(ops_\w+)::(\w+)/g)) {
+      const [, op, file, fn] = m;
+      const src = readFileSync(join(control, `${file}.rs`), "utf8");
+      const start = src.indexOf(`pub fn ${fn}(`);
+      expect(start).toBeGreaterThanOrEqual(0);
+      const body = src.slice(start, src.indexOf("\n}\n", start));
+      if (/user_token\(ctx\)|ctx\.user_token/.test(body)) needsToken.add(op);
+    }
+    expect(needsToken.size).toBeGreaterThan(0);
+    const reachable = new Set(atlasToolOpNames());
+    for (const op of needsToken) if (reachable.has(op)) expect(RUN_WITHHELD_OPS.has(op)).toBe(true);
+  });
 });
 
 describe("stop and undo", () => {
@@ -279,6 +370,10 @@ describe("stop and undo", () => {
     expect(res.undo).toMatchObject({ failed: [], cannot: [] });
     const report = res.undo as Exclude<typeof res.undo, "after-step" | undefined>;
     expect(report.undone.map((u) => u.label)).toEqual(["Edited the task “New title”", "Created the task “Dentist”"]);
+    // With what each wrote where, for the screens the Agent View tells (`db:changed`).
+    expect(report.undone.map((u) => [u.table, u.kind])).toEqual([["user_tasks", "restore"], ["user_tasks", "delete"]]);
+    const undoSteps = (db.query(`SELECT input_json FROM run_steps WHERE input_json LIKE '%undo_of%' ORDER BY step_index`).all() as Array<{ input_json: string }>).map((r) => JSON.parse(r.input_json));
+    expect(undoSteps.map((i) => [i.table, i.kind])).toEqual([["user_tasks", "restore"], ["user_tasks", "delete"]]);
     expect(db.query(`SELECT id, title FROM user_tasks`).all()).toEqual([{ id: "old", title: "Old title" }]);
 
     // A second undo finds nothing left to do.

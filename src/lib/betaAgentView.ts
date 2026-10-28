@@ -7,7 +7,7 @@
  * part of that picture, and none holds all of it:
  *
  *   - `runs` + `run_steps` + `tool_calls` (the agent tables): a goal, the
- *     agent's step and budget limits, the plan the brain's runner writes to
+ *     step cap the runner applies, the plan the brain's runner writes to
  *     `runs.plan_json` before the first step (each step carrying its own
  *     status), the steps taken with what each can undo, and pause/stop.
  *   - `atlas_agent_sessions` + `atlas_agent_events` (the brain's admin
@@ -130,8 +130,10 @@ export interface RunCard {
   sourceId: string | null;
   title: string;
   goal: string;
-  /** The hero's chip. Runs: the agent's limits; sessions: the session type; queue: none. */
+  /** The hero's chip. Runs: the step cap the runner applies; sessions: the session type; queue: none. */
   limit: string | null;
+  /** The chip's hover text: what the limit means and what it does not cover. */
+  limitNote: string | null;
   state: RunState;
   /** The list's right-hand label (mono). */
   when: string;
@@ -347,10 +349,46 @@ export function planProgress(plan: readonly RunPlanStep[]): { done: number; tota
   return { done: plan.filter((s) => s.status === 'done' || s.status === 'failed' || s.status === 'stopped').length, total: plan.length };
 }
 
+/**
+ * The runner's own ceiling on a plan (services/atlas-brain/src/agentRunner.ts
+ * `PLAN_MAX_STEPS`, pinned to it by a test): a run plans at most this many
+ * steps whatever its agent's `max_steps` says.
+ */
+export const RUN_PLAN_MAX_STEPS = 12;
+
+/** The steps a run of an agent with this `max_steps` may plan — the runner's arithmetic (agentRunner.ts `plan`, `parsePlan`). */
+export function runStepCap(maxSteps: number): number {
+  return Math.min(RUN_PLAN_MAX_STEPS, Math.max(1, Math.floor(maxSteps) || 1));
+}
+
+/**
+ * The hero chip: the cap the runner applies, not the agent's settings. The
+ * agent's daily budget is left off — the runner computes no cost, so nothing
+ * holds a run to it (the note says so).
+ */
 export function runLimit(agent: AgentLike | undefined): string | null {
   if (!agent) return null;
-  return `${agent.max_steps} steps · $${agent.daily_budget_limit}/day`;
+  const n = runStepCap(agent.max_steps);
+  return `${n} step${n === 1 ? '' : 's'}`;
 }
+
+export function runLimitNote(agent: AgentLike | undefined): string | null {
+  if (!agent) return null;
+  const n = runStepCap(agent.max_steps);
+  return [
+    `A run of ${agent.name} plans at most ${n} step${n === 1 ? '' : 's'}.`,
+    agent.max_steps > RUN_PLAN_MAX_STEPS ? `The agent allows ${agent.max_steps}; Atlas caps every plan at ${RUN_PLAN_MAX_STEPS}.` : null,
+    agent.daily_budget_limit ? `Its $${agent.daily_budget_limit}/day budget is not enforced: Atlas does not yet work out what a run costs.` : null,
+  ].filter(Boolean).join(' ');
+}
+
+/**
+ * What leaves the Mac when an agent run works, said on every run's hero. Each
+ * step is a model call: the planner gets the goal and the agent's
+ * instructions, every step gets those, the plan and what its tools read.
+ */
+export const RUN_EGRESS_NOTE =
+  'A run sends its goal, the agent’s instructions and whatever its tools read — mail, tasks, notes, your portfolio — to the AI provider at each step.';
 
 /**
  * A run's name: the first sentence of its goal, short enough for the list.
@@ -387,6 +425,7 @@ export function runCard(run: RunLike, agent: AgentLike | undefined, pendingAppro
     title,
     goal: paragraph,
     limit,
+    limitNote: runLimitNote(agent),
     state,
     // The design's "3/6" while it works; a run without a plan has only its age.
     when: state === 'done' ? 'done' : live && measured ? `${measured.done}/${measured.total}` : ago(run.finished_at ?? startedAt, now),
@@ -584,7 +623,7 @@ export interface StopOutcomeLike {
   stopped: boolean;
   approvalsClosed: number;
   undo?: {
-    undone: ReadonlyArray<{ label: string }>;
+    undone: ReadonlyArray<{ label: string; table?: string; kind?: string }>;
     failed: ReadonlyArray<{ label: string; message: string }>;
     cannot: ReadonlyArray<{ label: string }>;
   } | 'after-step';
@@ -603,6 +642,56 @@ export function describeStop(r: StopOutcomeLike): string {
     cannot.length ? `${cannot.length} can’t be undone.` : null,
   ].filter(Boolean);
   return `${head}${skipped} ${parts.join(' ')}`;
+}
+
+/**
+ * What a stop the brain did not confirm means. The screen asks the brain to
+ * stop first and answers the run's questions only after it has, so a refused
+ * stop leaves both as they were. A stop that timed out may still have landed
+ * (the webview gives up after 8 s; the brain does not), so that case says
+ * only what is known.
+ */
+export function stopFailure(e: unknown, questions: number): { text: string; unconfirmed: boolean } {
+  if ((e as { name?: unknown } | null)?.name === 'AbortError') {
+    return {
+      text: 'The brain did not answer in time, so the stop is not confirmed. The run’s status here shows whether it stopped; no question was answered from this screen.',
+      unconfirmed: true,
+    };
+  }
+  const left = questions ? ` Its ${questions === 1 ? 'question is' : `${questions} questions are`} still waiting.` : '';
+  return { text: `The run was not stopped: ${brainError(e)}${left}`, unconfirmed: false };
+}
+
+/** One `db:changed` event: the table a screen re-reads, and what kind of write it was. */
+export interface TableChange {
+  table: string;
+  op: 'delete' | 'update';
+}
+
+/**
+ * What an undo wrote, as the `db:changed` events the other screens re-read
+ * on — one per table and kind. The brain's inverses go through bun:sqlite,
+ * which emits nothing, so without these a task "Stop and undo" deleted stays
+ * in Lists, Calendar and the Home widgets.
+ */
+export function undoChanges(undone: ReadonlyArray<{ table?: unknown; kind?: unknown }>): TableChange[] {
+  const seen = new Map<string, TableChange>();
+  for (const u of undone) {
+    const table = str(u.table);
+    if (!table) continue;
+    const op: TableChange['op'] = u.kind === 'delete' ? 'delete' : 'update';
+    seen.set(`${table}:${op}`, { table, op });
+  }
+  return [...seen.values()];
+}
+
+/** The same, read from the undo steps the runner recorded (an undo that ran after the step in flight). */
+export function undoStepChanges(steps: readonly RunStepLike[]): TableChange[] {
+  return undoChanges(steps.flatMap((s) => {
+    const input = asObject(s.input_json);
+    if (s.kind !== 'tool_call' || input.op !== 'undo' || asObject(s.output_json).ok === false) return [];
+    return [{ table: input.table, kind: input.kind }];
+  }));
 }
 
 /** True once "Stop and undo" has taken anything back in this run. */
@@ -703,6 +792,7 @@ export function sessionCard(s: SessionLike, now: number = Date.now()): RunCard {
     title: s.task_summary?.trim() || `${type} session`,
     goal: sessionGoal(s, meta),
     limit: type,
+    limitNote: null,
     state,
     when: state === 'done' ? 'done' : ago(s.ended_at ?? s.started_at, now),
     sub: `${STATE_META[state].label} · ${type}`,
@@ -831,6 +921,7 @@ export function approvalsCard(pending: readonly ApprovalLike[], now: number = Da
       ? 'Nothing is waiting. When Atlas queues an action it may not take alone, it appears here with Approve and Skip.'
       : `${n} action${n === 1 ? '' : 's'} Atlas queued need${n === 1 ? 's' : ''} your answer before anything runs. Approving runs it now; skipping throws it away.`,
     limit: null,
+    limitNote: null,
     state: n > 0 ? 'waiting' : 'done',
     when: n > 0 ? String(n) : ago(newest, now),
     sub: n > 0 ? `Waiting for you · ${n} to answer` : 'Nothing waiting',
