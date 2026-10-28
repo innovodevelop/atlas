@@ -86,6 +86,8 @@ const BETA_CONSUMER: Readonly<Record<string, RouteOverride>> = {
 const BETA_ADMIN: Readonly<Record<string, RouteOverride>> = import.meta.env.VITE_ATLAS_EDITION === "consumer" ? {} : (() => {
   // One page, two tabs: /widgets is the catalog, /widget-sheet the states.
   const BetaWidgetCatalog = lazy(() => import("./pages/atlas/BetaWidgetCatalog"));
+  // One page, three tabs: Tests, Versions and Design Sync, each on its own path.
+  const BetaDevTools = lazy(() => import("./pages/atlas/BetaDevTools"));
   return {
     "/money": { Component: lazy(() => import("./pages/atlas/BetaMoney")) },
     "/system-status": { Component: lazy(() => import("./pages/atlas/BetaSystemStatus")) },
@@ -94,6 +96,9 @@ const BETA_ADMIN: Readonly<Record<string, RouteOverride>> = import.meta.env.VITE
     "/model-lab": { Component: lazy(() => import("./pages/atlas/BetaModelLab")) },
     "/widgets": { Component: BetaWidgetCatalog },
     "/widget-sheet": { Component: BetaWidgetCatalog },
+    "/tests": { Component: BetaDevTools },
+    "/versions": { Component: BetaDevTools },
+    "/design-sync": { Component: BetaDevTools },
   };
 })();
 
