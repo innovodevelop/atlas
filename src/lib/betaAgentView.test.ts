@@ -291,13 +291,21 @@ describe('a run with a plan', () => {
   });
   test('a step cut short by a stop says so', () => {
     const stopped = { ...PLAN, steps: [{ ...PLAN.steps[1], status: 'stopped', finished_at: '2026-10-28T09:04:00Z' }] };
-    expect(planFromRun(run({ plan_json: stopped }), [], [])[0]).toMatchObject({ mark: 'todo', detail: 'Stopped before it finished.' });
+    expect(planFromRun(run({ plan_json: stopped }), [], [])[0]).toMatchObject({ mark: 'todo', detail: 'Stopped before it finished.', stopped: true });
+  });
+  test('a paused run a new brain took over resumes after the step it cut short, and counts that step as finished', () => {
+    const adopted = { ...PLAN, steps: [PLAN.steps[0], { ...PLAN.steps[1], status: 'stopped', finished_at: '2026-10-28T09:04:00Z' }, PLAN.steps[2]] };
+    const c = runCard(run({ paused_at: '2026-10-28T09:04:00Z', plan_json: adopted }), agent, 0, NOW);
+    expect(c.measured).toEqual({ done: 2, total: 3 });
+    expect(pauseNote(planFromRun(run({ plan_json: adopted }), [], []))).toBe('Paused before step 3. Resume carries on from there.');
   });
   test('the pause line says whether a step is still finishing', () => {
     const plan = planFromRun(run({ plan_json: PLAN }), [], [approval()]);
     expect(pauseNote(plan)).toBe('Pausing after “Archive the old invoice”. Nothing new starts until you resume.');
     const between = planFromRun(run({ plan_json: { ...PLAN, steps: [PLAN.steps[0], { ...PLAN.steps[2] }] } }), [], [approval()]);
     expect(pauseNote(between)).toBe('Paused before step 2. Resume carries on from there.');
+    // Paused before the brain picked it up: there is no plan yet, and none is written until Resume.
+    expect(pauseNote([])).toBe('Paused before it started. Resume lets Atlas plan it and begin.');
   });
   test('the log reads what the runner records, and keeps only the queued calls from Rust', () => {
     const steps = [

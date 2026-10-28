@@ -162,6 +162,8 @@ export interface PlanStep {
   time: string;
   /** Set when the step is a pending approval: its buttons resolve this id. */
   approvalId?: string;
+  /** A planned step cut short (a stop, or a brain that went away mid-step); the run never comes back to it. */
+  stopped?: boolean;
 }
 
 export interface LogLine {
@@ -336,9 +338,13 @@ export function readPlan(planJson: unknown): RunPlanStep[] | null {
   return out.length ? out : null;
 }
 
-/** Steps finished (done or failed) of steps planned. */
+/**
+ * Steps finished of steps planned. A step cut short counts as finished: the
+ * runner never returns to it, so leaving it out would hold the count below
+ * the total for good.
+ */
 export function planProgress(plan: readonly RunPlanStep[]): { done: number; total: number } {
-  return { done: plan.filter((s) => s.status === 'done' || s.status === 'failed').length, total: plan.length };
+  return { done: plan.filter((s) => s.status === 'done' || s.status === 'failed' || s.status === 'stopped').length, total: plan.length };
 }
 
 export function runLimit(agent: AgentLike | undefined): string | null {
@@ -434,6 +440,7 @@ export function planFromRun(run: Pick<RunLike, 'id' | 'plan_json'>, steps: reado
       detail: s.status === 'stopped' ? STEP_STOPPED_DETAIL : (s.status === 'done' || s.status === 'failed') && s.summary ? s.summary : s.detail,
       mark: s.status === 'done' ? 'done' : s.status === 'failed' ? 'failed' : s.status === 'now' ? 'now' : 'todo',
       time: s.status === 'now' ? 'now' : s.finishedAt ? hhmm(s.finishedAt) : '',
+      ...(s.status === 'stopped' ? { stopped: true } : {}),
     });
     for (const a of byStep.get(i) ?? []) out.push(approvalStep(a));
   });
@@ -883,9 +890,12 @@ export function countLive(cards: readonly RunCard[]): number {
  */
 export function pauseNote(plan: readonly PlanStep[]): string {
   const steps = plan.filter((p) => !p.approvalId);
+  // Paused before the brain picked it up: nothing is planned or run until Resume.
+  if (!steps.length) return 'Paused before it started. Resume lets Atlas plan it and begin.';
   const inFlight = steps.find((p) => p.mark === 'now');
   if (inFlight) return `Pausing after “${inFlight.title}”. Nothing new starts until you resume.`;
-  const next = steps.findIndex((p) => p.mark === 'todo');
+  // A step cut short is not where Resume picks up; the first one not started is.
+  const next = steps.findIndex((p) => p.mark === 'todo' && !p.stopped);
   return next >= 0 ? `Paused before step ${next + 1}. Resume carries on from there.` : 'Paused. Resume carries on from where it stopped.';
 }
 

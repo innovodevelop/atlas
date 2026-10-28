@@ -490,7 +490,7 @@ const server = Bun.serve({
       if (url.pathname === "/admin/changelog" && req.method === "GET") return admin.getChangelog(req, url.searchParams.get("version_id") ?? undefined);
       if (url.pathname === "/admin/agent-sessions" && req.method === "GET") return admin.getAgentSessions(req, url.searchParams.get("status") ?? undefined);
       if (url.pathname.startsWith("/admin/agent-events/") && req.method === "GET") return admin.getAgentEvents(req, url.pathname.split("/")[3]);
-      if (url.pathname.startsWith("/admin/agent-sessions/") && url.pathname.endsWith("/stop") && req.method === "POST") return agentRuns.stopSession(req, url.pathname.split("/")[3]);
+      if (url.pathname.startsWith("/admin/agent-sessions/") && url.pathname.endsWith("/stop") && req.method === "POST") return await agentRuns.stopSession(req, url.pathname.split("/")[3]);
       if (url.pathname.startsWith("/admin/agent-runs/") && url.pathname.endsWith("/pause") && req.method === "POST") return agentRuns.pauseRun(req, url.pathname.split("/")[3]);
       if (url.pathname.startsWith("/admin/agent-runs/") && url.pathname.endsWith("/resume") && req.method === "POST") return agentRuns.resumeRun(req, url.pathname.split("/")[3]);
       if (url.pathname.startsWith("/admin/agent-runs/") && url.pathname.endsWith("/stop") && req.method === "POST") return await agentRuns.stopRun(req, url.pathname.split("/")[3], url.searchParams.get("undo") === "1");

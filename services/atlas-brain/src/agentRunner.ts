@@ -29,6 +29,15 @@
  *      Resume clears `paused_at` and the next step starts where the plan left
  *      off.
  *
+ * A PAUSE OUTLIVES THE BRAIN. Every step's status lives in `plan_json`, so a
+ * run the user paused is not lost when the app quits: the next brain adopts
+ * it (`adoptPaused`), still paused, and Resume carries on from the first step
+ * the plan has not started. A step that was in flight when the brain went
+ * away is marked stopped, because what it did is unknown. Every other run a
+ * brain left mid-way is closed as failed (`recoverOrphans`). A paused run
+ * holds no slot either: only runs that are working count toward
+ * MAX_PARALLEL_RUNS, so pausing three runs never blocks a fourth.
+ *
  * UNDO. Each mutating call records its inverse with the step, where one
  * exists (`undoFor`): a task, note, calendar event or watchlist entry the run
  * created is deleted; a task or note it edited gets the edited fields back.
@@ -74,9 +83,9 @@ export const STEP_WALL_CLOCK_MS = 90_000;
 /** A plan never runs longer than this, whatever the agent's own limit says. */
 export const PLAN_MAX_STEPS = 12;
 /**
- * Runs worked at once. More than one, so a run paused or waiting for an
- * answer does not hold every other run back; few, because each one is a
- * stream of model calls.
+ * Runs worked at once. More than one, so a run waiting for an answer does not
+ * hold every other run back; few, because each one is a stream of model
+ * calls. A paused run is not counted (see `tick`).
  */
 export const MAX_PARALLEL_RUNS = 3;
 /**
@@ -176,6 +185,33 @@ export function parsePlan(content: string | null, goal: string, maxSteps: number
   }
   if (steps.length) return { steps, source: "model", written_at: at };
   return { steps: [{ title: clip(goal, 120) || "Work the goal", detail: "", status: "todo" }], source: "goal", written_at: at };
+}
+
+const STEP_STATUSES: ReadonlySet<string> = new Set<PlanStepStatus>(["todo", "now", "done", "failed", "stopped"]);
+
+/**
+ * A plan this runner wrote, read back from `runs.plan_json` (a paused run a
+ * new brain adopts). Null when the column holds nothing usable; a step whose
+ * status is unknown counts as not started.
+ */
+export function readStoredPlan(text: string | null): RunPlan | null {
+  const o = parseObject(text);
+  if (!o || !Array.isArray(o.steps)) return null;
+  const steps: PlannedStep[] = [];
+  for (const raw of o.steps) {
+    const s = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : null;
+    if (!s || typeof s.title !== "string" || !s.title.trim()) continue;
+    steps.push({
+      title: s.title,
+      detail: typeof s.detail === "string" ? s.detail : "",
+      status: typeof s.status === "string" && STEP_STATUSES.has(s.status) ? (s.status as PlanStepStatus) : "todo",
+      ...(typeof s.started_at === "string" ? { started_at: s.started_at } : {}),
+      ...(typeof s.finished_at === "string" ? { finished_at: s.finished_at } : {}),
+      ...(typeof s.summary === "string" ? { summary: s.summary } : {}),
+    });
+  }
+  if (!steps.length) return null;
+  return { steps, source: o.source === "goal" ? "goal" : "model", written_at: typeof o.written_at === "string" ? o.written_at : "" };
 }
 
 function planSystemPrompt(maxSteps: number, toolNames: string[], agentPrompt: string | null): string {
@@ -287,6 +323,9 @@ export function undoFor(
 ): UndoRecord | null {
   if (!isMutatingAtlasOp(op) || !result.ok) return null;
   const data = result.data as Record<string, unknown> | null;
+  // The Clock answers "nothing is ringing" as a success that changed nothing
+  // (clock.rs run_voice_command); there is nothing to list, let alone undo.
+  if (data && data.changed_anything === false) return null;
   const row = rowOf(data);
   const what = nameOf(args, row);
   const noun = NOUN[op] ?? op;
@@ -537,6 +576,30 @@ export function createAgentRunner(deps: RunnerDeps) {
          finished_at = CASE WHEN ? THEN ? ELSE finished_at END, paused_at = CASE WHEN ? THEN NULL ELSE paused_at END
        WHERE id = ? AND status NOT IN ('cancelled','completed','failed')`,
     ).run(status, extra.error ?? null, extra.result == null ? null : JSON.stringify(extra.result), finished ? 1 : 0, iso(), finished ? 1 : 0, runId);
+    syncSchedule(runId);
+  }
+
+  /**
+   * A schedule's "Run now" writes `last_run_status: 'pending'` and nothing
+   * else ever moved it, so the schedule said pending long after its run had
+   * ended. The runner owns the run's status, so it keeps that copy in step.
+   * Best-effort: a database without the table (the tests' minimal ones) is fine.
+   */
+  function syncSchedule(runId: string): void {
+    try {
+      db.prepare(`UPDATE schedules SET last_run_status = (SELECT status FROM runs WHERE id = ?) WHERE last_run_id = ?`).run(runId, runId);
+    } catch { /* no schedules table */ }
+  }
+
+  /** Every schedule's copy at once, after the start-up sweep closed runs in bulk. */
+  function syncSchedules(): void {
+    try {
+      db.exec(
+        `UPDATE schedules SET last_run_status = (SELECT r.status FROM runs r WHERE r.id = schedules.last_run_id)
+         WHERE last_run_id IS NOT NULL
+           AND last_run_status IS NOT (SELECT r.status FROM runs r WHERE r.id = schedules.last_run_id)`,
+      );
+    } catch { /* no schedules table */ }
   }
 
   const stopped = (runId: string) => readRun(runId)?.status === "cancelled";
@@ -635,40 +698,44 @@ export function createAgentRunner(deps: RunnerDeps) {
     return answer ? clip(answer, 300) : null;
   }
 
-  /** Execute one run from `pending` to its end. Resolves; never throws. */
-  async function executeRun(runId: string): Promise<void> {
-    const claimed = db.prepare(`UPDATE runs SET status = 'planning', started_at = COALESCE(started_at, ?) WHERE id = ? AND status = 'pending'`).run(iso(), runId);
-    if (!claimed.changes) return;
-    const run = readRun(runId)!;
+  /** What a run's steps work with: its agent's instructions and the desktop tools the port offers now. */
+  async function context(run: RunRow): Promise<{ agent: AgentRow | null; tools: ToolDecl[] }> {
+    const agent = db.prepare(`SELECT system_prompt, max_steps FROM agents WHERE id = ?`).get(run.agent_id) as AgentRow | null;
+    const caps = control?.available() ? await control.capabilities() : [];
+    const tools = buildAtlasTools(caps, { allowMutating: true }).filter((t) => t.function.name.startsWith("atlas_"));
+    return { agent, tools };
+  }
+
+  /**
+   * Work every step of the plan that has not started, in order, then close
+   * the run. Steps already finished (a resumed run a new brain adopted) are
+   * skipped, and what they found is handed to the steps after them.
+   */
+  async function work(run: RunRow, agent: AgentRow | null, tools: ToolDecl[], p: RunPlan): Promise<void> {
+    const runId = run.id;
+    const earlier: string[] = p.steps.filter((s) => s.status === "done" && s.summary).map((s) => s.summary!);
+    let failures = p.steps.filter((s) => s.status === "failed" || s.status === "stopped").length;
+    for (let i = 0; i < p.steps.length; i++) {
+      if (p.steps[i].status !== "todo") continue;
+      if ((await gate(runId)) === "stop") break;
+      markStep(runId, p, i, { status: "now", started_at: iso() });
+      const line = await step(run, agent, p, i, earlier, tools);
+      const status: PlanStepStatus = line ? "done" : stopped(runId) ? "stopped" : "failed";
+      markStep(runId, p, i, { status, finished_at: iso(), ...(line ? { summary: line } : {}) });
+      if (line) earlier.push(line); else failures++;
+    }
+    // The last step may have queued a question: the run is not done until
+    // it is answered (or expires), or the user stops it.
+    if (!stopped(runId) && (await gate(runId)) === "go") {
+      if (failures === p.steps.length) setStatus(runId, "failed", { error: "No step produced a usable answer." });
+      else setStatus(runId, "completed", { result: { summary: earlier[earlier.length - 1] ?? "", steps: p.steps.length, failed_steps: failures } });
+    }
+  }
+
+  /** A run's end, however it came: an error closes it, and an undo the user asked for mid-step runs now. */
+  async function guarded(runId: string, body: () => Promise<void>): Promise<void> {
     try {
-      if (!hasKey()) {
-        insertStep(runId, "error", null, { reason: "No AI key is configured, so the run could not be planned." });
-        setStatus(runId, "failed", { error: "No AI key is configured." });
-        return;
-      }
-      const agent = db.prepare(`SELECT system_prompt, max_steps FROM agents WHERE id = ?`).get(run.agent_id) as AgentRow | null;
-      const caps = control?.available() ? await control.capabilities() : [];
-      const tools = buildAtlasTools(caps, { allowMutating: true }).filter((t) => t.function.name.startsWith("atlas_"));
-
-      const p = await plan(run, agent, tools.map((t) => t.function.name));
-      setStatus(runId, "running");
-
-      const earlier: string[] = [];
-      let failures = 0;
-      for (let i = 0; i < p.steps.length; i++) {
-        if ((await gate(runId)) === "stop") break;
-        markStep(runId, p, i, { status: "now", started_at: iso() });
-        const line = await step(run, agent, p, i, earlier, tools);
-        const status: PlanStepStatus = line ? "done" : stopped(runId) ? "stopped" : "failed";
-        markStep(runId, p, i, { status, finished_at: iso(), ...(line ? { summary: line } : {}) });
-        if (line) earlier.push(line); else failures++;
-      }
-      // The last step may have queued a question: the run is not done until
-      // it is answered (or expires), or the user stops it.
-      if (!stopped(runId) && (await gate(runId)) === "go") {
-        if (failures === p.steps.length) setStatus(runId, "failed", { error: "No step produced a usable answer." });
-        else setStatus(runId, "completed", { result: { summary: earlier[earlier.length - 1] ?? "", steps: p.steps.length, failed_steps: failures } });
-      }
+      await body();
     } catch (e) {
       insertStep(runId, "error", null, { reason: String(e).slice(0, 500) });
       setStatus(runId, "failed", { error: String(e).slice(0, 500) });
@@ -678,16 +745,67 @@ export function createAgentRunner(deps: RunnerDeps) {
     }
   }
 
-  /** One sweep: start the oldest pending runs while there is room. */
+  /** Execute one run from `pending` to its end. Resolves; never throws. */
+  async function executeRun(runId: string): Promise<void> {
+    const claimed = db.prepare(`UPDATE runs SET status = 'planning', started_at = COALESCE(started_at, ?) WHERE id = ? AND status = 'pending'`).run(iso(), runId);
+    if (!claimed.changes) return;
+    syncSchedule(runId);
+    const run = readRun(runId)!;
+    await guarded(runId, async () => {
+      if (!hasKey()) {
+        insertStep(runId, "error", null, { reason: "No AI key is configured, so the run could not be planned." });
+        setStatus(runId, "failed", { error: "No AI key is configured." });
+        return;
+      }
+      const { agent, tools } = await context(run);
+      const p = await plan(run, agent, tools.map((t) => t.function.name));
+      setStatus(runId, "running");
+      await work(run, agent, tools, p);
+    });
+  }
+
+  /**
+   * Carry on a paused run a previous brain left (see `adoptPaused`): it waits
+   * at the gate until the user resumes it, then works the steps not started.
+   * Resolves; never throws.
+   */
+  async function continueRun(runId: string): Promise<void> {
+    const run = readRun(runId);
+    const p = run ? readStoredPlan(run.plan_json) : null;
+    if (!run || !p || !LIVE.has(run.status)) return;
+    await guarded(runId, async () => {
+      // Nothing is asked of the model until the user resumes, so the key and
+      // the tools are looked up after the wait rather than before it.
+      if ((await gate(runId)) === "stop") return;
+      if (!hasKey()) {
+        insertStep(runId, "error", null, { reason: "No AI key is configured, so the run could not go on." });
+        setStatus(runId, "failed", { error: "No AI key is configured." });
+        return;
+      }
+      const { agent, tools } = await context(run);
+      await work(run, agent, tools, p);
+    });
+  }
+
+  /**
+   * One sweep: start the oldest pending runs while there is room. Only runs
+   * that are working take room; a paused one waits at its gate and asks the
+   * model nothing, so it does not keep a new run from starting. A run paused
+   * before it was picked up is not started (not even planned) until it is
+   * resumed.
+   */
   function tick(): void {
-    while (inFlight.size < MAX_PARALLEL_RUNS) {
-      const busy = [...inFlight.keys()];
+    const busy = [...inFlight.keys()];
+    let working = busy.filter((id) => !readRun(id)?.paused_at).length;
+    while (working < MAX_PARALLEL_RUNS) {
       const next = db.prepare(
-        `SELECT id FROM runs WHERE status = 'pending'${busy.length ? ` AND id NOT IN (${busy.map(() => "?").join(",")})` : ""}
+        `SELECT id FROM runs WHERE status = 'pending' AND paused_at IS NULL${busy.length ? ` AND id NOT IN (${busy.map(() => "?").join(",")})` : ""}
          ORDER BY created_at ASC LIMIT 1`,
       ).get(...busy) as { id: string } | null;
       if (!next) return;
       const id = next.id;
+      busy.push(id);
+      working++;
       inFlight.set(id, executeRun(id).finally(() => { inFlight.delete(id); }));
     }
   }
@@ -695,27 +813,64 @@ export function createAgentRunner(deps: RunnerDeps) {
   /**
    * Runs left mid-way by a brain that stopped. The loop above lives in memory,
    * so nothing would ever move them again; they are closed as failed rather
-   * than shown as working forever. Pending runs older than STALE_PENDING_MS
-   * are closed too, unstarted (see there).
+   * than shown as working forever — except a paused run with a plan, which
+   * `adoptPaused` carries on. Pending runs older than STALE_PENDING_MS are
+   * closed too, unstarted (see there), unless the user paused them: those
+   * wait for Resume however long it takes.
    */
   function recoverOrphans(): number {
     const at = iso();
     const orphaned = db.prepare(
       `UPDATE runs SET status = 'failed', finished_at = ?, paused_at = NULL,
          error_message = 'Atlas stopped while this run was in progress; it was not resumed.'
-       WHERE status IN ('planning','running','verifying')`,
+       WHERE status IN ('planning','running','verifying')
+         AND NOT (status = 'running' AND paused_at IS NOT NULL AND plan_json IS NOT NULL)`,
     ).run(at);
     const stale = db.prepare(
       `UPDATE runs SET status = 'failed', finished_at = ?,
          error_message = 'Atlas was not running agents when this was asked for, and it was not started this long afterwards.'
-       WHERE status = 'pending' AND created_at < ?`,
+       WHERE status = 'pending' AND paused_at IS NULL AND created_at < ?`,
     ).run(at, new Date(now() - STALE_PENDING_MS).toISOString());
+    syncSchedules();
     return orphaned.changes + stale.changes;
+  }
+
+  /**
+   * Take on the paused runs a previous brain was holding. Each stays paused
+   * until the user resumes it. A step that was in flight when that brain went
+   * away is marked stopped — what it did is unknown, so it is not repeated —
+   * and a run whose plan cannot be read is closed as failed. Returns the ids
+   * now being held.
+   */
+  function adoptPaused(): string[] {
+    const rows = db.prepare(
+      `SELECT id FROM runs WHERE status = 'running' AND paused_at IS NOT NULL AND plan_json IS NOT NULL ORDER BY created_at ASC`,
+    ).all() as Array<{ id: string }>;
+    const adopted: string[] = [];
+    for (const { id } of rows) {
+      if (inFlight.has(id)) continue;
+      const p = readStoredPlan(readRun(id)?.plan_json ?? null);
+      if (!p) {
+        setStatus(id, "failed", { error: "Atlas stopped while this run was paused, and its plan could not be read back." });
+        continue;
+      }
+      let touched = false;
+      p.steps.forEach((s, i) => {
+        if (s.status !== "now") return;
+        p.steps[i] = { ...s, status: "stopped", finished_at: iso() };
+        touched = true;
+      });
+      if (touched) savePlan(id, p);
+      inFlight.set(id, continueRun(id).finally(() => { inFlight.delete(id); }));
+      adopted.push(id);
+    }
+    return adopted;
   }
 
   function start(): () => void {
     ensureAgentRunSchema(db);
     try { recoverOrphans(); } catch (e) { console.warn("[agent-runner] orphan sweep failed:", e); }
+    try { adoptPaused(); } catch (e) { console.warn("[agent-runner] adopting paused runs failed:", e); }
     timer = setInterval(() => { try { tick(); } catch (e) { console.warn("[agent-runner] tick failed:", e); } }, pollMs);
     return () => { if (timer) clearInterval(timer); timer = null; };
   }
@@ -813,6 +968,7 @@ export function createAgentRunner(deps: RunnerDeps) {
       `UPDATE runs SET status = 'cancelled', paused_at = NULL, finished_at = COALESCE(finished_at, ?)
        WHERE id = ? AND status NOT IN ('completed','failed','cancelled')`,
     ).run(iso(), runId);
+    syncSchedule(runId);
     const approvalsClosed = closeApprovals(runId);
     const base = { ok: true as const, stopped: r.changes > 0, approvalsClosed };
     if (!opts.undo) return base;
@@ -825,7 +981,7 @@ export function createAgentRunner(deps: RunnerDeps) {
   }
 
   return {
-    start, tick, executeRun, recoverOrphans, pause, resume, stop, undoRun,
+    start, tick, executeRun, recoverOrphans, adoptPaused, pause, resume, stop, undoRun,
     /** Ids of the runs being worked right now. */
     get inFlight(): string[] { return [...inFlight.keys()]; },
   };

@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import type { ToolCall, ToolDecl, ChatMessage } from "../../../supabase/functions/_shared/orchestrator.ts";
 import type { CallOpts, ControlResult } from "./control.ts";
 import {
-  MAX_PARALLEL_RUNS, STALE_PENDING_MS, createAgentRunner, ensureAgentRunSchema, parsePlan, undoFor,
+  MAX_PARALLEL_RUNS, STALE_PENDING_MS, createAgentRunner, ensureAgentRunSchema, parsePlan, readStoredPlan, undoFor,
   type ModelTurn, type RunPlan, type UndoRecord,
 } from "./agentRunner.ts";
 
@@ -128,6 +128,8 @@ describe("what a call leaves to undo", () => {
     expect(undoFor("tasks.list", {}, ok({ rows: [] }))).toBeNull();
     expect(undoFor("tasks.create", { title: "x" }, { ok: false, error: { code: "invalid_args", message: "no", retryable: false } })).toBeNull();
     expect(undoFor("watchlist.add", { symbol: "AAPL" }, ok({ action: "unchanged", row: { symbol: "AAPL" } }))).toBeNull();
+    // The Clock's "nothing is ringing" is a success that changed nothing.
+    expect(undoFor("clock.stop_alarm", {}, ok({ done: false, changed_anything: false, message: "Nothing is ringing." }))).toBeNull();
   });
   test("mail, music and the Clock say why they cannot be undone", () => {
     for (const op of ["mail.archive", "music.play", "music.volume", "clock.set_alarm"]) {
@@ -369,6 +371,119 @@ describe("the loop", () => {
       runner.tick();
     }
     expect(runner.inFlight).toEqual([]);
+  });
+
+  test("a paused run outlives the brain: the next one holds it paused, then resumes from the first step not started", async () => {
+    const db = freshDb();
+    addRun(db, "r1", { status: "running" });
+    const left: RunPlan = {
+      source: "model",
+      written_at: "2026-10-28T09:00:00.000Z",
+      steps: [
+        { title: "Read the week", detail: "", status: "done", summary: "Three meetings, one free afternoon." },
+        { title: "Add the dentist task", detail: "", status: "now", started_at: "2026-10-28T09:01:00.000Z" },
+        { title: "Say what changed", detail: "", status: "todo" },
+      ],
+    };
+    db.query(`UPDATE runs SET plan_json = ?, paused_at = '2026-10-28T09:01:30.000Z' WHERE id = 'r1'`).run(JSON.stringify(left));
+    addRun(db, "gone", { status: "running" });
+
+    const prompts: string[] = [];
+    let sleeps = 0;
+    const box = {} as { runner: ReturnType<typeof createAgentRunner> };
+    box.runner = createAgentRunner({
+      db, control: fakeControl(db), hasKey: () => true, pollMs: 1,
+      complete: async (_m, messages) => { prompts.push(messages[0].content); return say("Told you what changed."); },
+      sleep: async () => {
+        sleeps++;
+        // Held, still paused, and nothing is asked of the model while it waits.
+        expect(run(db).paused_at).toBeTruthy();
+        expect(prompts).toEqual([]);
+        if (sleeps === 2) expect(box.runner.resume("r1", USER)).toEqual({ ok: true });
+      },
+    });
+    // The sweep closes the run that was simply working, and leaves the paused one.
+    expect(box.runner.recoverOrphans()).toBe(1);
+    expect(run(db, "gone").status).toBe("failed");
+    expect(run(db).status).toBe("running");
+    expect(box.runner.adoptPaused()).toEqual(["r1"]);
+    // The step in flight when the old brain went away is not run again.
+    expect(planOf(db).steps.map((s) => s.status)).toEqual(["done", "stopped", "todo"]);
+
+    for (let i = 0; i < 50 && box.runner.inFlight.length; i++) await new Promise((r) => setTimeout(r, 1));
+    expect(box.runner.inFlight).toEqual([]);
+    expect(sleeps).toBe(2);
+    expect(run(db).status).toBe("completed");
+    expect(planOf(db).steps.map((s) => s.status)).toEqual(["done", "stopped", "done"]);
+    // Only the step not started was worked, and it was told what the first one found.
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0]).toContain("Three meetings, one free afternoon.");
+  });
+
+  test("a paused run whose plan cannot be read is closed, not held", () => {
+    const db = freshDb();
+    addRun(db, "r1", { status: "running" });
+    db.query(`UPDATE runs SET plan_json = 'not a plan', paused_at = '2026-10-28T09:01:30.000Z' WHERE id = 'r1'`).run();
+    const runner = createAgentRunner({ db, sleep: noSleep });
+    expect(runner.recoverOrphans()).toBe(0);
+    expect(runner.adoptPaused()).toEqual([]);
+    expect(run(db)).toMatchObject({ status: "failed", paused_at: null });
+    expect(readStoredPlan("not a plan")).toBeNull();
+    expect(readStoredPlan(JSON.stringify({ steps: [{ title: "x", status: "exploded" }] }))?.steps[0].status).toBe("todo");
+  });
+
+  test("a run paused before it was picked up is not planned until resumed, and never goes stale", () => {
+    const db = freshDb();
+    const old = new Date(Date.now() - STALE_PENDING_MS - 60_000).toISOString();
+    addRun(db, "r1", { status: "pending", created_at: old });
+    let calls = 0;
+    const runner = createAgentRunner({ db, hasKey: () => true, sleep: noSleep, complete: async () => { calls++; return null; } });
+    expect(runner.pause("r1", USER)).toEqual({ ok: true });
+    expect(runner.recoverOrphans()).toBe(0);
+    runner.tick();
+    expect(runner.inFlight).toEqual([]);
+    expect(calls).toBe(0);
+    expect(run(db).status).toBe("pending");
+    expect(runner.resume("r1", USER)).toEqual({ ok: true });
+    runner.tick();
+    expect(runner.inFlight).toEqual(["r1"]);
+  });
+
+  test("a paused run holds no slot", async () => {
+    const db = freshDb();
+    for (let i = 0; i < MAX_PARALLEL_RUNS + 1; i++) addRun(db, `r${i}`, { created_at: `2026-10-28T09:0${i}:00.000Z` });
+    const release: Array<() => void> = [];
+    const runner = createAgentRunner({
+      db, hasKey: () => true, sleep: noSleep,
+      complete: () => new Promise((resolve) => release.push(() => resolve(say("ok")))),
+    });
+    runner.tick();
+    expect(runner.inFlight).toEqual(["r0", "r1", "r2"]);
+    expect(runner.pause("r0", USER)).toEqual({ ok: true });
+    runner.tick();
+    expect(runner.inFlight).toEqual(["r0", "r1", "r2", "r3"]);
+    // Resume before draining, so the paused one is not left waiting forever.
+    expect(runner.resume("r0", USER)).toEqual({ ok: true });
+    for (let i = 0; i < 40 && (runner.inFlight.length || release.length); i++) {
+      while (release.length) release.shift()!();
+      await new Promise((r) => setTimeout(r, 1));
+    }
+    expect(runner.inFlight).toEqual([]);
+  });
+
+  test("a schedule's last run status follows its run", async () => {
+    const db = freshDb();
+    addRun(db);
+    addRun(db, "r2", { status: "running" });
+    db.query(`INSERT INTO schedules (id, user_id, agent_id, name, cron_expression, last_run_id, last_run_status) VALUES ('s1', ?, 'a1', 'Morning', '0 7 * * *', 'r1', 'pending'), ('s2', ?, 'a1', 'Evening', '0 19 * * *', 'r2', 'pending')`).run(USER, USER);
+    const status = (id: string) => (db.query(`SELECT last_run_status AS s FROM schedules WHERE id = ?`).get(id) as { s: string }).s;
+    const runner = createAgentRunner({ db, control: fakeControl(db), complete: scriptedModel(PLAN_2, [say("a"), say("b")]).complete, hasKey: () => true, sleep: noSleep, pollMs: 1 });
+    runner.recoverOrphans();
+    expect(status("s2")).toBe("failed");
+    await runner.executeRun("r1");
+    expect(status("s1")).toBe("completed");
+    await runner.stop("r1", USER, { undo: false });
+    expect(status("s1")).toBe("completed");
   });
 
   test("an older database gets the paused_at column", () => {

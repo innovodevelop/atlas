@@ -30,7 +30,15 @@ import { markRepairStopped, repairRunning, stopRepair } from "./selfRepair.ts";
 /** The repository the CI sync reads (adminRoutes.ts getCiRuns); cancels go to the same one. */
 export const CI_REPO = "innovodevelop/atlas";
 
-export type SpawnFn = (argv: string[]) => { exitCode: number | null; stderr: string };
+export interface SpawnResult { exitCode: number | null; stderr: string }
+export type SpawnFn = (argv: string[]) => SpawnResult | Promise<SpawnResult>;
+
+/**
+ * How long `gh run cancel` may take. Under the webview's own 8 s limit on an
+ * admin call (useAdminApi BRAIN_TIMEOUT_MS), so the screen hears the answer
+ * rather than a timeout while GitHub goes on to cancel anyway.
+ */
+export const GH_CANCEL_TIMEOUT_MS = 7_000;
 
 interface Deps {
   db: Database;
@@ -51,10 +59,20 @@ export function ciRunId(sessionId: string): string | null {
   return /^ci-(\d{1,20})$/.exec(sessionId)?.[1] ?? null;
 }
 
-function spawnLive(argv: string[]): { exitCode: number | null; stderr: string } {
+/**
+ * Run `gh` without blocking the brain: a synchronous spawn would hold every
+ * other request and the agent runner for as long as GitHub takes to answer.
+ */
+async function spawnLive(argv: string[]): Promise<SpawnResult> {
   try {
-    const proc = Bun.spawnSync(argv, { stdout: "pipe", stderr: "pipe", timeout: 20_000 });
-    return { exitCode: proc.exitCode, stderr: new TextDecoder().decode(proc.stderr) };
+    const proc = Bun.spawn(argv, { stdout: "ignore", stderr: "pipe" });
+    const timer = setTimeout(() => proc.kill(), GH_CANCEL_TIMEOUT_MS);
+    try {
+      const [exitCode, stderr] = await Promise.all([proc.exited, new Response(proc.stderr).text()]);
+      return { exitCode: proc.signalCode ? null : exitCode, stderr: proc.signalCode ? "gh did not answer in time." : stderr };
+    } finally {
+      clearTimeout(timer);
+    }
   } catch (e) {
     return { exitCode: null, stderr: String(e) };
   }
@@ -84,7 +102,7 @@ export function createAgentRunHandlers({ db, runner, requireUser, json, spawn = 
     return r.ok ? json(r) : json({ error: r.error }, r.status);
   }
 
-  function stopSession(req: Request, sessionId: string | undefined): Response {
+  async function stopSession(req: Request, sessionId: string | undefined): Promise<Response> {
     requireUser(req);
     if (!plausibleId(sessionId)) return json({ error: "Not a session id." }, 400);
     const s = db.prepare(`SELECT id, session_type, status FROM atlas_agent_sessions WHERE id = ?`).get(sessionId) as
@@ -99,7 +117,7 @@ export function createAgentRunHandlers({ db, runner, requireUser, json, spawn = 
         const ghId = ciRunId(s.id);
         if (!ghId) return json({ error: "This session does not name a GitHub run, so there is nothing to cancel." }, 422);
         // Separate arguments, never a shell string; the id is digits only.
-        const r = spawn(["gh", "run", "cancel", ghId, "--repo", CI_REPO]);
+        const r = await spawn(["gh", "run", "cancel", ghId, "--repo", CI_REPO]);
         if (r.exitCode !== 0) return json({ error: `GitHub did not cancel the run: ${r.stderr.trim().slice(0, 300) || "gh failed"}` }, 502);
         db.prepare(`UPDATE atlas_agent_sessions SET status = 'cancelled', ended_at = COALESCE(ended_at, ?) WHERE id = ?`).run(at, s.id);
         return json({ ok: true, session_type: s.session_type, outcome: "cancel-requested" });

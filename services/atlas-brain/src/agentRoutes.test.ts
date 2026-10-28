@@ -74,8 +74,8 @@ describe("stopping a session", () => {
     const db = freshDb();
     addSession(db, "ci-987", "ci-pipeline");
     const argv: string[][] = [];
-    const h = handlers(db, (a) => { argv.push(a); return { exitCode: 0, stderr: "" }; });
-    const res = h.stopSession(req(), "ci-987");
+    const h = handlers(db, async (a) => { argv.push(a); return { exitCode: 0, stderr: "" }; });
+    const res = await h.stopSession(req(), "ci-987");
     expect(await res.json()).toEqual({ ok: true, session_type: "ci-pipeline", outcome: "cancel-requested" });
     expect(argv).toEqual([["gh", "run", "cancel", "987", "--repo", CI_REPO]]);
     expect(sessionStatus(db, "ci-987")).toBe("cancelled");
@@ -84,7 +84,7 @@ describe("stopping a session", () => {
     const db = freshDb();
     addSession(db, "ci-5", "ci-pipeline");
     const h = handlers(db, () => ({ exitCode: 1, stderr: "run 5 is already completed" }));
-    const res = h.stopSession(req(), "ci-5");
+    const res = await h.stopSession(req(), "ci-5");
     expect(res.status).toBe(502);
     expect(((await res.json()) as { error: string }).error).toContain("already completed");
     expect(sessionStatus(db, "ci-5")).toBe("active");
@@ -92,20 +92,20 @@ describe("stopping a session", () => {
   test("a Claude Code session is refused: Atlas only reads its transcript", async () => {
     const db = freshDb();
     addSession(db, "cc-1", "claude-code");
-    const res = handlers(db, () => { throw new Error("must not spawn"); }).stopSession(req(), "cc-1");
+    const res = await handlers(db, () => { throw new Error("must not spawn"); }).stopSession(req(), "cc-1");
     expect(res.status).toBe(422);
     expect(sessionStatus(db, "cc-1")).toBe("active");
   });
-  test("an ended session cannot be stopped again", () => {
+  test("an ended session cannot be stopped again", async () => {
     const db = freshDb();
     addSession(db, "ci-1", "ci-pipeline", "completed");
-    expect(handlers(db).stopSession(req(), "ci-1").status).toBe(409);
-    expect(handlers(db).stopSession(req(), "missing").status).toBe(404);
+    expect((await handlers(db).stopSession(req(), "ci-1")).status).toBe(409);
+    expect((await handlers(db).stopSession(req(), "missing")).status).toBe(404);
   });
   test("a self-repair this process is not running is closed as stopped", async () => {
     const db = freshDb();
     addSession(db, "repair-x", "autonomous");
-    const res = handlers(db).stopSession(req(), "repair-x");
+    const res = await handlers(db).stopSession(req(), "repair-x");
     expect(await res.json()).toEqual({ ok: true, session_type: "autonomous", outcome: "closed" });
     expect(sessionStatus(db, "repair-x")).toBe("cancelled");
     const events = db.query(`SELECT payload FROM atlas_agent_events WHERE session_id = 'repair-x'`).all() as Array<{ payload: string }>;
