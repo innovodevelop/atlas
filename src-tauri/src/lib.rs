@@ -16,6 +16,8 @@ mod music_engine;
 mod db;
 mod datafetch;
 mod mail;
+mod mail_flags;
+mod mail_archive;
 mod gmail;
 mod mail_imap;
 mod outlook;
@@ -605,6 +607,8 @@ pub fn run() {
       mail::mail_set_status,
       mail::mail_send_reply,
       mail::mail_ingest_errors,
+      mail::mail_wake_snoozes,
+      mail_archive::mail_archive_message,
       gmail::gmail_connect,
       gmail::gmail_disconnect,
       gmail::gmail_sync,

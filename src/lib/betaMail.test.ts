@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 import type { MailAuditEvent, MailDraft, MailThread } from '@/types/mail';
-import { atlasCard, composePrompt, initialsOf, isFirstContact, laterSendIso, mailGreeting, mailtoUrl } from './betaMail';
+import {
+  addressOf, atlasCard, canReconnectToArchive, composePrompt, initialsOf, isArchived, isFirstContact, laterSendIso, mailboxChanges, mailboxToasts,
+  mailGreeting, mailtoUrl, nextWakeDelay, refusalText, replySnoozes, watchTarget,
+} from './betaMail';
 
 const thread = (status: MailThread['status'], extra: Partial<MailThread> = {}): MailThread => ({
   id: 't1', account_id: 'a1', provider_thread_id: 'p1', subject: 'Hello', participants: ['dana@theverge.com'], status,
@@ -75,5 +78,78 @@ describe('compose helpers', () => {
     expect(initialsOf('Dana Whitfield')).toBe('DW');
     expect(initialsOf('dana.whitfield@theverge.com')).toBe('DW');
     expect(initialsOf('')).toBe('?');
+  });
+});
+
+describe('snooze until they reply', () => {
+  test('the watch is the other person, by address, with a week-out fallback', () => {
+    const t = thread('triage', { participants: ['Dana Whitfield <Dana@TheVerge.com>', 'me@x.dk'] });
+    const opts = replySnoozes(t, new Date(2026, 9, 28, 15, 0, 0));
+    expect(opts).toHaveLength(1);
+    expect(opts[0]).toMatchObject({ label: 'When Dana replies', watch: 'dana@theverge.com' });
+    expect(opts[0].until.startsWith('2026-11-04T09:00:00')).toBe(true);
+    expect(/(?:Z|[+-]\d{2}:\d{2})$/.test(opts[0].until)).toBe(true);
+  });
+  test('a thread with several people also offers anyone', () => {
+    const t = thread('triage', { participants: ['dana@theverge.com', 'priya@raman.studio', 'me@x.dk'] });
+    expect(replySnoozes(t).map((o) => o.watch)).toEqual(['dana@theverge.com', '*']);
+    expect(replySnoozes(thread('triage', { participants: ['me@x.dk'] })).map((o) => o.watch)).toEqual(['*']);
+  });
+  test('addresses and targets', () => {
+    expect(addressOf('"Dana W" <Dana@X.com>')).toBe('dana@x.com');
+    expect(addressOf(' Dana@X.com ')).toBe('dana@x.com');
+    expect(watchTarget(thread('triage', { participants: ['ME@x.dk', 'priya@raman.studio'] }))).toEqual({ address: 'priya@raman.studio', name: 'priya' });
+  });
+  test('the wake timer aims at the earliest snoozed thread', () => {
+    const now = Date.parse('2026-10-28T10:00:00Z');
+    const rows = [
+      { status: 'snooze' as const, snoozed_until: '2026-10-28T12:00:00Z' },
+      { status: 'snooze' as const, snoozed_until: '2026-10-28T11:00:00+00:00' },
+      { status: 'triage' as const, snoozed_until: '2026-10-28T10:30:00Z' },
+    ];
+    expect(nextWakeDelay(rows, now)).toBe(3_600_000);
+    expect(nextWakeDelay([{ status: 'snooze', snoozed_until: '2026-10-27T10:00:00Z' }], now)).toBe(0);
+    expect(nextWakeDelay([{ status: 'snooze', snoozed_until: null }], now)).toBeNull();
+  });
+  test('the card says who it waits for', () => {
+    const c = atlasCard(thread('snooze', { snoozed_until: '2026-11-04T09:00:00+01:00' }), [], null, false, [], { watch: 'dana@theverge.com' });
+    expect(c.title).toBe('Waiting for dana@theverge.com to reply');
+    expect(c.body).toContain('when dana@theverge.com replies, or ');
+    expect(atlasCard(thread('snooze'), [], null, false, [], { watch: '*' }).body).toBe('Atlas checks every sync and brings it back when anyone replies.');
+  });
+});
+
+describe('archive', () => {
+  test('a thread stays archived until it leaves handled or a reply arrives', () => {
+    expect(isArchived(thread('handled', { last_message_at: '2026-10-28T09:00:00Z' }), '2026-10-28T10:00:00Z')).toBe(true);
+    expect(isArchived(thread('handled', { last_message_at: '2026-10-28T11:00:00Z' }), '2026-10-28T10:00:00Z')).toBe(false);
+    expect(isArchived(thread('triage'), '2026-10-28T10:00:00Z')).toBe(false);
+    expect(isArchived(thread('handled'), null)).toBe(false);
+  });
+  test('the archived card offers the way back', () => {
+    expect(atlasCard(thread('handled'), [], null, false, [], { archived: true })).toMatchObject({ title: 'Archived', undo: { status: 'triage' } });
+  });
+  test('refusals say what to do', () => {
+    const r = { ok: false as const, reason: 'reconnect' as const, provider: 'gmail', email: 'me@gmail.com', accountId: 'gmail:u:me@gmail.com' };
+    expect(refusalText(r, true)).toBe('Reconnect me@gmail.com to archive');
+    expect(refusalText({ ...r, reason: 'no_folder', provider: 'imap' }, true)).toContain('has no Archive folder');
+    expect(canReconnectToArchive('outlook')).toBe(true);
+    expect(canReconnectToArchive('imap')).toBe(false);
+  });
+});
+
+describe('mailbox toasts', () => {
+  const mine = (a: { id: string }) => !a.id.startsWith('cfmail:');
+  const acct = (id: string, status = 'active') => ({ id, provider: 'gmail', email_address: id.split(':').pop() ?? id, status });
+  test('a new or recovered mailbox is connected, a missing one disconnected', () => {
+    const prev = [acct('gmail:u:a@x.com'), acct('gmail:u:b@x.com', 'error'), acct('cfmail:u:c@x.com')];
+    const next = [acct('gmail:u:b@x.com'), acct('outlook:u:d@x.com'), acct('outlook:u:e@x.com', 'error')];
+    const changes = mailboxChanges(prev, next, mine);
+    expect(changes).toEqual({ connected: ['b@x.com', 'd@x.com'], disconnected: ['a@x.com'] });
+    expect(mailboxToasts(changes)).toEqual(['Mailbox connected · b@x.com', 'Mailbox connected · d@x.com', 'Mailbox disconnected · a@x.com']);
+  });
+  test('nothing changed, nothing said', () => {
+    const list = [acct('gmail:u:a@x.com')];
+    expect(mailboxToasts(mailboxChanges(list, [...list], mine))).toEqual([]);
   });
 });

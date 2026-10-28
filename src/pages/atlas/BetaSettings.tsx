@@ -30,6 +30,8 @@ import { useStreamingTTS } from '@/hooks/useStreamingTTS';
 import { usePersonality } from '@/hooks/usePersonality';
 import { useAppUpdater } from '@/hooks/useAppUpdater';
 import { isUserMailbox, useMailIntelligence, type MailAccount } from '@/hooks/useMailIntelligence';
+import { useMailboxToasts } from '@/hooks/useMailboxToasts';
+import { useMailAlertsPref } from '@/hooks/useMailAlertsPref';
 import { usePortfolio } from '@/hooks/usePortfolio';
 import { useMusicPlayer } from '@/hooks/useMusicPlayer';
 import { useSystemVitals, type BtDevice, type SystemVitalsState } from '@/hooks/useSystemVitals';
@@ -84,6 +86,7 @@ const BetaSettings = () => {
   const mail = useMailIntelligence();
   const updater = useAppUpdater();
   const { text: toast, say } = useToastLine();
+  useMailboxToasts(mail.accounts, mail.isLoading, say);
   const [version, setVersion] = useState<string | null>(null);
   const [sphereEl, setSphereEl] = useState<HTMLButtonElement | null>(null);
   const mainRef = useRef<HTMLElement | null>(null);
@@ -410,6 +413,7 @@ const EMPTY_IMAP = { email: '', host: '', port: '993', username: '', password: '
  */
 function MailSection({ mail, say }: { mail: MailIntel; say: Say }) {
   const { accounts, isConnecting, connectingProvider, error, connect, connectImap, cancelConnect, disconnect, syncNow } = mail;
+  const alerts = useMailAlertsPref();
   const [confirm, setConfirm] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [scanning, setScanning] = useState<string | null>(null);
@@ -461,7 +465,9 @@ function MailSection({ mail, say }: { mail: MailIntel; say: Say }) {
     setImapBusy(true);
     const ok = await connectImap({ email: imap.email, host: imap.host, port: Number(imap.port) || 993, username: imap.username || undefined, password: imap.password });
     setImapBusy(false);
-    if (ok) { setImapOpen(false); setImap(EMPTY_IMAP); say('Mailbox connected'); } else setImapFailed(true);
+    // The "Mailbox connected" toast comes from the account list changing
+    // (useMailboxToasts), the same way for IMAP, Gmail and Outlook.
+    if (ok) { setImapOpen(false); setImap(EMPTY_IMAP); } else setImapFailed(true);
   };
 
   const hasGmail = accounts.some((a) => a.provider === 'gmail');
@@ -471,7 +477,7 @@ function MailSection({ mail, say }: { mail: MailIntel; say: Say }) {
   return (
     <>
       <section className="b-st-card" aria-label="Connected mailboxes">
-        <CardHead title="Connected mailboxes" sub="Atlas scans connected mailboxes read-only, every 15 minutes while it is open, and alerts you to bills, deadlines and documents. Your mailbox is never modified." />
+        <CardHead title="Connected mailboxes" sub="Atlas scans connected mailboxes read-only, every 15 minutes while it is open, and alerts you to bills, deadlines and documents. It changes a mailbox only when you archive a message in Mail, and Gmail and Outlook ask you to allow that first." />
         {accounts.map((a) => {
           const mine = isUserMailbox(a);
           const ok = a.status === 'active';
@@ -520,7 +526,7 @@ function MailSection({ mail, say }: { mail: MailIntel; say: Say }) {
 
       {imapOpen ? (
         <section className="b-st-card b-st-form" aria-label="Connect a mailbox over IMAP" ref={formRef}>
-          <CardHead title="Connect a mailbox over IMAP" sub="For iCloud, Fastmail, Yahoo and most other providers. Atlas reads the inbox over TLS only and never changes it. Many providers need an app-specific password here, not your normal one." />
+          <CardHead title="Connect a mailbox over IMAP" sub="For iCloud, Fastmail, Yahoo and most other providers. Atlas reads the inbox over TLS only, and changes it only when you archive a message in Mail (moved to its Archive folder). Many providers need an app-specific password here, not your normal one." />
           <input className="b-input" type="email" autoComplete="off" placeholder="Email address" aria-label="Email address" value={imap.email} onChange={field('email')} />
           <div className="b-st-form-pair">
             <input className="b-input" autoComplete="off" placeholder="IMAP server, e.g. imap.mail.me.com" aria-label="IMAP server" value={imap.host} onChange={field('host')} />
@@ -535,6 +541,30 @@ function MailSection({ mail, say }: { mail: MailIntel; say: Say }) {
           </div>
         </section>
       ) : null}
+
+      <section className="b-st-card" aria-label="Alerts">
+        <CardHead title="Alerts" />
+        <Row
+          icon="bell"
+          chip={alerts.enabled ? 'on' : 'quiet'}
+          title="Tell me about bills and deadlines"
+          sub={alerts.blocked
+            ? 'On, but macOS has notifications for Atlas turned off. Allow them in System Settings → Notifications.'
+            : 'A notification when Atlas finds something due in the next 7 days, once per thread. Found in the subject and preview a scan already stored; nothing leaves this Mac.'}
+          subTone={alerts.blocked ? 'warn' : 'quiet'}
+        >
+          <button
+            type="button"
+            role="switch"
+            aria-checked={alerts.enabled}
+            aria-label="Tell me about bills and deadlines"
+            className={`b-switch${alerts.enabled ? ' on' : ''}`}
+            disabled={alerts.saving}
+            onClick={() => void alerts.setEnabled(!alerts.enabled)}
+          ><span /></button>
+        </Row>
+        {alerts.error ? <p className="b-st-note b-st-note--warn">{alerts.error}</p> : null}
+      </section>
     </>
   );
 }

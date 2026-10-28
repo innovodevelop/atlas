@@ -233,6 +233,12 @@ export const MAIL_AUDIT_ACTIONS = {
   SEND_UNDONE: 'send_undone',
   RULE_MATCHED: 'rule_matched',
   AUTONOMY_CHANGED: 'autonomy_changed',
+  ARCHIVED: 'archived',
+  UNARCHIVED: 'unarchived',
+  /** Written by mail.rs when a snooze wakes (its time passed, or the watched person replied). */
+  SNOOZE_WOKE: 'snooze_woke',
+  /** Written by mail.rs when someone other than the watched person replied. */
+  SNOOZE_KEPT: 'snooze_kept',
 } as const;
 
 /** Sidebar views. `sent_today` is a real view even though sending is blocked — it reads 0. */
@@ -248,7 +254,10 @@ export type MailView =
   // The Beta Mail's lanes (design "Needs you" and "Inbox"): composites over
   // the statuses above. Not in MAIL_VIEWS, so the Workshop sidebar is unchanged.
   | 'needs_you'
-  | 'inbox';
+  | 'inbox'
+  // The Beta's Archive lane: threads archived from Mail (mail_archived) that
+  // no reply has brought back since.
+  | 'archive';
 
 /** The statuses the Beta's "Needs you" lane gathers: every thread waiting on the user. */
 export const NEEDS_YOU_STATUSES: readonly MailThreadStatus[] = ['triage', 'approve', 'drafting', 'escalate', 'handoff'] as const;

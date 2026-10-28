@@ -4,7 +4,11 @@
 // Same shape as gmail.rs: OAuth on-device, token in the Keychain, metadata-only
 // inbox sync, nothing mail-related in the cloud. Scope is Mail.Read (plus
 // User.Read for the mailbox address and offline_access for a refresh token):
-// Atlas cannot send, move, flag or delete mail.
+// Atlas cannot send, move, flag or delete mail. The one exception is opt-in:
+// a mailbox reconnected from Mail's "Reconnect <account> to archive" also
+// consents to Mail.ReadWrite, and Atlas uses it only for the Archive action the
+// user takes in Mail (move_message: Inbox to Archive and back). Sync keeps
+// asking for Mail.Read alone.
 //
 // The sign-in is RFC 8252 PKCE with a LOOPBACK redirect (oauth::Loopback), as
 // for Gmail. Atlas's Microsoft app registration is a public client ("Mobile
@@ -38,9 +42,16 @@ use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::db::DbState;
 use crate::gmail::{form, GmailOAuthPending, GmailState, SyncGuard};
+use crate::mail_archive::Refusal;
 use crate::oauth;
 
 const SCOPES: &str = "offline_access https://graph.microsoft.com/User.Read https://graph.microsoft.com/Mail.Read";
+/// The sign-in "Reconnect <account> to archive" starts, and the scopes the
+/// Archive action refreshes with. A grant made with SCOPES alone cannot be
+/// refreshed into these: Microsoft answers that consent is missing, which is
+/// how move_message knows to ask for the reconnect.
+const ARCHIVE_SCOPES: &str =
+    "offline_access https://graph.microsoft.com/User.Read https://graph.microsoft.com/Mail.ReadWrite";
 const GRAPH: &str = "https://graph.microsoft.com/v1.0";
 const ID_PREFIX: &str = "outlook:";
 const DELTA_PREFIX: &str = "d:";
@@ -93,7 +104,12 @@ fn authority(client: &MicrosoftClient) -> String {
     format!("https://login.microsoftonline.com/{}/oauth2/v2.0", client.tenant)
 }
 
+#[cfg(test)]
 fn build_authorize_url(client: &MicrosoftClient, redirect_uri: &str, challenge: &str, state: &str) -> String {
+    build_authorize_url_with(client, redirect_uri, challenge, state, SCOPES)
+}
+
+fn build_authorize_url_with(client: &MicrosoftClient, redirect_uri: &str, challenge: &str, state: &str, scopes: &str) -> String {
     format!(
         "{}/authorize?{}",
         authority(client),
@@ -105,7 +121,7 @@ fn build_authorize_url(client: &MicrosoftClient, redirect_uri: &str, challenge: 
             ("code_challenge_method", "S256"),
             ("code_challenge", challenge),
             ("state", state),
-            ("scope", SCOPES),
+            ("scope", scopes),
             ("prompt", "select_account"),
         ])
     )
@@ -189,20 +205,70 @@ fn graph_get(token: &str, url: &str) -> Result<Value, String> {
     }
 }
 
+/// A token error that means the stored grant does not cover Mail.ReadWrite
+/// (or no longer covers anything): the user reconnects with archiving allowed.
+fn lacks_archive_consent(err: &str) -> bool {
+    err.starts_with("Microsoft token endpoint")
+        && ["invalid_grant", "invalid_scope", "consent_required", "interaction_required"]
+            .iter()
+            .any(|code| err.contains(code))
+}
+
+/// Move one message between the Inbox and the Archive folder (Graph's
+/// well-known names `inbox` and `archive`). Immutable ids, the ones sync
+/// stores, survive the move, so the stored row still names the message and
+/// Undo can move it straight back; the delta sync drops it from its round as a
+/// removal and, back in the Inbox, finds it already stored.
+pub(crate) fn move_message(account_id: &str, provider_message_id: &str, to_archive: bool) -> Result<(), Refusal> {
+    let refresh = crate::secrets::outlook_refresh_token(account_id).ok_or(Refusal::NeedsScope)?;
+    let client = microsoft_client().map_err(Refusal::Failed)?;
+    let t = post_token(&client, &[
+        ("client_id", &client.id),
+        ("grant_type", "refresh_token"),
+        ("refresh_token", &refresh),
+        ("scope", ARCHIVE_SCOPES),
+    ])
+    .map_err(|e| if lacks_archive_consent(&e) { Refusal::NeedsScope } else { Refusal::Failed(e) })?;
+    if let Some(new) = t.refresh.as_deref().filter(|n| *n != refresh) {
+        crate::secrets::set_outlook_refresh_token(account_id, new).map_err(Refusal::Failed)?;
+    }
+    let destination = if to_archive { "archive" } else { "inbox" };
+    match crate::http::agent()
+        .post(&format!("{GRAPH}/me/messages/{}/move", crate::mail_archive::path_segment(provider_message_id)))
+        .set("Authorization", &format!("Bearer {}", t.access))
+        .set("Prefer", "IdType=\"ImmutableId\"")
+        .send_json(json!({ "destinationId": destination }))
+    {
+        Ok(_) => Ok(()),
+        Err(ureq::Error::Status(401 | 403, _)) => Err(Refusal::NeedsScope),
+        Err(ureq::Error::Status(404, _)) => Err(Refusal::Gone),
+        Err(ureq::Error::Status(code, _)) => Err(Refusal::Failed(format!("Microsoft Graph error ({code})."))),
+        Err(e) => Err(Refusal::Failed(format!("Could not reach Microsoft Graph: {e}"))),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Commands
 // ---------------------------------------------------------------------------
 
 /// Begin an Outlook sign-in. Returns the consent URL and the flow id; the
 /// outcome arrives on `outlook:status`. Cancel with mail-oauth-cancel.
+/// `archive: true` (Mail's "Reconnect <account> to archive") also asks for
+/// Mail.ReadWrite, which Microsoft's consent screen names.
 #[tauri::command(async)]
-pub fn outlook_connect(app: AppHandle, state: State<'_, GmailState>, user_id: String) -> Result<Value, String> {
+pub fn outlook_connect(
+    app: AppHandle,
+    state: State<'_, GmailState>,
+    user_id: String,
+    archive: Option<bool>,
+) -> Result<Value, String> {
     let client = microsoft_client()?;
     let loopback = oauth::Loopback::bind().map_err(|e| format!("Couldn't start the local sign-in listener: {e}"))?;
     let redirect_uri = loopback.redirect_uri();
     let (verifier, challenge) = oauth::generate_pkce();
     let flow = uuid::Uuid::new_v4().simple().to_string();
-    let url = build_authorize_url(&client, &redirect_uri, &challenge, &flow);
+    let scopes = if archive.unwrap_or(false) { ARCHIVE_SCOPES } else { SCOPES };
+    let url = build_authorize_url_with(&client, &redirect_uri, &challenge, &flow, scopes);
 
     state.register(&flow, GmailOAuthPending { verifier, user_id, redirect_uri, started: Instant::now() });
 
@@ -409,7 +475,12 @@ fn delete_account(conn: &rusqlite::Connection, id: &str) -> rusqlite::Result<usi
 // ---------------------------------------------------------------------------
 
 fn sync_and_record(app: &AppHandle, db: &DbState, outlook: &OutlookState, account_id: &str, user_id: &str) -> Result<Value, String> {
+    let since = crate::mail_flags::mark();
     let result = sync_account(app, db, outlook, account_id, user_id);
+    // Bills and deadlines in what this sync brought in (Settings → Mail → Alerts).
+    if result.is_ok() {
+        crate::mail_flags::after_sync(app, db, user_id, account_id, &since);
+    }
     if let Err(e) = &result {
         {
             let conn = db.conn.lock().unwrap();
@@ -673,6 +744,16 @@ mod tests {
 
     fn since() -> chrono::DateTime<Utc> {
         chrono::DateTime::parse_from_rfc3339("2026-10-09T00:00:00Z").unwrap().with_timezone(&Utc)
+    }
+
+    #[test]
+    fn only_an_archive_reconnect_asks_to_change_mail() {
+        let c = MicrosoftClient { id: "abc".into(), tenant: "common".into() };
+        let url = build_authorize_url_with(&c, "http://127.0.0.1:5555", "CH", "ST", ARCHIVE_SCOPES);
+        assert!(url.contains("Mail.ReadWrite") && !url.contains("Mail.Send"));
+        assert!(lacks_archive_consent("Microsoft token endpoint (400): invalid_grant AADSTS65001: consent"));
+        assert!(!lacks_archive_consent("Microsoft token endpoint (500): server_error"));
+        assert!(!lacks_archive_consent("Could not reach Microsoft: dns"));
     }
 
     #[test]

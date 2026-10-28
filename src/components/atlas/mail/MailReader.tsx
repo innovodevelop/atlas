@@ -1,6 +1,7 @@
 /**
  * The Beta Mail reading pane (`Atlas Mail Beta.dc.html`, section "Reading"):
- * status, subject, people, Reply / Snooze / Done, the snooze options, the
+ * status, subject, people, Reply / Snooze / Done / Archive, the snooze
+ * options (the presets, and "When Dana replies", which Atlas watches), the
  * Atlas card (what Atlas did or is waiting for), the messages, and the reply
  * box fed by the thread's live draft.
  *
@@ -10,7 +11,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { AtlasIcon } from '../AtlasIcon';
-import { REWRITES, STATUS_CHIP, atlasCard, initialsOf, laterSendIso } from '@/lib/betaMail';
+import { REWRITES, STATUS_CHIP, atlasCard, initialsOf, laterSendIso, replySnoozes } from '@/lib/betaMail';
 import { displayName, formatBytes, fullTime, participantSummary, snoozePresets } from '@/components/atlas-ui/mail/mailFormat';
 import type { MailAccount, MailAuditEvent, MailDraft, MailMessage, MailThread, MailThreadStatus } from '@/types/mail';
 
@@ -24,13 +25,18 @@ export interface MailReaderProps {
   pendingSend: { draftId: string; threadId: string; sendsAt: number } | null;
   busy: boolean;
   snoozeOpen: boolean;
+  /** The snooze's reply watch ('*' or an address), when it has one. */
+  watch: string | null;
+  archived: boolean;
   /** Set by the R shortcut: focus the reply, drafting one first if needed. */
   replyRequest: number;
   stacked: boolean;
   onBack: () => void;
   onStatus: (status: MailThreadStatus) => void;
+  onArchive: () => void;
   onToggleSnooze: () => void;
-  onSnooze: (until: string, label: string) => void;
+  /** `watch`: snooze until that person (or '*', anyone) replies, with `until` as the fallback. */
+  onSnooze: (until: string, label: string, watch?: string) => void;
   onDraft: (opts?: { instruction?: string; tone?: string }) => Promise<MailDraft>;
   onSaveDraft: (draftId: string, body: string) => Promise<MailDraft>;
   onReviseDraft: (draftId: string, instruction: string) => Promise<MailDraft>;
@@ -45,7 +51,7 @@ export function MailReader(p: MailReaderProps) {
   const chip = STATUS_CHIP[thread.status];
   const live = p.drafts.find((d) => d.state === 'proposed' || d.state === 'scheduled') ?? null;
   const pending = !!p.pendingSend && p.pendingSend.threadId === thread.id;
-  const card = atlasCard(thread, p.audit, live, pending, p.matchedOn);
+  const card = atlasCard(thread, p.audit, live, pending, p.matchedOn, { watch: p.watch, archived: p.archived });
   const own = thread.mailbox;
   const canReply = thread.status !== 'handled' && thread.status !== 'snooze';
 
@@ -109,7 +115,8 @@ export function MailReader(p: MailReaderProps) {
         <div className="b-mail-read-actions">
           <button type="button" className="b-mail-round" title="Reply · R" aria-label="Reply" disabled={!canReply || working === 'draft'} onClick={() => (live ? textRef.current?.focus() : void draftNow())}><AtlasIcon name="reply" size={16} /></button>
           <button type="button" className={`b-mail-round${p.snoozeOpen ? ' on' : ''}`} title="Snooze · H" aria-label="Snooze" aria-expanded={p.snoozeOpen} onClick={p.onToggleSnooze}><AtlasIcon name="clock" size={16} /></button>
-          <button type="button" className="b-mail-round" title="Done · E" aria-label="Mark done" disabled={thread.status === 'handled'} onClick={() => p.onStatus('handled')}><AtlasIcon name="check" size={16} /></button>
+          <button type="button" className="b-mail-round" title="Done" aria-label="Mark done" disabled={thread.status === 'handled'} onClick={() => p.onStatus('handled')}><AtlasIcon name="check" size={16} /></button>
+          <button type="button" className="b-mail-round" title="Archive · E" aria-label="Archive" disabled={p.archived} onClick={p.onArchive}><AtlasIcon name="folder" size={16} /></button>
         </div>
       </div>
       {p.snoozeOpen ? (
@@ -118,6 +125,9 @@ export function MailReader(p: MailReaderProps) {
             const [l, t] = o.label.split(' · ');
             return <button type="button" key={o.until} onClick={() => p.onSnooze(o.until, o.label)}>{l}{t ? <span>{t}</span> : null}</button>;
           })}
+          {replySnoozes(thread).map((o) => (
+            <button type="button" key={o.watch} title={o.hint} onClick={() => p.onSnooze(o.until, o.label, o.watch)}>{o.label}<span>Atlas watches</span></button>
+          ))}
         </div>
       ) : null}
 
