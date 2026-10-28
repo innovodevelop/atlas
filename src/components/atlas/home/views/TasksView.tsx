@@ -6,11 +6,14 @@
  * through `updateTask`, the date field writes `due_date`, × is `deleteTask`
  * (armed by the first tap, done by the second — a task does not come back),
  * Add is `addTask`. "Let Atlas do it" opens the Talk panel with the task as
- * the question (`openTalk`) — a real hand-off, not a badge. The design's
- * per-task descriptions of what Atlas found are not shown: nothing has
- * looked yet.
+ * the question (`openTalk`) — a real hand-off — and the hand-off is
+ * remembered on this Mac (`delegated_at` in `atlas_item_notes`), so the
+ * "Atlas is on it" badge is still there after a reload. "Research" (row 10)
+ * asks the brain for a short note from the task's own title, due date and
+ * priority (`researchQuestion`) and saves it with the task; that note is
+ * the design's "what Atlas found" line, written only once Atlas has looked.
  */
-import { useEffect, useState, type KeyboardEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { useTasks, type Task } from '@/hooks/useTasks';
 import { VeilSphere } from '@/components/atlas/VeilSphere';
 import { AtlasIcon } from '@/components/atlas/AtlasIcon';
@@ -20,27 +23,21 @@ import {
   delegable, dueInputValue, dueLabel, nextPriority, orderTasks, priorityTone, priorityWord, ringOffset, taskHeadline, taskSub,
 } from '@/lib/betaViews';
 import { useTick } from './useTick';
+import { escapeBlurs } from './fieldKeys';
+import { AtlasNote } from './AtlasNote';
+import { useItemNotes } from '@/hooks/useItemNotes';
+import { researchQuestion } from '@/lib/betaViews';
 
 /** The ring's circumference (r 48, as the design). */
 const RING_C = 2 * Math.PI * 48;
 /** The panel paper the ring's sphere sits on. */
 const PANEL: RGB = [241, 238, 234];
 
-/**
- * Esc inside a field leaves the field, not the screen: blur it and stop the
- * key before it reaches BetaHome's window listener, which closes the view.
- */
-function escapeBlurs(e: KeyboardEvent<HTMLInputElement>) {
-  if (e.key !== 'Escape') return;
-  e.stopPropagation();
-  e.currentTarget.blur();
-}
-
 export function TasksView() {
   const { tasks, completedCount, toggleTask, addTask, updateTask, deleteTask, isLoading, error } = useTasks();
   const now = useTick(60000);
   const [draft, setDraft] = useState('');
-  const [asked, setAsked] = useState<Record<string, true>>({});
+  const notes = useItemNotes('task');
   const [armed, setArmed] = useState<string | null>(null);
 
   // An armed delete disarms itself if the second tap does not come.
@@ -61,7 +58,7 @@ export function TasksView() {
   };
   const delegate = (t: Task) => {
     openTalk(`Help me with: ${t.title}`);
-    setAsked((a) => ({ ...a, [t.id]: true }));
+    void notes.save(t.id, { delegated_at: new Date().toISOString() });
   };
   const setDue = (t: Task, value: string) => {
     // The date field gives a calendar day; the task is due at nine that morning.
@@ -135,12 +132,24 @@ export function TasksView() {
           <div key={t.id} className="b-wv-take-card">
             <span className="b-wv-take-card-t">{t.title}</span>
             <span className="b-wv-take-card-d">{dueLabel(t.due_date, now)} · {priorityWord(t.priority)} priority</span>
-            <button type="button" className={`b-wv-take-btn${asked[t.id] ? ' on' : ''}`} onClick={() => delegate(t)}>
-              {asked[t.id] ? 'Atlas is on it · ask again' : 'Let Atlas do it'}
+            <button type="button" className={`b-wv-take-btn${notes.notes[t.id]?.delegated_at ? ' on' : ''}`} onClick={() => delegate(t)}>
+              {notes.notes[t.id]?.delegated_at ? 'Atlas is on it · ask again' : 'Let Atlas do it'}
             </button>
+            <AtlasNote
+              itemId={t.id}
+              verb="Researched"
+              action="Research"
+              note={notes.notes[t.id]}
+              asking={notes.asking}
+              now={now}
+              onAsk={() => void notes.ask(t.id, researchQuestion(t, now), 'tasks')}
+              onCancel={notes.cancel}
+              onForget={() => void notes.clear(t.id)}
+            />
           </div>
         ))}
         {!give.length ? <div className="b-wv-take-empty">Nothing open. Add a task and Atlas can take it.</div> : null}
+        {give.length ? <span className="b-wv-free-note">Research sends the task’s title, due date and priority to the AI provider Atlas uses; the note stays on this Mac.</span> : null}
       </aside>
     </div>
   );
