@@ -46,15 +46,22 @@ export function useItemNotes(kind: NoteKind) {
   /** Write fields onto an item's row: update when it exists, insert when not (the local upsert is not one). */
   const save = useCallback(async (itemId: string, patch: Partial<Pick<ItemNote, 'body' | 'noted_at' | 'delegated_at'>>): Promise<string | null> => {
     if (!user) return 'Sign in to keep notes.';
-    const existing = notes[itemId];
-    const res = existing
-      ? await supabase.from('atlas_item_notes').update(patch).eq('id', existing.id).select()
-      : await supabase.from('atlas_item_notes').insert({ user_id: user.id, item_kind: kind, item_id: itemId, ...patch }).select();
-    if (res.error) return res.error.message;
-    const row = ((res.data ?? []) as ItemNote[])[0];
+    // Update by the item's own key first, whatever this hook has loaded: a
+    // row written before the first read landed (or by another screen) is
+    // still found, so the insert below never trips the UNIQUE key.
+    const upd = await supabase.from('atlas_item_notes').update(patch)
+      .eq('user_id', user.id).eq('item_kind', kind).eq('item_id', itemId).select();
+    if (upd.error) return upd.error.message;
+    let rows = (upd.data ?? []) as ItemNote[];
+    if (!rows.length) {
+      const ins = await supabase.from('atlas_item_notes').insert({ user_id: user.id, item_kind: kind, item_id: itemId, ...patch }).select();
+      if (ins.error) return ins.error.message;
+      rows = (ins.data ?? []) as ItemNote[];
+    }
+    const row = rows[0];
     if (row) setNotes((n) => ({ ...n, [itemId]: row }));
     return null;
-  }, [user, kind, notes]);
+  }, [user, kind]);
 
   /** Ask the brain for this item's note; streams into `asking`, saved on success. */
   const ask = useCallback(async (itemId: string, question: string, screen: string) => {

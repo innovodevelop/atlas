@@ -35,7 +35,10 @@ pub(crate) fn valid_shortcut_name(raw: &str) -> Result<&str, String> {
         return Err("A shortcut name cannot contain line breaks or control characters.".into());
     }
     if name.starts_with('-') {
-        return Err("A shortcut name starting with '-' would be read as an option. Rename the shortcut.".into());
+        return Err(
+            "A shortcut name starting with '-' would be read as an option. Rename the shortcut."
+                .into(),
+        );
     }
     Ok(name)
 }
@@ -84,8 +87,14 @@ pub fn focus_shortcut_run(name: String) -> Result<(), String> {
                 if let Some(mut err) = child.stderr.take() {
                     let _ = err.by_ref().take(2_000).read_to_string(&mut msg);
                 }
-                let line = msg.lines().map(str::trim).find(|l| !l.is_empty()).unwrap_or("it stopped with an error");
-                return Err(format!("The shortcut \u{201c}{name}\u{201d} did not run: {line}"));
+                let line = msg
+                    .lines()
+                    .map(str::trim)
+                    .find(|l| !l.is_empty())
+                    .unwrap_or("it stopped with an error");
+                return Err(format!(
+                    "The shortcut \u{201c}{name}\u{201d} did not run: {line}"
+                ));
             }
             Ok(None) if started.elapsed() > RUN_TIMEOUT => {
                 let _ = child.kill();
@@ -105,7 +114,10 @@ mod tests {
     #[test]
     fn names_are_checked_before_they_reach_the_tool() {
         assert_eq!(valid_shortcut_name("  Focus on ").unwrap(), "Focus on");
-        assert_eq!(valid_shortcut_name("Arbejde – fokus").unwrap(), "Arbejde – fokus");
+        assert_eq!(
+            valid_shortcut_name("Arbejde – fokus").unwrap(),
+            "Arbejde – fokus"
+        );
         assert!(valid_shortcut_name("   ").is_err());
         assert!(valid_shortcut_name("--help").is_err());
         assert!(valid_shortcut_name("two\nlines").is_err());

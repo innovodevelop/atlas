@@ -82,6 +82,28 @@ export function locationKey(l: Pick<WeatherLocation, 'city' | 'lat' | 'lon'>): s
   return l.lat != null && l.lon != null ? `${l.city}@${l.lat.toFixed(4)},${l.lon.toFixed(4)}` : l.city;
 }
 
+/** The geocoder's answer, each match checked; anything malformed is dropped. */
+export function parsePlaces(v: unknown): WeatherPlace[] {
+  const list = v && typeof v === 'object' ? (v as { places?: unknown }).places : null;
+  if (!Array.isArray(list)) return [];
+  return list.flatMap((p) => { const ok = validPlace(p); return ok ? [ok] : []; });
+}
+
+/**
+ * Search for a place by name through OpenWeather's geocoding, in Rust
+ * (`weather_geocode`) with the key already on this Mac. Only the typed text
+ * leaves the Mac. Throws with a sentence the screen can show.
+ */
+export async function searchPlaces(query: string): Promise<WeatherPlace[]> {
+  const q = query.trim();
+  if ([...q].length < 2) throw new Error('Type at least two letters of the place.');
+  if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) {
+    throw new Error('Place search runs in the Mac app.');
+  }
+  const { invoke } = await import('@tauri-apps/api/core');
+  return parsePlaces(await invoke<unknown>('weather_geocode', { query: q }));
+}
+
 // --- The store ----------------------------------------------------------------------
 
 const systemZone = (): string | null => {

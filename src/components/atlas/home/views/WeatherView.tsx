@@ -18,7 +18,10 @@ import { mountSky, type SkyHandle } from '@/lib/weatherSky';
 import {
   airAdvice, aqiTone, aqiWord, bodyLook, clock24, dayBars, daylightLabel, hourOfLabel, iconWord, moonPhase,
   parseClockLabel, pm25Fraction, ringOffset, skyMix, skyWord, sunArc,
+  feelsLine, pollutantRows, rainFraction, sliceRain, windFrom,
 } from '@/lib/betaViews';
+import { placeLabel, searchPlaces, setWeatherPlace, type WeatherPlace } from '@/lib/weatherLocation';
+import { escapeBlurs } from './fieldKeys';
 import { useTick } from './useTick';
 
 const ICON_OF: Record<string, IconName> = { 'sunny': 'sun', 'partly-cloudy': 'partly cloudy', 'cloudy': 'cloud', 'rainy': 'rain', 'stormy': 'rain', 'snowy': 'cloud' };
@@ -30,7 +33,7 @@ const MOON_GLOW = '0 0 26px 6px rgba(240,236,226,.28), 0 0 70px 24px rgba(200,21
 const AIR_C = 2 * Math.PI * 56;
 
 export function WeatherView() {
-  const { weather, isFallback, isLoading } = useWeather();
+  const { weather, isFallback, isLoading, place } = useWeather();
   const now = useTick(60000);
   const [pick, setPick] = useState<number | null>(null);
   const heroRef = useRef<HTMLElement | null>(null);
@@ -100,6 +103,14 @@ export function WeatherView() {
   useEffect(() => { placeLight(); }, [bodyDay, placeLight]);
 
   const line = picked ? skyWord(mix) : weather.condition;
+  // What the reading (or the picked slice) says beyond the headline: how warm
+  // it feels and the wind. Only fields the forecast carried; the sample has none.
+  const feels = feelsLine(shownTemp, picked ? picked.feelsLike : weather.feelsLike);
+  const windNow = picked
+    ? (picked.wind != null ? `Wind ${Math.round(picked.wind)} mph` : null)
+    : isFallback ? null : `Wind ${Math.round(weather.windSpeed)} mph${windFrom(weather.windDeg) ? ` from ${windFrom(weather.windDeg)}` : ''}${weather.windGust != null && weather.windGust > weather.windSpeed ? `, gusts ${Math.round(weather.windGust)}` : ''}`;
+  const rainNow = picked ? sliceRain(picked.pop, picked.rain) : null;
+  const extra = [feels, windNow, rainNow ? `Rain ${rainNow}` : null].filter(Boolean).join(' · ');
   const when = picked ? `${String(picked.hour).padStart(2, '0')}:00` : 'now';
   const bars = dayBars(weather.daily ?? []);
   const air = weather.air ?? null;
@@ -137,6 +148,7 @@ export function WeatherView() {
               {line}
               {weather.high != null && weather.low != null ? <> · <span className="b-wv-nowrap">H {Math.round(weather.high)}° L {Math.round(weather.low)}°</span></> : null}
             </span>
+            {extra ? <span className="b-wv-line b-wv-line--small">{extra}</span> : null}
           </div>
           <div className="b-wv-arc" aria-label={arc.day ? 'The sun today' : 'The moon tonight'}>
             <svg viewBox="0 0 420 210" aria-hidden><path d="M20 200 A190 190 0 0 1 400 200" fill="none" stroke="rgba(249,247,244,.18)" strokeWidth="2" strokeDasharray="3 7" /></svg>
@@ -150,10 +162,15 @@ export function WeatherView() {
           {slices.map((h, i) => {
             const on = pick === i;
             const label = h.time === 'Now' ? 'now' : h.time.toLowerCase();
+            const rain = sliceRain(h.pop, h.rain);
             return (
-              <button key={h.key} type="button" className={`b-wv-hour${on ? ' on' : ''}`} aria-pressed={on} title={`Show the sky at ${label}`} onClick={() => setPick(on ? null : i)}>
+              <button key={h.key} type="button" className={`b-wv-hour${on ? ' on' : ''}`} aria-pressed={on} title={`Show the sky at ${label}${rain ? ` · rain ${rain}` : ''}`} onClick={() => setPick(on ? null : i)}>
                 <span className="b-wv-hour-t">{Math.round(h.temp)}°</span>
                 <AtlasIcon name={ICON_OF[h.icon] ?? 'cloud'} size={14} weight={1.7} />
+                {h.pop != null || h.rain != null ? (
+                  <span className="b-wv-hour-rain" aria-hidden><span style={{ height: `${Math.round(rainFraction(h.rain) * 100)}%` }} /></span>
+                ) : null}
+                {h.pop != null && h.pop > 0 ? <span className="b-wv-hour-pop b-num">{Math.round(h.pop)}%</span> : null}
                 <span className={`b-wv-hour-l b-num${h.time === 'Now' ? ' now' : ''}`}>{label}</span>
               </button>
             );
@@ -190,7 +207,9 @@ export function WeatherView() {
                   <span className="b-wv-air-mid"><span className="b-wv-air-n">{Math.round(air.pm25)}</span><span className="b-wv-air-w">{aqiWord(air.aqi)}</span></span>
                 </div>
                 <div className="b-wv-air-rows">
-                  <div className="b-wv-air-row"><span>PM2.5</span><span className="b-wv-air-bar"><span style={{ width: `${Math.round(pm25Fraction(air.pm25) * 100)}%` }} /></span><span className="b-num">{air.pm25.toFixed(1)}</span></div>
+                  {pollutantRows(air).map((r) => (
+                    <div key={r.kind} className={`b-wv-air-row b-wv-air-row--b${r.band}`}><span>{r.label}</span><span className="b-wv-air-bar"><span style={{ width: `${Math.round(r.fraction * 100)}%` }} /></span><span className="b-num">{r.value.toFixed(1)}</span></div>
+                  ))}
                   <div className="b-wv-air-row"><span>Index</span><span className="b-wv-air-bar"><span style={{ width: `${Math.round(Math.max(0, Math.min(5, air.aqi)) / 5 * 100)}%` }} /></span><span className="b-num">{air.aqi} / 5</span></div>
                   <span className="b-wv-air-note">µg/m³ · OpenWeather's 1–5 index</span>
                 </div>
@@ -202,6 +221,69 @@ export function WeatherView() {
           )}
         </section>
       </div>
+      {place ? <WeatherPlacePicker label={place.label} source={place.source} /> : null}
     </>
+  );
+}
+
+/**
+ * Where the weather is for (row 4): the place in use and how it was chosen,
+ * a search through OpenWeather's geocoding (only the typed text leaves the
+ * Mac, with the key already on it), and a way back to this Mac's time zone.
+ * The pick is stored on this Mac and every weather reading in Atlas follows it.
+ */
+function WeatherPlacePicker({ label, source }: { label: string; source: 'picked' | 'timezone' | 'default' }) {
+  const [q, setQ] = useState('');
+  const [found, setFound] = useState<WeatherPlace[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const how = source === 'picked' ? 'you picked it' : source === 'timezone' ? 'from this Mac’s time zone' : 'the default; pick your place';
+  const search = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      const places = await searchPlaces(q);
+      setFound(places);
+      if (!places.length) setErr('No place by that name. Try the town and its country, such as “Aarhus, DK”.');
+    } catch (e) {
+      setFound(null);
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const pick = (p: WeatherPlace) => { setWeatherPlace(p); setFound(null); setQ(''); };
+  return (
+    <section className="b-wv-place" aria-label="Weather location">
+      <span className="b-wv-h2">Location</span>
+      <span className="b-wv-sub">{label} · {how}</span>
+      <div className="b-wv-add">
+        <input
+          className="b-wv-add-in"
+          placeholder="Search for a town or city"
+          aria-label="Search for a place"
+          value={q}
+          maxLength={100}
+          onChange={(e) => { setQ(e.target.value); setErr(null); }}
+          onKeyDown={(e) => { if (e.key === 'Enter') void search(); else escapeBlurs(e); }}
+        />
+        <button type="button" className="b-wv-add-btn" disabled={busy || q.trim().length < 2} onClick={() => void search()}>{busy ? 'Searching…' : 'Search'}</button>
+      </div>
+      {found?.length ? (
+        <div className="b-wv-place-list">
+          {found.map((p) => (
+            <button key={`${p.lat},${p.lon}`} type="button" className="b-wv-slot" onClick={() => pick(p)}>
+              <span className="b-wv-slot-l">{placeLabel(p)}</span>
+              <span className="b-wv-slot-act">Use</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {err ? <p className="b-wv-err">{err}</p> : null}
+      {source === 'picked' ? (
+        <button type="button" className="b-wv-why-ask" onClick={() => setWeatherPlace(null)}>Use this Mac’s time zone instead</button>
+      ) : null}
+      <span className="b-wv-free-note">The search sends what you type to OpenWeather with the key on this Mac. The place you pick stays on this Mac; the forecast is asked for by its coordinates.</span>
+    </section>
   );
 }

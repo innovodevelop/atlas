@@ -18,6 +18,8 @@ import {
 } from '@/lib/betaWatchlist';
 
 type Listener = () => void;
+/** One empty list, so a signed-out reader's memo does not change every render. */
+const NO_ROWS: WatchRow[] = [];
 
 // --- Preferences: order, threshold, edited ----------------------------------------------
 
@@ -103,7 +105,7 @@ export function useWatchlist() {
   useEffect(() => attach(userId), [userId]);
 
   const mine = r.userId === userId;
-  const rows = mine ? r.rows : [];
+  const rows = mine ? r.rows : NO_ROWS;
   const loaded = mine && r.loaded;
   const shown = useMemo(() => shownSymbols(rows, p), [rows, p]);
 
@@ -132,7 +134,8 @@ export function useWatchlist() {
 
   const add = useCallback(async (raw: string): Promise<string | null> => {
     const check = checkAdd(raw, shown.symbols);
-    if (!check.ok) return check.reason;
+    // `in`, not `!check.ok`: without strictNullChecks a boolean discriminant does not narrow.
+    if ('reason' in check) return check.reason;
     if (!userId) return 'Sign in to keep a watchlist.';
     await run(async () => {
       const err = await insert(shown.starting ? [...shown.symbols, check.symbol] : [check.symbol]);
