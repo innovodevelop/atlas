@@ -470,6 +470,7 @@ const server = Bun.serve({
       if (url.pathname.startsWith("/admin/tests/run/") && req.method === "POST") return admin.runTest(req, url.pathname.split("/")[4]);
       if (url.pathname === "/admin/design-syncs" && req.method === "GET") return admin.getDesignSyncs(req);
       if (url.pathname === "/admin/design-syncs/sync" && req.method === "POST") return admin.syncDesignSyncs(req);
+      if (url.pathname === "/admin/design-syncs/screens" && req.method === "GET") return admin.getDesignScreens(req);
       if (url.pathname === "/admin/ingest-sessions" && req.method === "POST") return admin.ingestSessions(req);
       if (url.pathname === "/admin/ci-runs" && req.method === "POST") return admin.getCiRuns(req);
       if (url.pathname === "/admin/system/health" && req.method === "GET") return admin.getSystemHealth(req);

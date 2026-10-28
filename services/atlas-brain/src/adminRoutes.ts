@@ -18,6 +18,7 @@ import { createPlanSync, defaultRepoCandidates, type PlanSyncStatus } from "./pl
 import { ingestJsonlSessions } from "./jsonlIngest.ts";
 import { applyChangelog, readGitLog } from "./changelog.ts";
 import { applyDesignSyncs, parseDesignManifest } from "./designSync.ts";
+import { readDesignScreens } from "./designScreens.ts";
 import { executeRepair, type RepairContext } from "./selfRepair.ts";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { resolve } from "path";
@@ -197,6 +198,7 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
     discoverTests,
     getDesignSyncs,
     syncDesignSyncs,
+    getDesignScreens,
     ingestSessions,
     getCiRuns,
     getSystemHealth,
@@ -478,6 +480,17 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
     }
     const { entries, skipped } = parseDesignManifest(manifest);
     return json({ ...applyDesignSyncs(db, entries), skipped });
+  }
+
+  /**
+   * GET /admin/design-syncs/screens — the design ⇄ code table: each screen
+   * of the current handoff, the code that implements it and whether the
+   * design moved after it (designScreens.ts). Read from the checkout on
+   * every call; nothing is stored, so it can never disagree with the repo.
+   */
+  function getDesignScreens(req: Request): Response {
+    requireUser(req);
+    return json(readDesignScreens(PROJECT_ROOT));
   }
 
   function ingestSessions(req: Request): Response {
