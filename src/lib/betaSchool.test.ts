@@ -3,7 +3,7 @@ import {
   DAY, EMPTY_SCHOOL, FOCUS_SECONDS, FRESH_FOCUS, HOUR, MIN, MIN_EASE, START_EASE,
   addDays, cardsPrompt, cleanRewrite, clock, deadlineProgress, dueCards, dueIn, dueLabel,
   evaluateSheet, focusLeft, forecast, formatCell, formatInterval, fromInputs, gradePreview,
-  inRanges, isoWeek, lengthState, literal, marginPrompt, moveRef, newCard, nextColour,
+  inRanges, isoWeek, lengthState, literal, moveRef, newCard, nextColour,
   nextDueAt, nextHintLevel, parseCardDrafts, parseNotes, parseSchool, pauseFocus, rangesIn,
   rewritePrompt, schedule, sheetPrompt, sheetText, spreadSessions, startFocus, startOfDay,
   todayRibbon, tutorPrompt, tutorTitle, upcomingDeadlines, weekStart, wordCount,
@@ -207,10 +207,9 @@ describe('writing', () => {
     expect(lengthState(1300, 900, 1200)).toBe('over');
     expect(lengthState(10, null, null)).toBe('none');
   });
-  test('rewrite and margin prompts say what they may not do', () => {
+  test('the rewrite prompt says what it may not do', () => {
     expect(rewritePrompt('My text.', 'formal')).toContain('more formal');
     expect(rewritePrompt('My text.', 'shorter').endsWith('My text.')).toBe(true);
-    expect(marginPrompt('T', 'Body')).toContain('Never rewrite their sentences');
   });
   test('cleans what models wrap around a rewrite', () => {
     expect(cleanRewrite('Here is the rewritten passage:\n"Short and clear."')).toBe('Short and clear.');
@@ -321,5 +320,24 @@ describe('parseSchool', () => {
     expect(s.tutor[0].turns).toHaveLength(1);
     expect(s.sheet).toEqual({ A1: '5' });
     expect(s.focus).toEqual({ endsAt: null, left: FOCUS_SECONDS });
+  });
+  test('exams, preparations, what the tutor saw and anchored notes are read the same way', () => {
+    const s = parseSchool(JSON.stringify({
+      decks: [{ id: 'd1', name: 'Maths' }],
+      exams: [{ id: 'e1', title: 'Maths A', kind: 'oral', at: 5 }, { id: 'e2', title: 'No date' }, { id: 'e3', title: 'Odd', kind: 'sung', at: 6 }],
+      examDecks: { 'own:e1': ['d1', 'gone', 3], 'own:e9': ['gone'] },
+      prepared: [{ id: 'moodle:10', title: 'H7', at: 1, due: 9, steps: [{ text: 'Read', done: true }, { done: true }], deadlineId: 'dl' }, { id: 'x', title: 'No time' }],
+      seen: ['moodle:10', 5],
+      handedIn: ['moodle:11'],
+      understood: [{ day: '2026-10-28', threadId: 't1', at: 1, items: [{ text: 'Product rule', ok: true }, { ok: true }] }, { day: 'today', threadId: 't1', at: 1, items: [] }],
+      docs: [{ id: 'doc', title: '', body: 'b', updated: 1, notes: [{ id: 'n1', text: 'Why?', anchor: 'Intro' }, { id: 'n2', text: 'Loose' }, { text: 'no id' }] }],
+    }));
+    expect(s.exams).toEqual([{ id: 'e1', title: 'Maths A', kind: 'oral', at: 5 }, { id: 'e3', title: 'Odd', kind: 'exam', at: 6 }]);
+    expect(s.examDecks).toEqual({ 'own:e1': ['d1'] });
+    expect(s.prepared).toEqual([{ id: 'moodle:10', title: 'H7', course: '', due: 9, steps: [{ text: 'Read', done: true }], deadlineId: 'dl', deckId: null, at: 1 }]);
+    expect(s.seen).toEqual(['moodle:10']);
+    expect(s.handedIn).toEqual(['moodle:11']);
+    expect(s.understood).toEqual([{ day: '2026-10-28', threadId: 't1', at: 1, items: [{ text: 'Product rule', ok: true }] }]);
+    expect(s.docs[0].notes).toEqual([{ id: 'n1', text: 'Why?', anchor: 'Intro' }, { id: 'n2', text: 'Loose', anchor: null }]);
   });
 });

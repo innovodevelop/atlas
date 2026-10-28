@@ -1440,6 +1440,286 @@ CREATE TRIGGER IF NOT EXISTS trg_atlas_item_notes_updated AFTER UPDATE ON atlas_
   BEGIN UPDATE atlas_item_notes SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
 
 -- ###########################################################################
+-- # MUSIC — lyrics cache and resume points (Beta Music, Podcast)             #
+-- ###########################################################################
+
+-- LRCLIB answers, so a track's lyrics are asked for once. `found` 0 with no
+-- text is a remembered miss; music.rs asks again after a week.
+CREATE TABLE IF NOT EXISTS music_lyrics_cache (
+  cache_key    TEXT PRIMARY KEY NOT NULL,
+  found        INTEGER NOT NULL DEFAULT 0,
+  instrumental INTEGER NOT NULL DEFAULT 0,
+  synced       TEXT,
+  plain        TEXT,
+  fetched_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+-- Where Atlas's own engine stopped in an episode. Spotify's resume point only
+-- moves for Connect playback, and Atlas drives librespot directly, so this is
+-- the place it keeps on this Mac. `meta` is the webview's record of the item
+-- (title, show, artwork) for Home's Podcast widget. Capped at 300 rows.
+CREATE TABLE IF NOT EXISTS music_resume (
+  item_id     TEXT PRIMARY KEY NOT NULL,
+  uri         TEXT NOT NULL,
+  position_ms INTEGER NOT NULL DEFAULT 0,
+  duration_ms INTEGER NOT NULL DEFAULT 0,
+  meta        TEXT NOT NULL DEFAULT '{}',
+  updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_music_resume_updated ON music_resume(updated_at);
+
+-- ###########################################################################
+-- # SMART HOME, THE BETA EXTRAS — begin                                      #
+-- #                                                                          #
+-- # What the Beta Smart Home reads beyond the mirror above: the attributes a #
+-- # device's one value cannot carry, Home Assistant's own machinery          #
+-- # (automations, scripts, people), the history Atlas keeps of what the      #
+-- # devices did, and the Home / Away / Night modes. New tables only, so no   #
+-- # migration: CREATE TABLE IF NOT EXISTS creates each one on first launch.  #
+-- # Everything is keyed to a bridge and cascades with it, so unlinking Home  #
+-- # Assistant takes its history with it — except the mode mapping, which    #
+-- # names routines by their Home Assistant id and survives a relink.         #
+-- # Written by src-tauri/src/home/history.rs.                                #
+-- ###########################################################################
+
+-- One row per mirrored device: what the bridge says beyond `value`.
+CREATE TABLE IF NOT EXISTS home_device_detail (
+  device_id     TEXT PRIMARY KEY REFERENCES home_devices(id) ON DELETE CASCADE,
+  user_id       TEXT NOT NULL,
+  -- The Home Assistant domain (`climate`, `water_heater`, `sensor`). It is
+  -- what keeps a water heater's 55° out of the inside temperature.
+  domain        TEXT NOT NULL,
+  device_class  TEXT,
+  unit          TEXT,
+  state_class   TEXT,
+  -- What a thermostat is SET to. NULL is "the bridge did not say" (a
+  -- thermostat that is off, a heat-cool range) — never 0.
+  target        REAL,
+  -- The climate entity's own word for what it is doing: heating, idle, off.
+  hvac_action   TEXT,
+  -- The Home Assistant device the entity belongs to: files a plug's power
+  -- sensor under the plug, a doorbell's motion sensor under the camera.
+  hub_device_id TEXT,
+  -- grid | solar | device, from Home Assistant's Energy dashboard.
+  energy_role   TEXT,
+  updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+-- Home Assistant's machinery: read, never drawn as a device.
+CREATE TABLE IF NOT EXISTS home_hub_entities (
+  id             TEXT PRIMARY KEY,
+  user_id        TEXT NOT NULL,
+  bridge_id      TEXT NOT NULL REFERENCES home_bridges(id) ON DELETE CASCADE,
+  external_id    TEXT NOT NULL,
+  domain         TEXT NOT NULL CHECK (domain IN ('automation','script','person','device_tracker')),
+  label          TEXT NOT NULL,
+  -- The raw state word: on/off, home/not_home or a zone's name.
+  state          TEXT,
+  available      INTEGER NOT NULL DEFAULT 1 CHECK (available IN (0,1)),
+  -- For a script: 0 only when Atlas read its config and found no lock in it.
+  -- DEFAULT 1 for the same reason as home_scenes.touches_locks.
+  touches_locks  INTEGER NOT NULL DEFAULT 1 CHECK (touches_locks IN (0,1)),
+  last_changed   TEXT,
+  last_triggered TEXT,
+  created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_home_hub_entities_bridge_ext ON home_hub_entities(bridge_id, external_id);
+CREATE INDEX IF NOT EXISTS idx_home_hub_entities_user ON home_hub_entities(user_id, domain, label);
+
+-- What the mirror saw the devices do, and what Atlas told them to do.
+-- Capped: rows older than 30 days are pruned, and each account keeps at most
+-- 20 000 (home/history.rs, `prune_events`). Measurements (sensor.*) are never
+-- recorded — the energy card reads Home Assistant's own statistics instead.
+CREATE TABLE IF NOT EXISTS home_events (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id      TEXT NOT NULL,
+  bridge_id    TEXT NOT NULL REFERENCES home_bridges(id) ON DELETE CASCADE,
+  -- The entity id. Not the local device id: the history outlives a device
+  -- being re-created by a sync, and a scene or automation has no device row.
+  external_id  TEXT NOT NULL,
+  -- `state`: the bridge reported a change. `command`: Atlas sent one.
+  kind         TEXT NOT NULL CHECK (kind IN ('state','command')),
+  value        REAL,
+  state        TEXT,
+  available    INTEGER CHECK (available IN (0,1)),
+  -- For a command, the verb ("lock", "turn_off", "set"); NULL for a state.
+  detail       TEXT,
+  at           TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_home_events_entity ON home_events(user_id, external_id, at);
+CREATE INDEX IF NOT EXISTS idx_home_events_at ON home_events(user_id, at);
+
+-- Home / Away / Night, each mapped by the user to a scene or a script.
+CREATE TABLE IF NOT EXISTS home_modes (
+  user_id              TEXT NOT NULL,
+  mode                 TEXT NOT NULL CHECK (mode IN ('home','away','night')),
+  routine_kind         TEXT CHECK (routine_kind IN ('scene','script')),
+  routine_external_id  TEXT,
+  routine_label        TEXT,
+  updated_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  PRIMARY KEY (user_id, mode)
+);
+
+-- The mode the house is in, as far as Atlas set it. One row per account.
+CREATE TABLE IF NOT EXISTS home_mode_state (
+  user_id    TEXT PRIMARY KEY,
+  mode       TEXT NOT NULL CHECK (mode IN ('home','away','night')),
+  since      TEXT NOT NULL
+);
+
+-- ###########################################################################
+-- # SMART HOME, THE BETA EXTRAS — end.                                       #
+-- ###########################################################################
+
+-- ###########################################################################
+-- # MONEY — the bank store behind the Beta Money screen                       #
+-- ###########################################################################
+-- Transactions reach this Mac two ways: a netbank CSV export the user picks
+-- (parsed in the webview, src/lib/bankCsv.ts, written through
+-- bank_store_transactions), or the optional read-only GoCardless Bank Account
+-- Data link, which src-tauri/src/bank.rs reads on demand and once a day. Either
+-- way the rows live here and nowhere else. GoCardless's keys are in the
+-- Keychain (atlas-core), never in these tables.
+
+CREATE TABLE IF NOT EXISTS bank_accounts (
+  id           TEXT PRIMARY KEY,
+  user_id      TEXT NOT NULL,
+  name         TEXT NOT NULL,
+  institution  TEXT,
+  -- Only the last four digits: enough to tell two accounts apart on screen.
+  iban_last4   TEXT,
+  currency     TEXT NOT NULL DEFAULT 'DKK',
+  source       TEXT NOT NULL DEFAULT 'csv' CHECK (source IN ('csv','gocardless')),
+  link_id      TEXT,
+  external_id  TEXT,
+  balance      REAL,
+  balance_at   TEXT,
+  -- Savings and shared accounts stay out of the budget and the projection.
+  is_excluded  INTEGER NOT NULL DEFAULT 0,
+  created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_bank_accounts_user ON bank_accounts(user_id);
+
+-- The id is the dedupe key: a hash of account, day, amount, text and place
+-- among identical rows for CSV ("csv-…"), the bank's own transaction id for
+-- GoCardless ("gc:…"). Re-imports are INSERT OR IGNORE against it.
+CREATE TABLE IF NOT EXISTS bank_transactions (
+  id            TEXT PRIMARY KEY,
+  user_id       TEXT NOT NULL,
+  account_id    TEXT NOT NULL REFERENCES bank_accounts(id) ON DELETE CASCADE,
+  booked_on     TEXT NOT NULL,                -- YYYY-MM-DD, the booking day
+  amount        REAL NOT NULL,                -- signed: money out is negative
+  currency      TEXT,
+  text          TEXT NOT NULL,                -- the statement line as the bank wrote it
+  balance_after REAL,
+  source        TEXT NOT NULL DEFAULT 'csv' CHECK (source IN ('csv','gocardless')),
+  imported_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_bank_tx_user_day ON bank_transactions(user_id, booked_on DESC);
+CREATE INDEX IF NOT EXISTS idx_bank_tx_account_day ON bank_transactions(account_id, booked_on DESC);
+
+-- Merchant patterns the user set, or that Atlas set when asked to sort.
+-- Categories are the fixed set in src/lib/bankLedger.ts.
+CREATE TABLE IF NOT EXISTS bank_rules (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL,
+  pattern    TEXT NOT NULL,
+  category   TEXT NOT NULL,
+  origin     TEXT NOT NULL DEFAULT 'user' CHECK (origin IN ('user','atlas')),
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE(user_id, pattern)
+);
+
+CREATE TABLE IF NOT EXISTS bank_budgets (
+  id            TEXT PRIMARY KEY,
+  user_id       TEXT NOT NULL,
+  category      TEXT NOT NULL,
+  monthly_limit REAL NOT NULL,
+  created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE(user_id, category)
+);
+
+CREATE TABLE IF NOT EXISTS bank_goals (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL,
+  name       TEXT NOT NULL,
+  target     REAL NOT NULL,
+  due_on     TEXT,
+  -- When set, the goal's saved amount is this account's balance.
+  account_id TEXT REFERENCES bank_accounts(id) ON DELETE SET NULL,
+  currency   TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+-- Manual contributions; a negative one is a withdrawal.
+CREATE TABLE IF NOT EXISTS bank_goal_moves (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL,
+  goal_id    TEXT NOT NULL REFERENCES bank_goals(id) ON DELETE CASCADE,
+  amount     REAL NOT NULL,
+  made_on    TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+-- What the user said about a subscription Atlas found. Atlas cannot cancel
+-- at the merchant: 'reminded' means a reminder task to cancel it exists
+-- (`task_id`) and it still counts; 'cancelled' only stops it counting;
+-- 'ignored' means it was never a subscription. `merchant` is the recurring key
+-- from bankLedger.ts.
+CREATE TABLE IF NOT EXISTS bank_subscription_marks (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL,
+  merchant   TEXT NOT NULL,
+  status     TEXT NOT NULL CHECK (status IN ('reminded','cancelled','ignored')),
+  task_id    TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE(user_id, merchant)
+);
+
+-- One row per GoCardless requisition (the bank consent). `status` is
+-- GoCardless's own code (CR created, LN linked, EX expired, RJ rejected, …).
+CREATE TABLE IF NOT EXISTS bank_links (
+  id               TEXT PRIMARY KEY,           -- the requisition id
+  user_id          TEXT NOT NULL,
+  institution_id   TEXT NOT NULL,
+  institution_name TEXT,
+  agreement_id     TEXT,
+  status           TEXT NOT NULL DEFAULT 'CR',
+  history_days     INTEGER,
+  access_days      INTEGER,
+  linked_at        TEXT,
+  expires_at       TEXT,
+  last_synced_at   TEXT,
+  -- Claimed by whichever running bundle syncs next, so two open apps over the
+  -- one database do not both spend the bank's few daily reads.
+  sync_claimed_at  TEXT,
+  last_error       TEXT,
+  created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+CREATE TRIGGER IF NOT EXISTS trg_bank_accounts_updated AFTER UPDATE ON bank_accounts
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE bank_accounts SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_bank_rules_updated AFTER UPDATE ON bank_rules
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE bank_rules SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_bank_budgets_updated AFTER UPDATE ON bank_budgets
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE bank_budgets SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_bank_goals_updated AFTER UPDATE ON bank_goals
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE bank_goals SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_bank_links_updated AFTER UPDATE ON bank_links
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE bank_links SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+
+-- ###########################################################################
 -- # SETTINGS — the battery's last two days, and whether Atlas remembers       #
 -- ###########################################################################
 -- Settings → Battery draws the last 24 hours of charge. macOS keeps no such

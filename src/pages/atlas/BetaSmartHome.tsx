@@ -12,10 +12,14 @@
  * never confirmed, did not go through) is printed where the design prints a
  * status.
  *
- * What the design shows and this screen does not: the Home/Away/Night modes,
- * the energy card, the automation switches and the Atlas tip. Atlas has no
- * source for any of them — no presence, no meter, no scheduler, no history —
- * so none is drawn rather than drawn from nothing.
+ * The Beta extras come from the same bridge (src-tauri/src/home/beta.rs):
+ * Home / Away / Night, each running the scene or script the user mapped to
+ * it, with a Home/Away suggestion when Home Assistant knows where people are;
+ * the energy card from its power sensors and its own statistics; its
+ * automations with their switches; a camera's motion events and a still on
+ * request; and the tips and the lock note, read from the history Atlas keeps
+ * of what the devices did and which commands it sent. Each of them says what
+ * it needs when the bridge does not have it, and draws nothing invented.
  *
  * three.js is loaded lazily inside an effect, so it stays out of the main
  * bundle, and the stage only exists while there is a device to put on it.
@@ -23,13 +27,16 @@
  * same model.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { relativeLabel, useSmartHome, type LiveBridge, type LiveDevice } from '@/hooks/useSmartHome';
+import {
+  HOME_MODES, relativeLabel, useSmartHome, type EnergyToday, type HomeEvent, type HomeMode, type LiveBridge, type LiveDevice, type UseSmartHome,
+} from '@/hooks/useSmartHome';
 import { useWeather } from '@/hooks/useWeather';
 import { isRoutable } from '@/surfaces';
 import type { Stage, StageKind } from '@/lib/devices3d';
 import {
-  SWATCHES, controlKind, countOn, fToC, fmtTemp, hasPower, isSecured, lit, powerLabel, powerValue, roomSub, roomTemp, sceneInitial,
-  stageKindOf, stageStateOf, statusOf, stepTemp, thermNote,
+  MODE_LABEL, SWATCHES, cameraEventLine, cameraSensors, clockLabel, controlKind, countOn, energyView, fToC, fmtKwh, fmtTemp, fmtWatts,
+  hasPower, historyLine, homeTips, isSecured, lastMotion, lit, lockNote, powerLabel, powerValue, presenceSuggestion, roomSub, roomTemp,
+  sceneInitial, stageKindOf, stageStateOf, statusOf, stepTemp, stepperValue, thermNote, type Tip,
 } from '@/lib/betaSmartHome';
 import { DeviceControl } from '@/components/atlas-ui/smartHome/DeviceControls';
 import { VeilSphere } from '@/components/atlas/VeilSphere';
@@ -52,6 +59,14 @@ const RECENT_PX = 96;
 const WARM = '#ffd9a0';
 /** How long a scene pill may say "Running…" if neither an answer nor an error arrives. */
 const SCENE_PATIENCE_MS = 15_000;
+/** The history window the screen reads: a week, newest first, capped. */
+const HISTORY_DAYS_READ = 7;
+const HISTORY_LIMIT = 500;
+/** The history is re-read after a change, at most this often. */
+const HISTORY_SETTLE_MS = 4_000;
+/** Today's energy is re-read this often while the screen is open. */
+const ENERGY_EVERY_MS = 5 * 60_000;
+const MODE_DOT: Record<HomeMode, string> = { home: 'var(--b-green)', away: '#e07a1f', night: '#7854ff' };
 
 const ICON_OF: Record<StageKind, IconName> = {
   lamp: 'sun', bulb: 'sun', speaker: 'speaker', thermostat: 'temperature', lock: 'lock', camera: 'camera', blinds: 'sliders', plug: 'energy',
@@ -119,6 +134,245 @@ function RangeField({ value, min, max, fill, ariaLabel, readout, disabled, onCom
       />
       <span className="b-sh-range-label">{readout(v)}</span>
     </div>
+  );
+}
+
+const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+/**
+ * The history Atlas keeps (`home_events`), read for the last week and read
+ * again shortly after the house changes. Throttled rather than debounced: the
+ * push channel can signal every second, and a debounce would never fire.
+ */
+function useHomeHistory(live: UseSmartHome, active: boolean): { events: HomeEvent[]; error: string | null; keptDays: number } {
+  const { loadHistory, snapshot } = live;
+  const [events, setEvents] = useState<HomeEvent[]>([]);
+  const [keptDays, setKeptDays] = useState(30);
+  const [error, setError] = useState<string | null>(null);
+  const pending = useRef<number | null>(null);
+  const last = useRef(0);
+  const alive = useRef(true);
+  useEffect(() => () => {
+    alive.current = false;
+    if (pending.current != null) window.clearTimeout(pending.current);
+  }, []);
+  useEffect(() => {
+    if (!active) { setEvents([]); return; }
+    if (pending.current != null) return;
+    const wait = Math.max(0, last.current + HISTORY_SETTLE_MS - Date.now());
+    pending.current = window.setTimeout(() => {
+      pending.current = null;
+      last.current = Date.now();
+      const since = new Date(Date.now() - HISTORY_DAYS_READ * 86_400_000).toISOString();
+      loadHistory({ since, limit: HISTORY_LIMIT })
+        .then((h) => { if (alive.current) { setEvents(h.events); setKeptDays(h.keptDays); setError(null); } })
+        .catch((e) => { if (alive.current) setError(errText(e)); });
+    }, wait);
+  }, [active, snapshot, loadHistory]);
+  return { events, error, keptDays };
+}
+
+/** Today's energy from Home Assistant's statistics, only when there are energy sensors to ask about. */
+function useEnergyToday(live: UseSmartHome, sensors: number, active: boolean): { today: EnergyToday | null; error: string | null } {
+  const { loadEnergy } = live;
+  const [today, setToday] = useState<EnergyToday | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!active || sensors === 0) { setToday(null); return; }
+    let on = true;
+    const read = () => {
+      loadEnergy()
+        .then((t) => { if (on) { setToday(t); setError(null); } })
+        .catch((e) => { if (on) setError(errText(e)); });
+    };
+    read();
+    const id = window.setInterval(read, ENERGY_EVERY_MS);
+    return () => { on = false; window.clearInterval(id); };
+  }, [active, sensors, loadEnergy]);
+  return { today, error };
+}
+
+/** The design's switch: a 46×28 pill with a sliding knob. */
+function Switch({ on, label, disabled, busy, onChange }: { on: boolean; label: string; disabled?: boolean; busy?: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <button type="button" role="switch" aria-checked={on} aria-label={label} aria-busy={busy || undefined} disabled={disabled || busy} className={`b-sh-switch${on ? ' on' : ''}${busy ? ' busy' : ''}`} onClick={() => onChange(!on)}>
+      <span />
+    </button>
+  );
+}
+
+/** The energy card: live watts, today's kWh by hour, and the devices behind them. */
+function EnergyCard({ devices, today, error, usable, hasBridge }: {
+  devices: readonly LiveDevice[]; today: EnergyToday | null; error: string | null; usable: boolean; hasBridge: boolean;
+}) {
+  const view = useMemo(() => energyView(devices, today?.sensors ?? null), [devices, today]);
+  const max = Math.max(0, ...view.hours.map((h) => h ?? 0));
+  const nowHour = new Date().getHours();
+  if (!usable || !hasBridge || view.none) {
+    return (
+      <section className="b-sh-card b-sh-card--ink" aria-label="Energy today">
+        <span className="b-sh-card-eyebrow">Energy today</span>
+        <span className="b-sh-card-big">—</span>
+        <span className="b-sh-card-foot">
+          {!usable ? 'Energy is read from Home Assistant, in the Mac app.'
+            : !hasBridge ? 'Link Home Assistant and its power and energy sensors show here.'
+              : 'Your bridge reports no power or energy sensor. A smart plug or an energy meter in Home Assistant fills this card; nothing leaves your network.'}
+        </span>
+      </section>
+    );
+  }
+  return (
+    <section className="b-sh-card b-sh-card--ink" aria-label="Energy today">
+      <span className="b-sh-card-eyebrow">Energy today</span>
+      <span className="b-sh-energy-big">
+        {view.energySensors ? <>{fmtKwh(view.kwh)}<span> kWh</span></> : <>{fmtWatts(view.watts)}<span> now</span></>}
+      </span>
+      {view.energySensors ? (
+        <div className="b-sh-energy-bars" role="img" aria-label={`Energy by hour today, ${fmtKwh(view.kwh)} kWh so far`}>
+          {view.hours.map((h, i) => (
+            <span key={i} data-now={i === nowHour} data-none={h == null} style={{ height: h == null || max <= 0 ? undefined : `${Math.max(4, (h / max) * 100)}%` }} />
+          ))}
+        </div>
+      ) : null}
+      <span className="b-sh-card-foot">
+        {view.energySensors ? `${view.kwh == null ? 'Home Assistant keeps no statistics for these yet' : view.kwhFrom}` : ''}
+        {view.energySensors && view.watts != null ? ' · ' : ''}
+        {view.watts != null && view.energySensors ? `${fmtWatts(view.watts)} now, ${view.wattsFrom}` : !view.energySensors ? view.wattsFrom : ''}
+      </span>
+      {error ? <span className="b-sh-card-foot">Today’s total could not be read: {error}</span> : null}
+      {view.rows.length ? (
+        <div className="b-sh-energy-rows">
+          {view.rows.slice(0, 5).map((r) => (
+            <div key={r.key} className="b-sh-energy-row">
+              <span>{r.name}</span>
+              <b className="b-num">{[r.watts != null ? fmtWatts(r.watts) : null, r.kwh != null ? `${fmtKwh(r.kwh)} kWh` : null].filter(Boolean).join(' · ') || '—'}</b>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+/** Home Assistant's automations, each with its switch. */
+function AutomationsCard({ live, inert }: { live: UseSmartHome; inert: boolean }) {
+  const list = live.snapshot.automations;
+  const now = Date.now();
+  return (
+    <section className="b-sh-card b-sh-autos" aria-label="Automations">
+      <span className="b-card-title">Home Assistant runs these</span>
+      {list.length ? list.map((a) => {
+        const pending = live.automationPending[a.id];
+        const on = pending ?? a.on;
+        const fired = a.lastTriggered ? clockLabel(a.lastTriggered, now) : null;
+        return (
+          <div key={a.id} className={`b-sh-auto${!a.available ? ' stale' : ''}`}>
+            <span className="b-sh-auto-text">
+              <b>{a.label}</b>
+              <span>{!a.available ? 'Not responding' : pending !== undefined ? (pending ? 'Switching on…' : 'Switching off…') : fired ? `Last ran ${fired}` : 'Has not run yet'}</span>
+            </span>
+            <Switch on={on} label={a.label} disabled={inert || !a.available} busy={pending !== undefined} onChange={(v) => live.setAutomation(a.id, v)} />
+          </div>
+        );
+      }) : (
+        <p className="b-sh-card-p">{!live.usable ? 'Automations are read from Home Assistant, in the Mac app.' : live.snapshot.bridgeState === 'none' ? 'Link Home Assistant and its automations show here, with their switches.' : 'Your Home Assistant has no automations. Atlas lists them; it does not invent them.'}</p>
+      )}
+      {list.length ? <p className="b-sh-card-p">Switching one off stops it from running on its triggers; it does not stop a run already under way. Only your tap here changes them — Atlas never does it on its own.</p> : null}
+    </section>
+  );
+}
+
+/** Which scene or script each mode runs. */
+function ModesCard({ live, inert }: { live: UseSmartHome; inert: boolean }) {
+  const { snapshot } = live;
+  const [busy, setBusy] = useState<HomeMode | null>(null);
+  const locked = new Set(snapshot.lockedSceneIds);
+  const choose = (mode: HomeMode, id: string) => {
+    setBusy(mode);
+    live.mapMode(mode, id || null).catch(() => { /* the hook shows the error */ }).finally(() => setBusy(null));
+  };
+  return (
+    <section className="b-sh-card" aria-label="Modes">
+      <span className="b-card-title">Modes</span>
+      <p className="b-sh-card-p">Each mode runs the scene or script you choose for it in Home Assistant. Ones that might touch a lock stay out — run those from Home Assistant.</p>
+      {HOME_MODES.map((m) => {
+        const row = snapshot.modes.map.find((x) => x.mode === m);
+        const missing = !!row?.externalId && !row.routineId;
+        return (
+          <label key={m} className="b-sh-mode-map">
+            <span className="b-sh-mode-name"><i style={{ background: MODE_DOT[m] }} />{MODE_LABEL[m]}</span>
+            <select
+              className="b-sh-select" value={row?.routineId ?? ''} disabled={inert || busy === m}
+              aria-label={`What ${MODE_LABEL[m]} runs`} onChange={(e) => choose(m, e.target.value)}
+            >
+              <option value="">{missing ? `${row?.label ?? 'A routine'} (no longer reported)` : 'Nothing — only marks the mode'}</option>
+              {snapshot.scenes.length ? (
+                <optgroup label="Scenes">
+                  {snapshot.scenes.map((sc) => <option key={sc.id} value={sc.id} disabled={locked.has(sc.id)}>{sc.label}{locked.has(sc.id) ? ' · may touch a lock' : ''}</option>)}
+                </optgroup>
+              ) : null}
+              {snapshot.scripts.length ? (
+                <optgroup label="Scripts">
+                  {snapshot.scripts.map((sc) => <option key={sc.id} value={sc.id} disabled={!sc.runnable}>{sc.label}{!sc.runnable ? ' · may touch a lock' : ''}</option>)}
+                </optgroup>
+              ) : null}
+            </select>
+          </label>
+        );
+      })}
+    </section>
+  );
+}
+
+/** Atlas' tips, each with the one action the screen can take on it. */
+function TipsCard({ tips, inert, onSet, onOpen }: { tips: Tip[]; inert: boolean; onSet: (ids: string[], value: number) => void; onOpen: (id: string) => void }) {
+  if (!tips.length) return null;
+  return (
+    <div className="b-sh-tips" role="status">
+      {tips.slice(0, 3).map((t) => (
+        <div key={t.id} className="b-sh-tip">
+          <span><strong>Atlas:</strong> {t.text}</span>
+          {t.action ? (
+            <button
+              type="button" className="b-btn b-btn--card b-btn--row" disabled={inert && t.action.kind === 'set'}
+              onClick={() => {
+                const a = t.action;
+                if (!a) return;
+                if (a.kind === 'set') onSet(a.deviceIds, a.value);
+                else onOpen(a.deviceId);
+              }}
+            >{t.action.label}</button>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** What the selected device did, and what Atlas told it to do. */
+function HistoryCard({ device, events, error, keptDays }: { device: LiveDevice | null; events: HomeEvent[]; error: string | null; keptDays: number }) {
+  const mine = device ? events.filter((e) => e.deviceId === device.id).slice(0, 8) : [];
+  const now = Date.now();
+  return (
+    <section className="b-sh-card" aria-label="History">
+      <span className="b-card-title">{device ? `${device.name}, lately` : 'History'}</span>
+      {error ? <p className="b-sh-card-p">The history could not be read: {error}</p> : null}
+      {device && mine.length ? (
+        <div className="b-sh-history">
+          {mine.map((e) => (
+            <div key={e.id} className="b-sh-history-row" data-kind={e.kind}>
+              <span className="b-num">{clockLabel(e.at, now) ?? ''}</span>
+              <span>{historyLine(e, device)}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="b-sh-card-p">
+          {device ? 'Nothing recorded for it this week. ' : ''}
+          Atlas keeps what your devices do and what it tells them, on this Mac, for {keptDays} days. Sensor readings are not kept.
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -230,7 +484,9 @@ const BetaSmartHome = () => {
   }, [sceneRunning]);
   const runScene = useCallback((id: string) => { setSceneRunning(id); live.runScene(id); }, [live]);
 
-  const now = useTick(30_000, !!live.lastSceneRun);
+  // Ticks while the screen is open: "applied a minute ago", the lock note's
+  // day, and the tips' "late at night" all read the clock.
+  const now = useTick(30_000, true);
   // The tick only moves every thirty seconds, so a run newer than it would read
   // as being in the future; it is at least "just now".
   const sceneAgo = live.lastSceneRun ? relativeLabel(new Date(live.lastSceneRun.at).toISOString(), Math.max(now, live.lastSceneRun.at)) : null;
@@ -283,7 +539,43 @@ const BetaSmartHome = () => {
   const dOn = !!device && device.value > 0;
   const secured = !!device && isSecured(device);
   const pow = device ? powerLabel(device) : null;
-  const sphereState = live.syncing || live.linking || sceneRunning ? 'working' : undefined;
+  const sphereState = live.syncing || live.linking || sceneRunning || live.modePending ? 'working' : undefined;
+
+  // The Beta extras: the history Atlas keeps, today's energy, the tips, the
+  // Home/Away suggestion, the camera's events and its still.
+  const extrasOn = usable && hasBridge;
+  const { events, error: historyError, keptDays } = useHomeHistory(live, extrasOn);
+  const energySensors = useMemo(() => allDevices.filter((d) => d.deviceClass === 'energy').length, [allDevices]);
+  const { today: energyToday, error: energyError } = useEnergyToday(live, energySensors, extrasOn && !outage);
+  const modes = snapshot.modes;
+  const currentMode = modes.current;
+  const tips = useMemo(
+    () => (extrasOn ? homeTips({ devices: allDevices, events, mode: currentMode, nowMs: now }) : []),
+    [extrasOn, allDevices, events, currentMode, now],
+  );
+  const suggestion = useMemo(() => presenceSuggestion(snapshot.presence, currentMode), [snapshot.presence, currentMode]);
+  const lockLine = device && (ctl === 'lock' || ctl === 'garage') ? lockNote(device, events, now) : null;
+  const camLine = device && ctl === 'camera' ? cameraEventLine(lastMotion(cameraSensors(device, allDevices), events), now) : null;
+  const [camShot, setCamShot] = useState<{ id: string; url: string; at: string } | null>(null);
+  const [stillBusy, setStillBusy] = useState(false);
+  const [stillError, setStillError] = useState<string | null>(null);
+  useEffect(() => { setStillError(null); }, [device?.id]);
+  const askStill = useCallback((id: string) => {
+    setStillBusy(true);
+    setStillError(null);
+    live.cameraStill(id)
+      .then((r) => setCamShot({ id, url: r.dataUrl, at: r.at }))
+      .catch((e) => setStillError(errText(e)))
+      .finally(() => setStillBusy(false));
+  }, [live]);
+  const setMany = useCallback((ids: string[], value: number) => { for (const id of ids) live.setDeviceValue(id, value); }, [live]);
+  const openDevice = useCallback((id: string) => { const d = byId.get(id); if (d) pickDevice(d); }, [byId, pickDevice]);
+  const modeTitle = (m: HomeMode): string => {
+    const row = modes.map.find((x) => x.mode === m);
+    if (inert) return outage ? 'The bridge is not answering' : 'Modes run in the Mac app';
+    if (row?.label) return `${MODE_LABEL[m]} runs ${row.label}`;
+    return `Nothing is chosen for ${MODE_LABEL[m]} yet — pick a scene under Modes. Switching only marks the mode.`;
+  };
 
   return (
     <div className="b-sh" data-screen-label="Beta — Smart home">
@@ -301,6 +593,20 @@ const BetaSmartHome = () => {
               {' · '}<span className="b-sh-nowrap">{onCount} on</span>
             </span>
           </div>
+        </div>
+        <div className="b-sh-modes" role="group" aria-label="Mode">
+          {HOME_MODES.map((m) => {
+            const cur = modes.current === m;
+            const pendingHere = live.modePending === m;
+            return (
+              <button
+                type="button" key={m} className={`b-sh-mode${cur ? ' on' : ''}`} aria-pressed={cur} disabled={inert || !!live.modePending}
+                title={modeTitle(m)} onClick={() => live.setMode(m)}
+              >
+                <i style={{ background: MODE_DOT[m] }} />{pendingHere ? `${MODE_LABEL[m]}…` : MODE_LABEL[m]}
+              </button>
+            );
+          })}
         </div>
         <div className="b-sh-head-tools">
           <span className={`b-status b-status--${pill.tone}`}><i />{pill.text}</span>
@@ -326,6 +632,13 @@ const BetaSmartHome = () => {
           <AtlasIcon name="offline" size={18} weight={1.7} />
           <div><b>Working, with something switched off</b><span>{live.warning}</span></div>
           <button type="button" className="b-btn b-btn--ghost b-btn--row" onClick={live.dismissWarning}>Dismiss</button>
+        </div>
+      ) : null}
+      {suggestion && !inert ? (
+        <div className="b-sh-notice b-sh-notice--suggest" role="note">
+          <AtlasIcon name="home" size={18} weight={1.7} />
+          <div><b>Switch to {MODE_LABEL[suggestion.mode]}?</b><span>{suggestion.text} Atlas only suggests it; switching runs what you chose for {MODE_LABEL[suggestion.mode]}.</span></div>
+          <button type="button" className="b-btn b-btn--card b-btn--row" disabled={!!live.modePending} onClick={() => live.setMode(suggestion.mode)}>Switch to {MODE_LABEL[suggestion.mode]}</button>
         </div>
       ) : null}
 
@@ -364,8 +677,9 @@ const BetaSmartHome = () => {
 
         <section className="b-sh-main" aria-label={room ? room.name : 'Devices'}>
           <div className={`b-sh-stage${device && !device.available ? ' stale' : ''}`}>
-            {device && !reduced && three !== 'failed' ? <canvas ref={setCanvasEl} className="b-sh-canvas" aria-hidden /> : null}
-            {device && reduced && still ? <img className="b-sh-still" src={still} alt="" /> : null}
+            {device && !reduced && three !== 'failed' && camShot?.id !== device.id ? <canvas ref={setCanvasEl} className="b-sh-canvas" aria-hidden /> : null}
+            {device && reduced && still && camShot?.id !== device.id ? <img className="b-sh-still" src={still} alt="" /> : null}
+            {device && camShot?.id === device.id ? <img className="b-sh-still b-sh-camshot" src={camShot.url} alt={`${device.name}, still frame`} /> : null}
             <div className="b-sh-stage-head">
               <div>
                 <span className="b-sh-stage-room">{room?.name ?? 'No room'}</span>
@@ -400,9 +714,9 @@ const BetaSmartHome = () => {
                 {ctl === 'thermostat' ? (
                   <>
                     <div className="b-sh-stepper">
-                      <button type="button" aria-label="Cooler" disabled={inert} onClick={() => setValue(stepTemp(device.value, -0.5))}>−</button>
-                      <span className="b-num">{fmtTemp(device.value)}</span>
-                      <button type="button" aria-label="Warmer" disabled={inert} onClick={() => setValue(stepTemp(device.value, 0.5))}>+</button>
+                      <button type="button" aria-label="Cooler" disabled={inert} onClick={() => setValue(stepTemp(stepperValue(device), -0.5))}>−</button>
+                      <span className="b-num">{fmtTemp(stepperValue(device))}</span>
+                      <button type="button" aria-label="Warmer" disabled={inert} onClick={() => setValue(stepTemp(stepperValue(device), 0.5))}>+</button>
                     </div>
                     {/* For a device that is not answering, the truth line below says what the number is. */}
                     {device.available ? <span className="b-sh-ctl-note">{thermNote(device)}</span> : null}
@@ -412,7 +726,7 @@ const BetaSmartHome = () => {
                 {ctl === 'lock' ? (
                   <>
                     <button type="button" className={`b-sh-lock${secured ? ' locked' : ''}`} disabled={inert} onClick={() => setValue(secured ? 0 : 1)}>{secured ? 'Locked · tap to unlock' : 'Unlocked · tap to lock'}</button>
-                    <span className="b-sh-ctl-note">Locks ask for your approval every time — Atlas never turns one on its own.</span>
+                    <span className="b-sh-ctl-note">{lockLine ? `${lockLine}. ` : ''}Locks ask for your approval every time — Atlas never turns one on its own.</span>
                   </>
                 ) : null}
 
@@ -420,7 +734,7 @@ const BetaSmartHome = () => {
                   <>
                     {/* Commanded as a lock (closed = locked), read as a position. */}
                     <button type="button" className={`b-sh-lock${secured ? ' locked' : ''}`} disabled={inert} onClick={() => setValue(secured ? 0 : 1)}>{secured ? 'Closed · tap to open' : 'Open · tap to close'}</button>
-                    <span className="b-sh-ctl-note">A garage door is a lock to Atlas: it asks for your approval every time.</span>
+                    <span className="b-sh-ctl-note">{lockLine ? `${lockLine}. ` : ''}A garage door is a lock to Atlas: it asks for your approval every time.</span>
                   </>
                 ) : null}
 
@@ -433,8 +747,13 @@ const BetaSmartHome = () => {
 
                 {ctl === 'camera' ? (
                   <>
-                    <span className="b-sh-live"><i data-on={lit(device)} />{statusOf(device)}</span>
-                    <span className="b-sh-ctl-note">Recordings stay on your home hub — Atlas keeps none.</span>
+                    <span className="b-sh-live"><i data-on={lit(device)} />{camLine ?? statusOf(device)}</span>
+                    <button type="button" className="b-sh-link" disabled={inert || stillBusy} onClick={() => askStill(device.id)}>{stillBusy ? 'Fetching…' : camShot?.id === device.id ? 'New still' : 'Show a still'}</button>
+                    <span className="b-sh-ctl-note">
+                      {stillError ? `No still: ${stillError} ` : ''}
+                      {camShot?.id === device.id ? `Still from ${clockLabel(camShot.at, now) ?? 'just now'}, fetched from your hub and kept only on this screen. ` : ''}
+                      {camLine ? '' : 'No motion sensor of this camera’s has reported yet. '}Recordings stay on your home hub — Atlas keeps none.
+                    </span>
                   </>
                 ) : null}
 
@@ -506,6 +825,12 @@ const BetaSmartHome = () => {
               </div>
             ) : null}
           </section>
+
+          <EnergyCard devices={allDevices} today={energyToday} error={energyError} usable={usable} hasBridge={hasBridge} />
+          <AutomationsCard live={live} inert={inert} />
+          <TipsCard tips={tips} inert={inert} onSet={setMany} onOpen={openDevice} />
+          {extrasOn ? <HistoryCard device={device} events={events} error={historyError} keptDays={keptDays} /> : null}
+          {extrasOn ? <ModesCard live={live} inert={inert} /> : null}
 
           <section className="b-sh-card" aria-label="Bridge">
             <span className="b-card-title">Bridge</span>

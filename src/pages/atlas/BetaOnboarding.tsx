@@ -24,8 +24,9 @@
  *     now" on a first run is an answer (decline everything, so the gate stops
  *     asking) while on a revisit it is a cancel.
  *
- * Atlas types and does not speak here, as on the Beta sign-in. The sphere
- * is the talk entry point once there is an account to talk as.
+ * Atlas types its lines and, with the Voice pill on (off by default, the
+ * same remembered choice as the sign-in), speaks them too. The sphere is the
+ * talk entry point once there is an account to talk as.
  *
  * The welcome uses the name given at sign-up: handed over in the navigation
  * state on the way here, and read back from the local profile on a later
@@ -35,6 +36,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { useEntryVoice } from '@/hooks/useEntryVoice';
 import {
   ATLAS_PERMISSIONS, readMicConsent, readOnboarding, requestPermission, writeOnboarding,
   type AtlasPermission, type PermissionId,
@@ -66,7 +68,13 @@ export function BetaOnboardingFlow({ route }: { route: EntryRoute }) {
   // landed yet); otherwise the profile's, in the order Home reads it.
   const handedOver = (location.state as { firstName?: string } | null)?.firstName;
   const firstName = handedOver || profile?.nickname || profile?.first_name || null;
-  const { shown, target, typing, say } = useTypewriter();
+  const { shown, target, typing, say: type } = useTypewriter();
+  // The Voice pill (left-out row 30), off until turned on and remembered
+  // from the sign-in screen. Onboarding has no password step, so every line
+  // may be spoken; nothing the user types or chooses is.
+  const voice = useEntryVoice();
+  const { say: speak } = voice;
+  const say = useCallback((line: string) => { type(line); speak(line); }, [type, speak]);
 
   // Read ONCE. Settings and the account menu make this a revisit surface, so
   // it has to open on the answers actually given — seeding from `defaultOn`
@@ -248,7 +256,8 @@ export function BetaOnboardingFlow({ route }: { route: EntryRoute }) {
       // transcribed by ElevenLabs (useLoginVoice, the voice gateway), so the
       // line says so rather than promise what the code does not do.
       line="Your memories and documents stay on this Mac. What leaves it is the question you ask, with the few memories that help answer it — and your voice, while you speak, to be transcribed."
-      sphereState={onboardingSphereState(stage)}
+      sphereState={onboardingSphereState(stage, voice.playing)}
+      voice={{ on: voice.on, onToggle: () => voice.toggle(target) }}
       onSphere={isAuthenticated ? () => openTalk() : undefined}
       steps={steps}
       eyebrow={`Step ${idx + 1} of ${ONBOARDING_STEPS.length}`}
