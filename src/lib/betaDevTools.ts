@@ -103,6 +103,26 @@ export interface RunLike {
   output: string | null;
   error_message: string | null;
   run_at: string;
+  /** What its bun test step reported (left-out features, rows 81 and 82); null for a job with no test step, a run in flight, or an older brain. */
+  report?: ReportLike | null;
+}
+
+/** Structural copy of TestReport in services/atlas-brain/src/testReport.ts. */
+export interface ReportFileLike {
+  path: string;
+  pass: number;
+  fail: number;
+  skip: number;
+  todo: number;
+  /** The sum of the file's test times; Bun prints no per-file time. */
+  ms: number;
+  failed: string[];
+}
+
+export interface ReportLike {
+  totals: { pass: number; fail: number; skip: number; todo: number; errors: number; tests: number; files: number; ms: number | null };
+  files: ReportFileLike[];
+  coverage: { lines: number | null; funcs: number | null; files: number } | null;
 }
 
 /** A job's state: the run statuses, plus `stalled` (a run that never reported back) and `never`. */
@@ -137,8 +157,8 @@ export const DEFAULT_JOB = 'frontend';
  * listed here shows no command rather than a guessed one.
  */
 export const JOB_COMMAND: Readonly<Record<string, string>> = {
-  frontend: 'bun run ci:quick',
-  'atlas-brain': 'bunx tsc --noEmit · services/atlas-brain',
+  frontend: 'bun run ci:quick, then bun test --coverage tests/ ./src ./scripts supabase/functions/_shared',
+  'atlas-brain': 'bunx tsc --noEmit, then bun test --coverage · services/atlas-brain',
   'voice-gateway': 'bunx tsc --noEmit · services/voice-gateway',
   all: 'bun run ci',
 };
@@ -245,6 +265,123 @@ export function outputTail(run: RunLike | null, lines = 60): string {
 
 /** Poll fast only while a run is genuinely in flight; a stalled row does not count. */
 export const anyRunning = (groups: readonly JobGroup[]): boolean => groups.some((g) => g.state === 'running');
+
+// ── Test reports: counts, durations, coverage (rows 81 and 82) ──────────────
+
+/** "1 test", "1,152 tests". */
+export const testsLabel = (n: number): string => `${n.toLocaleString('en-US')} ${n === 1 ? 'test' : 'tests'}`;
+
+/** A file's time. Most unit-test files run in under a millisecond, which reads as such rather than "0 ms". */
+export function fileTime(ms: number): string {
+  if (ms > 0 && ms < 1) return '<1 ms';
+  return duration(ms);
+}
+
+/** The design's count and time columns as one line: "42 tests · 1.2s". */
+export const testsAndTime = (tests: number, ms: number): string => `${testsLabel(tests)} · ${fileTime(ms)}`;
+
+/** The job's report, when its newest run produced one. An older report is not borrowed for a newer run. */
+export const jobReport = (g: JobGroup): ReportLike | null => g.latestRun?.report ?? null;
+
+/** The count column: the tests the newest run ran, or the files the job covers when it has no report. */
+export function jobCount(g: JobGroup): string {
+  const r = jobReport(g);
+  return r ? testsLabel(r.totals.tests) : suiteCount(g);
+}
+
+export interface ReportFileRow {
+  path: string;
+  tests: number;
+  fail: number;
+  dot: 'green' | 'red' | 'neutral';
+  /** "12 tests · 0.4s", plus what did not pass when anything did not. */
+  line: string;
+  failed: string[];
+}
+
+/** A report's files as rows: failing first, then by path — what needs looking at on top. */
+export function reportFiles(r: ReportLike): ReportFileRow[] {
+  return [...r.files]
+    .sort((a, b) => (b.fail > 0 ? 1 : 0) - (a.fail > 0 ? 1 : 0) || a.path.localeCompare(b.path))
+    .map((f) => {
+      const tests = f.pass + f.fail + f.skip + f.todo;
+      const extra = [f.fail ? `${f.fail} failing` : '', f.skip ? `${f.skip} skipped` : '', f.todo ? `${f.todo} todo` : ''].filter(Boolean).join(', ');
+      return {
+        path: f.path || 'outside any file',
+        tests,
+        fail: f.fail,
+        dot: f.fail ? 'red' : f.pass ? 'green' : 'neutral',
+        line: `${testsAndTime(tests, f.ms)}${extra ? ` · ${extra}` : ''}`,
+        failed: f.failed,
+      };
+    });
+}
+
+/** The newest report of each job, added up. Null when no job has one yet. */
+export interface TestTotals { pass: number; fail: number; skip: number; todo: number; tests: number; jobs: number }
+
+export function testTotals(groups: readonly JobGroup[]): TestTotals | null {
+  const t: TestTotals = { pass: 0, fail: 0, skip: 0, todo: 0, tests: 0, jobs: 0 };
+  for (const g of groups) {
+    const r = jobReport(g);
+    if (!r) continue;
+    t.pass += r.totals.pass;
+    t.fail += r.totals.fail;
+    t.skip += r.totals.skip;
+    t.todo += r.totals.todo;
+    t.tests += r.totals.tests;
+    t.jobs += 1;
+  }
+  return t.jobs ? t : null;
+}
+
+/** "56.08% of lines · 45.67% of functions · 138 source files". */
+export function coverageLine(c: NonNullable<ReportLike['coverage']>): string {
+  return [
+    c.lines != null ? `${c.lines}% of lines` : null,
+    c.funcs != null ? `${c.funcs}% of functions` : null,
+    plural(c.files, 'source file'),
+  ].filter(Boolean).join(' · ');
+}
+
+export interface CoverageTile {
+  /** "56%" — lines, rounded, as the design's tile prints it. */
+  value: string;
+  /** What the figure is a share of: lines, or functions when Bun printed no line figure. */
+  of: 'lines' | 'functions';
+  job: string;
+  /**
+   * The tile's visible heading: "Coverage" for the default job's figure, and
+   * "Coverage · atlas-brain" when it is another job's, so a figure for a
+   * different source tree never sits under the same bare word.
+   */
+  label: string;
+  detail: string;
+}
+
+/**
+ * The Coverage tile. Each job measures its own tree, and percentages of two
+ * trees do not add up, so the tile shows one job's figure and names it: the
+ * default job's (the app's own gate) when it has one, else the first that
+ * does, with that job's name in the heading.
+ */
+export function coverageTile(groups: readonly JobGroup[]): CoverageTile | null {
+  const ordered = [...groups].sort((a, b) => (a.job === DEFAULT_JOB ? -1 : b.job === DEFAULT_JOB ? 1 : 0));
+  for (const g of ordered) {
+    const c = jobReport(g)?.coverage;
+    if (!c) continue;
+    const figure = c.lines ?? c.funcs;
+    if (figure == null) continue;
+    return {
+      value: `${Math.round(figure)}%`,
+      of: c.lines != null ? 'lines' : 'functions',
+      job: g.job,
+      label: g.job === DEFAULT_JOB ? 'Coverage' : `Coverage · ${g.job}`,
+      detail: `${g.job}, last run: ${coverageLine(c)}`,
+    };
+  }
+  return null;
+}
 
 // ── Versions ─────────────────────────────────────────────────────────────────
 

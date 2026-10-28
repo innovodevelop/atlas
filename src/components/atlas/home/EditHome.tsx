@@ -29,7 +29,8 @@ const LAYOUTS: { k: HomeLayout; t: string; d: string }[] = [
   { k: 'centred', t: 'Centred', d: 'Atlas in the middle, widgets around it' },
 ];
 
-const GROUP_ORDER: WidgetGroup[] = ['Day', 'Communication', 'Money', 'Body', 'Home', 'Media', 'Air & time'];
+// 'Work' holds the admin edition's developer widgets; a consumer build has none, so the group drops out.
+const GROUP_ORDER: WidgetGroup[] = ['Day', 'Communication', 'Money', 'Body', 'Home', 'Media', 'Air & time', 'Work'];
 
 export function EditHome({ slots, layout, settings, rows, onDone, onCancel }: EditHomeProps) {
   const [state, dispatch] = useReducer(editorReducer, undefined, () => openEditor(slots, layout, settings) as EditorState);

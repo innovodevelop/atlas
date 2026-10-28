@@ -34,7 +34,7 @@ export const fromTableSize = (s: string | null | undefined): WidgetSize => {
   return u === 'S' || u === 'M' || u === 'L' || u === 'XL' ? u : 'L';
 };
 
-export type WidgetGroup = 'Day' | 'Communication' | 'Money' | 'Body' | 'Home' | 'Media' | 'Air & time';
+export type WidgetGroup = 'Day' | 'Communication' | 'Money' | 'Body' | 'Home' | 'Media' | 'Air & time' | 'Work';
 /** Whether the widget shows real data today, a labelled sample, or is not wired yet. */
 export type WidgetSource = 'live' | 'sample' | 'unwired';
 
@@ -111,7 +111,23 @@ export const WIDGETS: readonly WidgetDef[] = [
   { id: 'transit', label: 'Transit', meta: 'Next departures from your stop, from Rejseplanen (needs an access ID)', group: 'Day', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'live', opens: { route: '/answer' } },
   { id: 'fx', label: 'Currency', meta: 'ECB reference rates for the pair you pick', group: 'Money', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { view: 'fx' } },
   ...moneyWidgets(),
+  ...devWidgets(),
 ];
+
+/**
+ * The developer widgets (left-out features, row 18): the repo's open pull
+ * requests, and its releases and latest workflow runs, read by the brain
+ * through this Mac's `gh` login. Admin edition only — the literal comparison
+ * folds when Vite builds, so a consumer build carries neither these
+ * definitions nor (widgets.tsx) their faces. They open GitHub itself, so they
+ * name no screen here.
+ */
+function devWidgets(): WidgetDef[] {
+  return import.meta.env.VITE_ATLAS_EDITION === 'consumer' ? [] : [
+    { id: 'pullrequests', label: 'Pull requests', meta: 'Open pull requests, and the ones waiting on your review', group: 'Work', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'live', opens: null },
+    { id: 'deploys', label: 'Deploys', meta: 'The latest release and workflow runs on GitHub', group: 'Work', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'live', opens: null },
+  ];
+}
 
 export const WIDGET_BY_ID: ReadonlyMap<string, WidgetDef> = new Map(WIDGETS.map((w) => [w.id, w]));
 

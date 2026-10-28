@@ -240,6 +240,22 @@ describe('the consumer bundle does not contain the admin screens', () => {
     }
   });
 
+  test('the developer widgets ship only in the admin build', () => {
+    // Pull requests and Deploys on Home (left-out features, row 18): their
+    // definitions (betaHome.ts), their faces and words (devWidgets.tsx,
+    // betaDevWidgets.ts) and the brain routes they call (useDevWidgets.ts).
+    const markers = [
+      'Open pull requests, and the ones waiting on your review', 'The latest release and workflow runs on GitHub',
+      'GitHub CLI signed out', 'publish it on GitHub to ship', '/admin/github/pulls', '/admin/github/deploys',
+      // Their empty copy in the widget catalog's table (betaWidgetCatalog.ts), which Home also loads.
+      'Atlas reads them through gh on this Mac',
+    ];
+    for (const marker of markers) {
+      expect(BODY.admin.includes(marker), `${marker} missing from the admin build`).toBe(true);
+      expect(BODY.consumer.includes(marker), `${marker} leaked into the consumer build`).toBe(false);
+    }
+  });
+
   test('mermaid ships only where a diagram does', () => {
     // ~1 MB of diagram engine reachable from /atlas-architecture alone.
     expect(BODY.admin.includes('sequenceDiagram')).toBe(true);

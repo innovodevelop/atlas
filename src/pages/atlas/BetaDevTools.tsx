@@ -9,17 +9,20 @@
  *     runs. A suite is a file, but running one runs its CI job's command, so
  *     the rows are the jobs (betaDevTools.ts `groupSuites`); Run and Run all
  *     start real runs through the brain's allowlist, and the sphere works
- *     while they do.
+ *     while they do. A job's bun test step is read into a report (left-out
+ *     features, rows 81 and 82): the tiles count tests and show coverage, a
+ *     row says how many tests it ran, and an open row lists every test file
+ *     with "N tests · X s", failing files first.
  *   - Versions: docs/VERSION-PLAN.md as the brain mirrored it into SQLite,
  *     with where the plan stands on GitHub, in the checkout and in this build;
  *     Open shows a version's features and changelog.
  *   - Design Sync: the design ⇄ code table the brain reads from the checkout
  *     and git (designScreens.ts), and the bundles of design/.sync-manifest.json.
  *
- * What the design shows that Atlas has no source for — test coverage, test
- * counts per suite, release channels to promote between — is left out rather
- * than drawn; see the notes beside each section. The screen has no header
- * sphere in the design, so the shell's corner orb stays the talk entry point.
+ * What the design shows that Atlas has no source for — release channels to
+ * promote between, tester counts — is left out rather than drawn; see the
+ * notes beside each section. The screen has no header sphere in the design,
+ * so the shell's corner orb stays the talk entry point.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -31,9 +34,9 @@ import { AtlasIcon } from '@/components/atlas/AtlasIcon';
 import { getAtlasState, publishAtlasState } from '@/lib/atlasStateBus';
 import { useBetaNavigate } from '@/lib/viewTransitions';
 import {
-  BUNDLE_STATUS, DEV_TABS, FEATURE_TONE, JOB_COMMAND, SCREEN_STATE, ago, anyRunning, bundleMeta, duration, errorText, fileName, groupSuites,
-  jobLine, outputTail, planSyncHeadline, planSyncLines, screenSummary, short, sortScreens, sortVersions, suiteCount, tabFor, testKpis,
-  versionChip, versionSub,
+  BUNDLE_STATUS, DEV_TABS, FEATURE_TONE, JOB_COMMAND, SCREEN_STATE, ago, anyRunning, bundleMeta, coverageLine, coverageTile, duration, errorText,
+  fileName, groupSuites, jobCount, jobLine, jobReport, outputTail, planSyncHeadline, planSyncLines, reportFiles, screenSummary, short, sortScreens,
+  sortVersions, tabFor, testKpis, testTotals, testsLabel, versionChip, versionSub,
   type BundleStatus, type ChipTone, type JobGroup, type JobState, type LineState, type SyncTone,
 } from '@/lib/betaDevTools';
 import { isTyping } from './atlasHelpers';
@@ -107,6 +110,8 @@ function TestsView({ open, onOpen, now }: ViewProps) {
 
   const groups = useMemo(() => groupSuites(suites, recent.runs, now), [suites, recent.runs, now]);
   const kpis = testKpis(groups);
+  const totals = testTotals(groups);
+  const coverage = coverageTile(groups);
   const running = anyRunning(groups);
   const busy = useCallback((g: JobGroup) => g.state === 'running' || starting.has(g.job), [starting]);
   const busyAny = running || starting.size > 0;
@@ -167,10 +172,22 @@ function TestsView({ open, onOpen, now }: ViewProps) {
 
   return (
     <>
+      {/* Passing and Failing count tests once a job has reported them, as the
+          design does; until then, jobs. A job can fail on lint or types with
+          no test failing, so Failing also says how many jobs failed. */}
       <div className="b-dt-kpis">
-        <div className="b-dt-kpi b-dt-kpi--ink"><span>Passing</span><b>{busyAny ? '…' : kpis.passing}{!busyAny && kpis.total ? <small>/ {kpis.total}</small> : null}</b></div>
-        <div className={`b-dt-kpi${kpis.failing && !busyAny ? ' b-dt-kpi--bad' : ''}`}><span>Failing</span><b>{busyAny ? '…' : kpis.failing}</b></div>
-        <div className="b-dt-kpi"><span>Not run yet</span><b>{kpis.notRun}</b></div>
+        <div className="b-dt-kpi b-dt-kpi--ink" title={totals ? `Tests passing in the newest run of ${totals.jobs === 1 ? 'the one job' : `each of the ${totals.jobs} jobs`} that ran bun test` : 'Jobs whose newest run passed'}>
+          <span>Passing</span>
+          <b>{busyAny ? '…' : totals ? totals.pass.toLocaleString('en-US') : kpis.passing}{!busyAny && (totals ? totals.tests : kpis.total) ? <small>/ {totals ? totals.tests.toLocaleString('en-US') : kpis.total}</small> : null}</b>
+        </div>
+        <div className={`b-dt-kpi${(kpis.failing || totals?.fail) && !busyAny ? ' b-dt-kpi--bad' : ''}`} title={totals ? 'Tests failing in the newest run of each job; a job can also fail on lint or types' : 'Jobs whose newest run failed'}>
+          <span>Failing</span>
+          <b>{busyAny ? '…' : totals ? totals.fail.toLocaleString('en-US') : kpis.failing}{!busyAny && totals && kpis.failing ? <small>· {kpis.failing} {kpis.failing === 1 ? 'job' : 'jobs'} failed</small> : null}</b>
+        </div>
+        <div className="b-dt-kpi" title={coverage?.detail ?? 'Measured by bun test --coverage when the frontend or atlas-brain job runs'}>
+          <span>{coverage ? coverage.label : 'Coverage'}</span>
+          <b>{coverage ? coverage.value : '—'}{coverage ? <small>{coverage.of}</small> : null}</b>
+        </div>
         <div className="b-dt-kpi"><span>Last run</span><b className="b-dt-kpi-time">{busyAny ? 'now' : lastRun}</b></div>
       </div>
 
@@ -200,6 +217,8 @@ function TestsView({ open, onOpen, now }: ViewProps) {
           const isOpen = open === g.job;
           const isBusy = busy(g);
           const tail = isOpen ? outputTail(g.latestRun) : '';
+          const report = jobReport(g);
+          const files = isOpen && report ? reportFiles(report) : [];
           return (
             <div key={g.job} className={`b-dt-job${isOpen ? ' open' : ''}`}>
               <div className="b-dt-job-row">
@@ -208,7 +227,7 @@ function TestsView({ open, onOpen, now }: ViewProps) {
                   <span className="b-num">{g.job}</span>
                   <span className="b-dt-job-desc">{isBusy && g.state !== 'running' ? 'starting…' : jobLine(g, now)}</span>
                 </button>
-                <span className="b-dt-job-count b-num">{suiteCount(g)}</span>
+                <span className="b-dt-job-count b-num" title={report ? `${report.totals.files} test files` : 'Suite files this job covers'}>{jobCount(g)}</span>
                 <span className="b-dt-job-time b-num">{isBusy ? '…' : duration(g.latestRun?.duration_ms)}</span>
                 <button type="button" className="b-btn b-btn--card b-btn--row" disabled={isBusy} onClick={() => void runJob(g)}>{isBusy ? 'Running…' : 'Run'}</button>
               </div>
@@ -218,9 +237,30 @@ function TestsView({ open, onOpen, now }: ViewProps) {
                     <span className="b-eyebrow">Runs</span>
                     <code className="b-num">{JOB_COMMAND[g.job] ?? 'not a job this screen knows'}</code>
                   </div>
-                  <div className="b-dt-files">
-                    {g.suites.map((s) => <span key={s.id} className="b-dt-file b-num" title={s.description ?? undefined}>{s.name}</span>)}
-                  </div>
+                  {report ? (
+                    <>
+                      <p className="b-dt-note">
+                        {testsLabel(report.totals.tests)} in {report.totals.files} {report.totals.files === 1 ? 'file' : 'files'}
+                        {report.totals.ms != null ? ` · ${duration(report.totals.ms)} in bun test` : ''}
+                        {report.totals.errors ? ` · ${report.totals.errors} ${report.totals.errors === 1 ? 'error' : 'errors'} outside any test` : ''}
+                        {report.coverage ? ` · coverage ${coverageLine(report.coverage)}` : ''}
+                      </p>
+                      <div className="b-dt-tfs" role="list" aria-label={`Test files in ${g.job}`}>
+                        {files.map((f) => (
+                          <div key={f.path} className="b-dt-tf" role="listitem">
+                            <span className={`b-dt-dot b-dt-dot--${f.dot}`} aria-hidden />
+                            <span className="b-dt-tf-path b-num" title={f.path}>{f.path}</span>
+                            <span className="b-dt-tf-line b-num">{f.line}</span>
+                            {f.failed.length ? <span className="b-dt-tf-failed">{f.failed.join(' · ')}</span> : null}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="b-dt-files">
+                      {g.suites.map((s) => <span key={s.id} className="b-dt-file b-num" title={s.description ?? undefined}>{s.name}</span>)}
+                    </div>
+                  )}
                   {tail ? <pre className="b-dt-log">{tail}</pre> : (
                     <p className="b-dt-note">{g.latestRun ? 'The last run recorded no output.' : g.lastRunAt ? 'Its last run is older than the 50 newest; run it again to see the log.' : 'Not run yet.'}</p>
                   )}
@@ -230,7 +270,7 @@ function TestsView({ open, onOpen, now }: ViewProps) {
           );
         })}
       </section>
-      <p className="b-dt-foot">One row per CI job: a suite file runs its job’s whole command, so the job is what passes or fails. Coverage is not measured by any job, so this screen does not show it.</p>
+      <p className="b-dt-foot">One row per CI job: a suite file runs its job’s whole command, so the job is what passes or fails. The frontend and atlas-brain jobs run bun test with coverage; test counts, file times and the coverage figure are read from that run’s own output. A file’s time is the sum of its tests’ times, because Bun prints none per file.</p>
     </>
   );
 }

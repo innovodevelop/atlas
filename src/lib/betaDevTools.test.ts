@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 import {
-  STALL_MS, ago, anyRunning, bundleMeta, duration, errorText, groupSuites, jobLine, listNames, outputTail, planSyncHeadline, planSyncLines,
-  screenSummary, sortScreens, sortVersions, suiteCount, tabFor, testKpis, versionChip, versionSub,
-  type PlanSyncLike, type RunLike, type ScreenLike, type SuiteLike,
+  STALL_MS, ago, anyRunning, bundleMeta, coverageLine, coverageTile, duration, errorText, fileTime, groupSuites, jobCount, jobLine, jobReport,
+  listNames, outputTail, planSyncHeadline, planSyncLines, reportFiles, screenSummary, sortScreens, sortVersions, suiteCount, tabFor, testKpis,
+  testTotals, testsAndTime, versionChip, versionSub,
+  type PlanSyncLike, type ReportLike, type RunLike, type ScreenLike, type SuiteLike,
 } from './betaDevTools';
 
 const NOW = Date.parse('2026-10-28T12:00:00Z');
@@ -97,6 +98,79 @@ describe('groupSuites', () => {
       suite({ id: 'c', ci_job: 'voice-gateway' }),
     ], [], NOW);
     expect(testKpis(groups)).toEqual({ total: 3, passing: 1, failing: 1, running: 0, notRun: 1, lastRunAt: minsAgo(3) });
+  });
+});
+
+describe('test reports (rows 81 and 82)', () => {
+  // The brain's report for its own suite and the app's, abridged from real runs.
+  const brainReport: ReportLike = {
+    totals: { pass: 259, fail: 0, skip: 0, todo: 0, errors: 0, tests: 259, files: 23, ms: 3550 },
+    files: [{ path: 'src/greeting.test.ts', pass: 10, fail: 0, skip: 0, todo: 0, ms: 352.59, failed: [] }],
+    coverage: { lines: 72.2, funcs: 75.6, files: 25 },
+  };
+  const appReport: ReportLike = {
+    totals: { pass: 1145, fail: 2, skip: 7, todo: 0, errors: 0, tests: 1154, files: 73, ms: 16_850 },
+    files: [
+      { path: 'tests/auth.spec.ts', pass: 5, fail: 0, skip: 8, todo: 0, ms: 0.66, failed: [] },
+      { path: 'src/lib/betaHome.test.ts', pass: 30, fail: 0, skip: 0, todo: 0, ms: 0.4, failed: [] },
+      { path: 'src/lib/betaDevTools.test.ts', pass: 12, fail: 2, skip: 0, todo: 1, ms: 1240, failed: ['formats > ago', 'tabs > each route is its tab'] },
+      { path: 'src/empty.test.ts', pass: 0, fail: 0, skip: 0, todo: 0, ms: 0, failed: [] },
+    ],
+    coverage: { lines: 56.08, funcs: 45.67, files: 138 },
+  };
+  const groups = () => groupSuites([
+    suite({ id: 'f', ci_job: 'frontend', last_status: 'failed', last_run_at: minsAgo(4) }),
+    suite({ id: 'b', ci_job: 'atlas-brain', last_status: 'passed', last_run_at: minsAgo(9) }),
+    suite({ id: 'v', ci_job: 'voice-gateway', last_status: 'passed', last_run_at: minsAgo(20) }),
+  ], [
+    run({ id: 'r1', suite_id: 'f', run_at: minsAgo(4), status: 'failed', report: appReport }),
+    run({ id: 'r0', suite_id: 'f', run_at: minsAgo(60), report: { ...appReport, coverage: { lines: 99, funcs: 99, files: 1 } } }),
+    run({ id: 'r2', suite_id: 'b', run_at: minsAgo(9), report: brainReport }),
+    run({ id: 'r3', suite_id: 'v', run_at: minsAgo(20), report: null }),
+  ], NOW);
+
+  test('rows count tests, and fall back to files for a job with no test step', () => {
+    const [front, brain, voice] = groups();
+    expect([front.job, brain.job, voice.job]).toEqual(['frontend', 'atlas-brain', 'voice-gateway']);
+    expect(jobCount(front)).toBe('1,154 tests');
+    expect(jobCount(brain)).toBe('259 tests');
+    expect(jobCount(voice)).toBe('1 suite');
+    expect(jobReport(front)).toBe(appReport);
+  });
+
+  test('the files of a run: failing first, each as “N tests · X s”', () => {
+    const rows = reportFiles(appReport);
+    expect(rows.map((r) => r.path)).toEqual(['src/lib/betaDevTools.test.ts', 'src/empty.test.ts', 'src/lib/betaHome.test.ts', 'tests/auth.spec.ts']);
+    expect(rows[0]).toMatchObject({ dot: 'red', tests: 15, line: '15 tests · 1.2s · 2 failing, 1 todo', failed: ['formats > ago', 'tabs > each route is its tab'] });
+    expect(rows[1]).toMatchObject({ dot: 'neutral', line: '0 tests · 0 ms' });
+    expect(rows[2].line).toBe('30 tests · <1 ms');
+    expect(rows[3]).toMatchObject({ dot: 'green', line: '13 tests · <1 ms · 8 skipped' });
+    expect(testsAndTime(1, 840)).toBe('1 test · 840 ms');
+    expect(fileTime(0)).toBe('0 ms');
+  });
+
+  test('totals add up the newest report of each job', () => {
+    expect(testTotals(groups())).toEqual({ pass: 1404, fail: 2, skip: 7, todo: 0, tests: 1413, jobs: 2 });
+    expect(testTotals(groupSuites([suite({ id: 'x' })], [], NOW))).toBeNull();
+  });
+
+  test('coverage: the app’s own job first, its newest run, named', () => {
+    expect(coverageTile(groups())).toEqual({ value: '56%', of: 'lines', job: 'frontend', label: 'Coverage', detail: 'frontend, last run: 56.08% of lines · 45.67% of functions · 138 source files' });
+    // Only atlas-brain has a report: its figure, and its name where it shows, not only on hover.
+    const brainOnly = groups().filter((g) => g.job !== 'frontend');
+    expect(coverageTile(brainOnly)).toMatchObject({ value: '72%', job: 'atlas-brain', label: 'Coverage · atlas-brain' });
+    // The frontend job is there but its newest run printed no report: the
+    // brain's figure is shown, and the heading says so.
+    const frontNoReport = groupSuites([
+      suite({ id: 'f', ci_job: 'frontend', last_status: 'failed', last_run_at: minsAgo(2) }),
+      suite({ id: 'b', ci_job: 'atlas-brain', last_status: 'passed', last_run_at: minsAgo(9) }),
+    ], [
+      run({ id: 'r1', suite_id: 'f', run_at: minsAgo(2), status: 'failed', report: null }),
+      run({ id: 'r2', suite_id: 'b', run_at: minsAgo(9), report: brainReport }),
+    ], NOW);
+    expect(coverageTile(frontNoReport)).toMatchObject({ value: '72%', job: 'atlas-brain', label: 'Coverage · atlas-brain' });
+    expect(coverageTile(groupSuites([suite({ id: 'x' })], [], NOW))).toBeNull();
+    expect(coverageLine({ lines: null, funcs: 50, files: 1 })).toBe('50% of functions · 1 source file');
   });
 });
 

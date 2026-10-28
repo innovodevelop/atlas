@@ -19,6 +19,8 @@ import { ingestJsonlSessions } from "./jsonlIngest.ts";
 import { applyChangelog, readGitLog } from "./changelog.ts";
 import { applyDesignSyncs, parseDesignManifest } from "./designSync.ts";
 import { readDesignScreens } from "./designScreens.ts";
+import { compactBunLog, parseBunTest, type TestReport } from "./testReport.ts";
+import { createGithubWidgets } from "./githubWidgets.ts";
 import { executeRepair, type RepairContext } from "./selfRepair.ts";
 import { aiProviderService, createProviderProbeCache } from "./providerProbe.ts";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
@@ -138,17 +140,72 @@ interface Deps {
  * sink. Job names mirror the CI jobs in scripts/ci/run.sh; `edge-functions` is
  * deliberately absent because it needs deno plus a per-directory loop, which
  * has no single-command form to allowlist.
+ *
+ * A job is ordered steps, and every step runs even after one fails, as in
+ * scripts/ci/run.sh: a lint error should not hide which tests fail. A step
+ * marked `report` is a `bun test --coverage` run whose output is read into
+ * atlas_test_reports (testReport.ts) — the Tests screen's coverage figure and
+ * per-file counts (left-out features, rows 81 and 82). The frontend's test
+ * step is CI's own test command; `ci:quick` is eslint plus tsc, which CI runs
+ * as well.
  */
-const CI_JOBS: Record<string, { cwd: string; argv: string[] }> = {
-  frontend: { cwd: PROJECT_ROOT, argv: ["bun", "run", "ci:quick"] },
-  "atlas-brain": { cwd: resolve(PROJECT_ROOT, "services/atlas-brain"), argv: ["bunx", "tsc", "--noEmit"] },
-  "voice-gateway": { cwd: resolve(PROJECT_ROOT, "services/voice-gateway"), argv: ["bunx", "tsc", "--noEmit"] },
-  all: { cwd: PROJECT_ROOT, argv: ["bun", "run", "ci"] },
+interface CiStep { argv: string[]; report?: true }
+const CI_JOBS: Record<string, { cwd: string; steps: CiStep[] }> = {
+  frontend: {
+    cwd: PROJECT_ROOT,
+    steps: [
+      { argv: ["bun", "run", "ci:quick"] },
+      { argv: ["bun", "test", "--coverage", "tests/", "./src", "./scripts", "supabase/functions/_shared"], report: true },
+    ],
+  },
+  "atlas-brain": {
+    cwd: resolve(PROJECT_ROOT, "services/atlas-brain"),
+    steps: [{ argv: ["bunx", "tsc", "--noEmit"] }, { argv: ["bun", "test", "--coverage"], report: true }],
+  },
+  "voice-gateway": { cwd: resolve(PROJECT_ROOT, "services/voice-gateway"), steps: [{ argv: ["bunx", "tsc", "--noEmit"] }] },
+  all: { cwd: PROJECT_ROOT, steps: [{ argv: ["bun", "run", "ci"] }] },
 };
 
 // Keep the stored log bounded — a full CI run prints far more than any panel
 // shows, and atlas.db is the user's own database.
 const OUTPUT_TAIL_CHARS = 20_000;
+/** Reports kept per job; older ones go when a new one lands. */
+const REPORTS_PER_JOB = 20;
+
+/**
+ * The child's environment. Bun prints only the failing tests when it thinks
+ * an AI agent is running it (CLAUDECODE or AI_AGENT set, as they are when a
+ * brain is started from a Claude Code session), and the report needs every
+ * test line, so those two are left out.
+ */
+function ciEnv(): Record<string, string | undefined> {
+  const env: Record<string, string | undefined> = { ...process.env };
+  delete env.CLAUDECODE;
+  delete env.AI_AGENT;
+  return env;
+}
+
+/** A stored report back as an object; a row that does not parse reads as none. */
+function parseStoredReport(raw: string | null): TestReport | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as TestReport;
+  } catch {
+    return null;
+  }
+}
+
+// Owned by the brain, like proactive_state: only the admin routes read or
+// write it. One row per test run that produced a bun test report; the run
+// row keeps its status and log as before.
+const TEST_REPORTS_DDL = `
+CREATE TABLE IF NOT EXISTS atlas_test_reports (
+  run_id     TEXT PRIMARY KEY REFERENCES atlas_test_runs(id) ON DELETE CASCADE,
+  job        TEXT NOT NULL,
+  report     TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_test_reports_job ON atlas_test_reports(job, created_at DESC);`;
 
 /**
  * major/minor/patch as numbers. The patch is optional because VERSION-PLAN.md
@@ -182,6 +239,9 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
     apply: applyVersionPlan,
     repoCandidates: defaultRepoCandidates(PROJECT_ROOT),
   });
+  db.exec(TEST_REPORTS_DDL);
+  // The admin Home's Pull requests and Deploys widgets (githubWidgets.ts).
+  const github = createGithubWidgets();
 
   // The AI provider probe behind System Status's Reasoning row, kept for a
   // minute between polls (providerProbe.ts). Declared above the return for the
@@ -213,6 +273,8 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
     scanErrors,
     getRepairs,
     initiateRepair,
+    getGithubPulls,
+    getGithubDeploys,
   };
 
   /** Check GitHub now, apply the plan if it changed, and return the status. */
@@ -331,12 +393,14 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
     return json(rows);
   }
 
+  /** Runs, newest first, each with its bun test report (parsed) or null. */
   function getTestRuns(req: Request, suiteId?: string): Response {
     requireUser(req);
-    const q = suiteId
-      ? db.query(`SELECT * FROM atlas_test_runs WHERE suite_id = ? ORDER BY run_at DESC LIMIT 50`).all(suiteId)
-      : db.query(`SELECT * FROM atlas_test_runs ORDER BY run_at DESC LIMIT 50`).all();
-    return json(q);
+    const select = `SELECT r.*, rep.report AS report FROM atlas_test_runs r LEFT JOIN atlas_test_reports rep ON rep.run_id = r.id`;
+    const rows = (suiteId
+      ? db.query(`${select} WHERE r.suite_id = ? ORDER BY r.run_at DESC LIMIT 50`).all(suiteId)
+      : db.query(`${select} ORDER BY r.run_at DESC LIMIT 50`).all()) as Array<Json & { report: string | null }>;
+    return json(rows.map((row) => ({ ...row, report: parseStoredReport(row.report) })));
   }
 
   function runTest(req: Request, suiteId: string): Response {
@@ -364,26 +428,73 @@ export function createAdminHandlers({ db, requireUser }: Deps) {
     // shell, so nothing that came out of the DB can be parsed as a command.
     const startMs = Date.now();
     void (async () => {
+      const logs: string[] = [];
+      let failed = false;
+      let spawnError: string | null = null;
+      let report: TestReport | null = null;
+      for (const step of job.steps) {
+        const label = `── ${step.argv.join(" ")}`;
+        try {
+          const proc = Bun.spawn(step.argv, { cwd: job.cwd, env: ciEnv(), stdout: "pipe", stderr: "pipe" });
+          // Drain both pipes while the child runs. An unread pipe fills and then
+          // blocks the child forever, which used to leave the run stuck at
+          // 'running' for any job that prints more than a pipe buffer.
+          const [stdout, stderr, code] = await Promise.all([
+            new Response(proc.stdout).text(),
+            new Response(proc.stderr).text(),
+            proc.exited,
+          ]);
+          if (code !== 0) failed = true;
+          // Read the whole output before anything trims it: the report's
+          // file headers and coverage table sit far outside the stored tail.
+          // Bun writes its report to stderr and the tests' own logging to
+          // stdout, so stderr is read first.
+          const stepReport = step.report ? parseBunTest(`${stderr}\n${stdout}`) : null;
+          if (stepReport) report = stepReport;
+          const body = step.report ? compactBunLog(`${stdout}${stderr}`, stepReport) : `${stdout}${stderr}`.trimEnd();
+          logs.push(`${label}${code !== 0 ? `  (exit ${code})` : ""}\n${body}`);
+        } catch (err) {
+          failed = true;
+          spawnError ??= `${step.argv[0]}: ${String(err)}`;
+          logs.push(`${label}\n${String(err)}`);
+        }
+      }
       try {
-        const proc = Bun.spawn(job.argv, { cwd: job.cwd, stdout: "pipe", stderr: "pipe" });
-        // Drain both pipes while the child runs. An unread pipe fills and then
-        // blocks the child forever, which used to leave the run stuck at
-        // 'running' for any job that prints more than a pipe buffer.
-        const [stdout, stderr, code] = await Promise.all([
-          new Response(proc.stdout).text(),
-          new Response(proc.stderr).text(),
-          proc.exited,
-        ]);
-        const durationMs = Date.now() - startMs;
-        db.query(`UPDATE atlas_test_runs SET status = ?, duration_ms = ?, output = ? WHERE id = ?`)
-          .run(code === 0 ? "passed" : "failed", durationMs, `${stdout}${stderr}`.slice(-OUTPUT_TAIL_CHARS), runId);
+        db.query(`UPDATE atlas_test_runs SET status = ?, duration_ms = ?, output = ?, error_message = ? WHERE id = ?`)
+          .run(failed ? "failed" : "passed", Date.now() - startMs, logs.join("\n\n").slice(-OUTPUT_TAIL_CHARS), spawnError, runId);
+        if (report) saveReport(runId, ciJob, report);
       } catch (err) {
-        db.query(`UPDATE atlas_test_runs SET status = 'failed', duration_ms = ?, error_message = ? WHERE id = ?`)
-          .run(Date.now() - startMs, String(err), runId);
+        console.error("[admin] could not record test run", runId, err);
       }
     })();
 
     return json({ runId, status: "running" });
+  }
+
+  /** Store a run's report and keep only the newest REPORTS_PER_JOB for its job. */
+  function saveReport(runId: string, jobName: string, report: TestReport): void {
+    db.query(`INSERT OR REPLACE INTO atlas_test_reports (run_id, job, report) VALUES (?, ?, ?)`).run(runId, jobName, JSON.stringify(report));
+    db.query(`
+      DELETE FROM atlas_test_reports WHERE job = ? AND run_id NOT IN (
+        SELECT run_id FROM atlas_test_reports WHERE job = ? ORDER BY created_at DESC LIMIT ?
+      )
+    `).run(jobName, jobName, REPORTS_PER_JOB);
+  }
+
+  /**
+   * GET /admin/github/pulls — the open pull requests of the plan's repo, for
+   * the admin Home's Pull requests widget. `ok: false` with the problem in
+   * words when gh is missing, signed out or offline: the widget's dormant face.
+   */
+  async function getGithubPulls(req: Request): Promise<Response> {
+    requireUser(req);
+    return json(await github.pulls());
+  }
+
+  /** GET /admin/github/deploys — its releases and latest workflow runs, for the Deploys widget. */
+  async function getGithubDeploys(req: Request): Promise<Response> {
+    requireUser(req);
+    return json(await github.deploys());
   }
 
   /**

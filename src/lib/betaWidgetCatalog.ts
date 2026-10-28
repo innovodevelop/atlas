@@ -242,6 +242,12 @@ export const EMPTY_COPY: Record<string, EmptySpec> = {
   budget: { title: 'No budget yet', hint: 'Set monthly limits per category in Money and the card shows what is left and whether you are ahead of an even pace.', action: { label: 'Open Money', route: '/money' } },
   subscriptions: { title: 'No subscriptions found', hint: 'Atlas finds subscriptions among payments that repeat every month or year, once your transactions are in Money.', action: { label: 'Open Money', route: '/money' } },
   transit: { title: 'No departures yet', hint: 'Add a Rejseplanen access ID and choose your stop; the next departures show here, live. Open the card to set it up.' },
+  // The developer widgets are admin only (betaHome.ts), and so is their copy:
+  // the literal comparison folds when Vite builds.
+  ...(import.meta.env.VITE_ATLAS_EDITION === 'consumer' ? {} : {
+    pullrequests: { title: 'No open pull requests', hint: 'Open pull requests on the repo show here, the ones waiting on your review first. Atlas reads them through gh on this Mac.' },
+    deploys: { title: 'Nothing released yet', hint: 'The newest GitHub release shows here, with the latest run of each workflow. Atlas reads them through gh on this Mac.' },
+  }),
 };
 
 export function emptyCopy(id: string): EmptySpec {
