@@ -47,7 +47,12 @@ export interface BankRuleRow { id: string; pattern: string; category: string; or
 export interface BankBudgetRow { id: string; category: string; monthly_limit: number }
 export interface BankGoalRow { id: string; name: string; target: number; due_on: string | null; account_id: string | null; currency: string | null }
 export interface BankGoalMoveRow { id: string; goal_id: string; amount: number; made_on: string }
-export type SubscriptionMarkStatus = 'cancelled' | 'ignored';
+/**
+ * What the user said about a subscription: `reminded` (a reminder task to
+ * cancel it at the merchant exists; it still counts), `cancelled` (it stops
+ * counting) or `ignored` (it was never a subscription).
+ */
+export type SubscriptionMarkStatus = 'reminded' | 'cancelled' | 'ignored';
 export interface BankSubMarkRow { id: string; merchant: string; status: SubscriptionMarkStatus; task_id: string | null; created_at: string }
 export interface BankLinkRow {
   id: string;
@@ -449,6 +454,8 @@ export interface Subscription {
   monthly: number;
   next: string;
   status: 'active' | 'cancelled';
+  /** A reminder task to cancel it at the merchant was added. */
+  reminded: boolean;
   markId: string | null;
   taskId: string | null;
   /** The merchant's own page for ending it, when Atlas knows it. */
@@ -497,7 +504,7 @@ export function subscriptionsOf(recurring: readonly Recurring[], marks: readonly
       return [{
         key: r.key, merchant: r.merchant, merchantKey: r.merchantKey, category: r.category, cadence: r.cadence, amount,
         monthly: Math.round(monthly * 100) / 100, next: r.next,
-        status: mark?.status === 'cancelled' ? 'cancelled' : 'active', markId: mark?.id ?? null, taskId: mark?.task_id ?? null,
+        status: mark?.status === 'cancelled' ? 'cancelled' : 'active', reminded: !!mark?.task_id, markId: mark?.id ?? null, taskId: mark?.task_id ?? null,
         url: cancelPageFor(r.merchantKey),
       }];
     })
@@ -596,12 +603,15 @@ export function projectCashflow(opts: { start: number | null; recurring: readonl
 
 /** The projection on the 300×100 box, with a zero line when the balance is projected to cross it. */
 export function projectionPoints(p: Projection): { line: string; area: string; y: (v: number) => number; zeroY: number | null } {
-  const lo = Math.min(p.min, p.known && p.min < 0 ? 0 : p.min);
-  const hi = Math.max(p.max, lo + 1);
+  // A balance projected below zero keeps zero inside the box, so the line
+  // can be drawn where it is crossed.
+  const crosses = p.known && p.min < 0;
+  const lo = p.min;
+  const hi = Math.max(crosses ? Math.max(p.max, 0) : p.max, lo + 1);
   const y = (v: number) => Number((100 - ((v - lo) / (hi - lo)) * 84 - 8).toFixed(1));
   const n = Math.max(1, p.points.length - 1);
   const line = p.points.map((v, i) => `${((i / n) * 300).toFixed(1)},${y(v)}`).join(' ');
-  return { line, area: `0,100 ${line} 300,100`, y, zeroY: p.known && p.min < 0 ? y(0) : null };
+  return { line, area: `0,100 ${line} 300,100`, y, zeroY: crosses ? y(0) : null };
 }
 
 /** The chips worth drawing: the largest events, at most `max`, in date order. */
@@ -686,11 +696,15 @@ export function budgetBalance(accounts: readonly Pick<BankAccountRow, 'balance' 
 
 export interface SortItem { key: string; merchant: string; total: number; count: number }
 
-/** Unsorted merchants, biggest first: what the button offers to send. */
+/**
+ * Unsorted merchants, biggest first: what the button offers to send. Rows on
+ * accounts left out of the budget are not offered — sorting them changes
+ * nothing on the screen, so they are not worth sending anywhere.
+ */
 export function unsortedMerchants(ledger: readonly LedgerTx[], limit = 40): SortItem[] {
   const by = new Map<string, SortItem>();
   for (const t of ledger) {
-    if (!t.unsorted) continue;
+    if (!t.unsorted || t.excluded) continue;
     const cur = by.get(t.merchantKey) ?? { key: t.merchantKey, merchant: t.merchant, total: 0, count: 0 };
     cur.total += -t.amount;
     cur.count += 1;

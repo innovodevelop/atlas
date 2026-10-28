@@ -165,6 +165,10 @@ describe('recurring, subscriptions and the projection', () => {
     expect(marked[0].status).toBe('cancelled');
     expect(subscriptionTotals(marked)).toEqual({ monthly: 0, count: 0, saved: 129 });
     expect(subscriptionsOf(rec, [{ id: 'm', merchant: subs[0].key, status: 'ignored', task_id: null, created_at: '' }])).toEqual([]);
+    // A reminder to cancel it does not stop it counting: only the bank can say it ended.
+    const reminded = subscriptionsOf(rec, [{ id: 'm', merchant: subs[0].key, status: 'reminded', task_id: 'task', created_at: '' }]);
+    expect(reminded[0]).toMatchObject({ status: 'active', reminded: true, taskId: 'task' });
+    expect(subscriptionTotals(reminded).monthly).toBe(129);
     expect(cancelPageFor('youtube premium')).toBe('https://www.youtube.com/paid_memberships');
     expect(cancelPageFor('irma')).toBeNull();
   });

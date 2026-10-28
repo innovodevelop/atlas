@@ -1505,13 +1505,15 @@ CREATE TABLE IF NOT EXISTS bank_goal_moves (
 );
 
 -- What the user said about a subscription Atlas found. Atlas cannot cancel
--- at the merchant; 'cancelled' only stops it counting, 'ignored' means it was
--- never a subscription. `merchant` is the recurring key from bankLedger.ts.
+-- at the merchant: 'reminded' means a reminder task to cancel it exists
+-- (`task_id`) and it still counts; 'cancelled' only stops it counting;
+-- 'ignored' means it was never a subscription. `merchant` is the recurring key
+-- from bankLedger.ts.
 CREATE TABLE IF NOT EXISTS bank_subscription_marks (
   id         TEXT PRIMARY KEY,
   user_id    TEXT NOT NULL,
   merchant   TEXT NOT NULL,
-  status     TEXT NOT NULL CHECK (status IN ('cancelled','ignored')),
+  status     TEXT NOT NULL CHECK (status IN ('reminded','cancelled','ignored')),
   task_id    TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   UNIQUE(user_id, merchant)

@@ -52,6 +52,25 @@ export interface WidgetDef {
 }
 
 /**
+ * The Money widgets (row 17 of docs/design-sync/2026-10-28-left-out-features.md):
+ * Spend, Budget and Subscriptions, read from the bank store on this Mac. Money
+ * is an admin surface (`/money` in src/surfaces.ts), so a consumer build lists
+ * none of them — a widget must never open a screen its edition cannot route.
+ */
+function moneyWidgets(): WidgetDef[] {
+  // The same comparison as `EDITION` in src/surfaces.ts, written out rather
+  // than imported: surfaces.ts carries every page's loader, and importing it
+  // would pull all of them into this pure module (and the strict typecheck
+  // of src/lib). A direct comparison is also what lets Vite fold it.
+  if (import.meta.env.VITE_ATLAS_EDITION === 'consumer') return [];
+  return [
+    { id: 'spend', label: 'Spend', meta: 'This month by category, from your bank', group: 'Money', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/money' } },
+    { id: 'budget', label: 'Budget', meta: 'Left to spend and your pace this month', group: 'Money', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/money' } },
+    { id: 'subscriptions', label: 'Subscriptions', meta: 'What repeats every month or year', group: 'Money', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'live', opens: { route: '/money' } },
+  ];
+}
+
+/**
  * Every widget Home can show, in the handoff's catalog order. `source` is
  * honest per widget: Energy, Podcast and Focus have no source in the app yet
  * and are listed so the editor can say so, not so a fake card can be added.
@@ -73,6 +92,7 @@ export const WIDGETS: readonly WidgetDef[] = [
   { id: 'energy', label: 'Energy', meta: 'No energy meter is connected yet', group: 'Home', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'unwired', opens: { route: '/smart-home' } },
   { id: 'podcast', label: 'Podcast', meta: 'No podcast source yet', group: 'Media', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'unwired', opens: null },
   { id: 'focus', label: 'Focus', meta: 'Focus sessions arrive with the Focus screen', group: 'Day', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'unwired', opens: null },
+  ...moneyWidgets(),
 ];
 
 export const WIDGET_BY_ID: ReadonlyMap<string, WidgetDef> = new Map(WIDGETS.map((w) => [w.id, w]));

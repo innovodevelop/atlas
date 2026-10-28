@@ -37,6 +37,9 @@ mod health;
 mod watchdog;
 mod brain;
 mod system_vitals;
+// Money: the local bank store (CSV imports) and the optional read-only
+// GoCardless Bank Account Data link. See src/bank.rs.
+mod bank;
 
 /// Outcome of a sidecar spawn attempt. `integrity_error` is set when the
 /// binary failed integrity verification (and was therefore NOT spawned) — it
@@ -616,6 +619,17 @@ pub fn run() {
       health::health_series,
       health::health_workouts,
       health::health_forget,
+      // Money. All `#[tauri::command(async)]`: HTTP to GoCardless and SQLite.
+      // None of them can move money; GoCardless's keys stay in the Keychain.
+      bank::bank_store_transactions,
+      bank::bank_gc_status,
+      bank::bank_gc_set_keys,
+      bank::bank_gc_clear_keys,
+      bank::bank_gc_institutions,
+      bank::bank_gc_link_start,
+      bank::bank_gc_link_refresh,
+      bank::bank_gc_sync,
+      bank::bank_gc_unlink,
     ])
     .setup(|app| {
       // ONE DATABASE, AND THIS LAUNCH'S IDENTITY — both before anything else in
@@ -790,6 +804,8 @@ pub fn run() {
           // Background Gmail sync writes the shared atlas.db too, so it runs
           // in the owner only, for the same reason.
           handle.manage(gmail::GmailAutoSync::spawn(handle.clone()));
+          // Linked banks are read once a day, by the owner only, for the same reason.
+          bank::spawn_daily_sync(handle.clone());
         });
       }
 

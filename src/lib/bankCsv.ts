@@ -177,7 +177,7 @@ export function detectDecimal(values: readonly string[]): DecimalMark {
   let comma = 0;
   let dot = 0;
   for (const raw of values) {
-    const v = raw.replace(CURRENCY_AFFIX, '').replace(/[\s ']/g, '');
+    const v = raw.replace(CURRENCY_AFFIX, '').replace(/[\s']/g, '');
     const lc = v.lastIndexOf(',');
     const ld = v.lastIndexOf('.');
     if (lc >= 0 && ld >= 0) { if (lc > ld) comma++; else dot++; continue; }
@@ -193,7 +193,7 @@ export function detectDecimal(values: readonly string[]): DecimalMark {
  * all, so a header or a status column never becomes money.
  */
 export function parseAmount(raw: string, decimal: DecimalMark = ','): number | null {
-  let s = raw.trim().replace(/^"|"$/g, '').replace(/−/g, '-').replace(CURRENCY_AFFIX, '').replace(/[\s ']/g, '');
+  let s = raw.trim().replace(/^"|"$/g, '').replace(/−/g, '-').replace(CURRENCY_AFFIX, '').replace(/[\s']/g, '');
   if (!s) return null;
   let neg = false;
   if (/^\(.*\)$/.test(s)) { neg = true; s = s.slice(1, -1); }
