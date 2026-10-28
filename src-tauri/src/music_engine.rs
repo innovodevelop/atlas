@@ -154,12 +154,21 @@ async fn engine_main(
     // Local queue backing next/prev (single track until playlist queueing lands).
     let mut queue: Vec<SpotifyUri> = Vec::new();
     let mut index: usize = 0;
+    // The URI string the webview last loaded, as it sent it. `music:unavailable`
+    // names the record with this rather than formatting librespot's own id
+    // type, so the webview can compare it with what it asked for.
+    let mut loaded: Option<String> = None;
 
     loop {
         tokio::select! {
             cmd = rx.recv() => match cmd {
                 Some(EngineCmd::Load(uri, start_ms)) => match SpotifyUri::from_uri(&uri) {
-                    Ok(u) => { queue = vec![u.clone()]; index = 0; player.load(u, true, start_ms); }
+                    Ok(u) => {
+                        queue = vec![u.clone()];
+                        index = 0;
+                        loaded = Some(uri.clone());
+                        player.load(u, true, start_ms);
+                    }
                     Err(e) => log::warn!("[music] bad Spotify URI '{uri}': {e:?}"),
                 },
                 Some(EngineCmd::Play) => player.play(),
@@ -209,16 +218,16 @@ async fn engine_main(
                     // Metadata refresh — the webview re-pulls full details.
                     emit_now_playing(&app, playing.load(Ordering::Relaxed), None);
                 }
-                Some(PlayerEvent::Unavailable { track_id, .. }) => {
+                Some(PlayerEvent::Unavailable { .. }) => {
                     // Spotify has no audio librespot may decode for this item
                     // (region, a removed track, an episode hosted elsewhere or
                     // published as video). Say which, so the webview can stop
                     // claiming it plays and offer a Connect speaker instead.
-                    log::warn!("[music] unavailable: {track_id}");
+                    log::warn!("[music] unavailable: {}", loaded.as_deref().unwrap_or("?"));
                     playing.store(false, Ordering::Relaxed);
                     let _ = app.emit(
                         "music:unavailable",
-                        serde_json::json!({ "uri": track_id.to_string() }),
+                        serde_json::json!({ "uri": loaded.clone() }),
                     );
                 }
                 Some(_) => {}

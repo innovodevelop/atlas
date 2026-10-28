@@ -2,43 +2,48 @@
  * The Beta Music — `/music`, the listening room (Beta redesign phase 4,
  * `Atlas Music Beta.dc.html`).
  *
- * The hero is the record: the cover with its disc, the title, the progress
- * ribbon (click to seek), the transport and Atlas's output volume. Beside it
- * the aside holds Up next and a Spotify search; under both, the station row
- * is the account's own playlists, with the liked songs first.
+ * The hero is the record: the cover with its disc, the album line with the
+ * release year, the title with Like, the progress ribbon (click to seek), the
+ * transport, Atlas's output volume and the ducking switch. Beside it the
+ * aside holds Up next, Lyrics, Rooms and a Spotify search; under both, the
+ * station row: Atlas's four mood stations, the liked songs and the account's
+ * own playlists.
  *
- * Everything reads and writes the same `useMusicPlayer` store the Home widget
- * and the Workshop player use, and the rules for what may be offered come
- * from `useMusicSurface` (read its header before adding a control). One thing
- * is new here: a queue. The Rust engine holds a one-element queue, so its own
- * Next and Previous do nothing; this screen keeps the list (liked songs, a
- * playlist, a search) and steps through it by handing the engine the next
- * track with its metadata (`load(uri, track)`), including when the engine
- * reports a track has ended (`nowPlaying.ended`). The queue therefore only
- * advances while this screen is open; the choice survives leaving it.
+ * The record and the engine come from `useMusicPlayer`; the queue, shuffle,
+ * repeat, volume, ducking, Like, the stations and Rooms come from the music
+ * queue store (`useMusicQueue`), which BetaShell keeps running on every
+ * screen — so Up next goes on advancing after this screen is left. The rules
+ * for what may be offered come from `useMusicSurface` (read its header before
+ * adding a control).
  *
- * Left out, because Atlas has no source for them: lyrics, rooms and
- * per-speaker volume (the engine plays on this Mac only), ducking (nothing
- * lowers the engine when someone speaks), the like button (the Spotify grant
- * has no `user-library-modify`) and the mood stations, which are the
- * account's real playlists instead.
+ * What leaves the Mac from here, and the screen says so where it happens:
+ * Like, Rooms, search and playback go to Spotify through the connected
+ * account; Lyrics sends the song's title, artist, album and length to
+ * LRCLIB; a mood station sends the titles and artists of liked songs to
+ * Atlas's AI model. Ducking and Wind down stay on this Mac.
+ *
+ * Left out: the design's "Matches your pace" for Run — no pace reaches a Mac.
  *
  * Keys, the design's: Space play/pause · ← previous · → next · / search · Esc Home.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
-import { engineHoldsUri, type Playlist, type SearchResults, type Track } from '@/hooks/useMusicPlayer';
+import type { Playlist, SearchResults, Track } from '@/hooks/useMusicPlayer';
+import { bootMusicQueue, musicQueue, queueOf, useMusicQueue } from '@/hooks/useMusicQueue';
 import { fmt, useMusicSurface } from '@/components/atlas-ui/music/useMusicSurface';
 import { drawWave, seedFromId, waveFor } from '@/components/atlas-ui/music/musicWave';
+import { MusicLike } from '@/components/atlas/music/MusicLike';
+import { MusicLyrics } from '@/components/atlas/music/MusicLyrics';
+import { MusicRooms } from '@/components/atlas/music/MusicRooms';
 import { VeilSphere } from '@/components/atlas/VeilSphere';
 import { AtlasIcon } from '@/components/atlas/AtlasIcon';
 import { useAtlasState } from '@/lib/atlasStateBus';
 import { openTalk, setTalkAnchor } from '@/lib/talkBus';
 import { useBetaNavigate } from '@/lib/viewTransitions';
 import {
-  DEFAULT_PREFS, PREFS_KEY, STATIONS_SHOWN, WAVE_BARS, afterEnd, neighbour, outputLine, parsePrefs, prevIntent,
-  queueSummary, ratioAt, sameSource, sourceLabel, startOf, stationLine, volumeLabel,
-  type MusicPrefs, type QueueSource,
+  MOODS, PLAYLISTS_SHOWN, STATION_POOL, WAVE_BARS, albumLine, neighbour, outputLine, queueSummary, ratioAt, sameSource,
+  sourceLabel, stationLine, volumeLabel, type QueueSource,
 } from '@/lib/betaMusic';
+import { LIKE_SCOPES, ROOM_SCOPES, lacks, reconnectLabel } from '@/lib/musicSpotify';
 import { isTyping } from './atlasHelpers';
 import '@/styles/beta/music.css';
 
@@ -56,22 +61,8 @@ const LIBRARY: QueueSource = { kind: 'library' };
 const LIBRARY_PAGE = 50;
 const SEARCH_DEBOUNCE_MS = 320;
 
-interface QueueState { source: QueueSource; tracks: Track[] }
-
-/**
- * The queue the room last played from. Module scope, so leaving the screen
- * and coming back finds the same list rather than falling back to the liked
- * songs; nothing is persisted beyond the session.
- */
-let lastQueue: QueueState = { source: LIBRARY, tracks: [] };
-
-function readPrefs(): MusicPrefs {
-  try { return parsePrefs(window.localStorage.getItem(PREFS_KEY)); } catch { return { ...DEFAULT_PREFS }; }
-}
-function writePrefs(p: MusicPrefs): void {
-  // A per-viewer convenience: a private window or blocked storage just forgets.
-  try { window.localStorage.setItem(PREFS_KEY, JSON.stringify(p)); } catch { /* nothing to do */ }
-}
+type Tab = 'queue' | 'lyrics' | 'rooms' | 'search';
+const TABS: readonly [Tab, string][] = [['queue', 'Up next'], ['lyrics', 'Lyrics'], ['rooms', 'Rooms'], ['search', 'Search']];
 
 const rgb = (c: readonly number[]): string => `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
 
@@ -80,14 +71,13 @@ const BetaMusic = () => {
   const s = useMusicSurface();
   const { m, track, isPlaying, durationMs } = s;
   const np = m.nowPlaying;
+  const q = useMusicQueue();
   const bus = useAtlasState();
 
   const canBrowse = m.available && m.connected;
   const canQueue = canBrowse && m.premium;
 
-  const [tab, setTab] = useState<'queue' | 'search'>('queue');
-  const [q, setQ] = useState<QueueState>(lastQueue);
-  const [prefs, setPrefs] = useState<MusicPrefs>(readPrefs);
+  const [tab, setTab] = useState<Tab>('queue');
   const [libLoading, setLibLoading] = useState(false);
   const [listsLoading, setListsLoading] = useState(false);
   const [more, setMore] = useState<{ busy: boolean; from: number } | null>(null);
@@ -106,7 +96,9 @@ const BetaMusic = () => {
   const timeRef = useRef<HTMLSpanElement | null>(null);
   const hoverRef = useRef<number | null>(null);
 
-  useEffect(() => { lastQueue = q; }, [q]);
+  // BetaShell already runs the store; booting it here too (it is ref-counted)
+  // keeps this screen whole if it is ever shown outside the shell.
+  useEffect(() => bootMusicQueue(), []);
   useEffect(() => { setTalkAnchor(sphereEl); return () => setTalkAnchor(null); }, [sphereEl]);
 
   // The liked songs are the room's default queue and the playlists are its
@@ -130,91 +122,11 @@ const BetaMusic = () => {
   }, [canBrowse, loadLibrary, loadPlaylists, m.library.length, m.playlists.length]);
 
   /** The list Up next shows and Next steps through. The liked songs stay live. */
-  const queue = q.source.kind === 'library' ? m.library : q.tracks;
+  const queue = queueOf(q, m.library);
   const currentId = track?.id ?? null;
-
-  const updatePrefs = useCallback((next: Partial<MusicPrefs>) => {
-    setPrefs((p) => { const v = { ...p, ...next }; writePrefs(v); return v; });
-  }, []);
-
-  // ── transport ────────────────────────────────────────────────────────────
-
-  /** Hand the engine `t` (with its record, so every surface shows it), optionally switching lists. */
-  const playTrack = useCallback(async (t: Track, next?: QueueState) => {
-    if (!canQueue) return;
-    if (next) setQ(next);
-    setNotice(null);
-    try { await m.load(t.uri, t); } catch { /* `useMusicPlayer` puts it on `error`, which the hero shows. */ }
-  }, [canQueue, m]);
-
-  const step = useCallback((dir: 1 | -1) => {
-    const t = neighbour(queue, currentId, dir, prefs.shuffle);
-    if (t) void playTrack(t);
-  }, [queue, currentId, prefs.shuffle, playTrack]);
-
-  const onNext = useCallback(() => step(1), [step]);
-
-  // The design's rule: more than four seconds in, Previous restarts the track.
-  const onPrev = useCallback(() => {
-    if (s.canSeek && prevIntent(m.readPosition()) === 'restart') { s.restart(); return; }
-    step(-1);
-  }, [s, m, step]);
-
-  /**
-   * Pause only means pause when Atlas is the one playing (see
-   * useMusicSurface). Otherwise the press plays the record here: loading it
-   * when the engine does not hold it or has finished it, resuming when it
-   * does. With nothing showing at all it starts the queue.
-   */
-  const onPlayPause = useCallback(() => {
-    if (!canQueue) return;
-    if (!track) {
-      const first = startOf(queue, prefs.shuffle);
-      if (first) void playTrack(first);
-      return;
-    }
-    if (s.showPause) { m.pause().catch(() => {}); return; }
-    if (np?.ended || !engineHoldsUri(track.uri)) { void playTrack(track); return; }
-    m.play().catch(() => {});
-  }, [canQueue, track, queue, prefs.shuffle, s.showPause, np?.ended, m, playTrack]);
-
-  // Advance when the engine reports the end of a track. Once per ending: the
-  // guard is cleared only by real progress on the next record, so a load that
-  // fails (and restores the ended record) cannot retry in a loop. A record
-  // that had already ended before the screen opened counts as handled —
-  // opening Music must not start something by itself.
-  const advanced = useRef<string | null>(np?.ended ? np.track?.id ?? null : null);
-  useEffect(() => {
-    if (!np) return;
-    if (!np.ended) { if (np.positionMs > 0) advanced.current = null; return; }
-    const ended = np.track;
-    if (!ended || advanced.current === ended.id || !canQueue) return;
-    advanced.current = ended.id;
-    const t = afterEnd(queue, ended, prefs.repeat, prefs.shuffle);
-    if (t) void playTrack(t);
-  }, [np, queue, prefs.repeat, prefs.shuffle, canQueue, playTrack]);
-
-  // The engine never reports its volume, so the room sets it to the value it
-  // shows as soon as there is an engine to set — the slider is then a fact.
-  const volumeApplied = useRef(false);
-  useEffect(() => {
-    if (!s.canVolume) { volumeApplied.current = false; return; }
-    if (volumeApplied.current) return;
-    volumeApplied.current = true;
-    m.setVolume(prefs.volume).catch(() => {});
-  }, [s.canVolume, m, prefs.volume]);
-
-  const onVolume = useCallback((v: number) => {
-    updatePrefs({ volume: v });
-    if (s.canVolume) m.setVolume(v).catch(() => {});
-  }, [updatePrefs, s.canVolume, m]);
+  const { prefs } = q;
 
   // ── stations and search ──────────────────────────────────────────────────
-
-  const playLibrary = useCallback(() => {
-    const first = startOf(m.library, prefs.shuffle);
-    if (first) void playTrack(first, { source: LIBRARY, tracks: [] });
-  }, [m.library, prefs.shuffle, playTrack]);
 
   const playStation = useCallback(async (p: Playlist) => {
     if (!canQueue) return;
@@ -222,16 +134,15 @@ const BetaMusic = () => {
     setNotice(null);
     try {
       const tracks = await loadPlaylistTracks(p.id);
-      const first = startOf(tracks, prefs.shuffle);
-      if (!first) { setNotice(`${p.name} has no tracks Atlas can play.`); return; }
-      await playTrack(first, { source: { kind: 'playlist', id: p.id, name: p.name }, tracks });
+      if (!tracks.length) { setNotice(`${p.name} has no tracks Atlas can play.`); return; }
+      await musicQueue.playList({ kind: 'playlist', id: p.id, name: p.name }, tracks);
       setTab('queue');
     } catch (e) {
       setNotice(`Could not open ${p.name}: ${String(e)}`);
     } finally {
       setStationBusy(null);
     }
-  }, [canQueue, loadPlaylistTracks, prefs.shuffle, playTrack]);
+  }, [canQueue, loadPlaylistTracks]);
 
   const loadMore = useCallback(async () => {
     const from = m.library.length;
@@ -262,8 +173,6 @@ const BetaMusic = () => {
 
   // ── keys ─────────────────────────────────────────────────────────────────
 
-  const keys = useRef({ onPlayPause, onNext, onPrev });
-  keys.current = { onPlayPause, onNext, onPrev };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -272,9 +181,9 @@ const BetaMusic = () => {
       const onControl = !!(e.target as HTMLElement | null)?.closest?.('button, a');
       switch (e.key) {
         case 'Escape': navigate('/'); break;
-        case ' ': if (!onControl) { e.preventDefault(); keys.current.onPlayPause(); } break;
-        case 'ArrowRight': keys.current.onNext(); break;
-        case 'ArrowLeft': keys.current.onPrev(); break;
+        case ' ': if (!onControl) { e.preventDefault(); void musicQueue.togglePlay(); } break;
+        case 'ArrowRight': musicQueue.next(); break;
+        case 'ArrowLeft': musicQueue.prev(); break;
         case '/': e.preventDefault(); setTab('search'); window.setTimeout(() => searchRef.current?.focus(), 0); break;
         default: break;
       }
@@ -349,10 +258,19 @@ const BetaMusic = () => {
   const canPrev = canQueue && (s.canSeek || neighbour(queue, currentId, -1) !== null);
   const canPlayBtn = canQueue && (!!track || queue.length > 0);
   const playTitle = !canQueue ? (s.blocker?.short ?? 'Nothing to play yet.')
-    : s.takeover ? 'Play this through Atlas, here on this Mac. The other device keeps its own queue.' : undefined;
-  const error = notice ?? m.error;
+    : s.takeover ? 'Play this here, through Atlas. The other device is paused, so the record moves rather than plays twice.' : undefined;
+  const error = notice ?? q.notice ?? m.error;
 
-  const visibleLists = allStations ? m.playlists : m.playlists.slice(0, STATIONS_SHOWN - 1);
+  const likeMissing = canBrowse && lacks(m.scopes, LIKE_SCOPES);
+  const roomsMissing = canBrowse && lacks(m.scopes, ROOM_SCOPES);
+  const reconnect = reconnectLabel(likeMissing, roomsMissing);
+  const onReconnect = useCallback(() => { void m.connect(); }, [m]);
+
+  const duckLine = !prefs.duck ? 'Music stays at full volume, even when Atlas speaks.'
+    : q.ducked ? 'Lowered now, while Atlas listens or speaks.'
+      : 'Atlas lowers the music when someone talks, and when it speaks to you.';
+
+  const visibleLists = allStations ? m.playlists : m.playlists.slice(0, PLAYLISTS_SHOWN);
 
   const rowFor = (t: Track, onClick: () => void, key: string) => {
     const on = t.id === currentId;
@@ -392,7 +310,7 @@ const BetaMusic = () => {
     return (
       <>
         {results.tracks.length ? <div className="b-mu-group">Tracks</div> : null}
-        {results.tracks.map((t) => rowFor(t, () => void playTrack(t, { source, tracks: results.tracks }), `s-${t.id}`))}
+        {results.tracks.map((t) => rowFor(t, () => void musicQueue.playTrack(t, { source, tracks: results.tracks }), `s-${t.id}`))}
         {results.playlists.length ? <div className="b-mu-group">Playlists</div> : null}
         {results.playlists.map((p) => (
           <button type="button" key={`p-${p.id}`} className="b-mu-row" disabled={!canQueue || stationBusy !== null} onClick={() => void playStation(p)}>
@@ -401,6 +319,22 @@ const BetaMusic = () => {
             <span className="b-mu-row-right"><AtlasIcon name="play" size={14} /></span>
           </button>
         ))}
+      </>
+    );
+  };
+
+  const tabBody = () => {
+    if (tab === 'search') return searchBody();
+    if (tab === 'lyrics') return <MusicLyrics track={s.blockerHidesTrack ? null : track} readPosition={m.readPosition} scroller={listRef} reduced={s.reduced} />;
+    if (tab === 'rooms') return <MusicRooms atlasOwnsAudio={s.atlasOwnsAudio} onReconnect={onReconnect} />;
+    return queueBody ?? (
+      <>
+        {queue.map((t, i) => rowFor(t, () => void musicQueue.playTrack(t), `${i}-${t.id}`))}
+        {canLoadMore ? (
+          <button type="button" className="b-mu-btn b-mu-btn--quiet b-mu-loadmore" disabled={more?.busy} onClick={() => void loadMore()}>
+            {more?.busy ? 'Reading…' : `Load ${LIBRARY_PAGE} more`}
+          </button>
+        ) : null}
       </>
     );
   };
@@ -447,10 +381,13 @@ const BetaMusic = () => {
                 </div>
               ) : (
                 <>
-                  <div>
-                    <span className="b-mu-album">{track ? (track.album || 'Single') : 'Nothing playing'}</span>
-                    <h1 className="b-mu-title" key={currentId ?? 'none'}>{track ? track.title : 'Pick something'}</h1>
-                    <span className="b-mu-artist">{track ? track.artist : queue.length ? 'Press play to start Up next, or choose a station.' : 'Choose a station, or search Spotify.'}</span>
+                  <div className="b-mu-titlerow">
+                    <div className="b-mu-titletext">
+                      <span className="b-mu-album">{track ? albumLine(track) : 'Nothing playing'}</span>
+                      <h1 className="b-mu-title" key={currentId ?? 'none'}>{track ? track.title : 'Pick something'}</h1>
+                      <span className="b-mu-artist">{track ? track.artist : queue.length ? 'Press play to start Up next, or choose a station.' : 'Choose a station, or search Spotify.'}</span>
+                    </div>
+                    <MusicLike track={track} className="b-mu-like" />
                   </div>
 
                   <div className="b-mu-ribbon">
@@ -476,46 +413,74 @@ const BetaMusic = () => {
                   ) : (
                     <>
                       <div className="b-mu-transport">
-                        <button type="button" className={`b-mu-tbtn b-mu-tbtn--sm${prefs.shuffle ? ' on' : ''}`} aria-label="Shuffle" aria-pressed={prefs.shuffle} title="Shuffle Up next" onClick={() => updatePrefs({ shuffle: !prefs.shuffle })}>
+                        <button type="button" className={`b-mu-tbtn b-mu-tbtn--sm${prefs.shuffle ? ' on' : ''}`} aria-label="Shuffle" aria-pressed={prefs.shuffle} title="Shuffle Up next" onClick={() => musicQueue.setPrefs({ shuffle: !prefs.shuffle })}>
                           <AtlasIcon name="shuffle" size={18} weight={1.6} />
                         </button>
-                        <button type="button" className="b-mu-tbtn b-mu-tbtn--md flip" aria-label="Previous" title="Previous · ←. More than four seconds in, it restarts the track." disabled={!canPrev} onClick={onPrev}>
+                        <button type="button" className="b-mu-tbtn b-mu-tbtn--md flip" aria-label="Previous" title="Previous · ←. More than four seconds in, it restarts the track." disabled={!canPrev} onClick={() => musicQueue.prev()}>
                           <AtlasIcon name="skip" size={22} weight={1.6} />
                         </button>
-                        <button type="button" className="b-mu-tbtn b-mu-tbtn--play" aria-label={s.showPause ? 'Pause' : 'Play'} title={playTitle} disabled={!canPlayBtn} onClick={onPlayPause}>
+                        <button type="button" className="b-mu-tbtn b-mu-tbtn--play" aria-label={s.showPause ? 'Pause' : 'Play'} title={playTitle} disabled={!canPlayBtn} onClick={() => void musicQueue.togglePlay()}>
                           <AtlasIcon name={s.showPause ? 'pause' : 'play'} size={30} weight={1.8} />
                         </button>
-                        <button type="button" className="b-mu-tbtn b-mu-tbtn--md" aria-label="Next" title="Next · →" disabled={!canNext} onClick={onNext}>
+                        <button type="button" className="b-mu-tbtn b-mu-tbtn--md" aria-label="Next" title="Next · →" disabled={!canNext} onClick={() => musicQueue.next()}>
                           <AtlasIcon name="skip" size={22} weight={1.6} />
                         </button>
-                        <button type="button" className={`b-mu-tbtn b-mu-tbtn--sm${prefs.repeat ? ' on' : ''}`} aria-label="Repeat" aria-pressed={prefs.repeat} title="Repeat this track" onClick={() => updatePrefs({ repeat: !prefs.repeat })}>
+                        <button type="button" className={`b-mu-tbtn b-mu-tbtn--sm${prefs.repeat ? ' on' : ''}`} aria-label="Repeat" aria-pressed={prefs.repeat} title="Repeat this track" onClick={() => musicQueue.setPrefs({ repeat: !prefs.repeat })}>
                           <AtlasIcon name="repeat" size={18} weight={1.6} />
                         </button>
                       </div>
 
                       <div className={`b-mu-volrow${s.canVolume ? '' : ' off'}`}>
                         <AtlasIcon name="speaker" size={18} weight={1.6} />
-                        <span>{s.canVolume ? 'Atlas’s own output on this Mac. Spotify on your other devices keeps its own volume.' : 'Volume applies once Atlas is the one playing.'}</span>
-                        <input type="range" min={0} max={1} step={0.01} value={prefs.volume} disabled={!s.canVolume} aria-label="Atlas output volume" onChange={(e) => onVolume(Number(e.currentTarget.value))} />
+                        <span>{s.canVolume ? 'Atlas’s own output on this Mac. Your speakers keep their own volume, in Rooms.' : 'Volume applies once Atlas is the one playing.'}</span>
+                        <input type="range" min={0} max={1} step={0.01} value={prefs.volume} disabled={!s.canVolume} aria-label="Atlas output volume" onChange={(e) => musicQueue.setPrefs({ volume: Number(e.currentTarget.value) })} />
                         <span className="b-mu-volval">{volumeLabel(prefs.volume)}</span>
+                      </div>
+
+                      <div className="b-mu-duck">
+                        <span className={`b-mu-duck-dot${prefs.duck ? ' on' : ''}`} aria-hidden />
+                        <span className="b-mu-duck-line">{duckLine}</span>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={prefs.duck}
+                          aria-label="Lower music when someone speaks"
+                          title="Ducking lowers Atlas’s own output on this Mac while Atlas listens, thinks or speaks. Nothing leaves the Mac."
+                          className={`b-mu-switch${prefs.duck ? ' on' : ''}`}
+                          onClick={() => musicQueue.setPrefs({ duck: !prefs.duck })}
+                        ><span /></button>
                       </div>
                     </>
                   )}
                 </>
               )}
+              {reconnect ? (
+                <div className="b-mu-reconnect">
+                  <p>Spotify only lets Atlas change your Liked Songs and steer your other speakers once you allow it. Reconnecting opens Spotify in your browser; the new permission is kept in your macOS Keychain.</p>
+                  <button type="button" className="b-mu-btn b-mu-btn--quiet" disabled={m.isConnecting} onClick={onReconnect}>
+                    {m.isConnecting ? 'Waiting for Spotify…' : reconnect}
+                  </button>
+                </div>
+              ) : null}
               {error ? <p className="b-mu-err" role="status">{error}</p> : null}
             </div>
           </div>
         </section>
 
-        <aside className="b-mu-aside" aria-label="Up next and search">
+        <aside className="b-mu-aside" aria-label="Up next, lyrics, rooms and search">
           <div className="b-mu-tabs" role="tablist">
-            <button type="button" role="tab" aria-selected={tab === 'queue'} className={tab === 'queue' ? 'on' : ''} onClick={() => setTab('queue')}>
-              Up next{queue.length ? <span className="b-num">{queue.length}</span> : null}
-            </button>
-            <button type="button" role="tab" aria-selected={tab === 'search'} className={tab === 'search' ? 'on' : ''} onClick={() => { setTab('search'); window.setTimeout(() => searchRef.current?.focus(), 0); }}>
-              Search
-            </button>
+            {TABS.map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                role="tab"
+                aria-selected={tab === k}
+                className={tab === k ? 'on' : ''}
+                onClick={() => { setTab(k); if (k === 'search') window.setTimeout(() => searchRef.current?.focus(), 0); }}
+              >
+                {label}{k === 'queue' && queue.length ? <span className="b-num">{queue.length}</span> : null}
+              </button>
+            ))}
           </div>
 
           {tab === 'search' ? (
@@ -524,34 +489,42 @@ const BetaMusic = () => {
               <input ref={searchRef} type="search" value={query} placeholder="Tracks, artists, playlists" aria-label="Search Spotify" disabled={!canBrowse} onChange={(e) => setQuery(e.target.value)} />
               {query ? <button type="button" aria-label="Clear search" onClick={() => { setQuery(''); searchRef.current?.focus(); }}><AtlasIcon name="close" size={14} /></button> : <kbd>/</kbd>}
             </label>
-          ) : queue.length ? (
+          ) : tab === 'queue' && queue.length ? (
             <div className="b-mu-listhead"><b>{sourceLabel(q.source)}</b><span>{queueSummary(queue)}</span></div>
           ) : null}
 
           <div className="b-mu-list nosb" ref={listRef} role="tabpanel">
-            {tab === 'queue' ? (
-              queueBody ?? (
-                <>
-                  {queue.map((t, i) => rowFor(t, () => void playTrack(t), `${i}-${t.id}`))}
-                  {canLoadMore ? (
-                    <button type="button" className="b-mu-btn b-mu-btn--quiet b-mu-loadmore" disabled={more?.busy} onClick={() => void loadMore()}>
-                      {more?.busy ? 'Reading…' : `Load ${LIBRARY_PAGE} more`}
-                    </button>
-                  ) : null}
-                </>
-              )
-            ) : searchBody()}
+            {tabBody()}
           </div>
         </aside>
       </div>
 
       {canBrowse ? (
         <section className="b-mu-stations" aria-label="Stations">
+          {MOODS.map((mood) => {
+            const on = q.source.kind === 'mood' && q.source.mood === mood.key && !!track && queue.some((t) => t.id === currentId);
+            const st = q.station?.mood === mood.key ? q.station : null;
+            const line = st ? st.note : on && isPlaying ? 'Playing' : mood.line;
+            return (
+              <button
+                type="button"
+                key={mood.key}
+                className={`b-mu-station${on ? ' on' : ''}${st?.status === 'error' ? ' err' : ''}`}
+                disabled={!canQueue || (q.station?.status === 'picking' && !st)}
+                aria-busy={st?.status === 'picking'}
+                title={`Atlas picks this station from your liked songs: it sends the titles and artists of up to ${STATION_POOL} of them to its AI model, and nothing else.`}
+                onClick={() => void musicQueue.startStation(mood.key)}
+              >
+                <span className="b-mu-swatch" style={{ background: mood.swatch, color: 'var(--b-card)' }}><AtlasIcon name="sparkle" size={20} weight={1.6} /></span>
+                <span className="b-mu-station-text"><b>{mood.title}</b><span>{line}</span></span>
+              </button>
+            );
+          })}
           <button
             type="button"
             className={`b-mu-station${sameSource(q.source, LIBRARY) && track && queue.some((t) => t.id === currentId) ? ' on' : ''}`}
             disabled={!canQueue || m.library.length === 0}
-            onClick={playLibrary}
+            onClick={() => void musicQueue.playLibrary()}
           >
             <span className="b-mu-swatch b-mu-swatch--blue"><AtlasIcon name="star" size={20} weight={1.6} /></span>
             <span className="b-mu-station-text"><b>Liked songs</b><span>{libLoading ? 'Reading…' : m.library.length ? `${m.library.length}${libMaybeMore ? '+' : ''} tracks` : 'None yet'}</span></span>
@@ -568,11 +541,14 @@ const BetaMusic = () => {
           {listsLoading && m.playlists.length === 0 ? (
             <div className="b-mu-station b-mu-station--more" aria-live="polite">Reading your playlists…</div>
           ) : null}
-          {m.playlists.length > STATIONS_SHOWN - 1 ? (
+          {m.playlists.length > PLAYLISTS_SHOWN ? (
             <button type="button" className="b-mu-station b-mu-station--more" aria-expanded={allStations} onClick={() => setAllStations((v) => !v)}>
               {allStations ? 'Fewer stations' : `All ${m.playlists.length} playlists`}
             </button>
           ) : null}
+          <p className="b-mu-stations-note">
+            Focus, Wind down, Cooking and Run are picked by Atlas from your liked songs: their titles and artists go to Atlas’s AI model, nothing else. Wind down plays a little softer every ten minutes.
+          </p>
         </section>
       ) : null}
     </div>

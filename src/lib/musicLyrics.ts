@@ -57,7 +57,6 @@ export function parseLrc(lrc: string | null | undefined): LyricLine[] {
     if (off) { offset = Number(off[1]); continue; }
     const stamps: number[] = [];
     let rest = line;
-    STAMP.lastIndex = 0;
     // Stamps lead the line; collect them and keep what follows the last one.
     for (;;) {
       const m = /^\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]\s*/.exec(rest);

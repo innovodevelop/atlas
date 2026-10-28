@@ -48,12 +48,12 @@ export interface WidgetDef {
   defaultSize: WidgetSize;
   source: WidgetSource;
   /** The screen the widget opens; a path for a route, or a full-view key. */
-  opens: { route: string } | { view: 'weather' | 'calendar' | 'tasks' | 'stocks' | 'email' | 'news' | 'music' } | null;
+  opens: { route: string } | { view: 'weather' | 'calendar' | 'tasks' | 'stocks' | 'email' | 'news' | 'music' | 'podcast' } | null;
 }
 
 /**
  * Every widget Home can show, in the handoff's catalog order. `source` is
- * honest per widget: Energy, Podcast and Focus have no source in the app yet
+ * honest per widget: Energy and Focus have no source in the app yet
  * and are listed so the editor can say so, not so a fake card can be added.
  */
 export const WIDGETS: readonly WidgetDef[] = [
@@ -71,7 +71,7 @@ export const WIDGETS: readonly WidgetDef[] = [
   { id: 'sleep', label: 'Sleep', meta: 'Last night, by stage', group: 'Body', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/health' } },
   { id: 'home', label: 'Home', meta: 'Rooms, temperatures, the front door', group: 'Home', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'live', opens: { route: '/smart-home' } },
   { id: 'energy', label: 'Energy', meta: 'No energy meter is connected yet', group: 'Home', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'unwired', opens: { route: '/smart-home' } },
-  { id: 'podcast', label: 'Podcast', meta: 'No podcast source yet', group: 'Media', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'unwired', opens: null },
+  { id: 'podcast', label: 'Podcast', meta: 'Your Spotify shows, where you stopped', group: 'Media', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'live', opens: { view: 'podcast' } },
   { id: 'focus', label: 'Focus', meta: 'Focus sessions arrive with the Focus screen', group: 'Day', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'unwired', opens: null },
 ];
 

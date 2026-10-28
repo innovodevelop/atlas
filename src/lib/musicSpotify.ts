@@ -211,6 +211,50 @@ export function normalizeDevices(raw: { devices?: RawDevice[] } | null | undefin
   });
 }
 
+// --- Atlas's own resume points (music_resume, on this Mac) -------------------------
+
+/** A row of `music_resume_recent`, as music.rs returns it. */
+export interface RawRecent {
+  item_id: string;
+  uri: string;
+  position_ms: number;
+  duration_ms: number;
+  updated_at: string;
+  meta: Record<string, unknown> | null;
+}
+
+/** A place Atlas kept, with the record the webview stored beside it (null when that record is unusable). */
+export interface RecentResume {
+  itemId: string;
+  uri: string;
+  positionMs: number;
+  durationMs: number;
+  updatedAt: string;
+  track: Track | null;
+}
+
+const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+
+/** A resume row → the record every music surface draws. The meta is the webview's own, so it is read defensively. */
+export function recentFromRaw(r: RawRecent): RecentResume {
+  const meta = r.meta ?? {};
+  const title = str(meta.title);
+  const track: Track | null = title
+    ? {
+      id: r.item_id,
+      uri: r.uri,
+      title,
+      artist: str(meta.artist),
+      album: str(meta.album),
+      artUrl: str(meta.artUrl) || null,
+      durationMs: typeof meta.durationMs === 'number' && Number.isFinite(meta.durationMs) ? meta.durationMs : r.duration_ms,
+      year: str(meta.year) || null,
+      kind: r.uri.startsWith('spotify:episode:') ? 'episode' : 'track',
+    }
+    : null;
+  return { itemId: r.item_id, uri: r.uri, positionMs: r.position_ms, durationMs: r.duration_ms, updatedAt: r.updated_at, track };
+}
+
 // --- Scopes ---------------------------------------------------------------------------
 
 /** Saving to Liked Songs. Reading them (the contains check) is `user-library-read`, which every grant has. */

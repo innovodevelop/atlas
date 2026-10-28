@@ -23,11 +23,10 @@ import { HomeGrid } from '@/components/atlas/home/HomeGrid';
 import { HomeWidget } from '@/components/atlas/home/widgets';
 import { EditHome } from '@/components/atlas/home/EditHome';
 import { AtlasIcon } from '@/components/atlas/AtlasIcon';
-import { FullView } from '@/components/atlas/home/views/FullView';
+import { FullView, type FullViewKey } from '@/components/atlas/home/views/FullView';
 import { WIDGET_BY_ID, packStage, stageRowCount, type HomeSlot } from '@/lib/betaHome';
 import { useBetaNavigate } from '@/lib/viewTransitions';
 import { isRoutable } from '@/surfaces';
-import type { AtlasExpandedKey } from './AtlasDashboard';
 import type { CalendarEvent } from '@/hooks/useCalendarEvents';
 
 const BetaHome = () => {
@@ -42,7 +41,7 @@ const BetaHome = () => {
   const needsYou = alerts.filter((a) => !a.acknowledged).length;
   const tasksOpen = tasks.filter((t) => !t.completed).length;
 
-  const [expanded, setExpanded] = useState<AtlasExpandedKey>(null);
+  const [expanded, setExpanded] = useState<FullViewKey | null>(null);
   const [editing, setEditing] = useState(false);
 
   // The row budget: what fits between the band and the dock at this window size.
@@ -70,7 +69,7 @@ const BetaHome = () => {
     const def = WIDGET_BY_ID.get(slot.id);
     if (!def?.opens) return undefined;
     if ('view' in def.opens) {
-      const view = def.opens.view as Exclude<AtlasExpandedKey, null>;
+      const view: FullViewKey = def.opens.view;
       return () => setExpanded(view);
     }
     const route = def.opens.route;

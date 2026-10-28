@@ -7,8 +7,9 @@
  * are the design's screens on the app's real hooks (styles in
  * src/styles/beta/views.css, reading in src/lib/betaViews.ts); Watchlist and
  * Music wrap the Workshop bodies until their own screens land; Mail goes to
- * `/mail`. The design's Podcast and Focus screens have no widget key and no
- * source behind them, so they are not built here.
+ * `/mail`. Podcast is the design's screen on Spotify's saved shows (its
+ * chapters left out, as no source has them). The design's Focus screen has no
+ * widget key and no source behind it, so it is not built here.
  */
 import type { AtlasExpandedKey } from '@/pages/atlas/AtlasDashboard';
 import { WeatherView } from './WeatherView';
@@ -18,9 +19,11 @@ import { BriefingView } from './BriefingView';
 import { StocksView } from './StocksView';
 import { EmailView } from './EmailView';
 import { MusicView } from './MusicView';
+import { PodcastView } from './PodcastView';
 import '@/styles/beta/views.css';
 
-export type FullViewKey = Exclude<AtlasExpandedKey, null>;
+/** The Workshop dashboard's keys, plus the views only the Beta Home has. */
+export type FullViewKey = Exclude<AtlasExpandedKey, null> | 'podcast';
 
 export interface FullViewProps {
   which: FullViewKey;
@@ -29,7 +32,7 @@ export interface FullViewProps {
 }
 
 const LABEL: Record<FullViewKey, string> = {
-  weather: 'Weather', calendar: 'Calendar', tasks: 'Tasks', stocks: 'Watchlist', email: 'Mail', news: 'Briefing', music: 'Music',
+  weather: 'Weather', calendar: 'Calendar', tasks: 'Tasks', stocks: 'Watchlist', email: 'Mail', news: 'Briefing', music: 'Music', podcast: 'Podcast',
 };
 
 export function FullView({ which, onClose }: FullViewProps) {
@@ -42,6 +45,7 @@ export function FullView({ which, onClose }: FullViewProps) {
       {which === 'stocks' ? <StocksView onClose={onClose} /> : null}
       {which === 'email' ? <EmailView onClose={onClose} /> : null}
       {which === 'music' ? <MusicView onClose={onClose} /> : null}
+      {which === 'podcast' ? <PodcastView /> : null}
     </div>
   );
 }

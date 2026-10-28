@@ -29,12 +29,19 @@ import { useMailIntelligence } from '@/hooks/useMailIntelligence';
 import { useStocks } from '@/hooks/useStocks';
 import { usePortfolio } from '@/hooks/usePortfolio';
 import { useNews } from '@/hooks/useNews';
-import { useMusicPlayer } from '@/hooks/useMusicPlayer';
+import { engineHoldsUri, useMusicPlayer } from '@/hooks/useMusicPlayer';
+import { musicQueue, useMusicQueue } from '@/hooks/useMusicQueue';
+import { useRecentEpisodes } from '@/hooks/usePodcasts';
+import { MusicLike } from '@/components/atlas/music/MusicLike';
+import { THIS_MAC, episodeLeft, nextLine, resumeFrom, roomsFrom } from '@/lib/betaMusic';
+import { ROOM_SCOPES, isEpisode, lacks } from '@/lib/musicSpotify';
 import { useSmartHome } from '@/hooks/useSmartHome';
 import { useHealth } from '@/hooks/useHealth';
 import { cityTimes } from '@/lib/worldClock';
 import { WATCHLIST, fmtPct } from '@/pages/atlas/atlasHelpers';
 import { eventTime, focusEvent, focusIn, thenEvents, todaysEvents } from '@/lib/stageFocus';
+// The Now playing extras and the Podcast face (bw-music-*) live with the widget screens' styles.
+import '@/styles/beta/views.css';
 
 export interface WidgetProps {
   size: WidgetSize;
@@ -285,33 +292,129 @@ export function ClockWidget(p: WidgetProps) {
 
 // --- Media -------------------------------------------------------------------------
 
+/** Clicks and keys on a widget's own controls are theirs, not the card's (which would open the full view). */
+const own = {
+  onClick: (e: { stopPropagation: () => void }) => e.stopPropagation(),
+  onKeyDown: (e: { stopPropagation: () => void }) => e.stopPropagation(),
+};
+
+/**
+ * Now playing, driven by the music queue store: previous and next step
+ * through Up next (the engine itself holds one record), play moves the record
+ * here when another device has it, and at L the design's extras — shuffle,
+ * repeat, Atlas's volume, the output room and what plays next.
+ */
 export function MusicWidget(p: WidgetProps) {
   const music = useMusicPlayer();
+  const q = useMusicQueue();
   const np = music.nowPlaying;
+  const track = np?.track ?? null;
   const playing = !!np?.isPlaying;
+  const atlasOwns = !!track && music.audioReady && engineHoldsUri(track.uri);
+  const showPause = playing && atlasOwns;
   const tick = useTick(1000, playing);
-  const progress = np?.track?.durationMs ? Math.min(1, music.readPosition() / np.track.durationMs) : 0;
+  const progress = track?.durationMs ? Math.min(1, music.readPosition() / track.durationMs) : 0;
   void tick;
+  const canQueue = music.available && music.connected && music.premium;
+  const roomsMissing = lacks(music.scopes, ROOM_SCOPES);
+  const rooms = roomsFrom(roomsMissing ? [] : q.devices, { atlasOwnsAudio: atlasOwns, isPlaying: playing, macVolume: q.prefs.volume });
+  const activeRoom = rooms.find((r) => r.active)?.id ?? THIS_MAC;
+  const canVolume = canQueue && music.audioReady;
+  const extras = p.size === 'L' && music.connected;
   const face: Face = {
     label: 'Now playing',
-    meta: music.connected ? (np?.deviceName ?? 'Spotify') : music.available ? 'Not connected' : 'Mac app only',
+    meta: music.connected ? (atlasOwns || !track ? 'This Mac' : (np?.deviceName ?? 'Spotify')) : music.available ? 'Not connected' : 'Mac app only',
     children: (
-      <span className="bw-music">
-        <span className="bw-art">{np?.track?.artUrl ? <img src={np.track.artUrl} alt="" /> : <AtlasIcon name="music" size={22} weight={1.6} />}</span>
-        <span className="bw-music-text">
-          <span className="bw-music-t">{np?.track?.title ?? (music.connected ? 'Nothing playing' : 'Connect Spotify')}</span>
-          <span className="bw-music-s">{np?.track?.artist ?? (music.connected ? 'Pick something in Music' : 'Through the Music screen')}</span>
+      <span className="bw-music-wrap">
+        <span className="bw-music">
+          <span className="bw-art">{track?.artUrl ? <img src={track.artUrl} alt="" /> : <AtlasIcon name="music" size={22} weight={1.6} />}</span>
+          <span className="bw-music-text">
+            <span className="bw-music-t">{track?.title ?? (music.connected ? 'Nothing playing' : 'Connect Spotify')}</span>
+            <span className="bw-music-s">{track?.artist ?? (music.connected ? 'Pick something in Music' : 'Through the Music screen')}</span>
+          </span>
+          {music.connected ? (
+            <span className="bw-music-ctl" {...own}>
+              <MusicLike track={track} className="bw-music-like" size={15} />
+              <button type="button" className="flip" aria-label="Previous" disabled={!canQueue} onClick={() => musicQueue.prev()}><AtlasIcon name="skip" size={16} /></button>
+              <button type="button" className="main" aria-label={showPause ? 'Pause' : 'Play'} disabled={!canQueue} title={canQueue ? undefined : 'Full-track playback needs Spotify Premium.'} onClick={() => void musicQueue.togglePlay()}><AtlasIcon name={showPause ? 'pause' : 'play'} size={16} /></button>
+              <button type="button" aria-label="Next" disabled={!canQueue} onClick={() => musicQueue.next()}><AtlasIcon name="skip" size={16} /></button>
+            </span>
+          ) : null}
         </span>
-        {music.connected ? (
-          <span className="bw-music-ctl" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="flip" aria-label="Previous" onClick={() => void music.prev()}><AtlasIcon name="skip" size={16} /></button>
-            <button type="button" className="main" aria-label={playing ? 'Pause' : 'Play'} onClick={() => void (playing ? music.pause() : music.play())}><AtlasIcon name={playing ? 'pause' : 'play'} size={16} /></button>
-            <button type="button" aria-label="Next" onClick={() => void music.next()}><AtlasIcon name="skip" size={16} /></button>
+        {extras ? (
+          <span className="bw-music-x" {...own}>
+            <button type="button" className={`bw-music-tog${q.prefs.shuffle ? ' on' : ''}`} aria-label="Shuffle" aria-pressed={q.prefs.shuffle} title="Shuffle Up next" onClick={() => musicQueue.setPrefs({ shuffle: !q.prefs.shuffle })}><AtlasIcon name="shuffle" size={15} /></button>
+            <button type="button" className={`bw-music-tog${q.prefs.repeat ? ' on' : ''}`} aria-label="Repeat" aria-pressed={q.prefs.repeat} title="Repeat this track" onClick={() => musicQueue.setPrefs({ repeat: !q.prefs.repeat })}><AtlasIcon name="repeat" size={15} /></button>
+            <span className="bw-music-vol" title={canVolume ? 'Atlas’s own output on this Mac' : 'Volume applies once Atlas is the one playing.'}>
+              <AtlasIcon name="speaker" size={15} />
+              <input type="range" min={0} max={1} step={0.01} value={q.prefs.volume} disabled={!canVolume} aria-label="Atlas output volume" onChange={(e) => musicQueue.setPrefs({ volume: Number(e.currentTarget.value) })} />
+            </span>
+            <select
+              className="bw-music-out"
+              aria-label="Output"
+              value={activeRoom}
+              disabled={!canQueue || roomsMissing || q.rooms.moving !== null}
+              title={roomsMissing ? 'Reconnect Spotify in Music to turn on Rooms.' : 'Where the music plays. Other rooms are your Spotify Connect speakers.'}
+              onFocus={() => { if (!roomsMissing) void musicQueue.refreshRooms(); }}
+              onChange={(e) => void musicQueue.moveTo(e.currentTarget.value)}
+            >
+              {rooms.map((r) => <option key={r.id} value={r.id} disabled={r.restricted}>{r.name}</option>)}
+            </select>
+            {q.nextUp ? <span className="bw-music-next">Next · {nextLine(q.nextUp)}</span> : null}
           </span>
         ) : null}
       </span>
     ),
-    bar: np?.track ? { fraction: progress, colour: 'var(--b-on-ink)' } : undefined,
+    bar: track ? { fraction: progress, colour: 'var(--b-on-ink)' } : undefined,
+  };
+  return <Card p={p} face={face} tone="ink" />;
+}
+
+/**
+ * Podcast: the episode playing now, or the one Atlas last kept a place in,
+ * with how much is left and a play button that resumes it. Opens the
+ * Podcast view (saved shows and episodes).
+ */
+export function PodcastWidget(p: WidgetProps) {
+  const music = useMusicPlayer();
+  const recent = useRecentEpisodes(1);
+  const np = music.nowPlaying;
+  const nowEp = np?.track && isEpisode(np.track) ? np.track : null;
+  const last = recent[0] ?? null;
+  const track = nowEp ?? last?.track ?? null;
+  const isNow = !!nowEp;
+  const playing = isNow && !!np?.isPlaying;
+  useTick(1000, playing);
+  const durationMs = track?.durationMs ?? 0;
+  const pos = isNow ? music.readPosition() : last?.positionMs ?? 0;
+  const start = !isNow && last ? resumeFrom({ local: { positionMs: last.positionMs }, spotify: null, durationMs: last.durationMs }) : 0;
+  const canQueue = music.available && music.connected && music.premium;
+  const showPause = playing && music.audioReady && !!track && engineHoldsUri(track.uri);
+  const onPlay = () => {
+    if (!track) return;
+    if (isNow) void musicQueue.togglePlay();
+    else void musicQueue.playTrack(track, undefined, start);
+  };
+  const face: Face = {
+    label: 'Podcast',
+    meta: music.connected ? 'Spotify' : music.available ? 'Not connected' : 'Mac app only',
+    children: (
+      <span className="bw-music">
+        <span className="bw-art">{track?.artUrl ? <img src={track.artUrl} alt="" /> : <AtlasIcon name="voice" size={22} weight={1.6} />}</span>
+        <span className="bw-music-text">
+          <span className="bw-music-t">{track?.title ?? (music.connected ? 'No episode started' : 'Connect Spotify')}</span>
+          <span className="bw-music-s">{track ? `${track.artist} · ${episodeLeft(durationMs, pos)}` : music.connected ? 'Open to pick from your shows' : 'Through the Music screen'}</span>
+        </span>
+        {track ? (
+          <span className="bw-music-ctl" {...own}>
+            <button type="button" className="main" aria-label={showPause ? 'Pause' : start > 0 ? 'Resume' : 'Play'} disabled={!canQueue} title={canQueue ? undefined : 'Episodes play through Atlas with Spotify Premium.'} onClick={onPlay}>
+              <AtlasIcon name={showPause ? 'pause' : 'play'} size={16} />
+            </button>
+          </span>
+        ) : null}
+      </span>
+    ),
+    bar: track && durationMs > 0 ? { fraction: Math.min(1, Math.max(0, pos / durationMs)), colour: 'var(--b-on-ink)' } : undefined,
   };
   return <Card p={p} face={face} tone="ink" />;
 }
@@ -437,6 +540,7 @@ const BY_ID: Record<string, (p: WidgetProps) => JSX.Element> = {
   air: AirWidget,
   clock: ClockWidget,
   music: MusicWidget,
+  podcast: PodcastWidget,
   activity: ActivityWidget,
   steps: StepsWidget,
   sleep: SleepWidget,
