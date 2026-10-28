@@ -208,7 +208,9 @@ export interface Lesson {
 
 const CANCELLED = /\baflyst|\bcancel+ed\b/i;
 const CHANGED = /(^|[^a-zæøå])ændret|\bchanged\b/i;
-const MARKER = /^\s*(?:aflyst|ændret|cancel+ed|changed)\s*!?\s*[-:–]?\s*/i;
+// The separator is an alternation rather than a bracket class on purpose:
+// Tailwind scans src for class names and read the bracket as a CSS property.
+const MARKER = /^\s*(?:aflyst|ændret|cancel+ed|changed)\s*!?\s*(?:-|:|–)?\s*/i;
 const KEYED = /^(lærere?|teachers?|lokaler?|rooms?|hold|team|class|titel|title|note|lektier|homework)\s*:\s*(.*)$/i;
 
 function field(text: string, keys: RegExp): string {
