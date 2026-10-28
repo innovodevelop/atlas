@@ -158,14 +158,14 @@ describe('KEEP_WORKSHOP: each entry is a decision that is still true', () => {
 
 describe('the guard bites', () => {
   test('a new Workshop surface with no Beta page is reported', () => {
-    const loaders = new Map([...LOADERS, ['/journal', './pages/atlas/AtlasJournal']]);
-    const c = classifySurfaces([...PATHS, '/journal'], loaders, OVERRIDES);
-    expect(c.filter((x) => x.kind === 'missing').map((x) => x.path)).toEqual(['/journal']);
+    const loaders = new Map([...LOADERS, ['/cutover-probe', './pages/atlas/AtlasCutoverProbe']]);
+    const c = classifySurfaces([...PATHS, '/cutover-probe'], loaders, OVERRIDES);
+    expect(c.filter((x) => x.kind === 'missing').map((x) => x.path)).toEqual(['/cutover-probe']);
   });
 
   test('a new surface that is a Beta page passes', () => {
-    const loaders = new Map([...LOADERS, ['/journal', './pages/atlas/BetaJournal']]);
-    const c = classifySurfaces([...PATHS, '/journal'], loaders, OVERRIDES);
+    const loaders = new Map([...LOADERS, ['/cutover-probe', './pages/atlas/BetaCutoverProbe']]);
+    const c = classifySurfaces([...PATHS, '/cutover-probe'], loaders, OVERRIDES);
     expect(c.filter((x) => x.kind === 'missing')).toEqual([]);
   });
 });

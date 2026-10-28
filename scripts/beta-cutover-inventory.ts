@@ -180,10 +180,6 @@ export function formatMarkdown(inv: Inventory, commit: string): string {
     if (s.byModule.length > 25) L.push(`- and ${s.byModule.length - 25} more modules`);
   }
 
-  L.push('', '### Unreachable today already (not part of the cutover)', '');
-  if (!inv.deadToday.length) L.push('None.');
-  for (const d of inv.deadToday) L.push(`- ${code(d.path)}${d.importedBy.length ? ` — imported only by ${short(d.importedBy, 3)}` : ' — imported by nothing'}`);
-
   if (inv.unresolved.length) {
     L.push('', '### Imports this walk could not resolve', '');
     for (const u of inv.unresolved) L.push(`- ${code(`${u.from}:${u.line}`)} ${code(u.spec)}`);

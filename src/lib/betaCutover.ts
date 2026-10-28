@@ -97,8 +97,6 @@ export interface FlagSite {
 export interface ParsedModule {
   readonly imports: readonly ModuleImport[];
   readonly flagSites: readonly FlagSite[];
-  /** Lines with an `import(…)` whose argument is not a literal (never resolvable statically). */
-  readonly opaqueDynamic: readonly number[];
 }
 
 function scriptKind(file: string): ts.ScriptKind {
@@ -264,7 +262,6 @@ export function parseModule(file: string, text: string): ParsedModule {
     }
   }
 
-  const opaqueDynamic: number[] = [];
   const uses = new Map<string, { all: number; off: number }>();
   const flagSites: FlagSite[] = [];
   const lines = text.split('\n');
@@ -274,10 +271,9 @@ export function parseModule(file: string, text: string): ParsedModule {
     if (clauses.has(n)) return;
     if (ts.isCallExpression(n) && n.expression.kind === ts.SyntaxKind.ImportKeyword) {
       const arg = n.arguments[0];
+      // A computed `import(name)` is never resolvable statically; the app has none.
       if (arg && ts.isStringLiteralLike(arg)) {
         drafts.push({ spec: arg.text, line: lineOf(n), dynamic: true, reexport: false, sideEffect: false, typeOnly: false, bindings: [], node: n });
-      } else {
-        opaqueDynamic.push(lineOf(n));
       }
     }
     if (ts.isIdentifier(n) && isUse(n)) {
@@ -307,7 +303,7 @@ export function parseModule(file: string, text: string): ParsedModule {
     return { ...d, flagOffOnly };
   });
 
-  return { imports, flagSites, opaqueDynamic };
+  return { imports, flagSites };
 }
 
 /** `@import` in a stylesheet. No Atlas stylesheet uses one today; this keeps it that way honestly. */
@@ -318,7 +314,7 @@ function parseCss(text: string): ParsedModule {
     const line = text.slice(0, m.index).split('\n').length;
     imports.push({ spec: m[1], line, dynamic: false, reexport: false, sideEffect: true, typeOnly: false, bindings: [], flagOffOnly: false });
   }
-  return { imports, flagSites: [], opaqueDynamic: [] };
+  return { imports, flagSites: [] };
 }
 
 /** Class names a stylesheet defines, read from selectors only (never from declaration values). */
@@ -334,7 +330,7 @@ export function cssClasses(text: string): string[] {
 }
 
 /** Every word-ish token in a source file, so a class lookup is a set probe instead of a scan. */
-export const sourceTokens = (text: string): Set<string> => new Set(text.match(/[A-Za-z_][\w-]*/g) ?? []);
+const sourceTokens = (text: string): Set<string> => new Set(text.match(/[A-Za-z_][\w-]*/g) ?? []);
 
 // ── what moves with an export ──────────────────────────────────────────────
 
@@ -468,8 +464,6 @@ export interface Edge {
 }
 
 export interface ModuleGraph {
-  /** Every code or stylesheet file handed in. */
-  readonly files: readonly string[];
   readonly edges: readonly Edge[];
   /** file → npm packages it imports. */
   readonly packages: ReadonlyMap<string, ReadonlySet<string>>;
@@ -479,14 +473,12 @@ export interface ModuleGraph {
 
 export function buildGraph(sources: ReadonlyMap<string, string>): ModuleGraph {
   const has = (p: string): boolean => sources.has(p);
-  const files: string[] = [];
   const edges: Edge[] = [];
   const packages = new Map<string, Set<string>>();
   const unresolved: { from: string; spec: string; line: number }[] = [];
   const parsed = new Map<string, ParsedModule>();
   for (const [file, text] of sources) {
     if (!isCodeFile(file) && !file.endsWith('.css')) continue;
-    files.push(file);
     const mod = parseModule(file, text);
     parsed.set(file, mod);
     for (const imp of mod.imports) {
@@ -505,7 +497,7 @@ export function buildGraph(sources: ReadonlyMap<string, string>): ModuleGraph {
       }
     }
   }
-  return { files: files.sort(), edges, packages, unresolved, parsed };
+  return { edges, packages, unresolved, parsed };
 }
 
 export interface ReachOptions {
@@ -773,7 +765,6 @@ export interface Inventory {
   readonly flagSites: readonly (FlagSite & { readonly file: string })[];
   readonly oldOnlyPackages: readonly { readonly name: string; readonly usedBy: readonly string[] }[];
   readonly tests: readonly { readonly file: string; readonly imports: readonly string[] }[];
-  readonly deadToday: readonly { readonly path: string; readonly importedBy: readonly string[] }[];
   readonly workshopCss: readonly { readonly sheet: string; readonly classes: number; readonly usedAfter: number; readonly byModule: readonly { readonly path: string; readonly classes: readonly string[] }[] }[];
   readonly unresolved: readonly { readonly from: string; readonly spec: string; readonly line: number }[];
   readonly counts: { readonly now: number; readonly after: number };
@@ -919,10 +910,6 @@ export function buildInventory(sources: ReadonlyMap<string, string>, opts: Inven
   }
   const tests = [...testMap.entries()].map(([file, mods]) => ({ file, imports: [...mods].sort() })).sort((a, b) => a.file.localeCompare(b.file));
 
-  const deadToday = graph.files
-    .filter((f) => inSrc(f) && !isTestFile(f) && !now.has(f))
-    .map((path) => ({ path, importedBy: [...new Set((importers.get(path) ?? []).map((e) => e.from))].sort() }));
-
   const workshopCss = sheets.filter(has).map((sheet) => {
     const classes = cssClasses(sources.get(sheet) ?? '');
     const byModule: { path: string; classes: string[] }[] = [];
@@ -954,7 +941,6 @@ export function buildInventory(sources: ReadonlyMap<string, string>, opts: Inven
     flagSites,
     oldOnlyPackages,
     tests,
-    deadToday,
     workshopCss,
     unresolved: graph.unresolved.filter((u) => inSrc(u.from)),
     counts: { now: now.size, after: after.size },

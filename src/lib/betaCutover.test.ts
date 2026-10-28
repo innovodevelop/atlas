@@ -67,7 +67,6 @@ describe('parseModule', () => {
     expect(byPath(mod, './z').typeOnly).toBe(true);
     expect(byPath(mod, './lazy').dynamic).toBe(true);
     expect(byPath(mod, './a').line).toBe(1);
-    expect(mod.opaqueDynamic).toEqual([11]);
   });
 
   test('marks imports that only the flag-off side of a check uses', () => {
@@ -331,7 +330,6 @@ describe('buildInventory on a small app', () => {
     ['src/lib/oldOnly.test.ts', "import { other } from './oldOnly';\nexport default other;"],
     ['src/lib/panelDep.ts', 'export const dep = 1;'],
     ['src/lib/shared.ts', 'export const shared = 1;'],
-    ['src/lib/orphan.ts', 'export const orphan = 1;'],
     ['src/styles/workshop.css', '.cardB { color: red }\n.unused { transition: opacity .2s }'],
     ['src/styles/mail.css', '.mail { color: red }'],
   ]);
@@ -370,7 +368,6 @@ describe('buildInventory on a small app', () => {
     expect(inv.flagSites.map((s) => `${s.file}:${s.line}`)).toEqual(['src/App.tsx:12', 'src/App.tsx:12']);
     expect(inv.oldOnlyPackages).toEqual([{ name: 'old-only-pkg', usedBy: ['src/pages/AtlasMail.tsx'] }]);
     expect(inv.tests).toEqual([{ file: 'src/lib/oldOnly.test.ts', imports: ['src/lib/oldOnly.ts'] }]);
-    expect(inv.deadToday.map((d) => d.path)).toEqual(['src/lib/orphan.ts']);
     expect(inv.workshopCss).toEqual([{ sheet: 'src/styles/workshop.css', classes: 2, usedAfter: 1, byModule: [{ path: 'src/pages/BetaMail.tsx', classes: ['cardB'] }] }]);
     expect(inv.unresolved).toEqual([]);
   });
