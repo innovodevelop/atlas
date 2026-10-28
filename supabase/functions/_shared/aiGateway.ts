@@ -16,9 +16,11 @@
 
 import {
   ANTHROPIC_MESSAGES_URL,
+  CLAUDE_DEFAULT_MODEL,
   claudeChatCompletion,
   claudeDocumentExtract,
   mapModelToClaude,
+  type StreamEndHook,
 } from "./claudeAdapter.ts";
 import {
   awsCredentialsFromEnv,
@@ -26,6 +28,7 @@ import {
   bedrockRegion,
   mapModelToBedrock,
 } from "./bedrockAdapter.ts";
+import { amzDateParts, signRequest } from "./awsSigV4.ts";
 
 // ---------------------------------------------------------------------------
 // Rate-limit resilience: exponential backoff + jitter + sliding-window TPM
@@ -329,23 +332,23 @@ export async function aiChatCompletion(body: Record<string, unknown>): Promise<R
     if (requestNeedsNativeServerTool(body)) {
       const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
       if (anthropicKey) {
-        return withRetry(() => claudeChatCompletion(body, anthropicKey), `${label}/bridge`);
+        return recorded("bridge", "anthropic", body, (end) => withRetry(() => claudeChatCompletion(body, anthropicKey, end), `${label}/bridge`));
       }
       const { anthropicTools: _drop, ...rest } = body;
-      return withRetry(() => bedrockChatCompletion(rest), `${label}/degraded`);
+      return recorded("degraded", "bedrock", rest, (end) => withRetry(() => bedrockChatCompletion(rest, end), `${label}/degraded`));
     }
-    return withRetry(() => bedrockChatCompletion(body), label);
+    return recorded("bedrock", "bedrock", body, (end) => withRetry(() => bedrockChatCompletion(body, end), label));
   }
 
   if (config.provider === "anthropic") {
-    return withRetry(() => claudeChatCompletion(body, config.apiKey), label);
+    return recorded("anthropic", "anthropic", body, (end) => withRetry(() => claudeChatCompletion(body, config.apiKey, end), label));
   }
 
   const payload = {
     ...body,
     model: mapModel(String(body.model ?? "google/gemini-2.5-flash")),
   };
-  return withRetry(
+  return recorded(config.provider, config.provider, payload, () => withRetry(
     () => fetch(config.chatUrl, {
       method: "POST",
       headers: {
@@ -355,7 +358,247 @@ export async function aiChatCompletion(body: Record<string, unknown>): Promise<R
       body: JSON.stringify(payload),
     }),
     label,
+  ));
+}
+
+// ---------------------------------------------------------------------------
+// Model-call recording
+//
+// Every call through aiChatCompletion is reported to one observer: which lane
+// served it, the model actually invoked, tokens in and out, how long the
+// provider took, and whether it worked. The gateway only measures; the brain
+// registers the observer that writes the row (services/atlas-brain/src/
+// modelCalls.ts), so this shared module still holds no database code and a
+// caller without an observer (the edge runtime, the tests) pays nothing.
+//
+// Two times are kept because a stream has two: `latencyMs` runs until the
+// provider answered (response headers — for a blocking call that is the whole
+// answer, for a stream the first byte), `durationMs` until the last byte.
+// ---------------------------------------------------------------------------
+
+/**
+ * The lane that served a call. "bridge" is a Bedrock-configured call that went
+ * to first-party Anthropic for a native server tool; "degraded" is the same
+ * call sent to Bedrock without that tool because no Anthropic key exists.
+ */
+export type ModelCallLane = "anthropic" | "bedrock" | "bridge" | "degraded" | "lovable_ai" | "gemini";
+
+export interface ModelCallRecord {
+  lane: ModelCallLane;
+  /** Who was billed: the provider whose endpoint answered. */
+  provider: AIGatewayConfig["provider"];
+  /** The id the caller asked for (often a logical id such as "google/gemini-2.5-flash"). */
+  requestedModel: string;
+  /** The id the provider ran, after the gateway's mapping. */
+  model: string;
+  stream: boolean;
+  /** HTTP status of the provider's answer; null when no answer came. */
+  status: number | null;
+  ok: boolean;
+  error: string | null;
+  latencyMs: number;
+  durationMs: number | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cacheReadTokens: number | null;
+  cacheWriteTokens: number | null;
+  /** `Date.now()` when the call started. */
+  startedAt: number;
+}
+
+export type ModelCallObserver = (record: ModelCallRecord) => void;
+
+let modelCallObserver: ModelCallObserver | null = null;
+
+/** Register (or, with null, remove) the one observer every model call is reported to. */
+export function setModelCallObserver(observer: ModelCallObserver | null): void {
+  modelCallObserver = observer;
+}
+
+function report(record: ModelCallRecord): void {
+  if (!modelCallObserver) return;
+  // The record is bookkeeping; it must never fail the answer it describes.
+  try {
+    modelCallObserver(record);
+  } catch (e) {
+    console.error("[aiGateway] model-call observer failed:", e);
+  }
+}
+
+/** The id this lane will actually invoke. Mapping can throw (an unmapped Bedrock tier); the call itself then fails the same way. */
+function invokedModel(lane: ModelCallLane, requested: string): string {
+  try {
+    if (lane === "anthropic" || lane === "bridge") return mapModelToClaude(requested);
+    if (lane === "bedrock" || lane === "degraded") return mapModelToBedrock(requested);
+  } catch {
+    return requested;
+  }
+  return requested;
+}
+
+const clip = (s: string, n = 300) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+
+function num(v: unknown): number | null {
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+/**
+ * Run one provider call and report it. `send` receives the stream-end hook the
+ * adapters call once a streamed answer is over; a blocking answer is reported
+ * as soon as its body (a clone, so the caller's copy is untouched) is read.
+ */
+async function recorded(
+  lane: ModelCallLane,
+  provider: AIGatewayConfig["provider"],
+  body: Record<string, unknown>,
+  send: (onStreamEnd: StreamEndHook) => Promise<Response>,
+): Promise<Response> {
+  const requestedModel = String(body.model ?? "");
+  const stream = body.stream === true;
+  const startedAt = Date.now();
+  const t0 = performance.now();
+  const base = { lane, provider, requestedModel, model: invokedModel(lane, requestedModel || (lane === "anthropic" || lane === "bridge" ? CLAUDE_DEFAULT_MODEL : "")), stream, startedAt };
+  let latencyMs: number | null = null;
+  let status: number | null = null;
+
+  const onStreamEnd: StreamEndHook = (o) => {
+    report({
+      ...base,
+      status,
+      ok: o.error === null,
+      error: o.error,
+      latencyMs: latencyMs ?? Math.round(performance.now() - t0),
+      durationMs: Math.round(performance.now() - t0),
+      inputTokens: o.inputTokens,
+      outputTokens: o.outputTokens,
+      cacheReadTokens: o.cacheReadTokens,
+      cacheWriteTokens: o.cacheWriteTokens,
+    });
+  };
+
+  let res: Response;
+  try {
+    res = await send(onStreamEnd);
+  } catch (e) {
+    report({
+      ...base, status: null, ok: false, error: clip(e instanceof Error ? e.message : String(e)),
+      latencyMs: Math.round(performance.now() - t0), durationMs: null,
+      inputTokens: null, outputTokens: null, cacheReadTokens: null, cacheWriteTokens: null,
+    });
+    throw e;
+  }
+  latencyMs = Math.round(performance.now() - t0);
+  status = res.status;
+  const empty = { inputTokens: null, outputTokens: null, cacheReadTokens: null, cacheWriteTokens: null };
+
+  if (!res.ok) {
+    const copy = res.clone();
+    void copy.text().then(
+      (t) => report({ ...base, ...empty, status, ok: false, error: clip(`HTTP ${status}${t ? ` · ${t}` : ""}`), latencyMs: latencyMs!, durationMs: latencyMs }),
+      () => report({ ...base, ...empty, status, ok: false, error: `HTTP ${status}`, latencyMs: latencyMs!, durationMs: latencyMs }),
+    );
+    return res;
+  }
+
+  const type = res.headers.get("content-type") ?? "";
+  if (stream && type.includes("text/event-stream")) {
+    // The Claude and Bedrock adapters call onStreamEnd when the stream is over.
+    // The legacy OpenAI-compatible lanes carry no usage in their stream, so
+    // their call is reported now, with the tokens unknown rather than zero.
+    if (lane === "lovable_ai" || lane === "gemini") {
+      report({ ...base, ...empty, status, ok: true, error: null, latencyMs, durationMs: null });
+    }
+    return res;
+  }
+
+  const copy = res.clone();
+  void copy.json().then(
+    (data: { usage?: Record<string, unknown> }) => {
+      const u = data?.usage ?? {};
+      report({
+        ...base, status, ok: true, error: null, latencyMs: latencyMs!, durationMs: latencyMs,
+        inputTokens: num(u.prompt_tokens),
+        outputTokens: num(u.completion_tokens),
+        cacheReadTokens: num(u.cache_read_input_tokens),
+        cacheWriteTokens: num(u.cache_creation_input_tokens),
+      });
+    },
+    () => report({ ...base, ...empty, status, ok: true, error: null, latencyMs: latencyMs!, durationMs: latencyMs }),
   );
+  return res;
+}
+
+/**
+ * The cheapest honest check that the configured provider is reachable and
+ * accepts this Mac's key, spending no tokens: first-party lists one model
+ * (GET /v1/models), Bedrock lists the Anthropic foundation models through its
+ * control plane. Bedrock's list may be refused by an invoke-only IAM policy;
+ * an AccessDenied still proves the host answered and the signature was
+ * accepted, so it reads as reachable with a note, while an unrecognised or
+ * badly signed key reads as refused.
+ */
+export interface ProviderProbe {
+  lane: "anthropic" | "bedrock" | null;
+  ok: boolean;
+  latencyMs: number | null;
+  /** A short sentence for the row: what was checked and what came back. */
+  detail: string;
+  error: string | null;
+}
+
+export async function probeAIProvider(
+  fetchFn: typeof fetch = fetch,
+  timeoutMs = 5_000,
+): Promise<ProviderProbe> {
+  const config = getAIConfig();
+  if (!config) {
+    return { lane: null, ok: false, latencyMs: null, detail: "No AI key on this Mac", error: "no AI key configured" };
+  }
+  const t0 = performance.now();
+  const elapsed = () => Math.round(performance.now() - t0);
+  const signal = AbortSignal.timeout(timeoutMs);
+  try {
+    if (config.provider === "anthropic") {
+      const res = await fetchFn(`${new URL(ANTHROPIC_MESSAGES_URL).origin}/v1/models?limit=1`, {
+        method: "GET",
+        headers: { "x-api-key": config.apiKey, "anthropic-version": "2023-06-01" },
+        signal,
+      });
+      const latencyMs = elapsed();
+      await res.text().catch(() => "");
+      if (res.ok) return { lane: "anthropic", ok: true, latencyMs, detail: "Claude first-party · key accepted", error: null };
+      if (res.status === 401 || res.status === 403) {
+        return { lane: "anthropic", ok: false, latencyMs, detail: "Claude first-party · key refused", error: `HTTP ${res.status}` };
+      }
+      return { lane: "anthropic", ok: false, latencyMs, detail: "Claude first-party · answered with an error", error: `HTTP ${res.status}` };
+    }
+    if (config.provider === "bedrock") {
+      const credentials = awsCredentialsFromEnv();
+      const region = bedrockRegion();
+      if (!credentials) return { lane: "bedrock", ok: false, latencyMs: null, detail: "Bedrock · no AWS key", error: "no AWS credentials" };
+      const url = `https://bedrock.${region}.amazonaws.com/foundation-models?byProvider=anthropic`;
+      const headers = await signRequest({ method: "GET", url, region, service: "bedrock", credentials, now: amzDateParts(new Date()) });
+      const res = await fetchFn(url, { method: "GET", headers, signal });
+      const latencyMs = elapsed();
+      const text = await res.text().catch(() => "");
+      const kind = res.headers.get("x-amzn-errortype") ?? "";
+      if (res.ok) return { lane: "bedrock", ok: true, latencyMs, detail: `Bedrock ${region} · key accepted`, error: null };
+      if (res.status === 403 && /AccessDenied/i.test(`${kind} ${text}`)) {
+        return { lane: "bedrock", ok: true, latencyMs, detail: `Bedrock ${region} · key accepted (listing not permitted)`, error: null };
+      }
+      return { lane: "bedrock", ok: false, latencyMs, detail: `Bedrock ${region} · key refused`, error: clip(`HTTP ${res.status}${kind ? ` ${kind.split(":")[0]}` : ""}`, 120) };
+    }
+    return { lane: null, ok: false, latencyMs: null, detail: `${config.provider} is a developer-only provider; not probed`, error: null };
+  } catch (e) {
+    const timedOut = e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError");
+    return {
+      lane: config.provider === "anthropic" || config.provider === "bedrock" ? config.provider : null,
+      ok: false,
+      latencyMs: null,
+      detail: timedOut ? `No answer within ${Math.round(timeoutMs / 1000)} s` : "Not reachable from this Mac",
+      error: clip(e instanceof Error ? e.message : String(e), 120),
+    };
+  }
 }
 
 /**

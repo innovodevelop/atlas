@@ -23,10 +23,12 @@
 
 import {
   CLAUDE_DEFAULT_MODEL,
+  createStreamTally,
   fromAnthropicMessage,
   mapModelToClaude,
   toAnthropicRequest,
   type AnthropicMessageResponse,
+  type StreamEndHook,
 } from "./claudeAdapter.ts";
 import { amzDateParts, signRequest, type AwsCredentials } from "./awsSigV4.ts";
 
@@ -363,7 +365,9 @@ function concatBytes(a: Uint8Array, b: Uint8Array): Uint8Array {
 export function bedrockEventStreamToOpenAI(
   source: ReadableStream<Uint8Array>,
   model: string,
+  onEnd?: StreamEndHook,
 ): ReadableStream<Uint8Array> {
+  const tally = createStreamTally(onEnd);
   const reader = source.getReader();
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
@@ -386,6 +390,7 @@ export function bedrockEventStreamToOpenAI(
       while (true) {
         const { done: streamDone, value } = await reader.read();
         if (streamDone) {
+          tally.end();
           controller.enqueue(done());
           controller.close();
           return;
@@ -414,6 +419,7 @@ export function bedrockEventStreamToOpenAI(
             } catch { /* keep raw */ }
             const label = hdrs[":exception-type"] ?? "bedrock error";
             console.error("[bedrock] stream exception:", label, detail);
+            tally.end(`${label}: ${detail}`);
             controller.enqueue(chunk({ content: `\n\n[${label}: ${detail}]` }));
             controller.enqueue(done());
             controller.close();
@@ -428,6 +434,7 @@ export function bedrockEventStreamToOpenAI(
           } catch {
             continue;
           }
+          tally.observe(inner);
 
           if (inner.type === "content_block_delta" && inner.delta?.type === "text_delta") {
             controller.enqueue(chunk({ content: String(inner.delta.text ?? "") }));
@@ -435,6 +442,7 @@ export function bedrockEventStreamToOpenAI(
           } else if (inner.type === "error") {
             const message = String(inner.error?.message ?? "Bedrock stream error");
             console.error("[bedrock] stream error:", message);
+            tally.end(message);
             controller.enqueue(chunk({ content: `\n\n[${message}]` }));
             controller.enqueue(done());
             controller.close();
@@ -447,6 +455,7 @@ export function bedrockEventStreamToOpenAI(
       }
     },
     cancel(reason) {
+      tally.end("cancelled by the reader");
       reader.cancel(reason).catch(() => {});
     },
   });
@@ -481,7 +490,10 @@ function logBedrockUsage(usage: Record<string, number> | undefined, model: strin
  * `claudeChatCompletion` that talks to Bedrock. Non-OK upstream responses are
  * returned untouched so callers keep reading `.status` / `.text()` unchanged.
  */
-export async function bedrockChatCompletion(body: Record<string, unknown>): Promise<Response> {
+export async function bedrockChatCompletion(
+  body: Record<string, unknown>,
+  onStreamEnd?: StreamEndHook,
+): Promise<Response> {
   const credentials = awsCredentialsFromEnv();
   if (!credentials) {
     return new Response(
@@ -518,7 +530,7 @@ export async function bedrockChatCompletion(body: Record<string, unknown>): Prom
   if (!upstream.ok) return upstream;
 
   if (stream) {
-    return new Response(bedrockEventStreamToOpenAI(upstream.body!, modelId), {
+    return new Response(bedrockEventStreamToOpenAI(upstream.body!, modelId, onStreamEnd), {
       status: 200,
       headers: {
         "Content-Type": "text/event-stream",

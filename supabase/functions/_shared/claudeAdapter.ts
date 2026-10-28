@@ -421,6 +421,73 @@ function logCacheUsage(usage: Record<string, number> | undefined, model: string)
 }
 
 // ---------------------------------------------------------------------------
+// Stream accounting
+//
+// A streamed answer reports its tokens inside the stream (message_start carries
+// the input side, message_delta the running output count), which the
+// translators below otherwise drop: the OpenAI chunk shape the callers parse has
+// no place for them. The AI gateway records every model call with its tokens, so
+// the translators hand them to an optional hook once the stream is over — and
+// exactly once, however it ends (finished, failed mid-stream, or cancelled by
+// the reader). Nothing about the chunks the callers see changes.
+
+/** What a finished stream reported about itself. Null where it said nothing. */
+export interface StreamOutcome {
+  inputTokens: number | null;
+  outputTokens: number | null;
+  cacheReadTokens: number | null;
+  cacheWriteTokens: number | null;
+  /** Why the stream ended early, or null when it ran to its end. */
+  error: string | null;
+}
+
+export type StreamEndHook = (outcome: StreamOutcome) => void;
+
+export function createStreamTally(onEnd?: StreamEndHook) {
+  const outcome: StreamOutcome = {
+    inputTokens: null,
+    outputTokens: null,
+    cacheReadTokens: null,
+    cacheWriteTokens: null,
+    error: null,
+  };
+  let ended = false;
+  const take = (u: unknown) => {
+    if (!u || typeof u !== "object") return;
+    const r = u as Record<string, unknown>;
+    if (typeof r.input_tokens === "number") outcome.inputTokens = r.input_tokens;
+    // message_delta's output count is cumulative, so the latest one wins.
+    if (typeof r.output_tokens === "number") outcome.outputTokens = r.output_tokens;
+    if (typeof r.cache_read_input_tokens === "number") outcome.cacheReadTokens = r.cache_read_input_tokens;
+    if (typeof r.cache_creation_input_tokens === "number") outcome.cacheWriteTokens = r.cache_creation_input_tokens;
+  };
+  return {
+    observe(event: Record<string, any>) {
+      if (event.type === "message_start") take(event.message?.usage);
+      else if (event.type === "message_delta") take(event.usage);
+      // Bedrock appends its own count to the last event; it is only a fallback
+      // for a stream whose usage blocks never arrived.
+      const metrics = event["amazon-bedrock-invocationMetrics"];
+      if (metrics && typeof metrics === "object") {
+        if (outcome.inputTokens == null && typeof metrics.inputTokenCount === "number") outcome.inputTokens = metrics.inputTokenCount;
+        if (outcome.outputTokens == null && typeof metrics.outputTokenCount === "number") outcome.outputTokens = metrics.outputTokenCount;
+      }
+    },
+    end(error: string | null = null) {
+      if (ended) return;
+      ended = true;
+      outcome.error = error;
+      // A recording hook must never be able to break the answer it records.
+      try {
+        onEnd?.({ ...outcome });
+      } catch (e) {
+        console.error("[claudeAdapter] stream end hook failed:", e);
+      }
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Streaming translation
 
 /**
@@ -431,7 +498,9 @@ function logCacheUsage(usage: Record<string, number> | undefined, model: string)
 export function anthropicSSEToOpenAI(
   source: ReadableStream<Uint8Array>,
   model: string,
+  onEnd?: StreamEndHook,
 ): ReadableStream<Uint8Array> {
+  const tally = createStreamTally(onEnd);
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
   const reader = source.getReader();
@@ -451,6 +520,7 @@ export function anthropicSSEToOpenAI(
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
+          tally.end();
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
           return;
@@ -473,6 +543,7 @@ export function anthropicSSEToOpenAI(
           } catch {
             continue;
           }
+          tally.observe(event);
 
           if (event.type === "message_start") {
             logCacheUsage(event.message?.usage, model);
@@ -482,6 +553,7 @@ export function anthropicSSEToOpenAI(
             // UI shows a silently truncated answer.
             const message = String(event.error?.message ?? "Claude stream error");
             console.error("[claude] stream error:", message);
+            tally.end(message);
             controller.enqueue(chunk({ content: `\n\n[${message}]` }));
             controller.enqueue(encoder.encode("data: [DONE]\n\n"));
             controller.close();
@@ -496,6 +568,7 @@ export function anthropicSSEToOpenAI(
       }
     },
     cancel(reason) {
+      tally.end("cancelled by the reader");
       reader.cancel(reason).catch(() => {});
     },
   });
@@ -512,6 +585,7 @@ export function anthropicSSEToOpenAI(
 export async function claudeChatCompletion(
   body: Record<string, unknown>,
   apiKey: string,
+  onStreamEnd?: StreamEndHook,
 ): Promise<Response> {
   const request = toAnthropicRequest(body);
   const upstream = await fetch(ANTHROPIC_MESSAGES_URL, {
@@ -527,7 +601,7 @@ export async function claudeChatCompletion(
   if (!upstream.ok) return upstream;
 
   if (request.stream) {
-    return new Response(anthropicSSEToOpenAI(upstream.body!, request.model), {
+    return new Response(anthropicSSEToOpenAI(upstream.body!, request.model, onStreamEnd), {
       status: 200,
       headers: {
         "Content-Type": "text/event-stream",
