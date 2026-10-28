@@ -109,6 +109,15 @@ export interface ChatDeps {
    * DEFAULT_PERSONALITY and behave exactly as before Phase 4.
    */
   personality?: PersonalityState;
+  /**
+   * Settings → "Remember things I share" (atlas_memory_settings, read by the
+   * brain sidecar). `false`: no conversation summaries, the prompt stops
+   * asking the model to capture what the user shares, and memory_store saves
+   * only on a turn where the user explicitly asked Atlas to remember. Absent
+   * (voice gateway, edge fns, tests) means on — the behaviour before the
+   * switch existed.
+   */
+  rememberShared?: boolean;
 }
 
 export interface ChatOptions {
@@ -715,7 +724,8 @@ export function buildPersonalizedPrompt(
   styleNotes: Array<{ key: string; value: unknown }> = [],
   conversationSummaries: Array<{ key: string; value: unknown; created_at: string }> = [],
   personality: PersonalityState = DEFAULT_PERSONALITY,
-  personalityCtx: PersonalityContext = {}
+  personalityCtx: PersonalityContext = {},
+  rememberShared = true,
 ): string {
   const userName = profile?.nickname || profile?.first_name || "there";
   const timeOfDay = profile?.timezone ? getTimeOfDay(profile.timezone) : "day";
@@ -753,6 +763,22 @@ export function buildPersonalizedPrompt(
     }
   }
 
+  // "Remember things I share" (ChatDeps.rememberShared). Off, memory_store
+  // stays declared — "remember that…" must still work — but the prompt stops
+  // inviting the model to capture what the user mentions in passing, and the
+  // tool itself refuses anything the user did not ask for (executeTool).
+  // On, both texts are byte-for-byte what they were: system[0] is the cached
+  // prefix, and the golden test in orchestrator.test.ts pins it.
+  const memoryToolLines = rememberShared
+    ? `3. **memory_store**: Save important facts about the user.
+   - USE THIS when they share: personal details, preferences, names, dates, important events`
+    : `3. **memory_store**: Save a fact about the user.
+   - ONLY when they explicitly ask you to remember something. They have switched off automatic remembering.`;
+  const memoryInstructions = rememberShared ? memoryInstructionsOn(userName) : `## Memory Instructions
+${userName} has switched off "Remember things I share". Do not save what they mention in passing. Call memory_store only when they explicitly ask you to remember something, and save exactly that.
+
+Be genuine, warm, and emotionally attentive all the same.`;
+
   const toolInstructions = hasTools ? `
 ## Tools Available
 You have access to powerful tools that you SHOULD USE ACTIVELY:
@@ -767,8 +793,7 @@ You have access to powerful tools that you SHOULD USE ACTIVELY:
    - USE THIS when asked to: research, investigate, analyze, compare, "tell me everything about"
    - USE THIS for complex questions requiring thorough analysis
 
-3. **memory_store**: Save important facts about the user.
-   - USE THIS when they share: personal details, preferences, names, dates, important events
+${memoryToolLines}
 
 CRITICAL INSTRUCTIONS:
 - DO NOT make up information. If you're unsure, USE web_search.
@@ -805,7 +830,12 @@ ${eventsContext}
 - Remembering personal details and following up on life events
 - Research and deep learning on topics (use tools when needed!)
 
-## Memory Instructions
+${memoryInstructions}`;
+}
+
+/** The prompt's memory section while "Remember things I share" is on — the text it has always had. */
+function memoryInstructionsOn(userName: string): string {
+  return `## Memory Instructions
 Pay deep attention to what ${userName} shares. Use memory_store to capture:
 
 **Identity & Soul:**
@@ -879,7 +909,32 @@ export interface ToolContext {
    * digest. Defaults to allowed, so every existing caller is unchanged.
    */
   allowMutating?: boolean;
+  /**
+   * "Remember things I share" (ChatDeps.rememberShared). `false` refuses
+   * memory_store unless `explicitRemember` is set. Absent means on.
+   */
+  rememberShared?: boolean;
+  /** The user's latest message explicitly asks Atlas to remember something (asksToRemember). */
+  explicitRemember?: boolean;
 }
+
+/**
+ * Does this message explicitly ask Atlas to remember something? The same
+ * anchored patterns as detectLearningIntent's "remember" and "teach", plus
+ * "don't forget" and "keep in mind" — asks, never a passing mention, so "do
+ * you remember the name of…" is a question and not consent to store.
+ */
+export function asksToRemember(text: string): boolean {
+  const intent = detectLearningIntent(text);
+  if (intent.hasIntent && (intent.intentType === "remember" || intent.intentType === "teach")) return true;
+  return /^(?:atlas[,!]?\s+)?(?:please\s+)?(?:don'?t forget|do not forget|keep in mind|make a note)\b/i.test(text.trim());
+}
+
+/** What memory_store answers when "Remember things I share" is off and nobody asked. */
+export const MEMORY_OFF_RESULT = {
+  skipped: true,
+  message: "Not saved: the user has switched off \"Remember things I share\". Only store something when they explicitly ask you to remember it.",
+} as const;
 
 export async function executeTool(
   toolCall: ToolCall,
@@ -977,6 +1032,11 @@ export async function executeTool(
     }
 
     case "memory_store": {
+      // Checked here, at the write, not only in the prompt: a model can call
+      // a declared tool whatever the prompt says.
+      if (ctx.rememberShared === false && !ctx.explicitRemember) {
+        return { name, result: MEMORY_OFF_RESULT };
+      }
       if (userId) {
         const { error } = await supabase.from("ai_memory").upsert({
           user_id: userId,
@@ -1343,7 +1403,7 @@ export async function buildTurnContext(deps: ChatDeps, opts: ChatOptions): Promi
     seriousTopic: detectSeriousTopic(recentUserTexts[recentUserTexts.length - 1] ?? ""),
   };
 
-  const systemPrompt = systemPromptOverride || buildPersonalizedPrompt(profile, memories, upcomingEvents, recentEvents, knowledgeBank, hasTools, styleNotes, conversationSummaries, deps.personality ?? DEFAULT_PERSONALITY, personalityCtx);
+  const systemPrompt = systemPromptOverride || buildPersonalizedPrompt(profile, memories, upcomingEvents, recentEvents, knowledgeBank, hasTools, styleNotes, conversationSummaries, deps.personality ?? DEFAULT_PERSONALITY, personalityCtx, deps.rememberShared !== false);
 
   // Per-turn context goes in a SECOND system message, never onto systemPrompt.
   //
@@ -1439,11 +1499,14 @@ export async function runToolLoop(args: {
   /** Absolute epoch-ms ceiling for ALL tool work in this turn. */
   deadline: number;
   chat?: typeof aiChatCompletion;
+  /** "Remember things I share" — see ToolContext. Absent means on. */
+  rememberShared?: boolean;
+  explicitRemember?: boolean;
 }): Promise<ToolLoopOutcome> {
   const {
     supabase, systemDb, userId, userToken, control,
     model, tools: chatTools, conversationMessages, deadline: turnDeadline,
-    chat = aiChatCompletion,
+    chat = aiChatCompletion, rememberShared, explicitRemember,
   } = args;
 
   const allToolResults: Array<{ name: string; result: unknown; citations?: string[] }> = [];
@@ -1529,6 +1592,8 @@ export async function runToolLoop(args: {
               // "play this" into an approval card the user has to tap while
               // already sitting in front of the app.
               profile: "interactive",
+              rememberShared,
+              explicitRemember,
             });
 
       if (result.result && typeof result.result === "object" && "citations" in result.result) {
@@ -1600,11 +1665,14 @@ async function streamAndCapture(args: {
   capturedSystemPrompt: string;
   toolMessages: Array<{ role: string; content: string; tool_calls?: unknown }>;
   learningIntent: ReturnType<typeof detectLearningIntent>;
+  /** "Remember things I share" — off skips the conversation summary. Absent means on. */
+  rememberShared?: boolean;
 }): Promise<ChatResult> {
   const {
     supabase, systemDb, userId, sessionId, conversationId, messages,
     model: chatModel, currentMessages, anthropicTools,
     citations: allCitations, capturedSystemPrompt, toolMessages, learningIntent,
+    rememberShared,
   } = args;
 
   // Now stream the final response — the pass that may run native web search.
@@ -1632,9 +1700,13 @@ async function streamAndCapture(args: {
   trackSessionContext(supabase, userId, sessionId, messages).catch(e =>
     console.log("[orchestrator] Session tracking error:", e)
   );
-  summarizeConversation(supabase, userId, conversationId, messages).catch(e =>
-    console.log("[orchestrator] Summary error:", e)
-  );
+  // A summary is a memory Atlas writes on its own, so "Remember things I
+  // share" switched off skips it.
+  if (rememberShared !== false) {
+    summarizeConversation(supabase, userId, conversationId, messages).catch(e =>
+      console.log("[orchestrator] Summary error:", e)
+    );
+  }
 
   // Prepend citations as a custom SSE event, then pass the AI stream through.
   const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
@@ -1835,6 +1907,8 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
     conversationMessages,
     maxIterations: maxToolIterations,
     deadline: turnDeadline,
+    rememberShared: deps.rememberShared,
+    explicitRemember: latestUserMessage ? asksToRemember(latestUserMessage.content) : false,
   });
   if (!loop.ok) return loop.error;
 
@@ -1859,5 +1933,6 @@ export async function runChat(deps: ChatDeps, opts: ChatOptions): Promise<ChatRe
     capturedSystemPrompt,
     toolMessages: loop.toolMessages,
     learningIntent,
+    rememberShared: deps.rememberShared,
   });
 }

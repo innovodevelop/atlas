@@ -25,6 +25,9 @@ use std::time::{Duration, Instant};
 
 const CACHE_SECS: u64 = 30;
 
+/// What macOS prints in place of a network name the asking app may not see.
+const REDACTED: &str = "<redacted>";
+
 #[derive(Serialize, Clone, Debug, Default, PartialEq)]
 pub struct Battery {
     pub percent: u8,
@@ -96,11 +99,16 @@ pub fn parse_pmset(out: &str) -> Option<Battery> {
 /// `ipconfig getsummary en0` prints a dictionary; the line we want is
 /// `  SSID : Fogware 5G`. Falls back to `networksetup -getairportnetwork en0`
 /// output: `Current Wi-Fi Network: Fogware 5G` / `You are not associated…`.
+///
+/// Since macOS 14.4 both tools print `<redacted>` for the name unless the app
+/// asking has Location Services access. That is still a connection: it is
+/// reported as connected with no name, never as a network called "<redacted>".
 pub fn parse_wifi(summary: &str, airport: &str) -> Wifi {
     if let Some(line) = summary.lines().find(|l| l.trim_start().starts_with("SSID :")) {
         let ssid = line.splitn(2, ':').nth(1).map(str::trim).filter(|s| !s.is_empty());
         if let Some(s) = ssid {
-            return Wifi { ssid: Some(s.to_string()), connected: true };
+            let name = if s == REDACTED { None } else { Some(s.to_string()) };
+            return Wifi { ssid: name, connected: true };
         }
     }
     if let Some(rest) = airport.trim().strip_prefix("Current Wi-Fi Network:") {
@@ -254,6 +262,12 @@ mod tests {
         assert_eq!(parse_wifi(summary, ""), Wifi { ssid: Some("Fogware 5G".into()), connected: true });
         assert_eq!(parse_wifi("", "Current Wi-Fi Network: Home\n"), Wifi { ssid: Some("Home".into()), connected: true });
         assert_eq!(parse_wifi("", "You are not associated with an AirPort network.\n"), Wifi { ssid: None, connected: false });
+    }
+
+    #[test]
+    fn wifi_with_a_redacted_name_is_connected_and_unnamed() {
+        let summary = "<dictionary> {\n  InterfaceType : WiFi\n  SSID : <redacted>\n  Security : WPA2_PSK\n}\n";
+        assert_eq!(parse_wifi(summary, ""), Wifi { ssid: None, connected: true });
     }
 
     #[test]

@@ -68,6 +68,10 @@ export class VoiceSession {
   private turnFullText = "";
   private llmAbort: AbortController | null = null;
   private awaitingBargeReport = false;
+  // Push to talk: true while the client holds its key. The VAD's end of
+  // speech is ignored then, so a pause mid-sentence does not send half of it;
+  // the release (`end_speech`) closes the utterance instead.
+  private held = false;
 
   // Per-turn latency breakdown (latency.ts): logged and sent to the client as
   // a `latency` message when the first audio of a turn arrives.
@@ -105,8 +109,16 @@ export class VoiceSession {
   handleMessage(msg: ClientMsg): void {
     switch (msg.type) {
       case "wake":
-      case "activate":
+        this.held = false;
         void this.startListening();
+        break;
+      case "activate":
+        this.held = msg.hold === true;
+        void this.startListening();
+        break;
+      case "end_speech":
+        this.held = false;
+        void this.closeUtterance();
         break;
       case "cancel":
         this.cancelTurn("cancel");
@@ -178,6 +190,12 @@ export class VoiceSession {
   }
 
   private async onSpeechEnd(): Promise<void> {
+    if (this.held) return; // push to talk: the key's release ends the utterance
+    await this.closeUtterance();
+  }
+
+  /** Finish the STT stream and answer what was said: the VAD's end of speech, or a push-to-talk release. */
+  private async closeUtterance(): Promise<void> {
     if (this.state !== "listening" || !this.stt) return;
     const timer = new TurnTimer(performance.now(), true);
     const text = await this.stt.finish();
@@ -401,6 +419,7 @@ export class VoiceSession {
   }
 
   private cancelTurn(_reason: string): void {
+    this.held = false;
     this.llmAbort?.abort();
     this.tts.abort();
     this.stt?.close();

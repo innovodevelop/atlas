@@ -1438,3 +1438,36 @@ CREATE TABLE IF NOT EXISTS atlas_item_notes (
 CREATE TRIGGER IF NOT EXISTS trg_atlas_item_notes_updated AFTER UPDATE ON atlas_item_notes
   FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
   BEGIN UPDATE atlas_item_notes SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+
+-- ###########################################################################
+-- # SETTINGS — the battery's last two days, and whether Atlas remembers       #
+-- ###########################################################################
+-- Settings → Battery draws the last 24 hours of charge. macOS keeps no such
+-- history that an app may read, so the owner instance samples `pmset -g batt`
+-- every ten minutes (mac_controls.rs) and deletes anything older than two
+-- days on each write: about three hundred rows, never more.
+CREATE TABLE IF NOT EXISTS battery_history (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  recorded_at TEXT NOT NULL,
+  percent     INTEGER NOT NULL CHECK (percent BETWEEN 0 AND 100),
+  charging    INTEGER NOT NULL DEFAULT 0,
+  on_power    INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_battery_history_recorded ON battery_history(recorded_at);
+
+-- Settings → Memory & Privacy → "Remember things I share". One row per user,
+-- written by the webview through the local CRUD shim and read by the brain on
+-- every chat turn (services/atlas-brain/src/memorySettings.ts). No row means
+-- the default, on. Off: the brain stops saving facts and conversation
+-- summaries on its own, and stores only what the user explicitly asks it to.
+CREATE TABLE IF NOT EXISTS atlas_memory_settings (
+  id              TEXT PRIMARY KEY NOT NULL,
+  user_id         TEXT NOT NULL UNIQUE,
+  remember_shared INTEGER NOT NULL DEFAULT 1 CHECK (remember_shared IN (0, 1)),
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+CREATE TRIGGER IF NOT EXISTS trg_atlas_memory_settings_updated AFTER UPDATE ON atlas_memory_settings
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE atlas_memory_settings SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;

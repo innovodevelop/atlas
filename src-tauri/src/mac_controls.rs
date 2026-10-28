@@ -1,5 +1,5 @@
 // Settings → This Mac: Wi-Fi, Bluetooth, the Mac's own details, battery
-// health and history, and whether the screen is locked.
+// health and history, whether the screen is locked, and Restart Atlas.
 //
 // system_vitals.rs answers the top bar's three quick questions every thirty
 // seconds. This module is what the Settings sections and the status panels
@@ -7,11 +7,14 @@
 //
 // THE SPLIT. The READ commands here run a fixed list of macOS tools and hand
 // their text back unparsed; the parsing lives in src/lib/macProbes.ts, where
-// it is unit-tested on real tool output in any environment (this crate only
-// builds on a Mac). The WRITE commands take user input, so they validate it
-// here, in Rust, before any tool sees it, and pass every value as its own
-// argument — there is no shell anywhere in this file, and nothing a user types
-// is ever interpreted by one.
+// it is unit-tested on real tool output with `bun test`. Two exceptions trim
+// in Rust before anything crosses to the webview, because the raw output
+// carries identifiers the screens never show: the hardware profile (serial
+// number, hardware UUID) is cut down to the model's name, and the battery's
+// ioreg dump (serial numbers, 16 KB of it) to the capacity lines. The WRITE
+// commands take user input, so they validate it here, in Rust, before any
+// tool sees it, and pass every value as its own argument — there is no shell
+// anywhere in this file, and nothing a user types is ever interpreted by one.
 //
 // SECRETS. `wifi_join` takes the password the user typed and passes it to
 // `networksetup` as one argument. It is never stored, never logged, never put
@@ -19,11 +22,21 @@
 // back), and it is dropped when the command returns. macOS keeps it in the
 // Keychain itself when the join succeeds, which is how every other app joins.
 //
+// NETWORK NAMES. Since macOS 14.4, `ipconfig` and `system_profiler` print
+// "<redacted>" for every network name unless the app asking has Location
+// Services access, which Atlas does not request. The preferred-network list is
+// not redacted, so known networks keep their names; the network in use and
+// the ones in range usually do not. The screens say so rather than guess.
+//
 // BLUETOOTH. macOS has no command-line tool for Bluetooth power or
 // connections. IOBluetooth bindings are not in Cargo.lock, so the switches use
 // `blueutil` when the user has installed it (Homebrew's two prefixes are
 // checked; it is never installed from here) and the section stays read-only,
 // saying why, when it is absent.
+//
+// Every command is `#[tauri::command(async)]`: each one spawns a process, and
+// `system_profiler` can take seconds, which on the main thread is a frozen
+// window.
 use crate::db::DbState;
 use rusqlite::params;
 use serde::Serialize;
@@ -40,8 +53,8 @@ const WIFI_FALLBACK_DEVICE: &str = "en0";
 /// How often the battery history takes a sample.
 const BATTERY_SAMPLE_SECS: u64 = 600;
 
-/// `system_profiler SPHardwareDataType` never changes while Atlas runs and
-/// takes a few hundred milliseconds, so it is read once.
+/// The model's name never changes while Atlas runs, and `system_profiler`
+/// takes a few hundred milliseconds, so it is read once an hour at most.
 const HARDWARE_CACHE_SECS: u64 = 3600;
 
 // --- Running tools ---------------------------------------------------------------
@@ -58,42 +71,56 @@ fn read(cmd: &str, args: &[&str]) -> String {
         .unwrap_or_default()
 }
 
+/// `text` with `secret` replaced, so a tool that echoes its arguments cannot
+/// hand a password back to the webview.
+fn scrub(text: &str, secret: Option<&str>) -> String {
+    let t = text.trim().to_string();
+    match secret {
+        Some(p) if !p.is_empty() => t.replace(p, "•••"),
+        _ => t,
+    }
+}
+
 /// Run a tool that changes something. `networksetup` reports most failures on
 /// stdout with exit status 0, so the text is checked as well as the status.
 /// `secret` is removed from anything that comes back.
 fn act(cmd: &str, args: &[&str], secret: Option<&str>) -> Result<String, String> {
-    let scrub = |s: &str| -> String {
-        let s = s.trim().to_string();
-        match secret {
-            Some(p) if !p.is_empty() => s.replace(p, "•••"),
-            _ => s,
-        }
-    };
-    let out = Command::new(cmd).args(args).output().map_err(|e| format!("{cmd} could not run: {e}"))?;
+    let out = Command::new(cmd)
+        .args(args)
+        .output()
+        .map_err(|e| format!("{cmd} could not run: {e}"))?;
     let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
     let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
     if !out.status.success() {
         let msg = if stderr.trim().is_empty() { stdout.as_str() } else { stderr.as_str() };
-        let msg = scrub(msg);
+        let msg = scrub(msg, secret);
         return Err(if msg.is_empty() { format!("{cmd} failed") } else { msg });
     }
     if let Some(line) = tool_failure(&stdout).or_else(|| tool_failure(&stderr)) {
-        return Err(scrub(&line));
+        return Err(scrub(&line, secret));
     }
-    Ok(scrub(&stdout))
+    Ok(scrub(&stdout, secret))
 }
 
 /// The first line of a tool's output that reports a failure, if any.
+/// `networksetup` prints "** Error: …", "Could not find network X." and
+/// "Network X was not found in the preferred networks list" — the last two
+/// with exit status 0.
 pub fn tool_failure(out: &str) -> Option<String> {
-    out.lines().map(str::trim).find(|l| {
-        let low = l.to_ascii_lowercase();
-        low.starts_with("error")
-            || low.starts_with("could not")
-            || low.starts_with("failed")
-            || low.contains("is not a wi-fi interface")
-            || low.contains("administrator")
-            || low.contains("not authorized")
-    }).map(str::to_string)
+    out.lines()
+        .map(str::trim)
+        .find(|l| {
+            let low = l.trim_start_matches('*').trim_start().to_ascii_lowercase();
+            low.starts_with("error")
+                || low.starts_with("could not")
+                || low.starts_with("failed")
+                || low.starts_with("you cannot")
+                || low.contains("was not found")
+                || low.contains("is not a wi-fi interface")
+                || low.contains("administrator")
+                || low.contains("not authorized")
+        })
+        .map(|l| l.trim_start_matches('*').trim_start().to_string())
 }
 
 // --- Validation --------------------------------------------------------------
@@ -115,10 +142,11 @@ pub fn validate_ssid(ssid: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// A Wi-Fi password: empty for an open network, otherwise at most 64
-/// characters (a WPA passphrase is 8–63, a raw key 64 hex digits; older WEP
-/// keys are shorter, so there is no lower bound here — the network refuses a
-/// wrong one). Control characters are refused.
+/// A Wi-Fi password: empty for an open network (or a known one, whose password
+/// macOS already holds), otherwise at most 64 characters (a WPA passphrase is
+/// 8–63, a raw key 64 hex digits; older WEP keys are shorter, so there is no
+/// lower bound here — the network refuses a wrong one). Control characters are
+/// refused.
 pub fn validate_password(password: &str) -> Result<(), String> {
     if password.chars().count() > 64 {
         return Err("A Wi-Fi password is at most 64 characters.".into());
@@ -178,7 +206,7 @@ pub struct WifiReadout {
     pub device: String,
     /// `networksetup -getairportpower`: "Wi-Fi Power (en0): On".
     pub power: String,
-    /// `ipconfig getsummary <device>`: SSID, security, BSSID.
+    /// `ipconfig getsummary <device>`: SSID (often redacted), security, link state.
     pub summary: String,
     /// `ipconfig getifaddr <device>`: the IPv4 address, or "".
     pub ip: String,
@@ -187,7 +215,7 @@ pub struct WifiReadout {
     /// `networksetup -listpreferredwirelessnetworks`: the known networks.
     pub preferred: String,
     /// `system_profiler SPAirPortDataType -json` — signal, rate, channel and
-    /// the networks in range. Slow (one to three seconds), so only on request.
+    /// the networks in range. Slow (one to five seconds), so only on request.
     pub profiler: Option<String>,
 }
 
@@ -218,7 +246,8 @@ pub fn wifi_set_power(on: bool) -> Result<(), String> {
 }
 
 /// Join a network. The password goes straight to `networksetup` as its own
-/// argument and nowhere else — see the header.
+/// argument and nowhere else — see the header. Without one, macOS uses the
+/// password it already holds for a known network.
 #[tauri::command(async)]
 pub fn wifi_join(ssid: String, password: Option<String>) -> Result<(), String> {
     validate_ssid(&ssid)?;
@@ -260,18 +289,22 @@ pub struct BluetoothReadout {
     pub profiler: String,
     /// `blueutil --power`: "1" or "0".
     pub power: Option<String>,
-    /// `blueutil --paired --format json`.
-    pub paired: Option<String>,
 }
 
+/// The Bluetooth section's read. `devices: false` skips the slow device list
+/// (300–1500 ms), for the status panel, which only needs the switch and has
+/// the device list from `system_vitals` already.
 #[tauri::command(async)]
-pub fn bluetooth_read() -> Result<BluetoothReadout, String> {
+pub fn bluetooth_read(devices: Option<bool>) -> Result<BluetoothReadout, String> {
     let tool = blueutil();
     Ok(BluetoothReadout {
         blueutil: tool.map(str::to_string),
-        profiler: read("system_profiler", &["SPBluetoothDataType", "-json"]),
+        profiler: if devices.unwrap_or(true) {
+            read("system_profiler", &["SPBluetoothDataType", "-json"])
+        } else {
+            String::new()
+        },
         power: tool.map(|t| read(t, &["--power"])),
-        paired: tool.map(|t| read(t, &["--paired", "--format", "json"])),
     })
 }
 
@@ -314,8 +347,9 @@ pub struct MacReadout {
     pub pressure: String,
     /// `sw_vers -productVersion`.
     pub os_version: String,
-    /// `system_profiler SPHardwareDataType -json` (cached): the model's name.
-    pub hardware: String,
+    /// The model's marketing name ("MacBook Pro"), from the cached hardware
+    /// profile; "" when it could not be read.
+    pub machine_name: String,
     /// `vm_stat`.
     pub vm_stat: String,
     /// `df -k /System/Volumes/Data` (the user's data volume on APFS).
@@ -326,21 +360,37 @@ pub struct MacReadout {
     pub self_pid: u32,
 }
 
-fn hardware_profile() -> String {
+/// `system_profiler SPHardwareDataType -json` → `machine_name`. The profile
+/// also carries the serial number and hardware UUID, so only the name leaves.
+pub fn parse_machine_name(json: &str) -> String {
+    serde_json::from_str::<serde_json::Value>(json)
+        .ok()
+        .and_then(|v| {
+            v.get("SPHardwareDataType")?
+                .as_array()?
+                .first()?
+                .get("machine_name")?
+                .as_str()
+                .map(str::to_string)
+        })
+        .unwrap_or_default()
+}
+
+fn machine_name() -> String {
     static CACHE: OnceLock<Mutex<Option<(Instant, String)>>> = OnceLock::new();
     let cache = CACHE.get_or_init(|| Mutex::new(None));
     if let Ok(guard) = cache.lock() {
-        if let Some((at, text)) = guard.as_ref() {
-            if at.elapsed() < Duration::from_secs(HARDWARE_CACHE_SECS) && !text.is_empty() {
-                return text.clone();
+        if let Some((at, name)) = guard.as_ref() {
+            if at.elapsed() < Duration::from_secs(HARDWARE_CACHE_SECS) && !name.is_empty() {
+                return name.clone();
             }
         }
     }
-    let text = read("system_profiler", &["SPHardwareDataType", "-json"]);
+    let name = parse_machine_name(&read("system_profiler", &["SPHardwareDataType", "-json"]));
     if let Ok(mut guard) = cache.lock() {
-        *guard = Some((Instant::now(), text.clone()));
+        *guard = Some((Instant::now(), name.clone()));
     }
-    text
+    name
 }
 
 fn ps_table() -> String {
@@ -361,7 +411,7 @@ pub fn mac_read() -> Result<MacReadout, String> {
         boottime: read("sysctl", &["-n", "kern.boottime"]),
         pressure: read("sysctl", &["-n", "kern.memorystatus_vm_pressure_level"]),
         os_version: read("sw_vers", &["-productVersion"]),
-        hardware: hardware_profile(),
+        machine_name: machine_name(),
         vm_stat: read("vm_stat", &[]),
         df,
         ps: ps_table(),
@@ -382,10 +432,12 @@ pub struct BatterySample {
 
 #[derive(Serialize, Debug, Default)]
 pub struct BatteryReadout {
-    /// `ioreg -r -c AppleSmartBattery`: cycle count, design and maximum capacity.
+    /// The capacity lines of `ioreg -r -c AppleSmartBattery`: cycle count,
+    /// design and maximum capacity. "" on a Mac without a battery.
     pub ioreg: String,
-    /// `system_profiler SPPowerDataType -json`: the condition macOS reports.
-    pub profiler: String,
+    /// `sppower_battery_health_info` from `system_profiler SPPowerDataType
+    /// -json` as JSON text: the condition and maximum capacity macOS reports.
+    pub health: String,
     /// `pmset -g`: the live settings, including `lowpowermode`.
     pub pmset: String,
     /// `ps -A -o pid=,ppid=,%cpu=,rss=,comm=`, for what is using the processor.
@@ -393,6 +445,44 @@ pub struct BatteryReadout {
     pub self_pid: u32,
     /// The last 24 hours of samples, oldest first.
     pub history: Vec<BatterySample>,
+}
+
+/// The keys the battery health card reads. ioreg prints them at the top level
+/// ("CycleCount" = 164) and, on recent macOS, inside the "BatteryData"
+/// dictionary ("DesignCapacity"=6249), so a line is kept when it names one.
+const BATTERY_KEYS: [&str; 6] = [
+    "\"CycleCount\"",
+    "\"DesignCapacity\"",
+    "\"AppleRawMaxCapacity\"",
+    "\"NominalChargeCapacity\"",
+    "\"MaxCapacity\"",
+    "\"DesignCycleCount9C\"",
+];
+
+/// The lines of the ioreg dump that carry a capacity key — and nothing else,
+/// so no serial number crosses to the webview.
+pub fn battery_capacity_lines(ioreg: &str) -> String {
+    ioreg
+        .lines()
+        .filter(|l| !l.contains("Serial") && BATTERY_KEYS.iter().any(|k| l.contains(k)))
+        .map(str::trim)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// `system_profiler SPPowerDataType -json` → the battery's health object as
+/// JSON text, or "" when there is none (a desktop Mac).
+pub fn battery_health_json(json: &str) -> String {
+    serde_json::from_str::<serde_json::Value>(json)
+        .ok()
+        .and_then(|v| {
+            v.get("SPPowerDataType")?
+                .as_array()?
+                .iter()
+                .find_map(|entry| entry.get("sppower_battery_health_info").cloned())
+        })
+        .map(|h| h.to_string())
+        .unwrap_or_default()
 }
 
 #[tauri::command(async)]
@@ -419,8 +509,8 @@ pub fn battery_read(state: State<'_, DbState>) -> Result<BatteryReadout, String>
         rows.filter_map(Result::ok).collect::<Vec<_>>()
     };
     Ok(BatteryReadout {
-        ioreg: read("ioreg", &["-r", "-c", "AppleSmartBattery"]),
-        profiler: read("system_profiler", &["SPPowerDataType", "-json"]),
+        ioreg: battery_capacity_lines(&read("ioreg", &["-r", "-c", "AppleSmartBattery"])),
+        health: battery_health_json(&read("system_profiler", &["SPPowerDataType", "-json"])),
         pmset: read("pmset", &["-g"]),
         ps: ps_table(),
         self_pid: std::process::id(),
@@ -467,12 +557,33 @@ pub fn start_battery_recorder(app: AppHandle) {
 
 // --- Screen lock -------------------------------------------------------------------
 
-/// `ioreg -n Root -d1`: the console session dictionary carries
-/// `"CGSSessionScreenIsLocked"=Yes` while the screen is locked. Read by the
-/// voice session's "mute when the Mac is locked".
+/// `ioreg -n Root -d1` lists the console sessions; the one on screen carries
+/// `"CGSSessionScreenIsLocked"=Yes` while the screen is locked, and no such key
+/// otherwise.
+pub fn parse_screen_locked(ioreg: &str) -> bool {
+    ioreg.contains("\"CGSSessionScreenIsLocked\"=Yes")
+}
+
+/// Whether the screen is locked right now. Read by the voice session's "mute
+/// when the Mac is locked". The ioreg dump is ~100 KB, so only the answer
+/// crosses to the webview.
 #[tauri::command(async)]
-pub fn screen_lock_read() -> Result<String, String> {
-    Ok(read("ioreg", &["-n", "Root", "-d1"]))
+pub fn screen_locked() -> Result<bool, String> {
+    Ok(parse_screen_locked(&read("ioreg", &["-n", "Root", "-d1"])))
+}
+
+// --- Restart Atlas -----------------------------------------------------------------
+
+/// Settings → Software Update's "Restart Atlas", and any other screen that
+/// needs a fresh start (a provider switch). Other packages invoke it by name.
+///
+/// `request_restart`, not `restart`: `AppHandle::restart` called on the main
+/// thread skips `RunEvent::Exit`, and that event is where lib.rs stops the
+/// brain and the voice gateway and gives up the sidecar claim. Skipping it
+/// would leave both sidecars running beside the relaunched app's new pair.
+#[tauri::command(async)]
+pub fn app_restart(app: AppHandle) {
+    app.request_restart();
 }
 
 #[cfg(test)]
@@ -518,7 +629,45 @@ mod tests {
             Some("Failed to join network Home.")
         );
         assert!(tool_failure("Could not find network Nowhere.\n").is_some());
+        assert_eq!(
+            tool_failure("Network Nowhere was not found in the preferred networks list\n").as_deref(),
+            Some("Network Nowhere was not found in the preferred networks list")
+        );
+        assert_eq!(tool_failure("** Error: The parameters were not valid.\n").as_deref(), Some("Error: The parameters were not valid."));
         assert!(tool_failure("").is_none());
         assert!(tool_failure("Wi-Fi Power (en0): On\n").is_none());
+    }
+
+    #[test]
+    fn secrets_are_scrubbed() {
+        assert_eq!(scrub(" wrong key hunter22 \n", Some("hunter22")), "wrong key •••");
+        assert_eq!(scrub("no secret here", Some("")), "no secret here");
+        assert_eq!(scrub("left alone", None), "left alone");
+    }
+
+    #[test]
+    fn machine_name_only() {
+        let json = r#"{"SPHardwareDataType":[{"machine_name":"MacBook Pro","serial_number":"XXXX","chip_type":"Apple M5"}]}"#;
+        assert_eq!(parse_machine_name(json), "MacBook Pro");
+        assert_eq!(parse_machine_name("not json"), "");
+    }
+
+    #[test]
+    fn battery_lines_and_health() {
+        let ioreg = "  |   \"ExternalConnected\" = Yes\n  |   \"MaxCapacity\" = 100\n  |   \"CycleCount\" = 164\n  |   \"Serial\" = \"ABC\"\n  |   \"BatteryData\" = {\"AppleRawMaxCapacity\"=5926,\"DesignCapacity\"=6249}\n";
+        let kept = battery_capacity_lines(ioreg);
+        assert!(kept.contains("\"CycleCount\" = 164"));
+        assert!(kept.contains("\"DesignCapacity\"=6249"));
+        assert!(!kept.contains("Serial") && !kept.contains("ExternalConnected"));
+        let power = r#"{"SPPowerDataType":[{"_name":"spbattery_information","sppower_battery_health_info":{"sppower_battery_cycle_count":164,"sppower_battery_health":"Good","sppower_battery_health_maximum_capacity":"100 %"}},{"_name":"sppower_information"}]}"#;
+        let health = battery_health_json(power);
+        assert!(health.contains("\"sppower_battery_health\":\"Good\""));
+        assert_eq!(battery_health_json(r#"{"SPPowerDataType":[{"_name":"sppower_information"}]}"#), "");
+    }
+
+    #[test]
+    fn screen_lock_from_console_users() {
+        assert!(parse_screen_locked("\"IOConsoleUsers\" = ({\"kCGSSessionOnConsoleKey\"=Yes,\"CGSSessionScreenIsLocked\"=Yes})"));
+        assert!(!parse_screen_locked("\"IOConsoleUsers\" = ({\"kCGSSessionOnConsoleKey\"=Yes})"));
     }
 }

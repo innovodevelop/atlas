@@ -17,10 +17,21 @@
  * Personality, Permissions, Mail, Portfolio, Music and Software Update are
  * redrawn on the design's cards over the same hooks the Workshop tabs use —
  * which is also how the design's confirm-before-disconnect reaches the
- * mailboxes and the brokerage, both of which delete stored data. "This Mac"
- * reads `useSystemVitals` and shows what the Mac reports: no switch, no join,
- * no pair, because the webview has no command for any of them. "Beta UI" is
- * the way back.
+ * mailboxes and the brokerage, both of which delete stored data. Voice adds
+ * how Atlas listens (src/lib/voiceInput.ts, read by the voice session), and
+ * Memory & Privacy the "Remember things I share" switch the brain obeys
+ * (src/hooks/useMemorySettings.ts).
+ *
+ * "This Mac" reads and switches the Mac itself through src/hooks/
+ * useMacControls.ts (Rust: src-tauri/src/mac_controls.rs): Wi-Fi power, join
+ * and forget; Bluetooth power and connections when blueutil is installed;
+ * the Mac's chip, memory, storage and processor; the battery's 24-hour
+ * history, health and energy use, and the switch that pauses the sphere.
+ * What macOS gives no tool for stays out and the screen says so: Wi-Fi
+ * disconnect and per-network auto-join, Low Power Mode (admin only, shown
+ * read-only), and Bluetooth without blueutil. Software Update adds the two
+ * automatic-update switches (src/lib/updatePrefs.ts) and Restart Atlas.
+ * "Beta UI" is the way back.
  */
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -33,6 +44,14 @@ import { isUserMailbox, useMailIntelligence, type MailAccount } from '@/hooks/us
 import { usePortfolio } from '@/hooks/usePortfolio';
 import { useMusicPlayer } from '@/hooks/useMusicPlayer';
 import { useSystemVitals, type BtDevice, type SystemVitalsState } from '@/hooks/useSystemVitals';
+import { useBatteryDetails, useBluetoothControls, useMacDetails, useWifiControls } from '@/hooks/useMacControls';
+import { useRememberShared } from '@/hooks/useMemorySettings';
+import {
+  gigabytes, historyBars, rateLabel, signalLine, signalWord, uptimeLabel, wifiHeadline, type NearbyNetwork, type PairedDevice,
+} from '@/lib/macProbes';
+import { onVoiceInputChange, readVoiceInput, setVoiceInput, type VoiceInputPrefs } from '@/lib/voiceInput';
+import { onUpdatePrefsChange, readUpdatePrefs, setUpdatePrefs, type UpdatePrefs } from '@/lib/updatePrefs';
+import { readSpherePaused, setSpheresPaused } from '@/lib/spherePause';
 import { ATLAS_PERMISSIONS, readOnboarding } from '@/lib/atlasPermissions';
 import { getActiveWakePhrases } from '@/lib/wakeWord';
 import { setBetaUi } from '@/lib/betaFlag';
@@ -187,14 +206,14 @@ const BetaSettings = () => {
         <main className="b-st-main" ref={mainRef}>
           {current === 'voice' ? <VoiceSection /> : null}
           {current === 'personality' ? <PersonalitySection /> : null}
-          {current === 'memory' ? <section className="b-st-card b-st-embed" aria-label="Memory and privacy"><MemoryPrivacyPanel /></section> : null}
+          {current === 'memory' ? <MemorySection /> : null}
           {current === 'permissions' ? <PermissionsSection onReview={() => plainNavigate('/permissions')} /> : null}
           {current === 'mail' ? <MailSection mail={mail} say={say} /> : null}
           {current === 'portfolio' ? <PortfolioSection say={say} /> : null}
           {current === 'music' ? <MusicSection say={say} /> : null}
-          {current === 'wifi' ? <WifiSection vitals={vitals} /> : null}
-          {current === 'bluetooth' ? <BluetoothSection vitals={vitals} /> : null}
-          {current === 'devices' ? <DevicesSection vitals={vitals} /> : null}
+          {current === 'wifi' ? <WifiSection say={say} /> : null}
+          {current === 'bluetooth' ? <BluetoothSection say={say} /> : null}
+          {current === 'devices' ? <DevicesSection vitals={vitals} version={version} /> : null}
           {current === 'battery' ? <BatterySection vitals={vitals} /> : null}
           {current === 'updates' ? <UpdatesSection updater={updater} version={version} /> : null}
           {current === 'budget' && AtlasBudgetTab ? (
@@ -230,10 +249,12 @@ function Stat({ k, v, ok }: { k: string; v: string; ok?: boolean }) {
 type ChipTone = 'quiet' | 'on' | 'ink' | 'ok' | 'warn' | 'off';
 type LineTone = 'quiet' | 'ok' | 'warn' | 'blue';
 
-/** One row of a card: the round icon chip, a title and a line, an optional trail, then its buttons. */
-function Row({ icon, chip = 'quiet', title, sub, subTone = 'quiet', trail, trailTone, emphasis, children }: {
+type MeterTone = 'ink' | 'green' | 'blue' | 'red';
+
+/** One row of a card: the round icon chip, a title and a line, an optional meter and trail, then its buttons. */
+function Row({ icon, chip = 'quiet', title, sub, subTone = 'quiet', trail, trailTone, emphasis, meter, children }: {
   icon?: IconName; chip?: ChipTone; title: string; sub?: string; subTone?: LineTone; trail?: string; trailTone?: 'ok' | 'warn' | 'ink';
-  emphasis?: boolean; children?: ReactNode;
+  emphasis?: boolean; meter?: { pct: number; tone?: MeterTone } | null; children?: ReactNode;
 }) {
   return (
     <div className={`b-st-row${emphasis ? ' b-st-row--emphasis' : ''}`}>
@@ -241,6 +262,11 @@ function Row({ icon, chip = 'quiet', title, sub, subTone = 'quiet', trail, trail
       <div className="b-st-row-text">
         <p className="b-st-row-t">{title}</p>
         {sub ? <p className={`b-st-row-s b-st-row-s--${subTone}`}>{sub}</p> : null}
+        {meter ? (
+          <div className={`b-st-meter b-st-meter--${meter.tone ?? 'ink'}`} role="meter" aria-label={title} aria-valuenow={Math.round(meter.pct)} aria-valuemin={0} aria-valuemax={100}>
+            <b style={{ width: `${Math.max(0, Math.min(100, meter.pct))}%` }} />
+          </div>
+        ) : null}
       </div>
       {trail || children ? (
         <div className="b-st-row-end">
@@ -265,6 +291,29 @@ function Confirm({ text, go, busy, onGo, onKeep }: { text: string; go: string; b
   );
 }
 
+/** The design's on/off switch (the shell's .b-switch). */
+function Toggle({ on, label, disabled, onChange }: { on: boolean; label: string; disabled?: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <button type="button" role="switch" aria-checked={on} aria-label={label} className={`b-switch b-st-switch${on ? ' on' : ''}`} disabled={disabled} onClick={() => onChange(!on)}>
+      <span />
+    </button>
+  );
+}
+
+function errorText(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
+/** The browser preview's stand-in for a section that only the Mac app can run. */
+function MacOnly({ title, icon, what }: { title: string; icon: IconName; what: string }) {
+  return (
+    <section className="b-st-card" aria-label={title}>
+      <CardHead title={title} />
+      <Row icon={icon} title="Runs in the Mac app" sub={`${what} run in the Atlas desktop app. Open Atlas on your Mac to use them.`} />
+    </section>
+  );
+}
+
 /** The "Sample" stamp the top bar uses, for the browser preview's fixture vitals. */
 function SampleStamp({ vitals }: { vitals: SystemVitalsState }) {
   return vitals.fixture ? <span className="b-topbar-fixture" title="The browser preview cannot see this Mac">Sample</span> : null;
@@ -281,6 +330,11 @@ function VoiceSection() {
   const consent = readOnboarding();
   const mic = consent?.choices?.microphone;
   const phrases = getActiveWakePhrases();
+  // How Atlas listens: stored on this Mac, read live by the voice session.
+  const [input, setInput] = useState<VoiceInputPrefs>(readVoiceInput);
+  useEffect(() => onVoiceInputChange(setInput), []);
+  const flip = (key: keyof VoiceInputPrefs) => (on: boolean) => setInput(setVoiceInput({ [key]: on }));
+  const wakeTitle = `Listen for ${(phrases.length ? phrases : ['Hey Atlas']).map((p) => `“${p}”`).join(' or ')}`;
 
   return (
     <>
@@ -322,10 +376,17 @@ function VoiceSection() {
           trail={consent ? (mic ? 'Allowed' : 'Off') : '—'} trailTone={mic ? 'ok' : undefined}
         />
         <Row
-          icon="voice" title={phrases.length ? `Listens for ${phrases.map((p) => `“${p}”`).join(' or ')}` : 'No wake word loaded'}
-          sub={phrases.length ? 'Detected on this Mac by Atlas’s own model, once the microphone is on. Nothing is sent until Atlas wakes.' : 'The wake-word model did not load; the microphone button still works.'}
-          trail="On-device"
-        />
+          title={wakeTitle}
+          sub={phrases.length ? 'Wake word is detected on-device. Nothing is sent until Atlas wakes.' : 'The wake-word model did not load; the microphone button and push to talk still work.'}
+        >
+          <Toggle on={input.wakeWord} label={wakeTitle} onChange={flip('wakeWord')} />
+        </Row>
+        <Row title="Push to talk" sub="Hold the right ⌥ Option key on Home to speak, and release to send. Works alongside the wake word.">
+          <Toggle on={input.pushToTalk} label="Push to talk" onChange={flip('pushToTalk')} />
+        </Row>
+        <Row title="Mute when the Mac is locked" sub="Atlas stops listening the moment the screen locks.">
+          <Toggle on={input.muteWhenLocked} label="Mute when the Mac is locked" onChange={flip('muteWhenLocked')} />
+        </Row>
       </section>
     </>
   );

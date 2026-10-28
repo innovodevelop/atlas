@@ -42,6 +42,9 @@ mod brain;
 mod system_vitals;
 // The Focus screen's optional "run my Shortcut" (Beta row 12).
 mod focus_mode;
+// Settings → This Mac (Beta F9): Wi-Fi, Bluetooth, the Mac's details, battery
+// health and history, the screen-lock check, and Restart Atlas.
+mod mac_controls;
 
 /// Outcome of a sidecar spawn attempt. `integrity_error` is set when the
 /// binary failed integrity verification (and was therefore NOT spawned) — it
@@ -577,6 +580,21 @@ pub fn run() {
       focus_mode::focus_shortcut_run,
       // Battery / Wi-Fi / Bluetooth for the Beta top bar. Read-only, no secrets.
       system_vitals::system_vitals,
+      // Settings → This Mac and the status panels' switches (mac_controls.rs).
+      // All `#[tauri::command(async)]`: each spawns a macOS tool. The Wi-Fi
+      // password passes through `wifi_join` once and is never kept.
+      mac_controls::wifi_read,
+      mac_controls::wifi_set_power,
+      mac_controls::wifi_join,
+      mac_controls::wifi_forget,
+      mac_controls::bluetooth_read,
+      mac_controls::bluetooth_set_power,
+      mac_controls::bluetooth_device,
+      mac_controls::mac_read,
+      mac_controls::battery_read,
+      mac_controls::screen_locked,
+      // Other screens invoke this one by name (a provider switch, an update).
+      mac_controls::app_restart,
       mail::mail_sync,
       mail::mail_thread_fetch,
       mail::mail_mark_read,
@@ -808,6 +826,9 @@ pub fn run() {
           // Background Gmail sync writes the shared atlas.db too, so it runs
           // in the owner only, for the same reason.
           handle.manage(gmail::GmailAutoSync::spawn(handle.clone()));
+          // The battery history is one shared table too: one recorder per
+          // machine, in the owner, or every sample would be written twice.
+          mac_controls::start_battery_recorder(handle.clone());
         });
       }
 
