@@ -475,7 +475,7 @@ const DESIGNED: DesignedWidget[] = [
   { id: 'lights', name: 'Lights', category: 'home', designShape: 'progress', built: false, needs: 'A connected bridge. Home Assistant works today; HomeKit accessories work in the Lighthouse build — see the note above.' },
 
   // --- media
-  { id: 'podcast', name: 'Podcast', category: 'media', designShape: 'progress', built: false, needs: 'A podcast source. The Spotify scope Atlas requests does not cover shows.' },
+  { id: 'podcast', name: 'Podcast', category: 'media', designShape: 'progress', built: false, needs: 'Built for the Beta Home (Spotify saved shows, played through Atlas); the Workshop dashboard has no card for it.' },
   { id: 'reading', name: 'Reading', category: 'media', designShape: 'rows', built: false, needs: 'A read-later store. None exists.' },
 
   // --- know

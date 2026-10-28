@@ -13,9 +13,10 @@
  * control:
  *   • shuffle and skip — `music_engine.rs` holds a one-element queue, so both
  *     are silent no-ops in Rust today;
- *   • like — writing the Spotify library needs `user-library-modify`, absent
- *     from the scope string in `music.rs` and not addable without every
- *     connected user reconnecting;
+ *   • like — the Beta Music screen and Home's Now playing widget save to the
+ *     Spotify library (`music_save_tracks`, with a reconnect for grants made
+ *     before `user-library-modify` was asked for); these Workshop players do
+ *     not;
  *   • the queue button — there is no queue to open.
  *
  * The reasons live here as constants so the three presentations cannot drift
@@ -36,7 +37,7 @@ export const WHY_SHUFFLE =
 export const WHY_NEXT =
   'Skip needs a queue. Atlas loads one track at a time, so there is nothing after this one yet.';
 export const WHY_LIKE =
-  'Atlas cannot save to your Spotify library: that needs the user-library-modify permission, which it has never asked for. Adding it would require every connected account to reconnect.';
+  'Liking a song lives in the Music screen, which saves it to your Spotify library. This player does not.';
 export const WHY_QUEUE = 'There is no queue yet — Atlas plays a single track at a time.';
 export const WHY_RESTART = 'Restart this track. There is no previous track: Atlas plays one at a time.';
 /**

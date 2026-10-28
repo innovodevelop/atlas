@@ -14,14 +14,31 @@
  *
  * The design draws its own "Atlas" wordmark at the top of the aside; under
  * the Beta shell the top bar already carries one, so the aside leaves that
- * row to the bar. The design's voice toggle is not here either: the Beta
- * entry does not speak (see useTypewriter.ts), so a control to silence it
- * would be a control that does nothing.
+ * row to the bar, and keeps only the design's voice pill there (`voice`):
+ * Atlas speaking its lines, off until the user turns it on (useEntryVoice.ts).
  */
 import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
 import type { QuickSphereState } from '@/lib/quickSphere';
 import { setTalkAnchor } from '@/lib/talkBus';
+import { voicePillCopy } from '@/lib/entryVoice';
 import { EntrySphere } from './EntrySphere';
+
+/** The design's speaker glyphs, on and struck through (its `voiceIco`). */
+const SPEAKER_ON = 'M4 9.5h3.5L12 5.5v13l-4.5-4H4zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11';
+const SPEAKER_OFF = 'M4 9.5h3.5L12 5.5v13l-4.5-4H4zM16 9.5l5 5M21 9.5l-5 5';
+
+/** The "Voice on / Voice off" pill in the aside's top row. */
+function VoicePill({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  const copy = voicePillCopy(on);
+  return (
+    <button type="button" className="b-en-voice" aria-pressed={on} aria-label={copy.aria} title={copy.title} onClick={onToggle}>
+      <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d={on ? SPEAKER_ON : SPEAKER_OFF} />
+      </svg>
+      {copy.label}
+    </button>
+  );
+}
 
 export interface EntryStep { label: string; state: 'done' | 'current' | 'todo' }
 
@@ -45,6 +62,8 @@ export interface EntrySceneProps {
   typing: boolean;
   sub: string;
   children: ReactNode;
+  /** Atlas's voice: the pill's state and what it does. Omit and there is no pill. */
+  voice?: { on: boolean; onToggle: () => void };
 }
 
 /**
@@ -62,7 +81,7 @@ async function openLegal(e: MouseEvent, url: string) {
   }
 }
 
-export function EntryScene({ variant, screenLabel, kicker, line, sphereState, onSphere, steps, eyebrow, said, target, typing, sub, children }: EntrySceneProps) {
+export function EntryScene({ variant, screenLabel, kicker, line, sphereState, onSphere, steps, eyebrow, said, target, typing, sub, children, voice }: EntrySceneProps) {
   const [sphereEl, setSphereEl] = useState<HTMLDivElement | null>(null);
   useEffect(() => { setTalkAnchor(sphereEl); return () => setTalkAnchor(null); }, [sphereEl]);
 
@@ -72,6 +91,7 @@ export function EntryScene({ variant, screenLabel, kicker, line, sphereState, on
     // top bar to its on-ink colours over the paper column.
     <div className={`b-en b-en--${variant}`} data-screen-label={screenLabel} data-beta-tone="paper">
       <aside className="b-en-aside">
+        {voice ? <div className="b-en-aside-top"><VoicePill on={voice.on} onToggle={voice.onToggle} /></div> : null}
         <div className="b-en-stage">
           <div className="b-en-sphere" ref={setSphereEl}>
             <EntrySphere state={sphereState} />

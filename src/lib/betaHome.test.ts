@@ -76,9 +76,12 @@ describe('Beta Home model', () => {
     s = editorReducer(s, { type: 'add', id: 'sleep' });
     s = editorReducer(s, { type: 'add', id: 'sleep' });
     expect(s.slots.filter((x) => x.id === 'sleep')).toHaveLength(1);
-    // Unwired widgets cannot be added: no fake card.
+    // Unwired widgets cannot be added: no fake card. Energy is the one left
+    // without a source now that Focus (F6) and Podcast (F4) are live.
+    s = editorReducer(s, { type: 'add', id: 'energy' });
+    expect(s.slots.some((x) => x.id === 'energy')).toBe(false);
     s = editorReducer(s, { type: 'add', id: 'podcast' });
-    expect(s.slots.some((x) => x.id === 'podcast')).toBe(false);
+    expect(s.slots.some((x) => x.id === 'podcast')).toBe(true);
     s = editorReducer(s, { type: 'remove', id: 'inbox' });
     expect(s.slots.some((x) => x.id === 'inbox')).toBe(false);
     s = editorReducer(s, { type: 'layout', layout: 'grid' });

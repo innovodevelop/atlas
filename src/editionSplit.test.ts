@@ -299,6 +299,19 @@ describe('the consumer bundle does not contain the admin screens', () => {
     }
   });
 
+  test('the bank store ships only where /money does', () => {
+    // Home's Spend, Budget and Subscriptions widgets read the bank store, and
+    // Home is a consumer screen. Leaving them out of the consumer catalog
+    // (betaHome.ts moneyWidgets) hides them; folding them out of the widget
+    // dispatcher (widgets.tsx) is what removes useBank and its commands. These
+    // are two of the command names useBank invokes, written nowhere else in
+    // the webview.
+    for (const marker of ['bank_store_transactions', 'bank_gc_link_start']) {
+      expect(BODY.admin.includes(marker), `${marker} missing from the admin build`).toBe(true);
+      expect(BODY.consumer.includes(marker), `${marker} leaked into the consumer build`).toBe(false);
+    }
+  });
+
   /**
    * The OTHER half, and it is not implied by the one above: with the panels
    * lazily loaded, a filter that returned every tab would still produce a
