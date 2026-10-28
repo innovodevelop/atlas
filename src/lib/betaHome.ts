@@ -73,6 +73,9 @@ export const WIDGETS: readonly WidgetDef[] = [
   { id: 'energy', label: 'Energy', meta: 'No energy meter is connected yet', group: 'Home', sizes: ['S', 'M', 'L'], defaultSize: 'S', source: 'unwired', opens: { route: '/smart-home' } },
   { id: 'podcast', label: 'Podcast', meta: 'No podcast source yet', group: 'Media', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'unwired', opens: null },
   { id: 'focus', label: 'Focus', meta: 'Focus sessions arrive with the Focus screen', group: 'Day', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'unwired', opens: null },
+  // Left-out row 20: live once the user adds a Rejseplanen access ID (the
+  // face says so until then); opens the Answer screen's departures board.
+  { id: 'transit', label: 'Transit', meta: 'Next departures from your stop, from Rejseplanen (needs an access ID)', group: 'Day', sizes: ['S', 'M', 'L'], defaultSize: 'M', source: 'live', opens: { route: '/answer' } },
 ];
 
 export const WIDGET_BY_ID: ReadonlyMap<string, WidgetDef> = new Map(WIDGETS.map((w) => [w.id, w]));

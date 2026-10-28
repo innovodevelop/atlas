@@ -55,5 +55,6 @@ describe('labels', () => {
     const a = { id: 'a', source: '', title: 'a', turns: 1, startedAt: at(28, 9), lastAt: at(28, 13) };
     const b = { ...a, id: 'b', startedAt: at(28, 13, 59) };
     expect(earlierThan([a, b], NOW.getTime() - 30 * 60000).map((c) => c.id)).toEqual(['a']);
+    expect(earlierThan([a, b], NOW.getTime(), 'a').map((c) => c.id)).toEqual(['b']);
   });
 });

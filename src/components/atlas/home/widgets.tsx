@@ -32,6 +32,9 @@ import { useNews } from '@/hooks/useNews';
 import { useMusicPlayer } from '@/hooks/useMusicPlayer';
 import { useSmartHome } from '@/hooks/useSmartHome';
 import { useHealth } from '@/hooks/useHealth';
+import { useTransit } from '@/hooks/useTransit';
+import { countdown, departureNote, type Departure } from '@/lib/transit';
+import { useBetaNavigate } from '@/lib/viewTransitions';
 import { cityTimes } from '@/lib/worldClock';
 import { WATCHLIST, fmtPct } from '@/pages/atlas/atlasHelpers';
 import { eventTime, focusEvent, focusIn, thenEvents, todaysEvents } from '@/lib/stageFocus';
@@ -414,6 +417,67 @@ export function HomeKitWidget(p: WidgetProps) {
   return <Card p={p} face={face} />;
 }
 
+// --- Transit (left-out row 20) -----------------------------------------------------
+
+/** Every two minutes while Home is visible: a day of it stays well inside the access ID's monthly allowance. */
+const TRANSIT_REFRESH_MS = 120_000;
+
+/**
+ * Rejseplanen departures from the user's stop. Dormant until an access ID is
+ * in the Keychain and a stop is chosen, and the face says which is missing;
+ * opening it goes to the Answer screen's board, where both are set up.
+ */
+export function TransitWidget(p: WidgetProps) {
+  const transit = useTransit();
+  const navigate = useBetaNavigate();
+  const { status, stop, departures } = transit;
+  const [deps, setDeps] = useState<Departure[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const now = useTick(30000);
+  const live = status === 'ready' && !!stop && !p.preview;
+
+  useEffect(() => {
+    if (!live || !stop) return;
+    let alive = true;
+    const load = () => {
+      if (document.visibilityState !== 'visible') return;
+      departures(stop)
+        .then((list) => { if (alive) { setDeps(list); setError(null); } })
+        .catch((e: unknown) => { if (alive) setError(e instanceof Error ? e.message : 'Rejseplanen did not answer.'); });
+    };
+    load();
+    const id = window.setInterval(load, TRANSIT_REFRESH_MS);
+    return () => { alive = false; window.clearInterval(id); };
+  }, [live, stop, departures]);
+
+  const upcoming = (deps ?? []).filter((d) => d.at >= now - 60_000);
+  const next = upcoming.find((d) => !d.cancelled) ?? null;
+  const open = p.open ? () => navigate('/answer', { state: { departures: true } }) : undefined;
+  const face: Face = status !== 'ready' || !stop
+    ? {
+        label: 'Transit',
+        meta: status === 'unavailable' ? 'Mac app only' : status === 'needs-key' ? 'Not connected' : 'Rejseplanen',
+        value: '—',
+        sub: status === 'unavailable'
+          ? 'Departures come through the Atlas app on your Mac'
+          : status === 'needs-key'
+            ? 'Add a Rejseplanen access ID. Open this card to set it up.'
+            : status === 'ready' ? 'Choose your stop. Open this card to pick one.' : 'Checking Rejseplanen…',
+      }
+    : {
+        label: 'Transit',
+        meta: stop.name,
+        value: next ? next.expected : '—',
+        delta: next ? countdown(next, new Date(now)) : undefined,
+        deltaTone: next && next.delayMin > 0 ? 'down' : 'blue',
+        sub: error ?? (next ? `${next.line}${next.direction ? ` → ${next.direction}` : ''}` : deps ? 'Nothing leaves in the next two hours' : 'Asking Rejseplanen…'),
+        rows: upcoming.filter((d) => d !== next).slice(0, 3).map<FaceRow>((d) => ({
+          key: d.key, lead: d.expected, title: d.line, sub: d.direction || undefined, value: departureNote(d), valueTone: d.cancelled || d.delayMin > 0 ? 'down' : 'muted', strike: d.cancelled,
+        })),
+      };
+  return <Card p={{ ...p, open }} face={face} />;
+}
+
 // --- Not wired yet -----------------------------------------------------------------
 
 export function UnwiredWidget(p: WidgetProps & { id: string }) {
@@ -441,6 +505,7 @@ const BY_ID: Record<string, (p: WidgetProps) => JSX.Element> = {
   steps: StepsWidget,
   sleep: SleepWidget,
   home: HomeKitWidget,
+  transit: TransitWidget,
 };
 
 export function HomeWidget({ id, ...p }: WidgetProps & { id: string }) {

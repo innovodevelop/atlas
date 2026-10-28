@@ -11,21 +11,12 @@ import type { UseTransit } from '@/hooks/useTransit';
 import type { TransitStop } from '@/lib/transit';
 
 /** Rejseplanen Labs' request form; "Private user" is the free tier. */
-export const REJSEPLANEN_REQUEST_URL = 'https://labs.rejseplanen.dk/hc/da/requests/new';
+const REJSEPLANEN_REQUEST_URL = 'https://labs.rejseplanen.dk/hc/da/requests/new';
 
 export function TransitKeyCard({ transit }: { transit: UseTransit }) {
   const [key, setKey] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  if (transit.status === 'unavailable') {
-    return (
-      <section className="b-answer-transit" aria-label="Departures">
-        <p className="b-answer-transit-t">Departures need the Atlas app on your Mac.</p>
-        <p className="b-answer-transit-d">Rejseplanen is asked by the app itself, so the access ID stays in this Mac’s Keychain. The browser preview cannot do that.</p>
-      </section>
-    );
-  }
 
   const save = async () => {
     if (!key.trim() || busy) return;
@@ -43,7 +34,7 @@ export function TransitKeyCard({ transit }: { transit: UseTransit }) {
       <span className="b-answer-transit-k">Rejseplanen · not connected</span>
       <p className="b-answer-transit-t">Live departures need a Rejseplanen access ID.</p>
       <p className="b-answer-transit-d">
-        It is free for private use. Ask Rejseplanen Labs for one — choose “Private user” — and it arrives by email, good for 50,000 lookups a month.
+        It is free for private use. Ask Rejseplanen Labs for one — choose “Private user” — and it arrives by email. Paste it here once.
       </p>
       <form className="b-answer-transit-form" onSubmit={(e) => { e.preventDefault(); void save(); }}>
         <input
@@ -54,7 +45,6 @@ export function TransitKeyCard({ transit }: { transit: UseTransit }) {
           aria-label="Rejseplanen access ID"
           autoComplete="off"
           spellCheck={false}
-          disabled={transit.status === 'loading'}
         />
         <button type="submit" className="b-btn b-btn--primary" disabled={!key.trim() || busy}>{busy ? 'Saving…' : 'Save'}</button>
       </form>

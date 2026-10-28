@@ -81,6 +81,17 @@ describe("findPerson", () => {
     expect(findPerson(db._db, USER, "Me", NOW).address).toBeNull();
     expect(findPerson(db._db, USER, "Zed Nobody", NOW)).toMatchObject({ found: false, emails: 0, recent: [] });
   });
+  test("an address inside another address is not that person's mail", () => {
+    const db = freshDb();
+    seedMail(db);
+    db._db.query(
+      `INSERT INTO mail_messages (id, user_id, account_id, thread_id, provider_message_id, from_address, subject, snippet, received_at, extracted)
+       VALUES ('m9', ?, 'acc', NULL, 'm9', 'Kpriya <kpriya@raman.studio>', 'Other', 's', '2026-10-28T12:00:00.000Z', '{"direction":"inbound"}')`,
+    ).run(USER);
+    const p = findPerson(db._db, USER, "priya@raman.studio", NOW);
+    expect(p.emails).toBe(3);
+    expect(p.recent.some((e) => e.title === "Other")).toBe(false);
+  });
   test("another user's rows are invisible", () => {
     const db = freshDb();
     seedMail(db);

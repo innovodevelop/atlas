@@ -47,7 +47,9 @@ fn clean(value: &str, what: &str, max: usize) -> Result<String, String> {
         return Err(format!("Rejseplanen: {what} is too long"));
     }
     if v.chars().any(|c| c.is_control()) {
-        return Err(format!("Rejseplanen: {what} has characters it cannot carry"));
+        return Err(format!(
+            "Rejseplanen: {what} has characters it cannot carry"
+        ));
     }
     Ok(v.to_string())
 }
@@ -89,7 +91,9 @@ pub fn transit_set_key(key: String) -> Result<(), String> {
         return clear_core_key(ACCOUNT);
     }
     if !valid_key(k) {
-        return Err("That does not look like a Rejseplanen access ID: one word, no spaces.".to_string());
+        return Err(
+            "That does not look like a Rejseplanen access ID: one word, no spaces.".to_string(),
+        );
     }
     set_core_key(ACCOUNT, k)
 }
@@ -98,7 +102,10 @@ pub fn transit_set_key(key: String) -> Result<(), String> {
 #[tauri::command(async)]
 pub fn transit_find_stops(query: String) -> Result<Value, String> {
     let q = clean(&query, "the stop name", 80)?;
-    get("location.name", &[("input", q.as_str()), ("type", "S"), ("maxNo", "8")])
+    get(
+        "location.name",
+        &[("input", q.as_str()), ("type", "S"), ("maxNo", "8")],
+    )
 }
 
 /// The next departures from a stop (`departureBoard`), optionally only those
@@ -107,11 +114,19 @@ pub fn transit_find_stops(query: String) -> Result<Value, String> {
 #[tauri::command(async)]
 pub fn transit_departures(stop_id: String, direction: Option<String>) -> Result<Value, String> {
     let id = clean(&stop_id, "the stop", 300)?;
-    let dir = match direction.as_deref().map(str::trim).filter(|d| !d.is_empty()) {
+    let dir = match direction
+        .as_deref()
+        .map(str::trim)
+        .filter(|d| !d.is_empty())
+    {
         Some(d) => Some(clean(d, "the direction", 300)?),
         None => None,
     };
-    let mut params: Vec<(&str, &str)> = vec![("id", id.as_str()), ("maxJourneys", "12"), ("duration", "120")];
+    let mut params: Vec<(&str, &str)> = vec![
+        ("id", id.as_str()),
+        ("maxJourneys", "12"),
+        ("duration", "120"),
+    ];
     if let Some(d) = dir.as_deref() {
         params.push(("direction", d));
     }
@@ -124,11 +139,19 @@ mod tests {
 
     #[test]
     fn clean_bounds_and_refuses_control_characters() {
-        assert_eq!(clean("  Nørreport St.  ", "x", 80).unwrap(), "Nørreport St.");
+        assert_eq!(
+            clean("  Nørreport St.  ", "x", 80).unwrap(),
+            "Nørreport St."
+        );
         assert!(clean("", "x", 80).is_err());
         assert!(clean("a\nb", "x", 80).is_err());
         assert!(clean(&"a".repeat(81), "x", 80).is_err());
-        assert!(clean("A=1@O=Nørreport St.@X=12571@Y=55683@U=86@L=8600646@", "x", 300).is_ok());
+        assert!(clean(
+            "A=1@O=Nørreport St.@X=12571@Y=55683@U=86@L=8600646@",
+            "x",
+            300
+        )
+        .is_ok());
     }
 
     #[test]

@@ -75,11 +75,12 @@ export function sourceLabel(source: string): string {
 }
 
 /**
- * Only conversations that began before the screen opened: the one under way
- * here is "This session", not an earlier one.
+ * Only conversations that began before the screen opened, and never the one
+ * under way here (`current`, the Talk session id when the caller knows it):
+ * that one is "This session", not an earlier one.
  */
-export function earlierThan(list: readonly ConversationSummary[], openedAt: number): ConversationSummary[] {
-  return list.filter((c) => Date.parse(c.startedAt) < openedAt);
+export function earlierThan(list: readonly ConversationSummary[], openedAt: number, current: string | null = null): ConversationSummary[] {
+  return list.filter((c) => Date.parse(c.startedAt) < openedAt && c.id !== current);
 }
 
 /** The design's row: "Voice · 6 turns · 4 min" and "Yesterday". */

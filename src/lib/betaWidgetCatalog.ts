@@ -227,6 +227,7 @@ export const EMPTY_COPY: Record<string, EmptySpec> = {
   energy: { title: 'Not wired yet', hint: 'No energy meter is connected yet; this widget arrives with one.' },
   podcast: { title: 'Not wired yet', hint: 'There is no podcast source in Atlas yet.' },
   focus: { title: 'Not wired yet', hint: 'Focus sessions arrive with the Focus screen.' },
+  transit: { title: 'No departures yet', hint: 'Add a Rejseplanen access ID and choose your stop; the next departures show here, live. Open the card to set it up.' },
 };
 
 export function emptyCopy(id: string): EmptySpec {

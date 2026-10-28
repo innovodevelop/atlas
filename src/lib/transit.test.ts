@@ -1,8 +1,26 @@
 import { describe, expect, test } from 'bun:test';
 import {
   STOP_KEY, boardNote, countdown, departureNote, departuresHeadline, hhmm, kindOf, parseDepartures, parseStops,
-  readSavedStop, routeFromQuestion, transitApiError, transitErrorCopy, writeSavedStop,
+  readSavedStop, routeFromQuestion, sameStop, transitApiError, transitErrorCopy, transitPlan, writeSavedStop,
 } from './transit';
+
+describe('transitPlan', () => {
+  test('dormant until the key, then the stop, then the board', () => {
+    expect(transitPlan('unavailable', null, null)).toBe('unavailable');
+    expect(transitPlan('loading', null, null)).toBe('checking');
+    expect(transitPlan('needs-key', { name: 'Nørreport St.' }, null)).toBe('needs-key');
+    expect(transitPlan('ready', null, null)).toBe('pick-stop');
+    expect(transitPlan('ready', { name: 'Nørreport St.' }, null)).toBe('board');
+    expect(transitPlan('ready', { name: 'Nørreport St.' }, 'Nørreport')).toBe('board');
+    expect(transitPlan('ready', { name: 'Nørreport St.' }, 'Aarhus H')).toBe('pick-stop');
+  });
+  test('sameStop', () => {
+    expect(sameStop('København H', 'København')).toBe(true);
+    expect(sameStop('Lund C', 'lund')).toBe(true);
+    expect(sameStop('Nørreport St.', 'Østerport')).toBe(false);
+    expect(sameStop('St.', 'H')).toBe(false);
+  });
+});
 
 const NOW = new Date(2026, 9, 28, 14, 10, 0);
 

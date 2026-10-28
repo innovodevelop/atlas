@@ -280,3 +280,45 @@ export function transitErrorCopy(message: string): string {
   if (/not found|Command transit_/i.test(message)) return 'Departures need the Atlas app on your Mac.';
   return message || 'Rejseplanen did not answer.';
 }
+
+/* ---- what the Answer screen draws for a travel question -------------------- */
+
+export type TransitPlan =
+  /** Not the desktop app, or a build without the commands: the composed answer and a line saying why. */
+  | 'unavailable'
+  /** Still asking the Keychain whether an access ID is stored. */
+  | 'checking'
+  /** No access ID: the key card above the composed answer. */
+  | 'needs-key'
+  /** An access ID but no stop (or the question names another one): the stop picker. */
+  | 'pick-stop'
+  /** The board is the answer; the brain is not asked. */
+  | 'board';
+
+/**
+ * Which of those a travel question gets. A question that names where it
+ * leaves FROM, and that is not the saved stop, asks for the stop first:
+ * answering "from Aarhus H" with the board of Nørreport would be a wrong
+ * answer drawn confidently.
+ */
+export function transitPlan(
+  status: 'loading' | 'unavailable' | 'needs-key' | 'ready',
+  saved: Pick<TransitStop, 'name'> | null,
+  from: string | null,
+): TransitPlan {
+  if (status === 'unavailable') return 'unavailable';
+  if (status === 'loading') return 'checking';
+  if (status === 'needs-key') return 'needs-key';
+  if (!saved) return 'pick-stop';
+  if (from && !sameStop(saved.name, from)) return 'pick-stop';
+  return 'board';
+}
+
+/** "Nørreport St." and "nørreport" are the same stop for a question's purposes. */
+export function sameStop(saved: string, asked: string): boolean {
+  const norm = (s: string) =>
+    s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').split(' ').filter((w) => w && !['st', 'station', 'stn', 'h', 'c'].includes(w)).join(' ');
+  const a = norm(saved);
+  const b = norm(asked);
+  return !!a && !!b && (a === b || a.startsWith(`${b} `) || b.startsWith(`${a} `));
+}

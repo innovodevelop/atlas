@@ -200,20 +200,31 @@ export function findPerson(db: Database, userId: string, asked: string, now: Dat
   const recent: PersonEvent[] = [];
   let lastMail: string | null = null;
   if (address) {
+    // The LIKE only narrows: "anna@x.dk" is inside "hanna@x.dk", so every
+    // candidate is parsed and kept only when one of its addresses IS this one.
     const a = like(address);
-    const inbound = db.query(`SELECT COUNT(*) AS n FROM mail_messages WHERE user_id = ? AND lower(from_address) LIKE ? ESCAPE '\\'`).get(userId, a) as { n: number };
-    const outbound = db.query(`SELECT COUNT(*) AS n FROM mail_messages WHERE user_id = ? AND ${DIRECTION} = 'outbound' AND ${TO_ADDRESS} LIKE ? ESCAPE '\\'`).get(userId, a) as { n: number };
-    emails = inbound.n + outbound.n;
-    threads = (db.query(`SELECT COUNT(*) AS n FROM mail_threads WHERE user_id = ? AND lower(participants) LIKE ? ESCAPE '\\'`).get(userId, a) as { n: number }).n;
-    const msgs = db
+    const rows = db
       .query(
-        `SELECT thread_id, subject, snippet, received_at, ${DIRECTION} AS direction FROM mail_messages
+        `SELECT thread_id, subject, snippet, received_at, from_address, ${DIRECTION} AS direction,
+                json_extract(${EXTRACTED}, '$.to_address') AS to_address
+           FROM mail_messages
           WHERE user_id = ? AND (lower(from_address) LIKE ? ESCAPE '\\' OR (${DIRECTION} = 'outbound' AND ${TO_ADDRESS} LIKE ? ESCAPE '\\'))
-            AND received_at IS NOT NULL
-          ORDER BY received_at DESC LIMIT 4`,
+          ORDER BY received_at DESC
+          LIMIT 5000`,
       )
-      .all(userId, a, a) as Array<{ thread_id: string | null; subject: string | null; snippet: string | null; received_at: string; direction: string | null }>;
-    for (const m of msgs) {
+      .all(userId, a, a) as Array<{
+        thread_id: string | null; subject: string | null; snippet: string | null; received_at: string | null;
+        from_address: string | null; direction: string | null; to_address: unknown;
+      }>;
+    const addrsOf = (raw: unknown) =>
+      typeof raw === "string" ? raw.split(/,(?![^<]*>)/).map((one) => splitAddress(one).addr).filter((x): x is string => !!x) : [];
+    const mine = rows.filter((m) =>
+      splitAddress(m.from_address ?? "").addr === address || (m.direction === "outbound" && addrsOf(m.to_address).includes(address as string)),
+    );
+    emails = mine.length;
+    threads = new Set(mine.map((m) => m.thread_id).filter((t): t is string => !!t)).size;
+    const dated = mine.filter((m): m is typeof m & { received_at: string } => !!m.received_at && Number.isFinite(Date.parse(m.received_at)));
+    for (const m of dated.slice(0, 4)) {
       recent.push({
         kind: m.direction === "outbound" ? "mail-out" : "mail-in",
         at: m.received_at,
@@ -222,19 +233,25 @@ export function findPerson(db: Database, userId: string, asked: string, now: Dat
         threadId: m.thread_id,
       });
     }
-    lastMail = msgs[0]?.received_at ?? null;
+    lastMail = dated[0]?.received_at ?? null;
   }
 
   // Meetings: the address or the name among the attendees, or the first name
   // as a whole word in the title. The LIKE narrows; the regex decides.
   const first = (display ?? name).split(/[\s@.]/)[0].toLowerCase();
-  const eventRows = db
-    .query(
-      `SELECT title, start_time, location, attendees FROM user_events
-        WHERE user_id = ? AND (lower(attendees) LIKE ? ESCAPE '\\' OR lower(attendees) LIKE ? ESCAPE '\\' OR lower(title) LIKE ? ESCAPE '\\')
-        ORDER BY start_time ASC LIMIT 400`,
-    )
-    .all(userId, like(address ?? lower), like(display ?? lower), like(first)) as Array<{ title: string; start_time: string; location: string | null; attendees: string | null }>;
+  // Two reads, so a long calendar history cannot push the next meeting out
+  // of a single LIMIT: the most recent past ones and the upcoming ones.
+  const eventSql = (cmp: "<" | ">=", order: "ASC" | "DESC") =>
+    `SELECT title, start_time, location, attendees FROM user_events
+      WHERE user_id = ? AND start_time ${cmp} ? AND (lower(attendees) LIKE ? ESCAPE '\\' OR lower(attendees) LIKE ? ESCAPE '\\' OR lower(title) LIKE ? ESCAPE '\\')
+      ORDER BY start_time ${order} LIMIT 200`;
+  const nowIso = now.toISOString();
+  const eventArgs = [userId, nowIso, like(address ?? lower), like(display ?? lower), like(first)] as const;
+  type EventRow = { title: string; start_time: string; location: string | null; attendees: string | null };
+  const eventRows = [
+    ...(db.query(eventSql("<", "DESC")).all(...eventArgs) as EventRow[]).reverse(),
+    ...(db.query(eventSql(">=", "ASC")).all(...eventArgs) as EventRow[]),
+  ];
   const fullRe = wordRe(lower);
   const firstRe = first.length >= 2 ? wordRe(first) : null;
   const events = eventRows.filter((e) => {
