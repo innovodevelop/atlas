@@ -35,6 +35,9 @@ mod home;
 // that works today is the Apple Health export importer. See src/health/mod.rs.
 mod health;
 mod watchdog;
+// The Clock's native half: keep the Mac awake until an alarm, ring an alarm on
+// a Home Assistant speaker, and the bridge the brain's clock tools answer on.
+mod clock;
 mod brain;
 mod system_vitals;
 
@@ -554,6 +557,14 @@ pub fn run() {
       db::db_delete,
       db::memory_recall,
       db::memory_upsert_vector,
+      // The Clock (src/clock.rs). All `#[tauri::command(async)]`: one spawns
+      // caffeinate, one calls Home Assistant on the LAN.
+      clock::clock_keep_awake,
+      clock::clock_release_awake,
+      clock::clock_awake_status,
+      clock::clock_speakers,
+      clock::clock_ring_speaker,
+      clock::clock_command_reply,
       datafetch::fetch_weather,
       datafetch::fetch_stocks,
       datafetch::fetch_news,
