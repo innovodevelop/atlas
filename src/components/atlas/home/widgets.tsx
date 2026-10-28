@@ -67,6 +67,9 @@ import {
   type HistoryEvent, type LightWidget,
 } from '@/lib/betaSmartHome';
 import '@/styles/beta/smartHome.css';
+import { useBank } from '@/hooks/useBank';
+import { dayLabel, spendRows, totalSpent } from '@/lib/betaMoney';
+import { paceSentence } from '@/lib/bankLedger';
 
 export interface WidgetProps {
   size: WidgetSize;
@@ -337,6 +340,65 @@ export function WatchWidget(p: WidgetProps) {
       // Never on the sample: a canned +2.6% is not news.
       attention: hasQuotes ? watchAttention(stocks, watch.threshold) : null,
     } : undefined,
+  };
+  return <Card p={p} face={face} />;
+}
+
+// --- Money: the bank store (admin builds list these; see betaHome.ts) --------------
+
+function moneyEmptySub(available: boolean): string {
+  return available ? 'Import a CSV or connect a bank in Money' : 'Money keeps its data in the Mac app';
+}
+
+const monthName = (today: string) => new Date(`${today}T12:00:00`).toLocaleDateString(undefined, { month: 'long' });
+
+export function SpendWidget(p: WidgetProps) {
+  const { model, available, today } = useBank();
+  const cur = model.currency;
+  const rows = spendRows(model).filter((r) => r.spent > 0);
+  const face: Face = {
+    label: 'Spend',
+    meta: monthName(today),
+    value: model.hasData ? money(totalSpent(model), cur) : '—',
+    sub: model.hasData ? `spent in ${monthName(today)}` : moneyEmptySub(available),
+    rows: rows.slice(0, 4).map<FaceRow>((r) => ({ key: r.id, leadKind: 'dot', dotOn: true, title: r.label, value: money(r.spent, cur), valueTone: 'ink' })),
+    kv: p.size === 'M' ? rows.slice(0, 3).map((r) => ({ t: money(r.spent, cur), s: r.label })) : undefined,
+  };
+  return <Card p={p} face={face} />;
+}
+
+export function BudgetWidget(p: WidgetProps) {
+  const { model, available } = useBank();
+  const cur = model.currency;
+  const ring = model.ring;
+  const budgeted = ring.mode === 'budget';
+  const limited = spendRows(model).filter((r) => r.limit);
+  const face: Face = {
+    label: 'Budget',
+    meta: budgeted ? `${Math.round(ring.pace * 100)}% through the month` : undefined,
+    value: budgeted ? money(ring.left, cur) : '—',
+    delta: budgeted ? paceSentence(ring, (v) => money(v, cur)) : undefined,
+    deltaTone: budgeted ? (ring.over ? 'down' : 'up') : 'muted',
+    sub: budgeted ? `left of ${money(ring.budget, cur)}` : model.hasData ? 'Set monthly limits in Money' : moneyEmptySub(available),
+    bar: budgeted ? { fraction: Math.min(1, ring.budget > 0 ? ring.spent / ring.budget : 0), colour: ring.over ? 'var(--b-red)' : 'var(--b-blue)' } : undefined,
+    rows: limited.slice(0, 4).map<FaceRow>((r) => ({
+      key: r.id, title: r.label, value: `${money(r.spent, cur)} / ${money(r.limit ?? 0, cur)}`, valueTone: r.limit && r.spent > r.limit ? 'down' : 'muted',
+    })),
+  };
+  return <Card p={p} face={face} />;
+}
+
+export function SubscriptionsWidget(p: WidgetProps) {
+  const { model, available, today } = useBank();
+  const cur = model.currency;
+  const active = model.subs.filter((s) => s.status === 'active').sort((a, b) => (a.next < b.next ? -1 : a.next > b.next ? 1 : 0));
+  const face: Face = {
+    label: 'Subscriptions',
+    meta: active.length ? `${active.length} found` : undefined,
+    value: active.length ? money(model.subTotals.monthly, cur) : '—',
+    sub: active.length ? 'a month' : model.hasData ? 'None found yet: a payment must repeat first' : moneyEmptySub(available),
+    rows: active.slice(0, 4).map<FaceRow>((s) => ({ key: s.key, title: s.merchant, sub: `next ${dayLabel(s.next, today)}`, value: money(s.amount, cur), valueTone: 'muted' })),
+    note: model.subTotals.saved ? `Saving ${money(model.subTotals.saved, cur)} a month from cancellations` : undefined,
   };
   return <Card p={p} face={face} />;
 }
@@ -993,6 +1055,9 @@ const BY_ID: Record<string, (p: WidgetProps) => JSX.Element> = {
   bulb: BulbWidget,
   floorlamp: FloorLampWidget,
   frontdoor: FrontDoorWidget,
+  spend: SpendWidget,
+  budget: BudgetWidget,
+  subscriptions: SubscriptionsWidget,
 };
 
 export function HomeWidget({ id, ...p }: WidgetProps & { id: string }) {

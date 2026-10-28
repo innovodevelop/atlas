@@ -1571,3 +1571,150 @@ CREATE TABLE IF NOT EXISTS home_mode_state (
 -- ###########################################################################
 -- # SMART HOME, THE BETA EXTRAS — end.                                       #
 -- ###########################################################################
+
+-- ###########################################################################
+-- # MONEY — the bank store behind the Beta Money screen                       #
+-- ###########################################################################
+-- Transactions reach this Mac two ways: a netbank CSV export the user picks
+-- (parsed in the webview, src/lib/bankCsv.ts, written through
+-- bank_store_transactions), or the optional read-only GoCardless Bank Account
+-- Data link, which src-tauri/src/bank.rs reads on demand and once a day. Either
+-- way the rows live here and nowhere else. GoCardless's keys are in the
+-- Keychain (atlas-core), never in these tables.
+
+CREATE TABLE IF NOT EXISTS bank_accounts (
+  id           TEXT PRIMARY KEY,
+  user_id      TEXT NOT NULL,
+  name         TEXT NOT NULL,
+  institution  TEXT,
+  -- Only the last four digits: enough to tell two accounts apart on screen.
+  iban_last4   TEXT,
+  currency     TEXT NOT NULL DEFAULT 'DKK',
+  source       TEXT NOT NULL DEFAULT 'csv' CHECK (source IN ('csv','gocardless')),
+  link_id      TEXT,
+  external_id  TEXT,
+  balance      REAL,
+  balance_at   TEXT,
+  -- Savings and shared accounts stay out of the budget and the projection.
+  is_excluded  INTEGER NOT NULL DEFAULT 0,
+  created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_bank_accounts_user ON bank_accounts(user_id);
+
+-- The id is the dedupe key: a hash of account, day, amount, text and place
+-- among identical rows for CSV ("csv-…"), the bank's own transaction id for
+-- GoCardless ("gc:…"). Re-imports are INSERT OR IGNORE against it.
+CREATE TABLE IF NOT EXISTS bank_transactions (
+  id            TEXT PRIMARY KEY,
+  user_id       TEXT NOT NULL,
+  account_id    TEXT NOT NULL REFERENCES bank_accounts(id) ON DELETE CASCADE,
+  booked_on     TEXT NOT NULL,                -- YYYY-MM-DD, the booking day
+  amount        REAL NOT NULL,                -- signed: money out is negative
+  currency      TEXT,
+  text          TEXT NOT NULL,                -- the statement line as the bank wrote it
+  balance_after REAL,
+  source        TEXT NOT NULL DEFAULT 'csv' CHECK (source IN ('csv','gocardless')),
+  imported_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_bank_tx_user_day ON bank_transactions(user_id, booked_on DESC);
+CREATE INDEX IF NOT EXISTS idx_bank_tx_account_day ON bank_transactions(account_id, booked_on DESC);
+
+-- Merchant patterns the user set, or that Atlas set when asked to sort.
+-- Categories are the fixed set in src/lib/bankLedger.ts.
+CREATE TABLE IF NOT EXISTS bank_rules (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL,
+  pattern    TEXT NOT NULL,
+  category   TEXT NOT NULL,
+  origin     TEXT NOT NULL DEFAULT 'user' CHECK (origin IN ('user','atlas')),
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE(user_id, pattern)
+);
+
+CREATE TABLE IF NOT EXISTS bank_budgets (
+  id            TEXT PRIMARY KEY,
+  user_id       TEXT NOT NULL,
+  category      TEXT NOT NULL,
+  monthly_limit REAL NOT NULL,
+  created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE(user_id, category)
+);
+
+CREATE TABLE IF NOT EXISTS bank_goals (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL,
+  name       TEXT NOT NULL,
+  target     REAL NOT NULL,
+  due_on     TEXT,
+  -- When set, the goal's saved amount is this account's balance.
+  account_id TEXT REFERENCES bank_accounts(id) ON DELETE SET NULL,
+  currency   TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+-- Manual contributions; a negative one is a withdrawal.
+CREATE TABLE IF NOT EXISTS bank_goal_moves (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL,
+  goal_id    TEXT NOT NULL REFERENCES bank_goals(id) ON DELETE CASCADE,
+  amount     REAL NOT NULL,
+  made_on    TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+-- What the user said about a subscription Atlas found. Atlas cannot cancel
+-- at the merchant: 'reminded' means a reminder task to cancel it exists
+-- (`task_id`) and it still counts; 'cancelled' only stops it counting;
+-- 'ignored' means it was never a subscription. `merchant` is the recurring key
+-- from bankLedger.ts.
+CREATE TABLE IF NOT EXISTS bank_subscription_marks (
+  id         TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL,
+  merchant   TEXT NOT NULL,
+  status     TEXT NOT NULL CHECK (status IN ('reminded','cancelled','ignored')),
+  task_id    TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  UNIQUE(user_id, merchant)
+);
+
+-- One row per GoCardless requisition (the bank consent). `status` is
+-- GoCardless's own code (CR created, LN linked, EX expired, RJ rejected, …).
+CREATE TABLE IF NOT EXISTS bank_links (
+  id               TEXT PRIMARY KEY,           -- the requisition id
+  user_id          TEXT NOT NULL,
+  institution_id   TEXT NOT NULL,
+  institution_name TEXT,
+  agreement_id     TEXT,
+  status           TEXT NOT NULL DEFAULT 'CR',
+  history_days     INTEGER,
+  access_days      INTEGER,
+  linked_at        TEXT,
+  expires_at       TEXT,
+  last_synced_at   TEXT,
+  -- Claimed by whichever running bundle syncs next, so two open apps over the
+  -- one database do not both spend the bank's few daily reads.
+  sync_claimed_at  TEXT,
+  last_error       TEXT,
+  created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+CREATE TRIGGER IF NOT EXISTS trg_bank_accounts_updated AFTER UPDATE ON bank_accounts
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE bank_accounts SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_bank_rules_updated AFTER UPDATE ON bank_rules
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE bank_rules SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_bank_budgets_updated AFTER UPDATE ON bank_budgets
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE bank_budgets SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_bank_goals_updated AFTER UPDATE ON bank_goals
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE bank_goals SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+CREATE TRIGGER IF NOT EXISTS trg_bank_links_updated AFTER UPDATE ON bank_links
+  FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+  BEGIN UPDATE bank_links SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;

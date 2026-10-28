@@ -237,6 +237,10 @@ export const EMPTY_COPY: Record<string, EmptySpec> = {
   bulb: { title: 'No bulb yet', hint: 'Link Home Assistant and a light shows here, with its brightness.', action: { label: 'Open Smart Home', route: '/smart-home' } },
   floorlamp: { title: 'No floor lamp', hint: 'Atlas looks for a light whose name says floor lamp. Rename one in Home Assistant and it shows here.', action: { label: 'Open Smart Home', route: '/smart-home' } },
   frontdoor: { title: 'No camera yet', hint: 'Link Home Assistant and its door camera shows here, with the last motion it saw.', action: { label: 'Open Smart Home', route: '/smart-home' } },
+  // The Money widgets; listed only in admin builds, like /money itself.
+  spend: { title: 'No bank data yet', hint: 'Import a CSV export from your netbank, or connect a bank read-only, and this month’s spending shows here by category.', action: { label: 'Open Money', route: '/money' } },
+  budget: { title: 'No budget yet', hint: 'Set monthly limits per category in Money and the card shows what is left and whether you are ahead of an even pace.', action: { label: 'Open Money', route: '/money' } },
+  subscriptions: { title: 'No subscriptions found', hint: 'Atlas finds subscriptions among payments that repeat every month or year, once your transactions are in Money.', action: { label: 'Open Money', route: '/money' } },
 };
 
 export function emptyCopy(id: string): EmptySpec {
