@@ -167,6 +167,9 @@ export const SURFACES: readonly SurfaceMeta[] = [
   // Beta phase 3: where the Talk panel's "Open the full answer" lands. Reached
   // by navigation only; the page sends the Workshop UI back to the admin view.
   { path: '/answer', label: 'Answer', icon: 'Sparkles', entry: 'none', mock: false, edition: 'consumer' },
+  // Beta phase 4: timer, countdown, alarms and world clocks — local features,
+  // nothing sampled. Linked from the menu and from Home's "Elsewhere" widget.
+  { path: '/clock', label: 'Clock', icon: 'Clock', entry: 'menu', mock: false, edition: 'consumer' },
   {
     path: '/atlas-teach',
     label: 'Teach Atlas',
@@ -313,6 +316,7 @@ const CONSUMER_LOADERS: Record<string, Loader> = {
   '/mail': () => import('./pages/atlas/AtlasMail'),
   '/home': () => import('./pages/atlas/AtlasHome'),
   '/answer': () => import('./pages/atlas/BetaAnswer'),
+  '/clock': () => import('./pages/atlas/BetaClock'),
   '/atlas-teach': () => import('./pages/AtlasTeach'),
   '/smart-home': () => import('./pages/atlas/AtlasSmartHome'),
   '/health': () => import('./pages/atlas/AtlasHealth'),
