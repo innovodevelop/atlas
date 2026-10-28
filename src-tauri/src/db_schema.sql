@@ -1832,3 +1832,47 @@ CREATE TABLE IF NOT EXISTS atlas_memory_settings (
 CREATE TRIGGER IF NOT EXISTS trg_atlas_memory_settings_updated AFTER UPDATE ON atlas_memory_settings
   FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
   BEGIN UPDATE atlas_memory_settings SET updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = NEW.id; END;
+
+-- ###########################################################################
+-- # SYSTEM STATUS AND MODEL LAB — the model-call ledger and app versions      #
+-- ###########################################################################
+-- One row per call the AI gateway makes (Beta rows 72, 73, 77). The brain
+-- writes it (services/atlas-brain/src/modelCalls.ts, which carries a mirror of
+-- this DDL for a standalone brain — keep the two in lockstep) and prunes it to
+-- 90 days and 50 000 rows. `cost_usd` is an estimate at Anthropic's list price
+-- when the call was made; NULL when the model is unpriced or no tokens were
+-- reported, never a guessed zero. `latency_ms` runs until the provider
+-- answered (the first byte of a stream), `duration_ms` until the last byte.
+CREATE TABLE IF NOT EXISTS atlas_model_calls (
+  id                 TEXT PRIMARY KEY,
+  started_at         TEXT NOT NULL,
+  lane               TEXT NOT NULL,
+  provider           TEXT NOT NULL,
+  requested_model    TEXT,
+  model              TEXT NOT NULL,
+  stream             INTEGER NOT NULL DEFAULT 0,
+  http_status        INTEGER,
+  ok                 INTEGER NOT NULL,
+  error              TEXT,
+  latency_ms         INTEGER NOT NULL,
+  duration_ms        INTEGER,
+  input_tokens       INTEGER,
+  output_tokens      INTEGER,
+  cache_read_tokens  INTEGER,
+  cache_write_tokens INTEGER,
+  cost_usd           REAL,
+  created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_atlas_model_calls_started ON atlas_model_calls(started_at);
+
+-- Which version of each app bundle ran, one row per change (Beta row 78),
+-- written at launch by system_status.rs. Keyed by bundle because Atlas.app and
+-- Lighthouse.app share this database and are updated separately.
+CREATE TABLE IF NOT EXISTS atlas_app_versions (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  bundle_id        TEXT NOT NULL,
+  version          TEXT NOT NULL,
+  previous_version TEXT,
+  first_seen_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_atlas_app_versions_bundle ON atlas_app_versions(bundle_id, id);

@@ -50,6 +50,8 @@
 .b-ss-svc { display: grid; grid-template-columns: 12px minmax(0, 1fr) 110px 70px; gap: 12px; align-items: center; padding: 14px; border-radius: 18px; background: var(--b-page); }
 .b-ss-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--b-green); }
 .b-ss-dot--bad { background: #e07a1f; animation: b-ss-pulse 1.6s infinite; }
+/* F10: a service with nothing to check (no mailbox, no bridge) — neither fine nor failing. */
+.b-ss-dot--idle { background: var(--b-neutral); }
 .b-ss-svc-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .b-ss-svc-text b { font-size: 14px; font-weight: 600; }
 .b-ss-svc-text span { font-size: 12px; color: var(--b-ink2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

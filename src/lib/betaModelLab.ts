@@ -6,9 +6,11 @@
  * Every routing fact comes from `src/lib/mocks/modelLab.ts`, the build-time
  * transcription of the gateway source (claudeAdapter.ts, bedrockAdapter.ts,
  * aiGateway.ts). This module only decides how a fact reads on a lane. The two
- * measured things the lab shows — usage and latency — come from the app's own
- * tables and are passed in as rows, so nothing here can invent a figure: with
- * no rows, the functions say so in words instead of returning a zero.
+ * measured things the lab shows — usage per model and latency per lane — come
+ * from the brain's model-call ledger (one row per gateway call, see
+ * services/atlas-brain/src/modelCalls.ts) and are passed in as its summary, so
+ * nothing here can invent a figure: with no calls, the functions say so in
+ * words instead of returning a zero.
  */
 import { GATEWAY, TIERS, type ModelTier } from '@/lib/mocks/modelLab';
 
@@ -191,31 +193,56 @@ export function dayLabel(iso: string, withYear = true): string {
   return withYear ? `${Number(m[3])} ${month} ${m[1]}` : `${Number(m[3])} ${month}`;
 }
 
-// ---- Measured readings -------------------------------------------------------
+// ---- Measured readings: the brain's model-call ledger --------------------------
 
-/** One `atlas_usage_history` row: per provider, per day. Never per model. */
-export interface UsageRow {
-  date: string;
+/**
+ * The brain's `/admin/model-calls` answer (services/atlas-brain/src/modelCalls.ts):
+ * every call the AI gateway made in the window, folded per model and per lane.
+ * Mirrored here because the webview cannot import the sidecar's modules.
+ */
+export interface ModelUsage {
+  model: string;
   provider: string;
-  total_calls: number | null;
-  estimated_cost: number | null;
-  tokens_used: number | null;
+  calls: number;
+  failed: number;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+  cost_usd: number | null;
+  unpriced_calls: number;
 }
 
-/** One `atlas_provider_status` row, the fields the lab reads. */
-export interface ProviderHealthRow {
+export interface LaneLatency {
+  lane: string;
   provider: string;
-  total_calls: number | null;
-  successful_calls: number | null;
-  avg_response_time_ms: number | null;
+  calls: number;
+  ok: number;
+  p50_ms: number | null;
+  p95_ms: number | null;
+  last_at: string | null;
+}
+
+export interface ModelCallsSummary {
+  days: number;
+  since: string;
+  prices_as_of: string;
+  running_lane: string | null;
+  recording_since: string | null;
+  today: { since: string; calls: number; failed: number };
+  total: { calls: number; failed: number; tokens: number; cost_usd: number | null; unpriced_calls: number };
+  models: ModelUsage[];
+  lanes: LaneLatency[];
 }
 
 export interface UsageLine {
-  provider: string;
+  /** The model as a person says it ("Sonnet 4.6"); first-party and Bedrock calls of one model share a line. */
   label: string;
   calls: number;
+  failed: number;
   tokens: number;
-  cost: number;
+  /** Null when none of its calls could be priced. */
+  cost: number | null;
   /** 0–1, of tokens when any were recorded, else of calls. */
   share: number;
   colour: string;
@@ -224,13 +251,15 @@ export interface UsageLine {
 
 export interface UsageSummary {
   lines: UsageLine[];
-  days: number;
   calls: number;
   tokens: number;
-  cost: number;
+  cost: number | null;
+  unpricedCalls: number;
 }
 
 export const USAGE_COLOURS = ['#1e1e24', '#3461f2', '#7854ff', '#0fae76', '#e07a1f', '#8b8681'];
+/** The design's colour for a tier that exists but was not called. */
+export const UNUSED_COLOUR = '#d8d4cd';
 
 const PROVIDER_LABEL: Record<string, string> = {
   anthropic: 'Anthropic',
@@ -259,31 +288,55 @@ export function formatTokens(n: number): string {
 
 export const usd = (v: number): string => `$${v.toFixed(2)}`;
 
-/** The usage card's lines: one per provider the table has rows for, largest first. */
-export function usageByProvider(rows: readonly UsageRow[]): UsageSummary {
-  const by = new Map<string, { calls: number; tokens: number; cost: number }>();
-  const days = new Set<string>();
-  for (const r of rows) {
-    if (!r.provider) continue;
-    days.add(r.date);
-    const key = r.provider.toLowerCase();
-    const cur = by.get(key) ?? { calls: 0, tokens: 0, cost: 0 };
-    cur.calls += num(r.total_calls);
-    cur.tokens += num(r.tokens_used);
-    cur.cost += num(r.estimated_cost);
-    by.set(key, cur);
+const tokensOf = (m: ModelUsage): number => num(m.input_tokens) + num(m.output_tokens) + num(m.cache_read_tokens) + num(m.cache_write_tokens);
+
+/**
+ * The usage card: one line per model the ledger holds, largest first, then the
+ * tiers the running lane can invoke that were not called at all ("not called",
+ * as the design draws Fable 5). Costs are summed only over calls that carried
+ * one, so an unpriced call never reads as free.
+ */
+export function usageByModel(summary: ModelCallsSummary | null, unusedModels: readonly string[] = []): UsageSummary {
+  const by = new Map<string, { calls: number; failed: number; tokens: number; cost: number | null }>();
+  for (const m of summary?.models ?? []) {
+    const label = profileLabel(m.model);
+    const cur = by.get(label) ?? { calls: 0, failed: 0, tokens: 0, cost: null };
+    cur.calls += num(m.calls);
+    cur.failed += num(m.failed);
+    cur.tokens += tokensOf(m);
+    if (m.cost_usd != null) cur.cost = (cur.cost ?? 0) + num(m.cost_usd);
+    by.set(label, cur);
   }
-  const totals = [...by.values()].reduce((a, v) => ({ calls: a.calls + v.calls, tokens: a.tokens + v.tokens, cost: a.cost + v.cost }), { calls: 0, tokens: 0, cost: 0 });
-  const lines = [...by.entries()]
-    .sort((a, b) => b[1].tokens - a[1].tokens || b[1].cost - a[1].cost || b[1].calls - a[1].calls)
-    .map(([provider, v], i) => {
-      const share = totals.tokens > 0 ? v.tokens / totals.tokens : totals.calls > 0 ? v.calls / totals.calls : 0;
-      const value = v.tokens > 0
-        ? `${formatTokens(v.tokens)} tok · ${usd(v.cost)}`
-        : v.calls > 0 ? `${v.calls} ${v.calls === 1 ? 'call' : 'calls'} · ${usd(v.cost)}` : 'not called';
-      return { provider, label: providerLabel(provider), ...v, share, colour: USAGE_COLOURS[i % USAGE_COLOURS.length], value };
+  const totalTokens = [...by.values()].reduce((a, v) => a + v.tokens, 0);
+  const totalCalls = [...by.values()].reduce((a, v) => a + v.calls, 0);
+  const lines: UsageLine[] = [...by.entries()]
+    .sort((a, b) => b[1].tokens - a[1].tokens || b[1].calls - a[1].calls || a[0].localeCompare(b[0]))
+    .map(([label, v], i) => {
+      const share = totalTokens > 0 ? v.tokens / totalTokens : totalCalls > 0 ? v.calls / totalCalls : 0;
+      const price = v.cost == null ? 'no price' : usd(v.cost);
+      const value = v.tokens > 0 ? `${formatTokens(v.tokens)} tok · ${price}` : `${v.calls} ${v.calls === 1 ? 'call' : 'calls'} · ${price}`;
+      return { label, ...v, share, colour: USAGE_COLOURS[i % USAGE_COLOURS.length], value };
     });
-  return { lines, days: days.size, ...totals };
+  const seen = new Set(lines.map((l) => l.label));
+  for (const id of unusedModels) {
+    const label = profileLabel(id);
+    if (!id || seen.has(label)) continue;
+    seen.add(label);
+    lines.push({ label, calls: 0, failed: 0, tokens: 0, cost: null, share: 0, colour: UNUSED_COLOUR, value: 'not called' });
+  }
+  const priced = lines.filter((l) => l.cost != null);
+  return {
+    lines,
+    calls: totalCalls,
+    tokens: totalTokens,
+    cost: priced.length ? priced.reduce((a, l) => a + (l.cost ?? 0), 0) : null,
+    unpricedCalls: num(summary?.total.unpriced_calls),
+  };
+}
+
+/** The models a lane's tiers invoke, in tier order, for the "not called" lines. */
+export function laneModels(lane: Lane): string[] {
+  return TIERS.map((t) => (lane === 'anthropic' ? t.firstParty.model : t.bedrock.profile ?? '')).filter(Boolean);
 }
 
 /** 820 → "820 ms", 1 840 → "1.8 s". */
@@ -291,18 +344,61 @@ export function formatMs(ms: number): string {
   return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`;
 }
 
-/**
- * The latency a lane card can state. Only first-party has a row shape: the
- * table's CHECK constraint admits five provider names and Bedrock is not one
- * of them, so on Bedrock the honest answer is that it cannot be recorded.
- */
-export function latencyOf(lane: Lane, rows: readonly ProviderHealthRow[]): string {
-  if (lane === 'bedrock') return 'not recordable (no Bedrock row in atlas_provider_status)';
-  const row = rows.find((r) => r.provider === 'anthropic');
-  if (!row) return 'not recorded';
-  const total = num(row.total_calls);
-  if (row.avg_response_time_ms == null) return total > 0 ? `${total} calls · no timing recorded` : 'not recorded';
-  return `${formatMs(num(row.avg_response_time_ms))} avg · ${num(row.successful_calls)}/${total} ok`;
+/** What each gateway lane is, in the words the lab uses. */
+export const GATEWAY_LANE_LABEL: Record<string, string> = {
+  anthropic: 'First-party',
+  bedrock: 'Bedrock',
+  bridge: 'Bridge to first-party',
+  degraded: 'Bedrock, no web tools',
+  lovable_ai: 'Lovable AI (dev)',
+  gemini: 'Gemini (dev)',
+};
+
+export function gatewayLaneLabel(lane: string): string {
+  return GATEWAY_LANE_LABEL[lane] ?? providerLabel(lane);
+}
+
+export interface LatencyLine {
+  lane: string;
+  label: string;
+  /** "1.8 s", or "—" when no call on the lane worked. */
+  p95: string;
+  detail: string;
+  /** 0–1 against the slowest lane's p95. */
+  share: number;
+}
+
+/** p95 per lane, the busiest lane first: the time until the provider answered, over the calls that worked. */
+export function latencyLines(summary: ModelCallsSummary | null): LatencyLine[] {
+  const lanes = summary?.lanes ?? [];
+  const peak = Math.max(1, ...lanes.map((l) => num(l.p95_ms)));
+  return lanes.map((l) => ({
+    lane: l.lane,
+    label: gatewayLaneLabel(l.lane),
+    p95: l.p95_ms == null ? '—' : formatMs(l.p95_ms),
+    detail: `${l.calls} ${l.calls === 1 ? 'call' : 'calls'}${l.ok < l.calls ? ` · ${l.calls - l.ok} failed` : ''}${l.p50_ms != null ? ` · median ${formatMs(l.p50_ms)}` : ''}`,
+    share: l.p95_ms == null ? 0 : num(l.p95_ms) / peak,
+  }));
+}
+
+/** A lane card's own p95: the calls served on that lane itself (not the bridge or the degraded path). */
+export function laneP95(summary: ModelCallsSummary | null, lane: Lane): LaneLatency | null {
+  return summary?.lanes.find((l) => l.lane === lane) ?? null;
+}
+
+/** The lane card's Latency fact. */
+export function latencyFact(summary: ModelCallsSummary | null, lane: Lane): string {
+  if (!summary) return 'not read yet';
+  const l = laneP95(summary, lane);
+  if (!l || !l.calls) return `no calls in the last ${summary.days} days`;
+  if (l.p95_ms == null) return `${l.calls} ${l.calls === 1 ? 'call' : 'calls'}, none answered`;
+  return `${formatMs(l.p95_ms)} p95 · ${l.calls} ${l.calls === 1 ? 'call' : 'calls'}`;
+}
+
+/** The brain's running provider as a lab lane; null for none or a developer-only provider. */
+export function runningLaneOf(summary: ModelCallsSummary | null): Lane | null {
+  const p = summary?.running_lane;
+  return p === 'anthropic' || p === 'bedrock' ? p : null;
 }
 
 export type StatusTone = 'ready' | 'syncing' | 'failed' | 'paused';
@@ -313,10 +409,14 @@ export interface LaneReading {
   loading: boolean;
   /** Whether this lane's key (or AWS pair) is in the Keychain; null when unread. */
   keyPresent: boolean | null;
-  /** This lane is the stored `atlas_ai_provider`. */
+  /** This lane is the stored `atlas_ai_provider` — what the brain starts on. */
   selected: boolean;
-  /** The brain sidecar's own report; null when it could not be read. */
+  /** The brain's own report; null when it could not be read. */
   brainRunning: boolean | null;
+  /** Whether the running brain is on this lane now; null when the brain could not say. */
+  running?: boolean | null;
+  /** This lane's p95 over the window, when it has one. */
+  p95Ms?: number | null;
 }
 
 /** The lane card's status pill: what is known, in as few words as the pill holds. */
@@ -325,10 +425,15 @@ export function laneStatus(r: LaneReading): { text: string; tone: StatusTone } {
   if (r.loading) return { text: 'Reading…', tone: 'syncing' };
   if (r.selected) {
     if (r.keyPresent === false) return { text: 'Selected · no key', tone: 'failed' };
+    // Stored but not what the brain runs: the switch waits for a restart.
+    if (r.running === false) return { text: 'Selected · from next start', tone: 'syncing' };
     if (r.brainRunning === false) return { text: 'Selected · brain not running', tone: 'failed' };
-    if (r.brainRunning === true && r.keyPresent === true) return { text: 'Live · key present', tone: 'ready' };
+    if (r.brainRunning === true && r.keyPresent === true) {
+      return { text: r.p95Ms != null ? `Live · ${formatMs(r.p95Ms)} p95` : 'Live · key present', tone: 'ready' };
+    }
     return { text: 'Selected', tone: 'paused' };
   }
+  if (r.running === true) return { text: 'Running until restart', tone: 'syncing' };
   if (r.keyPresent === null) return { text: 'Key unknown', tone: 'paused' };
   return r.keyPresent ? { text: 'Key present', tone: 'ready' } : { text: 'No key', tone: 'paused' };
 }
@@ -340,4 +445,35 @@ export function laneFacts(lane: Lane, latency: string): Array<{ k: string; v: st
     ? { k: 'Max tokens', v: `${GATEWAY.maxTokens.blocking} blocking · ${GATEWAY.maxTokens.streaming} streaming` }
     : { k: 'Switch', v: GATEWAY.switchKeychain };
   return [{ k: 'Host', v: l.host }, { k: 'Auth', v: l.auth }, { k: 'Streaming', v: l.streaming }, own, { k: 'Latency', v: latency }];
+}
+
+// ---- The provider switch (row 74) ------------------------------------------------
+
+export interface SwitchPlan {
+  /** False when the lane has no key: the gateway fails closed, so switching would only stop Atlas answering. */
+  allowed: boolean;
+  /** Why it is not allowed, in a sentence. */
+  reason: string | null;
+  /** What changes, and what leaves the Mac, from the next start. */
+  effect: string;
+}
+
+/**
+ * What switching the stored `atlas_ai_provider` to `target` would do. The brain
+ * reads the preference when it is spawned, so every switch takes effect on the
+ * next start, and the sentence says where prompts go from then on.
+ */
+export function switchPlan(target: Lane, keyPresent: boolean | null): SwitchPlan {
+  const host = laneInfo(target).host;
+  const effect = target === 'bedrock'
+    ? `From the next start, chat, memory and background prompts go to ${laneName('bedrock')} at ${host} instead of ${laneInfo('anthropic').host}. Turns that need web search still go to Anthropic when its key is present.`
+    : `From the next start, every prompt goes to ${host} instead of ${laneName('bedrock')}.`;
+  if (keyPresent === false) {
+    return {
+      allowed: false,
+      reason: target === 'bedrock' ? 'Add the AWS access key pair in Settings first: without it Bedrock refuses every call.' : 'Add an Anthropic API key in Settings first: without it the first-party lane refuses every call.',
+      effect,
+    };
+  }
+  return { allowed: true, reason: null, effect };
 }
