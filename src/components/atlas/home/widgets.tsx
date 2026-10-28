@@ -19,7 +19,7 @@
  * Card draws the face that reading calls for (`liveFaceState`). The catalog,
  * the sheet and Edit Home do not pass it, so they draw what they always drew.
  */
-import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { WidgetFace, type FacePreview, type FacePreviewCopy, type FaceProps, type FaceRow, type FaceTone } from './WidgetFace';
 import { AtlasIcon } from '../AtlasIcon';
 import { WIDGET_BY_ID, type WidgetSize } from '@/lib/betaHome';
@@ -669,7 +669,26 @@ export function UnwiredWidget(p: WidgetProps & { id: string }) {
   return <Card p={p} face={face} tone="linen" />;
 }
 
+// --- Developer widgets (admin edition; left-out features, F13) ---------------------
+
+/**
+ * Pull requests and Deploys read GitHub through the brain and exist only in
+ * the admin edition. The literal comparison folds when Vite builds, so a
+ * consumer build has neither the import nor its chunk (editionSplit.test.ts
+ * checks for their strings), the same way betaHome.ts drops their definitions.
+ */
+const DevWidget = import.meta.env.VITE_ATLAS_EDITION === 'consumer' ? null : lazy(() => import('./devWidgets'));
+
+const DEV_BY_ID: Record<string, (p: WidgetProps) => JSX.Element> = DevWidget
+  ? Object.fromEntries(['pullrequests', 'deploys'].map((id) => [id, (p: WidgetProps) => (
+    <Suspense fallback={<WidgetFace label={WIDGET_BY_ID.get(id)?.label ?? id} size={p.size} delay={p.delay} tone={p.forceTone} preview="loading" />}>
+      <DevWidget id={id} {...p} />
+    </Suspense>
+  )]))
+  : {};
+
 const BY_ID: Record<string, (p: WidgetProps) => JSX.Element> = {
+  ...DEV_BY_ID,
   weather: WeatherWidget,
   today: TodayWidget,
   tasks: TasksWidget,

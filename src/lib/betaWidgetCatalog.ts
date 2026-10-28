@@ -231,6 +231,12 @@ export const EMPTY_COPY: Record<string, EmptySpec> = {
   focus: { title: 'No focus yet today', hint: 'Start a 25 or 50 minute session and Atlas holds its own notifications until it ends.' },
   upnext: { title: 'Nothing coming up', hint: 'Your next events show here, with how long until each.', action: { label: 'Block focus time', ask: 'Block an hour of focus time in my calendar this afternoon.' } },
   fx: { title: 'No rate yet', hint: 'Rates are the European Central Bank’s daily reference, fetched through the Mac app with no key.' },
+  // The developer widgets are admin only (betaHome.ts), and so is their copy:
+  // the literal comparison folds when Vite builds.
+  ...(import.meta.env.VITE_ATLAS_EDITION === 'consumer' ? {} : {
+    pullrequests: { title: 'No open pull requests', hint: 'Open pull requests on the repo show here, the ones waiting on your review first. Atlas reads them through gh on this Mac.' },
+    deploys: { title: 'Nothing released yet', hint: 'The newest GitHub release shows here, with the latest run of each workflow. Atlas reads them through gh on this Mac.' },
+  }),
 };
 
 export function emptyCopy(id: string): EmptySpec {

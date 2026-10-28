@@ -105,7 +105,7 @@ html[data-ui="beta"] .b-dt-head { view-transition-name: hero; }
 .b-dt-discover { height: 42px; }
 
 .b-dt-job { border-radius: var(--b-r-inset); background: var(--b-card); transition: background .2s; }
-.b-dt-job-row { display: grid; grid-template-columns: 12px minmax(0, 1fr) 90px 70px auto; gap: 12px; align-items: center; padding: 9px 10px 9px 14px; font-size: 13.5px; }
+.b-dt-job-row { display: grid; grid-template-columns: 12px minmax(0, 1fr) 100px 70px auto; gap: 12px; align-items: center; padding: 9px 10px 9px 14px; font-size: 13.5px; }
 .b-dt-job-name { min-width: 0; display: flex; align-items: baseline; gap: 10px; padding: 4px 0; background: none; color: var(--b-ink); text-align: left; cursor: pointer; }
 .b-dt-job-name > .b-num { flex: none; }
 .b-dt-job-name:hover > .b-num { color: var(--b-blue); }
@@ -114,6 +114,13 @@ html[data-ui="beta"] .b-dt-head { view-transition-name: hero; }
 .b-dt-job-time { text-align: right; }
 .b-dt-files { display: flex; flex-wrap: wrap; gap: 4px; }
 .b-dt-file { height: 26px; padding: 0 10px; display: inline-flex; align-items: center; border-radius: var(--b-r-pill); background: var(--b-page); font-size: 11.5px; color: var(--b-ink2); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A run's test files (left-out features, row 82): the design's suite rows —
+   dot, mono name, "N tests · X s" — inside the open job, failing names under. */
+.b-dt-tfs { display: flex; flex-direction: column; gap: 3px; max-height: 360px; overflow-y: auto; overscroll-behavior: contain; }
+.b-dt-tf { display: grid; grid-template-columns: 9px minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 9px 12px; border-radius: var(--b-r-row); background: var(--b-page); font-size: 12.5px; }
+.b-dt-tf-path { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-dt-tf-line { color: var(--b-ink2); white-space: nowrap; text-align: right; }
+.b-dt-tf-failed { grid-column: 2 / -1; font-size: 12px; line-height: 1.45; color: var(--b-red-deep); overflow-wrap: anywhere; }
 .b-dt-log { margin: 0; max-height: 320px; overflow: auto; padding: 12px 14px; border-radius: var(--b-r-small); background: var(--b-ink); color: var(--b-on-ink-body); font: 12px/1.55 var(--b-font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 
 /* ── Versions ── */
@@ -175,6 +182,9 @@ button.b-dt-scr-code:hover { color: var(--b-ink); }
   .b-dt-feat > .b-dt-chip--warm { display: none; }
   .b-dt-cl { grid-template-columns: minmax(0, 1fr) auto; }
   .b-dt-cl > .b-dt-chip { display: none; }
+  /* A file's count line moves under its name rather than squeezing it. */
+  .b-dt-tf { grid-template-columns: 9px minmax(0, 1fr); }
+  .b-dt-tf-line { grid-column: 2; text-align: left; white-space: normal; }
 }
 @media (max-width: 480px) {
   .b-dt-job-time { display: none; }

@@ -114,10 +114,12 @@ export const bunRunner: Runner = async (argv, cwd) => {
 
 /**
  * An app launched from Finder gets launchd's PATH (/usr/bin:/bin:…), which
- * has no Homebrew, so a bare "gh" isn't found even when it's installed.
+ * has no Homebrew, so a bare "gh" isn't found even when it's installed. A gh
+ * unpacked by hand (this Mac's lives in ~/bin) is just as invisible, so the
+ * two usual per-user folders are looked in after Homebrew's.
  */
 export function ghBinary(exists: (p: string) => boolean = existsSync): string {
-  for (const p of ["/opt/homebrew/bin/gh", "/usr/local/bin/gh"]) {
+  for (const p of ["/opt/homebrew/bin/gh", "/usr/local/bin/gh", join(homedir(), "bin", "gh"), join(homedir(), ".local", "bin", "gh")]) {
     if (exists(p)) return p;
   }
   return "gh";

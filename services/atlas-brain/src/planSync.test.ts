@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Database } from "bun:sqlite";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { containsFromCompare, createPlanSync, diffPlans, ghBinary, type Runner } from "./planSync.ts";
 import { parseVersionPlan, type Version } from "./versionPlan.ts";
@@ -53,6 +53,12 @@ describe("containsFromCompare", () => {
 test("gh is found in Homebrew even with launchd's PATH", () => {
   expect(ghBinary((p) => p === "/opt/homebrew/bin/gh")).toBe("/opt/homebrew/bin/gh");
   expect(ghBinary(() => false)).toBe("gh");
+});
+
+test("a gh unpacked into ~/bin is found too, after Homebrew's", () => {
+  const mine = join(homedir(), "bin", "gh");
+  expect(ghBinary((p) => p === mine)).toBe(mine);
+  expect(ghBinary((p) => p === mine || p === "/usr/local/bin/gh")).toBe("/usr/local/bin/gh");
 });
 
 /** A checkout on disk (for existsSync and the plan file) with a fake git. */

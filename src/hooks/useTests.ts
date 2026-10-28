@@ -22,6 +22,18 @@ export interface TestRunRow {
   error_message: string | null;
   triggered_by: string;
   run_at: string;
+  /**
+   * What the run's bun test step reported — counts per file, durations and
+   * the coverage figure (services/atlas-brain/src/testReport.ts). Null for a
+   * job with no test step, a run still going, or a brain that predates it.
+   */
+  report?: TestReportRow | null;
+}
+
+export interface TestReportRow {
+  totals: { pass: number; fail: number; skip: number; todo: number; errors: number; tests: number; files: number; ms: number | null };
+  files: Array<{ path: string; pass: number; fail: number; skip: number; todo: number; ms: number; failed: string[] }>;
+  coverage: { lines: number | null; funcs: number | null; files: number } | null;
 }
 
 /** GET /admin/tests/suites — backs the "Test Suites" panel on /tests. */
