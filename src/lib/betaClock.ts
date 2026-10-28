@@ -675,6 +675,17 @@ export function targetInputValue(ms: number): string {
 
 // ── Alarms ───────────────────────────────────────────────────────────────────
 
+/**
+ * Where an alarm rings besides the dialog: a Home Assistant speaker from the
+ * smart-home mirror, by its local device id. The name is kept with it so the
+ * list can say "Bedroom speaker" without the mirror loaded; the id is what
+ * the ring resolves (src-tauri/src/clock.rs `clock_ring_speaker`).
+ */
+export interface RingTarget {
+  id: string;
+  name: string;
+}
+
 export interface Alarm {
   id: string;
   /** `HH:MM`, read on the home zone's clock. */
@@ -685,6 +696,8 @@ export interface Alarm {
   on: boolean;
   /** The instant a snooze rings, or null. */
   snoozedUntil: number | null;
+  /** A Home Assistant speaker to ring on; absent or null is This Mac. */
+  ringOn?: RingTarget | null;
 }
 
 export const DAY_ORDER: readonly number[] = [1, 2, 3, 4, 5, 6, 0];
@@ -800,7 +813,7 @@ export function heroLine(next: AlarmPlan | null, alarms: readonly Alarm[], nowMs
 
 /** A fresh alarm for the editor: seven on weekdays, the design's default. */
 export function draftAlarm(nowMs: number): Alarm {
-  return { id: newAlarmId(nowMs), time: '07:00', label: 'Alarm', days: [1, 2, 3, 4, 5], on: true, snoozedUntil: null };
+  return { id: newAlarmId(nowMs), time: '07:00', label: 'Alarm', days: [1, 2, 3, 4, 5], on: true, snoozedUntil: null, ringOn: null };
 }
 
 /**
@@ -834,18 +847,33 @@ export interface ClockPrefs {
    * profile has loaded. Null until the screen has said; then this Mac's zone.
    */
   zone: string | null;
+  /**
+   * "Keep this Mac awake until then", for one alarm: the switch's stored
+   * state. While it is set the store holds the Mac awake until that alarm's
+   * next ring, takes the hold again when Atlas starts, and clears it when the
+   * alarm rings, is switched off or is deleted (src/lib/betaClockAwake.ts).
+   */
+  awake: { alarmId: string } | null;
 }
 
 export const PREFS_KEY = 'atlas:clock';
 
 export function defaultPrefs(): ClockPrefs {
-  return { cities: [...DEFAULT_CITIES], alarms: [], timer: { ...TIMER_IDLE, laps: [] }, countdown: { ...COUNTDOWN_IDLE, splits: [] }, zone: null };
+  return { cities: [...DEFAULT_CITIES], alarms: [], timer: { ...TIMER_IDLE, laps: [] }, countdown: { ...COUNTDOWN_IDLE, splits: [] }, zone: null, awake: null };
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const num = (v: unknown, fallback: number): number => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
 const str = (v: unknown, fallback: string): string => (typeof v === 'string' ? v : fallback);
 const numList = (v: unknown): number[] => (Array.isArray(v) ? v.filter((n): n is number => typeof n === 'number' && Number.isFinite(n)) : []);
+
+/** A saved speaker choice, or null (This Mac) when it is missing or unreadable. */
+function parseRingTarget(v: unknown): RingTarget | null {
+  if (!isRecord(v)) return null;
+  const id = str(v.id, '').trim();
+  const name = str(v.name, '').trim();
+  return id ? { id, name: name || 'Speaker' } : null;
+}
 
 /** A saved blob back into preferences; anything unreadable falls back to the default for that field. */
 export function parsePrefs(raw: string | null): ClockPrefs {
@@ -874,11 +902,15 @@ export function parsePrefs(raw: string | null): ClockPrefs {
           days: numList(a.days).filter((d) => d >= 0 && d <= 6 && Number.isInteger(d)),
           on: a.on === true,
           snoozedUntil: typeof a.snoozedUntil === 'number' && Number.isFinite(a.snoozedUntil) ? a.snoozedUntil : null,
+          ringOn: parseRingTarget(a.ringOn),
         }))
         .filter((a) => a.id && parseHHMM(a.time));
     }
 
     out.zone = typeof v.zone === 'string' ? validZone(v.zone) : null;
+    // A hold for an alarm that is no longer saved is no hold.
+    const awakeId = isRecord(v.awake) && typeof v.awake.alarmId === 'string' ? v.awake.alarmId : null;
+    if (awakeId && out.alarms.some((a) => a.id === awakeId)) out.awake = { alarmId: awakeId };
 
     if (isRecord(v.timer)) {
       const t = v.timer;

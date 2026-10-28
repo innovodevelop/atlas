@@ -132,7 +132,8 @@ pub fn stocks(_app: &AppHandle, args: &Value, _ctx: &Ctx) -> Result<Value, Strin
 
 pub fn news(_app: &AppHandle, args: &Value, _ctx: &Ctx) -> Result<Value, String> {
     let category = args.get("category").and_then(Value::as_str).map(str::to_string);
-    crate::datafetch::fetch_news(category)
+    // No Briefing topics here: the brain asks for the category it names.
+    crate::datafetch::fetch_news(category, None)
 }
 
 #[cfg(test)]

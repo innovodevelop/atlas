@@ -207,7 +207,27 @@ html[data-ui="beta"] .b-ck-hero { view-transition-name: hero; }
 .b-ck .b-ck-ed-day { flex: none; width: 52px; height: 36px; border-radius: var(--b-r-small); background: var(--b-page); color: var(--b-ink); font-size: 12.5px; font-weight: 600; transition: background .2s; }
 .b-ck .b-ck-ed-day:hover { background: var(--b-hover); }
 .b-ck .b-ck-ed-day.on { background: var(--b-blue); color: #fff; }
-.b-ck-ed-out { display: flex; align-items: center; gap: 9px; height: 44px; padding: 0 13px; border-radius: var(--b-r-row); background: var(--b-emphasis); color: var(--b-blue-deep); font-size: 13px; font-weight: 600; }
+/* Ring on: This Mac and the Home Assistant speakers, two to a row (the design's grid). */
+.b-ck-ed-outs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.b-ck .b-ck-ed-out { display: flex; align-items: center; gap: 9px; min-height: 44px; padding: 6px 13px; border-radius: var(--b-r-row); background: var(--b-page); color: var(--b-ink); font-size: 13px; font-weight: 600; text-align: left; transition: background .2s, color .2s; box-sizing: border-box; min-width: 0; }
+.b-ck .b-ck-ed-out:hover { background: var(--b-hover); }
+.b-ck .b-ck-ed-out.on { background: var(--b-emphasis); color: var(--b-blue-deep); }
+.b-ck .b-ck-ed-out.missing:not(.on) { color: var(--b-ink2); }
+.b-ck-ed-out svg { flex: none; }
+.b-ck-ed-out-t { display: flex; flex-direction: column; min-width: 0; }
+.b-ck-ed-out-t b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-ck-ed-out-t small { font-size: 11px; font-weight: 500; color: var(--b-ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-ck-ed-out.on .b-ck-ed-out-t small { color: var(--b-blue-deep); }
+
+/* "Keep this Mac awake until then" — the switch row inside the alarm note. */
+.b-ck .b-ck-awake { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--b-r-small); background: var(--b-card); color: var(--b-ink); text-align: left; }
+.b-ck .b-ck-note.ink .b-ck-awake { background: rgba(249, 247, 244, .08); color: var(--b-on-ink); }
+.b-ck .b-ck-awake:disabled { cursor: default; opacity: .7; }
+.b-ck-awake > span:first-child { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; line-height: 1.45; }
+.b-ck-awake-sw { display: flex; flex: none; width: 42px; height: 25px; padding: 3px; border-radius: var(--b-r-pill); background: #d8d4cd; justify-content: flex-start; box-sizing: border-box; transition: background .25s; }
+.b-ck-note.ink .b-ck-awake-sw { background: rgba(249, 247, 244, .22); }
+.b-ck-awake.on .b-ck-awake-sw { background: #50dca0; justify-content: flex-end; }
+.b-ck-awake-sw span { width: 19px; height: 19px; border-radius: 50%; background: #fff; }
 .b-ck-ed-acts { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 4px; }
 .b-ck .b-ck-ed-acts .b-btn { height: 38px; }
 
@@ -263,6 +283,33 @@ html[data-ui="beta"] .b-ck-hero { view-transition-name: hero; }
 .b-ck-ringacts .stop { background: var(--b-on-ink); color: var(--b-ink); }
 .b-ck-ringacts .stop:hover { background: #fff; }
 
+/* ── Home widget: Clock dials ──
+   From Atlas Widgets Beta.dc.html (`isDials`): one dial in S, a row of three
+   in M, two rows in L. The face takes the card's track colour by day and goes
+   dark from 20:00 to 06:00, like the Clocks list. Drawn inside the widget
+   face (components/atlas/home/WidgetFace.tsx), so these rules carry their
+   own prefix and never reach the Clock page. */
+
+.b-ck-dials { flex: 1; min-height: 0; margin-top: 6px; display: grid; grid-template-columns: repeat(var(--b-ck-dial-cols, 1), minmax(0, 1fr)); gap: 6px; align-content: space-evenly; justify-items: center; }
+.b-ck-dial { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; max-width: 100%; }
+.b-ck-dial svg { display: block; width: var(--b-ck-dial-size, 48px); height: var(--b-ck-dial-size, 48px); }
+.b-ck-dial .face { fill: var(--b-panel); transition: fill .5s; }
+.b-ck-dial .tick { fill: var(--b-neutral); }
+.b-ck-dial .hand { stroke: var(--b-ink); stroke-linecap: round; transition: transform .6s var(--b-spring); transform-origin: 50px 50px; }
+.b-ck-dial .hub { fill: var(--b-ink); }
+.b-ck-dial.night .face { fill: #101013; }
+.b-ck-dial.night .tick { fill: rgba(249, 247, 244, .35); }
+.b-ck-dial.night .hand { stroke: var(--b-on-ink); }
+.b-ck-dial.night .hub { fill: var(--b-on-ink); }
+.bw--ink .b-ck-dial .face, .bw--slate .b-ck-dial .face { fill: rgba(249, 247, 244, .14); }
+.bw--ink .b-ck-dial .hand, .bw--slate .b-ck-dial .hand { stroke: var(--b-on-ink); }
+.bw--ink .b-ck-dial .hub, .bw--slate .b-ck-dial .hub { fill: var(--b-on-ink); }
+.bw--ink .b-ck-dial .tick, .bw--slate .b-ck-dial .tick { fill: rgba(249, 247, 244, .35); }
+.b-ck-dial-name { display: flex; flex-direction: column; align-items: center; min-width: 0; max-width: 100%; }
+.b-ck-dial-name b { max-width: 100%; font-size: 10.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-ck-dial-name span { font-size: 10px; color: var(--b-ink2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bw--ink .b-ck-dial-name span, .bw--slate .b-ck-dial-name span { color: var(--b-on-ink-small); }
+
 /* ── Narrow ── */
 
 @media (max-width: 999px) {
@@ -285,6 +332,7 @@ html[data-ui="beta"] .b-ck-hero { view-transition-name: hero; }
   .b-ck-alarm-t { font-size: 28px; }
   .b-ck .b-ck-ed-time { width: 128px; font-size: 26px; }
   .b-ck .b-ck-ed-day { width: auto; flex: 1 1 40px; }
+  .b-ck-ed-outs { grid-template-columns: minmax(0, 1fr); }
   .b-ck-ringcard { padding: 26px 20px; }
   .b-ck-ringcard .t { font-size: 60px; }
 }
@@ -296,5 +344,5 @@ html[data-ui="beta"] .b-ck-hero { view-transition-name: hero; }
 
 @media (prefers-reduced-motion: reduce) {
   .b-ck-hero, .b-ck-lap, .b-ck-editor, .b-ck-ringing, .b-ck-ringcard svg { animation: none; }
-  .b-ck *, .b-ck-ring .arc { transition: none !important; }
+  .b-ck *, .b-ck-ring .arc, .b-ck-dial .hand, .b-ck-dial .face { transition: none !important; }
 }
