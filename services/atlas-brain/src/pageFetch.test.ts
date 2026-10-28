@@ -14,10 +14,13 @@ const LOOPBACK: ResolvedAddress[] = [{ address: "127.0.0.1", family: 4 }];
 
 let hits = 0;
 const seen: Headers[] = [];
+// The handler's redirects name the server's own port; reading it through this
+// variable rather than `server` keeps the server's type from depending on itself.
+let ownPort = 0;
 const server = Bun.serve({
   hostname: "127.0.0.1",
   port: 0,
-  async fetch(req) {
+  async fetch(req: Request): Promise<Response> {
     hits++;
     seen.push(req.headers);
     const url = new URL(req.url);
@@ -35,7 +38,7 @@ const server = Bun.serve({
     if (p === "/slow") { await Bun.sleep(1500); return new Response("<p>late</p>", { headers: { "content-type": "text/html" } }); }
     if (p === "/to-private") return new Response(null, { status: 302, headers: { location: "http://127.0.0.1/secret" } });
     if (p === "/to-file") return new Response(null, { status: 301, headers: { location: "file:///etc/passwd" } });
-    if (p === "/to-rebind") return new Response(null, { status: 302, headers: { location: `http://rebind.test:${server.port}/page` } });
+    if (p === "/to-rebind") return new Response(null, { status: 302, headers: { location: `http://rebind.test:${ownPort}/page` } });
     const hop = /^\/hop\/(\d+)$/.exec(p);
     if (hop) {
       const n = Number(hop[1]);
@@ -45,6 +48,7 @@ const server = Bun.serve({
     return new Response("not found", { status: 404 });
   },
 });
+ownPort = Number(server.port);
 afterAll(() => server.stop(true));
 
 const base = () => `http://public.test:${server.port}`;

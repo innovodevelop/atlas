@@ -251,7 +251,14 @@ export function removeKept(state: BrowserState, keptId: string): BrowserState {
   return { ...state, kept: state.kept.filter((k) => k.id !== keptId) };
 }
 
-export function setNotes(state: BrowserState, tabId: string, notes: PageNotes): BrowserState {
+/**
+ * Keeps "On this page" notes with their tab. `url` is the page they were read
+ * from: notes that arrive after the tab has gone on to another page belong to
+ * no page on screen, so they are dropped rather than pinned to the wrong one.
+ */
+export function setNotes(state: BrowserState, tabId: string, notes: PageNotes, url?: string): BrowserState {
+  const tab = state.tabs.find((t) => t.id === tabId);
+  if (!tab || (url !== undefined && tab.url !== url)) return state;
   return { ...state, tabs: state.tabs.map((t) => (t.id === tabId ? { ...t, notes } : t)) };
 }
 

@@ -181,6 +181,15 @@ describe('the session', () => {
     const s = openPage(EMPTY_BROWSER, copy('https://a.example/'), { now: NOW });
     const notes = { summary: 'S', points: [], provider: 'anthropic', partial: false, at: NOW.toISOString() };
     expect(selectedTab(setNotes(s, s.tabs[0].id, notes))?.notes).toEqual(notes);
+    expect(selectedTab(setNotes(s, s.tabs[0].id, notes, 'https://a.example/'))?.notes).toEqual(notes);
+  });
+
+  test('notes read from a page the tab has since left are dropped', () => {
+    const s = openPage(EMPTY_BROWSER, copy('https://a.example/'), { now: NOW });
+    const moved = openPage(s, copy('https://b.example/'), { replaceTabId: s.tabs[0].id, now: NOW });
+    const notes = { summary: 'S', points: [], provider: null, partial: false, at: NOW.toISOString() };
+    expect(setNotes(moved, moved.tabs[0].id, notes, 'https://a.example/')).toBe(moved);
+    expect(setNotes(moved, 'gone', notes)).toBe(moved);
   });
 });
 

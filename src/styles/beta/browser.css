@@ -189,9 +189,10 @@ html[data-ui="beta"] .beta-page:has(> .b-br) { padding-bottom: 0; }
 .b-br-point p { margin: 0; min-width: 0; font-size: 12.5px; line-height: 1.5; text-wrap: pretty; }
 .b-br-point b { font-weight: 600; }
 .b-br-tag { flex: none; height: 20px; padding: 0 8px; display: flex; align-items: center; border-radius: var(--b-r-pill); font-size: 10.5px; font-weight: 600; }
+/* The design's fourth kind, "link" (a page tied to your Mail or calendar), is
+   not drawn: "On this page" reads the page text only and nothing of yours. */
 .b-br-tag[data-kind="claim"] { background: var(--b-emphasis); color: var(--b-blue-deep); }
 .b-br-tag[data-kind="quote"] { background: var(--b-panel); color: var(--b-ink2); }
-.b-br-tag[data-kind="link"] { background: var(--b-green-fill); color: var(--b-green-deep); }
 .b-br-tag[data-kind="warn"] { background: var(--b-br-warn-fill); color: var(--b-br-warn-ink); }
 .b-br-side-none { flex: none; margin: 0; padding: 18px 14px; border-radius: var(--b-r-row); background: var(--b-page); font-size: 12.5px; line-height: 1.5; color: var(--b-ink2); text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .b-br-side-none .b-btn:disabled { opacity: .6; cursor: default; transform: none; }

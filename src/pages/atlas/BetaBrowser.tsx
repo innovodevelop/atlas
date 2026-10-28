@@ -223,10 +223,13 @@ const BetaBrowser = () => {
     if (ctl.signal.aborted) return;
     setNoticing(null);
     if (failed(res)) { setRefusal(askFailed(null, res.message)); return; }
-    updateBrowser((s) => setNotes(s, t.id, res.notes));
+    updateBrowser((s) => setNotes(s, t.id, res.notes, t.url));
   }, []);
 
   const pickGo = useCallback((row: GoRow) => {
+    // Picked while the address bar was being edited: the page loads into that
+    // tab, as typing the address and pressing Enter would.
+    const target = goTarget;
     setSuggestOpen(false);
     setTyped('');
     setGoTarget(null);
@@ -236,8 +239,8 @@ const BetaBrowser = () => {
       const next = openKept(getBrowser(), row.ref, new Date());
       if (next) { updateBrowser(() => next); return; }
     }
-    void go(row.url, null);
-  }, [go]);
+    void go(row.url, target);
+  }, [go, goTarget]);
 
   const hasPage = !!page;
   const askRows = hasPage ? ASK_PROMPTS : [];
