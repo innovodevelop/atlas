@@ -9,7 +9,7 @@
  * model, the edition filter (an Architecture button never appears in a
  * consumer build) and the DEV assertions are shared; only the skin differs.
  */
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Dock, type DockItem } from '@/components/atlas-ui/primitives';
 import { useAccountDockItem } from '@/components/atlas-ui/useAccountDockItem';
@@ -34,7 +34,10 @@ export function currentDockId(pathname: string): string | undefined {
 export function BetaDock() {
   const { pathname } = useLocation();
   const navigate = useBetaNavigate();
-  const account = useAccountDockItem(() => navigate('/settings'));
+  // The account menu's "Privacy & delete account" asks for the memory tab;
+  // the Beta Settings reads `?tab=` the way the Workshop route does.
+  const openSettings = useCallback((tab?: 'memory') => navigate(tab ? `/settings?tab=${tab}` : '/settings'), [navigate]);
+  const account = useAccountDockItem(openSettings);
 
   const items = useMemo<DockItem[]>(() => [
     ...ORDER.map((o) => ({
