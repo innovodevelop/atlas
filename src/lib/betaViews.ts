@@ -448,3 +448,151 @@ export function readingMinutes(text: string, wpm = 160): number {
   const words = text.trim() ? text.trim().split(/\s+/).length : 0;
   return Math.max(1, Math.round(words / wpm));
 }
+
+// ---- Weather: the slice and the air in full (row 4) ------------------------------
+
+const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'] as const;
+
+/** Where the wind blows from, as a compass point: 290° → "W". */
+export function windFrom(deg: number | null | undefined): string | null {
+  if (deg == null || !Number.isFinite(deg)) return null;
+  return COMPASS[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
+}
+
+/** The rain bar's height in a slice, 0–1: 5 mm in three hours is a downpour. */
+export function rainFraction(mm: number | null | undefined, ceiling = 5): number {
+  return mm && mm > 0 ? clamp01(mm / ceiling) : 0;
+}
+
+/** "60% · 1.2 mm" · "20%" · "1.2 mm" · null — what a slice says about rain. */
+export function sliceRain(pop: number | null | undefined, mm: number | null | undefined): string | null {
+  const parts: string[] = [];
+  if (pop != null && pop > 0) parts.push(`${Math.round(pop)}%`);
+  if (mm != null && mm > 0) parts.push(`${mm.toFixed(1)} mm`);
+  return parts.length ? parts.join(' · ') : null;
+}
+
+export type Pollutant = 'pm25' | 'pm10' | 'o3' | 'no2';
+
+/**
+ * OpenWeather's own bands for each pollutant (µg/m³), the lower edge of
+ * Fair, Moderate, Poor and Very poor — the table its 1–5 index is read from.
+ */
+export const POLLUTANT_BANDS: Record<Pollutant, readonly [number, number, number, number]> = {
+  pm25: [10, 25, 50, 75],
+  pm10: [20, 50, 100, 200],
+  o3: [60, 100, 140, 180],
+  no2: [40, 70, 150, 200],
+};
+export const POLLUTANT_LABEL: Record<Pollutant, string> = { pm25: 'PM2.5', pm10: 'PM10', o3: 'O₃', no2: 'NO₂' };
+
+/** A pollutant's own 1–5 band (the same scale as the index). */
+export function pollutantBand(kind: Pollutant, v: number): number {
+  const edges = POLLUTANT_BANDS[kind];
+  return 1 + edges.filter((e) => v >= e).length;
+}
+
+/** The bar's fill: the reading against the edge of Very poor. */
+export function pollutantFraction(kind: Pollutant, v: number): number {
+  return clamp01(v / POLLUTANT_BANDS[kind][3]);
+}
+
+/** The pollutants the reading carries, in the design's order, skipping any the station does not report. */
+export function pollutantRows(air: { pm25: number; pm10?: number | null; o3?: number | null; no2?: number | null }): { kind: Pollutant; label: string; value: number; band: number; fraction: number }[] {
+  const all: [Pollutant, number | null | undefined][] = [['pm25', air.pm25], ['pm10', air.pm10], ['o3', air.o3], ['no2', air.no2]];
+  return all.flatMap(([kind, v]) => (v == null || !Number.isFinite(v) ? [] : [{
+    kind, label: POLLUTANT_LABEL[kind], value: v, band: pollutantBand(kind, v), fraction: pollutantFraction(kind, v),
+  }]));
+}
+
+/** "Feels 66°" when it differs from the reading by a degree or more; null otherwise. */
+export function feelsLine(temp: number, feels: number | null | undefined): string | null {
+  if (feels == null || !Number.isFinite(feels)) return null;
+  return Math.round(feels) !== Math.round(temp) ? `Feels ${Math.round(feels)}°` : null;
+}
+
+// ---- Calendar: Atlas prepares a meeting (row 9) ----------------------------------
+
+const TIME_ONLY = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+const PREP_WHEN = new Intl.DateTimeFormat(undefined, { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
+
+/**
+ * The question "Prepare" asks the brain: the event's own fields and nothing
+ * else from the calendar, so what leaves the Mac is exactly what the card
+ * shows. The brain may add what it already knows (mail, memory) and says so.
+ */
+export function prepareQuestion(e: Pick<CalendarEvent, 'title' | 'start_time' | 'end_time' | 'location' | 'attendees' | 'description'>): string {
+  const lines = [
+    'Prepare me for this event. Write short notes I can read in a minute: what it is likely about, what to bring or decide, and two or three questions worth asking.',
+    'Use the details below and anything you already know about these people or this subject from my mail and memory, and say which is which. If there is too little to go on, say so in one line instead of guessing.',
+    '',
+    `Title: ${e.title.trim()}`,
+    `When: ${PREP_WHEN.format(new Date(e.start_time))}${e.end_time ? ` to ${TIME_ONLY.format(new Date(e.end_time))}` : ''}`,
+  ];
+  if (e.location?.trim()) lines.push(`Where: ${e.location.trim()}`);
+  if (e.attendees.length) lines.push(`With: ${e.attendees.join(', ')}`);
+  if (e.description?.trim()) lines.push(`Notes on the event: ${e.description.trim().slice(0, 2000)}`);
+  return lines.join('\n');
+}
+
+/** "Prepared 12 min ago" · "Prepared yesterday" — how old a note is. */
+export function notedLabel(verb: string, notedAt: string | null, now: number): string {
+  const t = notedAt ? Date.parse(notedAt) : NaN;
+  if (!Number.isFinite(t)) return verb;
+  const mins = Math.max(0, Math.round((now - t) / 60000));
+  if (mins < 1) return `${verb} just now`;
+  if (mins < 60) return `${verb} ${mins} min ago`;
+  const days = Math.round((startOfDay(now) - startOfDay(t)) / (24 * HOUR));
+  if (days <= 0) return `${verb} ${Math.round(mins / 60)} h ago`;
+  if (days === 1) return `${verb} yesterday`;
+  return `${verb} ${days} days ago`;
+}
+
+// ---- Tasks: Atlas researches a task (row 10) -------------------------------------
+
+/** The question "Research" asks: the task's own fields, a short note back. */
+export function researchQuestion(t: Pick<ViewTask, 'title' | 'due_date' | 'priority'>, now: number): string {
+  return [
+    'Research this task for me and write a short note, five lines at most: what it involves, the first concrete step, and anything I should check or watch out for.',
+    'Use what you know from my mail and memory where it helps, and look things up if you need to. If you cannot tell, say so in one line.',
+    '',
+    `Task: ${t.title.trim()}`,
+    `Due: ${dueLabel(t.due_date, now).replace(/^Due /, '')}`,
+    `Priority: ${priorityWord(t.priority)}`,
+  ].join('\n');
+}
+
+// ---- Up next (row 15) ------------------------------------------------------------
+
+/** The events still to come or on now, soonest first, at most `max`. */
+export function upNextEvents(events: readonly CalendarEvent[], now: number, max = 4): CalendarEvent[] {
+  return events
+    .filter((e) => endOf(e) > now)
+    .sort((a, b) => Date.parse(a.start_time) - Date.parse(b.start_time))
+    .slice(0, max);
+}
+
+const WEEKDAY_TIME = new Intl.DateTimeFormat(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+
+/** "now" · "in 18 min" · "in 3 h" · "tomorrow 09:30" · "Thu 14:00". */
+export function upNextWhen(e: CalendarEvent, now: number): string {
+  const start = Date.parse(e.start_time);
+  if (start <= now) return 'now';
+  const mins = Math.round((start - now) / 60000);
+  const day = Math.round((startOfDay(start) - startOfDay(now)) / (24 * HOUR));
+  if (day === 0) return mins >= 120 ? `in ${Math.round(mins / 60)} h` : `in ${Math.max(1, mins)} min`;
+  if (day === 1) return `tomorrow ${TIME_ONLY.format(new Date(start))}`;
+  return WEEKDAY_TIME.format(new Date(start));
+}
+
+/** "Room 4 · with Maya Ortiz" · "with Ida, Lukas and 2 more" · null. */
+export function withLine(e: Pick<CalendarEvent, 'location' | 'attendees'>): string | null {
+  const parts: string[] = [];
+  if (e.location?.trim()) parts.push(e.location.trim());
+  const people = e.attendees.filter((a) => a.trim());
+  if (people.length) {
+    const shown = people.slice(0, 2).join(', ');
+    parts.push(`with ${shown}${people.length > 2 ? ` and ${people.length - 2} more` : ''}`);
+  }
+  return parts.length ? parts.join(' · ') : null;
+}

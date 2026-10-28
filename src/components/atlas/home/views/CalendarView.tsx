@@ -10,6 +10,12 @@
  * slot is offered for the open task Atlas would take first (`useTasks`), so
  * the block arrives named for the work it makes room for. The hook loads from
  * today forward, so earlier days in the week are not offered.
+ *
+ * Prepare (row 9) asks the brain for notes on the picked event from its own
+ * title, time, place, attendees and description (`prepareQuestion`), and
+ * keeps the answer with the event on this Mac (`useItemNotes`), so the card
+ * still shows it tomorrow. The question goes to the AI provider the brain
+ * uses; the card says so.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useCalendarEvents, type CalendarEvent } from '@/hooks/useCalendarEvents';
@@ -24,6 +30,9 @@ import {
   weekDays, type FreeSlot,
 } from '@/lib/betaViews';
 import { useTick } from './useTick';
+import { useItemNotes } from '@/hooks/useItemNotes';
+import { prepareQuestion } from '@/lib/betaViews';
+import { AtlasNote } from './AtlasNote';
 
 /** Pixels per hour in the day grid (the design's HPX). */
 const HPX = 64;
@@ -41,6 +50,7 @@ export function CalendarView() {
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [booking, setBooking] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const notes = useItemNotes('event');
 
   const week = weekDays(now);
   const dayEvents = useMemo(() => eventsOnDay(events, dayStart), [events, dayStart]);
@@ -160,6 +170,18 @@ export function CalendarView() {
               {card.attendees.length ? (
                 <div className="b-wv-evcard-people">{card.attendees.map((p) => <span key={p} className="b-wv-person">{p}</span>)}</div>
               ) : null}
+              <AtlasNote
+                itemId={card.id}
+                verb="Prepared"
+                action="Prepare"
+                note={notes.notes[card.id]}
+                asking={notes.asking}
+                now={now}
+                onInk
+                onAsk={() => void notes.ask(card.id, prepareQuestion(card), 'calendar')}
+                onCancel={notes.cancel}
+                onForget={() => void notes.clear(card.id)}
+              />
               <div className="b-wv-evcard-actions">
                 {url ? <button type="button" className="b-btn b-btn--paper" onClick={() => void openExternal(url)}><AtlasIcon name="open" size={16} />Join</button> : null}
                 <button type="button" className="b-btn b-btn--onink" onClick={() => push(card, 15)}>Push 15 min</button>
@@ -187,7 +209,7 @@ export function CalendarView() {
             );
           })}
           {!slots.length ? <div className="b-wv-empty">{isToday ? 'No free half hour left in the day.' : 'The day is full.'}</div> : null}
-          <span className="b-wv-free-note">Booking adds the block to your calendar. Pick it in the day to push or delete it.</span>
+          <span className="b-wv-free-note">Booking adds the block to your calendar. Pick it in the day to push or delete it. Prepare sends the event’s title, time, place, people and notes to the AI provider Atlas uses; the note it writes stays on this Mac.</span>
         </div>
         {error ? <p className="b-wv-err">{error}</p> : null}
       </aside>

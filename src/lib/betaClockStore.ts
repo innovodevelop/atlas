@@ -26,15 +26,36 @@
  * `notice` for the page to show. The ringing alarm itself is state here, so
  * the page shows it whenever the user comes back, and it is published to the
  * Atlas state bus as 'alert' so every sphere and the top bar say so too.
+ *
+ * Three things reach past the webview, all through the Mac app
+ * (src/lib/betaClockNative.ts → src-tauri/src/clock.rs):
+ *   - "Keep this Mac awake until then": while the switch is on for an alarm,
+ *     `syncAwake` keeps one `caffeinate` hold matching that alarm's next ring,
+ *     and lets it go when the alarm rings, is switched off or deleted.
+ *   - An alarm set to ring on a Home Assistant speaker speaks there instead of
+ *     chiming here, and chimes here after all — with a note saying why — when
+ *     the speaker does not answer.
+ *   - The brain's clock tools ("wake me at seven", "stop", "snooze") arrive as
+ *     `clock:command` events and are answered by `answerCommand`, through the
+ *     same actions the screen uses.
  */
 import { useSyncExternalStore } from 'react';
 import { isWindowActive } from '@/hooks/useWindowActivity';
 import { getAtlasState, publishAtlasState, type AtlasStateSnapshot } from './atlasStateBus';
 import {
-  COUNTDOWN_IDLE, COUNTDOWN_MIN_MS, PREFS_KEY, RING_GRACE_MS, TIMER_IDLE, afterFire, countdownLeft, countdownTotal,
-  dueAlarms, hhmm, nextAlarm, parsePrefs, snoozeUntil, sortAlarms, systemZone, validZone, zoneTime,
-  type Alarm, type AlarmPlan, type CityRef, type ClockPrefs, type CountdownMode,
+  COUNTDOWN_IDLE, COUNTDOWN_MIN_MS, PREFS_KEY, RING_GRACE_MS, SNOOZE_MINUTES, TIMER_IDLE, afterFire, countdownLeft,
+  countdownTotal, dueAlarms, hhmm, nextAlarm, nextFire, parsePrefs, snoozeUntil, sortAlarms, systemZone, validZone,
+  zoneTime,
+  type Alarm, type AlarmPlan, type CityRef, type ClockPrefs, type CountdownMode, type RingTarget,
 } from './betaClock';
+import { awakeTarget, settleAwake } from './betaClockAwake';
+import {
+  isNative, keepAwake, listenForCommands, messageOf, releaseAwake, replyToCommand, ringSpeaker, sessionUserId,
+} from './betaClockNative';
+import { fallbackNote, outLabel, ringMessage } from './betaClockSpeakers';
+import {
+  NOTHING_RINGING, mergeVoiceAlarm, readCommand, setReply, snoozeMinutes, voiceAlarm, type VoiceReply,
+} from './betaClockVoice';
 
 export type AlertPermission = 'unknown' | 'granted' | 'denied';
 
@@ -51,6 +72,14 @@ export interface ClockSnapshot {
   /** The last thing that went wrong on the way out; null when all is well. */
   notice: string | null;
   alerts: AlertPermission;
+  /** Where the ringing alarm is ringing: "This Mac" or a speaker's name. */
+  ringingOn: string;
+  /** Why it is ringing somewhere other than where it was set to, or null. */
+  ringingNote: string | null;
+  /** The keep-awake hold the Mac app confirmed, until this instant; null when there is none. */
+  awakeUntil: number | null;
+  /** The brain's clock commands can reach this store (the Mac app is listening for them). */
+  voiceReady: boolean;
 }
 
 type Listener = () => void;
@@ -62,6 +91,12 @@ const listeners = new Set<Listener>();
  * make the store tick for a display that is not showing.
  */
 const ringListeners = new Set<Listener>();
+/**
+ * The Home widgets' subscribers (`useClockPrefs`). Like the dialog's, they
+ * never make the store tick: a widget reads the saved state and runs its own
+ * slow clock, so Home does not re-render every second for a city time.
+ */
+const prefListeners = new Set<Listener>();
 
 let lastCheck = Date.now();
 let timer: number | null = null;
@@ -72,6 +107,9 @@ let timerVisible = false;
 let booted = false;
 /** What the state bus said before an alarm took it over, to hand back afterwards. */
 let busBefore: AtlasStateSnapshot | null = null;
+/** Bumped on every ring and every stop, so a speaker call that answers late knows it is stale. */
+let ringSeq = 0;
+let speakTimer: number | null = null;
 
 let snap: ClockSnapshot = {
   now: Date.now(),
@@ -81,6 +119,10 @@ let snap: ClockSnapshot = {
   missed: [],
   notice: null,
   alerts: 'unknown',
+  ringingOn: 'This Mac',
+  ringingNote: null,
+  awakeUntil: null,
+  voiceReady: false,
 };
 
 function readPrefs(): ClockPrefs {
@@ -105,6 +147,7 @@ const alarmZone = (): string => snap.prefs.zone ?? systemZone();
 function emit(): void {
   listeners.forEach((l) => l());
   ringListeners.forEach((l) => l());
+  prefListeners.forEach((l) => l());
 }
 
 function set(patch: Partial<ClockSnapshot>): void {
@@ -126,15 +169,18 @@ function addNotice(text: string, patch: Partial<ClockSnapshot> = {}): void {
 }
 
 function setPrefs(update: (p: ClockPrefs) => ClockPrefs): void {
-  const prefs = update(snap.prefs);
-  if (prefs === snap.prefs) return;
+  const next = update(snap.prefs);
+  if (next === snap.prefs) return;
+  // A keep-awake switch whose alarm was just deleted or switched off goes off with it.
+  const prefs = settleAwake(next, Date.now(), alarmZone());
   persist(prefs);
   set({ prefs, now: Date.now() });
   schedule();
+  syncAwake();
 }
 
-const inTauri = (): boolean => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-const describe = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+const inTauri = isNative;
+const describe = messageOf;
 
 // ── Sound ────────────────────────────────────────────────────────────────────
 //
@@ -286,10 +332,106 @@ async function notify(title: string, body: string): Promise<void> {
 function fireAlarm(plan: AlarmPlan, test: boolean): void {
   const label = plan.alarm.label || 'Alarm';
   if (!snap.ringing) busBefore = getAtlasState();
-  set({ ringing: plan, ringingTest: test });
+  stopSpeaker();
+  const seq = ++ringSeq;
+  const speaker = plan.alarm.ringOn ?? null;
+  const canSpeak = !!speaker && inTauri() && !!sessionUserId();
+  set({
+    ringing: plan,
+    ringingTest: test,
+    ringingOn: canSpeak && speaker ? speaker.name : 'This Mac',
+    ringingNote: speaker && !canSpeak
+      ? `${speaker.name} can only ring from the Atlas Mac app with someone signed in, so it is ringing on this Mac.`
+      : null,
+  });
   publishAtlasState('alert', 'clock');
-  startChimeLoop();
+  if (canSpeak && speaker) startSpeaker(plan, speaker, seq);
+  else startChimeLoop();
   void notify(label, `${test ? 'Test ring' : 'Alarm'} · ${plan.alarm.time}. Open Clock to stop or snooze.`);
+}
+
+// ── Ringing on a speaker ─────────────────────────────────────────────────────
+//
+// The speaker says the alarm once, then again every half minute while it is
+// still ringing, four times in all — one sentence is easy to sleep through, a
+// minute of it is not. The first failure, at any point, moves the ring to this
+// Mac's chime and says why, in the dialog and on the page.
+
+const SPEAK_EVERY_MS = 30_000;
+const SPEAK_TIMES = 4;
+
+function startSpeaker(plan: AlarmPlan, speaker: RingTarget, seq: number): void {
+  let said = 0;
+  const say = async () => {
+    speakTimer = null;
+    if (seq !== ringSeq || !snap.ringing) return;
+    said += 1;
+    const r = await ringSpeaker(speaker.id, ringMessage(plan.alarm));
+    if (seq !== ringSeq || !snap.ringing) return;
+    if ('error' in r) {
+      set({ ringingOn: 'This Mac', ringingNote: fallbackNote(speaker.name, r.error) });
+      addNotice(`${plan.alarm.label || 'Alarm'} was set to ring on ${speaker.name}, which didn’t answer (${r.error.replace(/\.$/, '')}). It rang on this Mac instead.`);
+      startChimeLoop();
+      return;
+    }
+    if (said < SPEAK_TIMES) speakTimer = window.setTimeout(() => { void say(); }, SPEAK_EVERY_MS);
+  };
+  void say();
+}
+
+function stopSpeaker(): void {
+  if (speakTimer != null) window.clearTimeout(speakTimer);
+  speakTimer = null;
+}
+
+// ── Keep awake ───────────────────────────────────────────────────────────────
+//
+// One hold at a time, matched to the switch after every change. `awakeHeld` is
+// what the Mac app last confirmed; a call in flight is never doubled, and a
+// change that arrives during one is applied when it returns.
+
+let awakeHeld: number | null = null;
+let awakeBusy = false;
+let awakeAgain = false;
+
+function syncAwake(): void {
+  if (!inTauri()) return;
+  const want = awakeTarget(snap.prefs, Date.now(), alarmZone());
+  const until = want ? want.until : null;
+  if (until === awakeHeld) return;
+  if (awakeBusy) { awakeAgain = true; return; }
+  awakeBusy = true;
+  void (async () => {
+    try {
+      const r = until == null ? await releaseAwake() : await keepAwake(until);
+      awakeHeld = r.active ? r.untilMs : null;
+      set({ awakeUntil: awakeHeld });
+    } catch (e) {
+      // Say so, and turn the switch off: it must not claim a hold macOS refused.
+      awakeHeld = null;
+      set({ awakeUntil: null });
+      addNotice(`Atlas could not keep this Mac awake: ${describe(e)}`);
+      if (until != null && snap.prefs.awake) {
+        const prefs = { ...snap.prefs, awake: null };
+        persist(prefs);
+        set({ prefs });
+      }
+    } finally {
+      awakeBusy = false;
+      if (awakeAgain) { awakeAgain = false; syncAwake(); }
+    }
+  })();
+}
+
+/** Turn "Keep this Mac awake until then" on (for the next alarm) or off. */
+export function setKeepAwake(on: boolean): void {
+  if (!on) {
+    setPrefs((p) => (p.awake ? { ...p, awake: null } : p));
+    return;
+  }
+  const next = nextAlarm(snap.prefs.alarms, Date.now(), alarmZone());
+  if (!next) return;
+  setPrefs((p) => ({ ...p, awake: { alarmId: next.alarm.id } }));
 }
 
 /** Hand the state bus back to whoever had it, unless someone has spoken since. */
@@ -329,6 +471,8 @@ function tick(): void {
   if (due.ring.length || due.missed.length) {
     const spent = new Set([...due.ring, ...due.missed].map((p) => p.alarm.id));
     prefs = { ...prefs, alarms: prefs.alarms.map((a) => (spent.has(a.id) ? afterFire(a) : a)) };
+    // The alarm a keep-awake hold was for has come: the hold has done its job.
+    prefs = settleAwake(prefs, now, alarmZone(), [...spent]);
     changed = true;
     if (due.missed.length) {
       patch.missed = [...snap.missed, ...due.missed];
@@ -342,6 +486,7 @@ function tick(): void {
   // The last due alarm wins the dialog; the ones before it are spent above.
   if (due.ring.length) fireAlarm(due.ring[due.ring.length - 1], false);
   schedule();
+  if (changed) syncAwake();
 }
 
 /** Pick the next tick from what is on screen and what is pending. */
@@ -390,6 +535,12 @@ export function getClock(): ClockSnapshot {
 export interface RingingState {
   plan: AlarmPlan;
   test: boolean;
+  /** "This Mac" or the speaker's name. */
+  on: string;
+  /** Why it is not ringing where it was set to, or null. */
+  note: string | null;
+  /** The brain's "stop" and "snooze" can reach this alarm. */
+  voice: boolean;
 }
 
 let ringingView: RingingState | null = null;
@@ -398,8 +549,26 @@ let ringingView: RingingState | null = null;
 function getRinging(): RingingState | null {
   const plan = snap.ringing;
   if (!plan) return (ringingView = null);
-  if (ringingView?.plan !== plan || ringingView.test !== snap.ringingTest) ringingView = { plan, test: snap.ringingTest };
+  const v = ringingView;
+  if (v?.plan !== plan || v.test !== snap.ringingTest || v.on !== snap.ringingOn || v.note !== snap.ringingNote || v.voice !== snap.voiceReady) {
+    ringingView = { plan, test: snap.ringingTest, on: snap.ringingOn, note: snap.ringingNote, voice: snap.voiceReady };
+  }
   return ringingView;
+}
+
+function subscribePrefs(fn: Listener): () => void {
+  prefListeners.add(fn);
+  return () => { prefListeners.delete(fn); };
+}
+
+const getPrefs = (): ClockPrefs => snap.prefs;
+
+/**
+ * The saved Clock state — cities, alarms, the timer and the countdown — for
+ * the Home widgets. Never makes the store tick; the caller keeps its own time.
+ */
+export function useClockPrefs(): ClockPrefs {
+  return useSyncExternalStore(subscribePrefs, getPrefs, getPrefs);
 }
 
 function subscribeRinging(fn: Listener): () => void {
@@ -427,6 +596,70 @@ export function bootClock(): void {
   };
   window.addEventListener('pointerdown', unlock, { once: true, passive: true });
   window.addEventListener('keydown', unlock, { once: true, passive: true });
+  // A keep-awake switch left on when Atlas last quit takes its hold again.
+  syncAwake();
+  void armVoice();
+}
+
+// ── Voice: the brain's clock tools ───────────────────────────────────────────
+
+async function armVoice(): Promise<void> {
+  try {
+    const unlisten = await listenForCommands((payload) => { void answerCommand(payload); });
+    if (unlisten) set({ voiceReady: true });
+  } catch (e) {
+    // The hints stay hidden: they only show once the path works.
+    console.warn('[clock] could not listen for voice commands', e);
+  }
+}
+
+async function answerCommand(payload: unknown): Promise<void> {
+  const cmd = readCommand(payload);
+  if (!cmd) return;
+  let reply: VoiceReply;
+  try {
+    reply = handleCommand(cmd.action, cmd.args);
+  } catch (e) {
+    reply = { ok: false, message: `The Clock could not do that: ${describe(e)}` };
+  }
+  await replyToCommand(cmd.id, reply.ok, reply.message, reply.data ?? null);
+}
+
+/** One command from the brain, through the same actions the screen uses. Exported for tests. */
+export function handleCommand(action: string, args: unknown): VoiceReply {
+  const now = Date.now();
+  const tz = alarmZone();
+  switch (action) {
+    case 'set_alarm': {
+      const parsed = voiceAlarm(args, now);
+      if ('error' in parsed) return { ok: false, message: parsed.error };
+      const labelGiven = typeof (args as { label?: unknown } | null)?.label === 'string';
+      const { alarm, existed } = mergeVoiceAlarm(snap.prefs.alarms, parsed.alarm, labelGiven);
+      saveAlarm(alarm);
+      const at = nextFire(alarm, now, tz);
+      return {
+        ok: true,
+        message: setReply(alarm, at, now, tz, existed, outLabel(alarm)),
+        data: { id: alarm.id, time: alarm.time, label: alarm.label, days: alarm.days, next_at: at == null ? null : new Date(at).toISOString() },
+      };
+    }
+    case 'stop_alarm': {
+      const r = snap.ringing;
+      if (!r) return { ok: false, message: NOTHING_RINGING };
+      stopRinging();
+      return { ok: true, message: `Stopped ${r.alarm.label || 'the alarm'} (${r.alarm.time}).` };
+    }
+    case 'snooze_alarm': {
+      const r = snap.ringing;
+      if (!r) return { ok: false, message: NOTHING_RINGING };
+      const minutes = snoozeMinutes(args, SNOOZE_MINUTES);
+      const until = snoozeRinging(minutes);
+      if (until == null) return { ok: true, message: 'That was a test ring of an alarm that is not saved, so it simply stopped.' };
+      return { ok: true, message: `Snoozed ${r.alarm.label || 'the alarm'} for ${minutes} minutes, until ${hhmm(zoneTime(tz, until))}.` };
+    }
+    default:
+      return { ok: false, message: `The Clock has no action “${action}”.` };
+  }
 }
 
 /** Catch up now — the page calls this when the window becomes active again. */
@@ -561,21 +794,28 @@ export function ringNow(alarm: Alarm): void {
   schedule();
 }
 
-/** Snooze the ringing alarm. A test ring of an unsaved alarm has nothing to snooze, so it just stops. */
-export function snoozeRinging(): void {
+/**
+ * Snooze the ringing alarm, by the design's nine minutes unless told otherwise.
+ * A test ring of an unsaved alarm has nothing to snooze, so it just stops.
+ * Returns when it rings again, or null when it will not.
+ */
+export function snoozeRinging(minutes: number = SNOOZE_MINUTES): number | null {
   const r = snap.ringing;
-  if (!r) return;
+  if (!r) return null;
   const saved = snap.prefs.alarms.some((a) => a.id === r.alarm.id);
   stopRinging();
-  if (!saved) return;
-  const until = snoozeUntil(Date.now());
+  if (!saved) return null;
+  const until = snoozeUntil(Date.now(), minutes);
   setPrefs((p) => ({ ...p, alarms: p.alarms.map((a) => (a.id === r.alarm.id ? { ...a, on: true, snoozedUntil: until } : a)) }));
+  return until;
 }
 
 export function stopRinging(): void {
   stopChimeLoop();
+  stopSpeaker();
+  ringSeq += 1;
   if (snap.ringing) {
-    set({ ringing: null, ringingTest: false });
+    set({ ringing: null, ringingTest: false, ringingOn: 'This Mac', ringingNote: null });
     releaseBus();
   }
   schedule();

@@ -87,6 +87,39 @@ fn mock_weather(city: &str) -> Value {
     })
 }
 
+/// One forecast slice for the hour strip. Beyond the temperature and icon the
+/// strip always had, it carries what the 3-hour forecast says about that slice
+/// itself: the chance of precipitation (`pop`, 0–1 from OpenWeather, sent as a
+/// whole percentage), the rain expected in those three hours (`rain.3h`, mm —
+/// absent from the payload when none is forecast, so 0), how warm it will feel
+/// and the wind. No field is invented: each is read from the slice or omitted.
+fn slice_json(label: String, item: &Value) -> Value {
+    let round = |v: &Value| v.as_f64().unwrap_or(0.0).round() as i64;
+    json!({
+        "time": label,
+        "temp": round(&item["main"]["temp"]),
+        "icon": map_icon(item["weather"][0]["icon"].as_str().unwrap_or("")),
+        "pop": item["pop"].as_f64().map(|p| (p.clamp(0.0, 1.0) * 100.0).round() as i64),
+        "rain": item["rain"]["3h"].as_f64().map(|mm| (mm * 10.0).round() / 10.0).unwrap_or(0.0),
+        "feelsLike": item["main"]["feels_like"].as_f64().map(|v| v.round() as i64),
+        "wind": item["wind"]["speed"].as_f64().map(|v| v.round() as i64),
+    })
+}
+
+/// The air-pollution reading: OpenWeather's 1–5 index and the four pollutants
+/// the Weather screen draws, all µg/m³. A pollutant the station does not
+/// report stays null rather than becoming a reassuring zero.
+fn air_json(item: &Value) -> Value {
+    let c = &item["components"];
+    json!({
+        "aqi": item["main"]["aqi"].as_i64().unwrap_or(0),
+        "pm25": c["pm2_5"].as_f64().unwrap_or(0.0),
+        "pm10": c["pm10"].as_f64(),
+        "o3": c["o3"].as_f64(),
+        "no2": c["no2"].as_f64(),
+    })
+}
+
 #[tauri::command(async)]
 pub fn fetch_weather(city: Option<String>, lat: Option<f64>, lon: Option<f64>) -> Result<Value, String> {
     let city = city.unwrap_or_else(|| "San Francisco".to_string());
@@ -130,7 +163,7 @@ pub fn fetch_weather(city: Option<String>, lat: Option<f64>, lon: Option<f64>) -
                 let h24 = dt.hour();
                 let label = if idx == 0 { "Now".to_string() }
                     else { let ap = if h24 < 12 {"AM"} else {"PM"}; let h = if h24 % 12 == 0 {12} else {h24 % 12}; format!("{h}{ap}") };
-                json!({"time":label,"temp":round(&item["main"]["temp"]),"icon":map_icon(item["weather"][0]["icon"].as_str().unwrap_or(""))})
+                slice_json(label, item)
             }).collect();
 
             // Aggregate by day.
@@ -166,7 +199,7 @@ pub fn fetch_weather(city: Option<String>, lat: Option<f64>, lon: Option<f64>) -
     let air_url = format!("{base}/air_pollution?appid={api}&lat={clat}&lon={clon}");
     if let Ok(a) = get_json(&air_url) {
         if let Some(item) = a["list"].get(0) {
-            air = json!({"aqi": item["main"]["aqi"].as_i64().unwrap_or(0), "pm25": item["components"]["pm2_5"].as_f64().unwrap_or(0.0)});
+            air = air_json(item);
         }
     }
 
@@ -176,6 +209,12 @@ pub fn fetch_weather(city: Option<String>, lat: Option<f64>, lon: Option<f64>) -
         "condition": data["weather"][0]["main"].as_str().unwrap_or("Clear"),
         "humidity": data["main"]["humidity"].as_i64().unwrap_or(0),
         "windSpeed": round(&data["wind"]["speed"]),
+        // Additive (Beta row 4): what the reading itself carries beyond the
+        // headline. Absent from `mock_weather` on purpose, so the sample never
+        // shows a "feels like" or a gust that nobody measured.
+        "feelsLike": data["main"]["feels_like"].as_f64().map(|v| v.round() as i64),
+        "windDeg": data["wind"]["deg"].as_i64(),
+        "windGust": data["wind"]["gust"].as_f64().map(|v| v.round() as i64),
         "icon": map_icon(cur_icon),
         "sunrise": fmt_time(data["sys"]["sunrise"].as_i64().unwrap_or(0), tz),
         "sunset": fmt_time(data["sys"]["sunset"].as_i64().unwrap_or(0), tz),
@@ -293,10 +332,115 @@ fn mock_news() -> Value {
     ]})
 }
 
+/// NewsAPI's `top-headlines` categories — the only values its `category`
+/// parameter takes. Anything else from the webview is not a category.
+const NEWS_CATEGORIES: [&str; 7] = ["business", "entertainment", "general", "health", "science", "sports", "technology"];
+/// Briefing topics per fetch. `top-headlines` takes ONE category or one `q`
+/// per request, so every topic is a request; the webview stretches its poll
+/// interval by the same count so the key's daily quota is spent at the rate
+/// one topic always spent it.
+const MAX_TOPICS: usize = 4;
+
+/// A Briefing topic: one of the seven categories, or a keyword the user typed
+/// (letters, digits, spaces and a little punctuation, 2–40 characters).
+#[derive(Debug, PartialEq)]
+enum Topic {
+    Category(&'static str),
+    Keyword(String),
+}
+
+fn parse_topic(raw: &str) -> Option<Topic> {
+    let t = raw.trim();
+    let lower = t.to_lowercase();
+    if let Some(c) = NEWS_CATEGORIES.iter().find(|c| **c == lower) {
+        return Some(Topic::Category(c));
+    }
+    let n = t.chars().count();
+    let ok = (2..=40).contains(&n)
+        && t.chars().all(|c| c.is_alphanumeric() || matches!(c, ' ' | '-' | '&' | '.' | '\''));
+    ok.then(|| Topic::Keyword(t.to_string()))
+}
+
+fn capitalise(s: &str) -> String {
+    let mut c = s.chars();
+    c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default()
+}
+
+/// One article in the shape the webview's `NewsItem` reads.
+fn article_json(a: &Value, label: &str) -> Value {
+    json!({
+        "title": a["title"].clone(),
+        "description": a["description"].as_str().unwrap_or(""),
+        "source": a["source"]["name"].as_str().unwrap_or("Unknown"),
+        "time": time_ago(a["publishedAt"].as_str().unwrap_or("")),
+        "url": a["url"].clone(),
+        "category": label,
+    })
+}
+
+/// The Briefing's chosen topics: one `top-headlines` request each, merged
+/// round-robin so every topic leads somewhere in the first screen, the same
+/// story reached by two topics shown once. A topic whose request fails is
+/// skipped; when every one fails the error goes back (redacted), so the card
+/// keeps its last headlines and says it is offline instead of swapping in
+/// the sample.
+fn fetch_topics(api: &str, topics: &[Topic]) -> Result<Value, String> {
+    let mut lists: Vec<(String, Vec<Value>)> = Vec::new();
+    let mut last_err: Option<String> = None;
+    for topic in topics {
+        let base = crate::http::agent()
+            .get("https://newsapi.org/v2/top-headlines")
+            .query("pageSize", "5")
+            .query("apiKey", api);
+        let (req, label) = match topic {
+            Topic::Category(c) => (base.query("country", "us").query("category", c), capitalise(c)),
+            Topic::Keyword(k) => (base.query("q", k).query("language", "en"), k.clone()),
+        };
+        // safe_err: `apiKey` is on this URL too.
+        match req.call().map_err(safe_err).and_then(|r| r.into_json::<Value>().map_err(|e| e.to_string())) {
+            Ok(data) => {
+                let items = data["articles"].as_array().map(|arr| arr.iter().map(|a| article_json(a, &label)).collect()).unwrap_or_default();
+                lists.push((label, items));
+            }
+            Err(e) => last_err = Some(e),
+        }
+    }
+    if lists.is_empty() {
+        return Err(last_err.unwrap_or_else(|| "no topic answered".into()));
+    }
+    let mut seen = std::collections::HashSet::new();
+    let mut merged: Vec<Value> = Vec::new();
+    let longest = lists.iter().map(|(_, l)| l.len()).max().unwrap_or(0);
+    for i in 0..longest {
+        for (_, list) in &lists {
+            if let Some(a) = list.get(i) {
+                let key = a["url"].as_str().map(str::to_string).unwrap_or_else(|| a["title"].to_string());
+                if seen.insert(key) { merged.push(a.clone()); }
+            }
+        }
+    }
+    let articles: Vec<Value> = merged.into_iter().take(12).enumerate().map(|(i, mut a)| {
+        a["id"] = json!((i + 1).to_string());
+        // The first story of each topic leads its row, as the single-topic
+        // fetch marks its first two.
+        a["trending"] = json!(i < lists.len().min(2));
+        a
+    }).collect();
+    Ok(json!({"articles": articles}))
+}
+
 #[tauri::command(async)]
-pub fn fetch_news(category: Option<String>) -> Result<Value, String> {
-    let category = category.unwrap_or_else(|| "general".to_string());
+pub fn fetch_news(category: Option<String>, topics: Option<Vec<String>>) -> Result<Value, String> {
     let Some(api) = core_key("news_api_key") else { return Ok(mock_news()) };
+    let chosen: Vec<Topic> = topics.unwrap_or_default().iter().filter_map(|t| parse_topic(t)).take(MAX_TOPICS).collect();
+    if !chosen.is_empty() {
+        return fetch_topics(&api, &chosen);
+    }
+    // The webview's category goes into a URL, so only a real category does.
+    let category = category
+        .map(|c| c.trim().to_lowercase())
+        .filter(|c| NEWS_CATEGORIES.contains(&c.as_str()))
+        .unwrap_or_else(|| "general".to_string());
 
     let url = format!("https://newsapi.org/v2/top-headlines?country=us&category={category}&pageSize=5&apiKey={api}");
     let data = match get_json(&url) {
@@ -320,9 +464,148 @@ pub fn fetch_news(category: Option<String>) -> Result<Value, String> {
     Ok(json!({"articles": articles}))
 }
 
+// ---------------------------------------------------------------------------
+// Weather location (OpenWeather geocoding, same key)
+// ---------------------------------------------------------------------------
+
+/// What the place search accepts: a place name as a person types it.
+fn valid_place_query(q: &str) -> Result<&str, String> {
+    let q = q.trim();
+    let n = q.chars().count();
+    if n < 2 || n > 100 || q.chars().any(|c| c.is_control()) {
+        return Err("Type a place name, 2 to 100 characters.".into());
+    }
+    Ok(q)
+}
+
+/// The Weather screen's place search. Sends only the typed text (and the key)
+/// to OpenWeather's geocoding endpoint and returns up to five matches with
+/// their coordinates; the webview stores the one picked on this Mac.
+#[tauri::command(async)]
+pub fn weather_geocode(query: String) -> Result<Value, String> {
+    let q = valid_place_query(&query)?;
+    let Some(api) = core_key("openweather_api_key") else {
+        return Err("No OpenWeather key on this Mac. Add one in Settings to search for a place.".into());
+    };
+    let data = crate::http::agent()
+        .get("https://api.openweathermap.org/geo/1.0/direct")
+        .query("q", q)
+        .query("limit", "5")
+        .query("appid", &api)
+        .call()
+        // safe_err: `appid` is on this URL.
+        .map_err(safe_err)?
+        .into_json::<Value>()
+        .map_err(|e| e.to_string())?;
+    let places: Vec<Value> = data.as_array().map(|arr| {
+        arr.iter().filter_map(|p| {
+            let lat = p["lat"].as_f64()?;
+            let lon = p["lon"].as_f64()?;
+            let name = p["name"].as_str()?;
+            Some(json!({
+                "name": name,
+                "country": p["country"].as_str().unwrap_or(""),
+                "state": p["state"].as_str(),
+                "lat": lat,
+                "lon": lon,
+            }))
+        }).collect()
+    }).unwrap_or_default();
+    Ok(json!({"places": places}))
+}
+
+// ---------------------------------------------------------------------------
+// Currency (Frankfurter — ECB reference rates, no key)
+// ---------------------------------------------------------------------------
+
+/// An ISO 4217 code as Frankfurter spells it: three ASCII capitals.
+fn valid_currency(code: &str) -> Result<String, String> {
+    let c = code.trim().to_uppercase();
+    if c.len() == 3 && c.bytes().all(|b| b.is_ascii_uppercase()) {
+        Ok(c)
+    } else {
+        Err(format!("{code:?} is not a currency code"))
+    }
+}
+
+/// The Currency widget's reading: today's ECB reference rate from `base` to
+/// `quote`, and the last month of daily rates for its line. Frankfurter needs
+/// no key and receives only the two currency codes. The rates are the ECB's
+/// once-a-day reference, published around 16:00 CET on working days, so
+/// `date` is the day the rate is for, not when it was fetched.
+#[tauri::command(async)]
+pub fn fetch_fx(base: String, quote: String) -> Result<Value, String> {
+    let base = valid_currency(&base)?;
+    let quote = valid_currency(&quote)?;
+    if base == quote {
+        return Ok(json!({"base": base, "quote": quote, "date": Utc::now().format("%Y-%m-%d").to_string(), "rate": 1.0, "series": []}));
+    }
+    let latest = get_json(&format!("https://api.frankfurter.app/latest?from={base}&to={quote}"))?;
+    let rate = latest["rates"][quote.as_str()].as_f64().ok_or("Frankfurter has no rate for that pair")?;
+    let date = latest["date"].as_str().unwrap_or("").to_string();
+
+    // The month's line is a nicety: a failure here keeps today's rate.
+    let start = (Utc::now() - chrono::Duration::days(31)).format("%Y-%m-%d");
+    let mut series: Vec<Value> = Vec::new();
+    if let Ok(hist) = get_json(&format!("https://api.frankfurter.app/{start}..?from={base}&to={quote}")) {
+        if let Some(days) = hist["rates"].as_object() {
+            // The keys are ISO dates, so sorting them as text is date order —
+            // whatever order the map happens to keep.
+            let mut days: Vec<(&String, f64)> = days.iter().filter_map(|(d, r)| r[quote.as_str()].as_f64().map(|v| (d, v))).collect();
+            days.sort_by(|a, b| a.0.cmp(b.0));
+            series = days.into_iter().map(|(d, v)| json!({"date": d, "rate": v})).collect();
+        }
+    }
+    Ok(json!({"base": base, "quote": quote, "date": date, "rate": rate, "series": series}))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn topics_are_categories_or_plain_keywords() {
+        assert_eq!(parse_topic(" Technology "), Some(Topic::Category("technology")));
+        assert_eq!(parse_topic("climate"), Some(Topic::Keyword("climate".into())));
+        assert_eq!(parse_topic("AI & policy"), Some(Topic::Keyword("AI & policy".into())));
+        assert_eq!(parse_topic("x"), None);
+        assert_eq!(parse_topic("a=b&apiKey=1"), None);
+        assert_eq!(parse_topic(&"a".repeat(41)), None);
+    }
+
+    #[test]
+    fn currency_codes_and_place_queries_are_checked() {
+        assert_eq!(valid_currency("eur").unwrap(), "EUR");
+        assert!(valid_currency("EU").is_err());
+        assert!(valid_currency("E1R").is_err());
+        assert!(valid_currency("EUR&to=").is_err());
+        assert_eq!(valid_place_query("  Aarhus ").unwrap(), "Aarhus");
+        assert!(valid_place_query("a").is_err());
+        assert!(valid_place_query("line\nbreak").is_err());
+    }
+
+    #[test]
+    fn a_slice_carries_rain_chance_feel_and_wind() {
+        let item = json!({"main": {"temp": 51.4, "feels_like": 47.6}, "weather": [{"icon": "10d"}], "pop": 0.62, "rain": {"3h": 1.23}, "wind": {"speed": 11.6}});
+        let s = slice_json("3PM".into(), &item);
+        assert_eq!(s["pop"], json!(62));
+        assert_eq!(s["rain"], json!(1.2));
+        assert_eq!(s["feelsLike"], json!(48));
+        assert_eq!(s["wind"], json!(12));
+        assert_eq!(s["icon"], json!("rainy"));
+        // No rain block in the payload means none forecast, not unknown.
+        let dry = slice_json("6PM".into(), &json!({"main": {"temp": 50}, "weather": [{"icon": "01d"}]}));
+        assert_eq!(dry["rain"], json!(0.0));
+        assert_eq!(dry["pop"], Value::Null);
+    }
+
+    #[test]
+    fn air_keeps_unreported_pollutants_null() {
+        let a = air_json(&json!({"main": {"aqi": 2}, "components": {"pm2_5": 6.1, "pm10": 12.0, "o3": 41.5}}));
+        assert_eq!(a["aqi"], json!(2));
+        assert_eq!(a["pm10"], json!(12.0));
+        assert_eq!(a["no2"], Value::Null);
+    }
 
     /// The regression test for the credential leak.
     ///

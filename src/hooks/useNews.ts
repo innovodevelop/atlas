@@ -1,6 +1,7 @@
 import { useMemo, useSyncExternalStore } from 'react';
 import { localClient as supabase } from '@/integrations/local/localClient';
 import { createSharedPoll } from '@/lib/sharedStore';
+import { newsIntervalMs, useBriefingTopics } from '@/lib/briefingTopics';
 
 export interface NewsItem {
   id: string;
@@ -34,6 +35,11 @@ const NO_NEWS: NewsItem[] = [];
  * changed.
  */
 export const useNews = (category?: string) => {
+  // With no category the fetch follows the Briefing topics the user chose
+  // (src/lib/briefingTopics.ts) — one request per topic, so the interval
+  // stretches by the same count and the key's daily quota holds.
+  const chosen = useBriefingTopics();
+  const topics = category ? null : chosen.length ? chosen : null;
   const poll = useMemo(
     () =>
       createSharedPoll<NewsItem[]>({
@@ -41,17 +47,17 @@ export const useNews = (category?: string) => {
         // with a real category that happens to be spelled the same way: the key
         // decides who shares a store, so an ambiguous one hands a caller
         // somebody else's headlines.
-        key: `news:${JSON.stringify(category ?? null)}`,
+        key: `news:${JSON.stringify(category ?? null)}${topics ? `:${JSON.stringify(topics)}` : ''}`,
         fetch: async () => {
           const { data, error } = await supabase.functions.invoke('get-news', {
-            body: { category },
+            body: topics ? { category, topics } : { category },
           });
           if (error) throw error;
           return (data as { articles?: NewsItem[] } | null)?.articles || [];
         },
-        intervalMs: REFRESH_MS,
+        intervalMs: newsIntervalMs(topics ?? [], REFRESH_MS),
       }),
-    [category],
+    [category, topics],
   );
 
   const snap = useSyncExternalStore(poll.subscribe, poll.getSnapshot, poll.getSnapshot);
