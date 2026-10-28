@@ -1055,9 +1055,15 @@ const BY_ID: Record<string, (p: WidgetProps) => JSX.Element> = {
   bulb: BulbWidget,
   floorlamp: FloorLampWidget,
   frontdoor: FrontDoorWidget,
-  spend: SpendWidget,
-  budget: BudgetWidget,
-  subscriptions: SubscriptionsWidget,
+  // The Money faces exist only where /money does, like their WIDGETS entries
+  // (betaHome.ts moneyWidgets). The direct comparison is what Vite folds, so a
+  // consumer bundle drops these faces and, with them, useBank and its bank_*
+  // commands — not listing a widget is not the same as not shipping it.
+  ...(import.meta.env.VITE_ATLAS_EDITION === 'consumer' ? {} : {
+    spend: SpendWidget,
+    budget: BudgetWidget,
+    subscriptions: SubscriptionsWidget,
+  }),
 };
 
 export function HomeWidget({ id, ...p }: WidgetProps & { id: string }) {
