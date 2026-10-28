@@ -27,8 +27,9 @@
  * into loose dots.
  *
  * Rule 2 — the shell's heaviest moment stays inside FRAME_BUDGET. That moment
- * is a band sphere, the Talk panel's sphere and the orb all animating at once
- * (Voice, with Talk open). The reference engine was built around one 24 k
+ * is a band sphere, the Talk panel's sphere, the orb and — with the hub or
+ * capsule dock style — the dock's sphere all animating at once (Voice, with
+ * Talk open; see DOCK_SPHERE in src/lib/betaDock.ts). The reference engine was built around one 24 k
  * sphere on its own page (`atlas-quickstart-sphere.js`, its default count),
  * so the shell allows one and a half of those. The engine warns in
  * development when a screen goes over.

@@ -182,10 +182,11 @@ export function hubSides<T extends { id: string }>(items: readonly T[]): { left:
 
 /**
  * The small spheres two styles carry (the hub's Voice button, the capsule's
- * state): the board's own budget, a half of the bottom-left orb's, since the
- * shell already draws that one.
+ * state): the orb's density (5200 at 128 px) at the hub's 76 px. It animates
+ * beside the band, the Talk panel and the orb, so it counts toward the shell's
+ * FRAME_BUDGET (src/lib/sphereBudget.ts), which the four fill exactly.
  */
-export const DOCK_SPHERE = { count: 2500, scale: 0.42 } as const;
+export const DOCK_SPHERE = { count: 1800, scale: 0.42 } as const;
 
 /* ── Keyboard ────────────────────────────────────────────────────────────── */
 

@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { FRAME_BUDGET, SPHERE_BUDGET, SPHERE_MAX, clampCount, fitToBox, particleBudget, type SphereSize } from './sphereBudget';
+import { DOCK_SPHERE } from './betaDock';
 import { SPHERE } from './betaTokens';
 
 const SIZES = Object.keys(SPHERE_BUDGET) as SphereSize[];
@@ -25,8 +26,9 @@ describe('the sphere budget table', () => {
     }
   });
 
-  test("the shell's heaviest moment (band + Talk panel + orb) fits the frame budget", () => {
-    const heaviest = SPHERE_BUDGET.band.count + SPHERE_BUDGET.panel.count + SPHERE_BUDGET.orb.count;
+  // The hub and capsule dock styles add a fourth live sphere to that moment.
+  test("the shell's heaviest moment (band + Talk panel + orb + dock sphere) fits the frame budget", () => {
+    const heaviest = SPHERE_BUDGET.band.count + SPHERE_BUDGET.panel.count + SPHERE_BUDGET.orb.count + DOCK_SPHERE.count;
     expect(heaviest).toBeLessThanOrEqual(FRAME_BUDGET);
   });
 
