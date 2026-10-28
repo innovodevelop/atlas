@@ -231,6 +231,12 @@ export const EMPTY_COPY: Record<string, EmptySpec> = {
   focus: { title: 'No focus yet today', hint: 'Start a 25 or 50 minute session and Atlas holds its own notifications until it ends.' },
   upnext: { title: 'Nothing coming up', hint: 'Your next events show here, with how long until each.', action: { label: 'Block focus time', ask: 'Block an hour of focus time in my calendar this afternoon.' } },
   fx: { title: 'No rate yet', hint: 'Rates are the European Central Bank’s daily reference, fetched through the Mac app with no key.' },
+  // Smart Home (F3): the lamp, light and camera widgets, all from Home Assistant.
+  lamp: { title: 'No lamp yet', hint: 'Link Home Assistant and a colour light shows here, with its swatches.', action: { label: 'Open Smart Home', route: '/smart-home' } },
+  lights: { title: 'No lights yet', hint: 'Link Home Assistant and the lights that are on show here, room by room.', action: { label: 'Open Smart Home', route: '/smart-home' } },
+  bulb: { title: 'No bulb yet', hint: 'Link Home Assistant and a light shows here, with its brightness.', action: { label: 'Open Smart Home', route: '/smart-home' } },
+  floorlamp: { title: 'No floor lamp', hint: 'Atlas looks for a light whose name says floor lamp. Rename one in Home Assistant and it shows here.', action: { label: 'Open Smart Home', route: '/smart-home' } },
+  frontdoor: { title: 'No camera yet', hint: 'Link Home Assistant and its door camera shows here, with the last motion it saw.', action: { label: 'Open Smart Home', route: '/smart-home' } },
 };
 
 export function emptyCopy(id: string): EmptySpec {

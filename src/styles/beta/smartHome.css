@@ -170,6 +170,89 @@
 .b-sh-card .sh-panel-note { font-size: 12.5px; color: var(--b-ink2); }
 .b-sh-card .sh-panel-note:last-child { margin-bottom: 0; }
 
+/* The Beta extras: modes, the suggestion, energy, automations, tips,
+   history, the mode map, the camera still. Values from the design's header
+   segmented control, its ink energy card, its "runs these" list and its
+   tip bubble. */
+.b-sh-modes { display: flex; gap: 2px; padding: 4px; border-radius: var(--b-r-pill); background: var(--b-panel); flex: none; max-width: 100%; overflow-x: auto; }
+.b-sh-mode { height: 42px; padding: 0 18px; display: flex; align-items: center; gap: 8px; border-radius: var(--b-r-pill); background: transparent; color: var(--b-ink); font-size: 13.5px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background .2s, color .2s; }
+.b-sh-mode:hover { background: var(--b-hover); }
+.b-sh-mode.on, .b-sh-mode.on:hover { background: var(--b-ink); color: var(--b-on-ink); }
+.b-sh-mode i { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.b-sh-mode:disabled { cursor: default; opacity: .55; }
+.b-sh-mode.on:disabled { opacity: 1; }
+.b-sh-notice--suggest { background: var(--b-emphasis); }
+.b-sh-notice--suggest > svg, .b-sh-notice--suggest b { color: var(--b-blue-deep); }
+
+.b-sh-energy-big { font-family: var(--b-font-display); font-size: 44px; font-weight: 500; letter-spacing: -.05em; line-height: 1; font-variant-numeric: tabular-nums; }
+.b-sh-energy-big span { font-size: 18px; color: var(--b-on-ink-small); letter-spacing: 0; }
+.b-sh-energy-bars { display: flex; align-items: flex-end; gap: 3px; height: 64px; }
+.b-sh-energy-bars span { flex: 1; min-width: 0; height: 4%; border-radius: 4px; background: rgba(249, 247, 244, .22); }
+.b-sh-energy-bars span[data-now="true"] { background: #8fa9ff; }
+.b-sh-energy-bars span[data-none="true"] { height: 2px; background: rgba(249, 247, 244, .12); }
+.b-sh-energy-rows { display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
+.b-sh-energy-row { display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px; color: var(--b-on-ink-body); }
+.b-sh-energy-row span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.b-sh-energy-row b { flex: none; font-weight: 600; color: var(--b-on-ink); }
+
+.b-sh-autos { padding: 10px; gap: 4px; }
+.b-sh-autos > .b-card-title { padding: 8px 10px 4px; }
+.b-sh-autos > .b-sh-card-p { padding: 4px 10px 6px; }
+.b-sh-auto { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 18px; background: var(--b-card); }
+.b-sh-auto.stale { opacity: .6; }
+.b-sh-auto-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.b-sh-auto-text b { font-size: 13.5px; font-weight: 600; overflow-wrap: anywhere; }
+.b-sh-auto-text span { font-size: 12px; line-height: 1.45; color: var(--b-ink2); }
+.b-sh-switch { display: flex; flex: none; width: 46px; height: 28px; padding: 3px; border-radius: var(--b-r-pill); background: #d8d4cd; justify-content: flex-start; cursor: pointer; transition: background .25s; }
+.b-sh-switch span { width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 2px 5px rgba(30, 30, 36, .22); }
+.b-sh-switch.on { background: var(--b-blue); justify-content: flex-end; }
+.b-sh-switch:disabled { cursor: default; opacity: .55; }
+.b-sh-switch.busy { opacity: .75; }
+.b-sh-switch:focus-visible { box-shadow: 0 0 0 3px rgba(52, 97, 242, .18); }
+
+.b-sh-tips { display: flex; flex-direction: column; gap: 8px; }
+.b-sh-tip { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 14px 16px; border-radius: 22px; background: var(--b-emphasis); font-size: 13px; line-height: 1.55; color: var(--b-ink); }
+.b-sh-tip strong { font-weight: 600; color: var(--b-blue-deep); }
+
+.b-sh-history { display: flex; flex-direction: column; gap: 4px; }
+.b-sh-history-row { display: flex; gap: 10px; padding: 8px 12px; border-radius: var(--b-r-row); background: var(--b-card); font-size: 12.5px; line-height: 1.45; }
+.b-sh-history-row .b-num { flex: none; min-width: 44px; color: var(--b-ink2); }
+.b-sh-history-row[data-kind="command"] { background: var(--b-emphasis); }
+
+.b-sh-mode-map { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
+.b-sh-mode-name { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; flex: none; }
+.b-sh-mode-name i { width: 7px; height: 7px; border-radius: 50%; }
+.b-sh-select { flex: 1 1 auto; min-width: 0; max-width: 220px; height: 36px; padding: 0 12px; border: none; border-radius: var(--b-r-row); background: var(--b-card); color: var(--b-ink); font: inherit; font-size: 13px; cursor: pointer; }
+.b-sh-select:disabled { cursor: default; opacity: .55; }
+.b-sh-select:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(52, 97, 242, .18); }
+
+.b-sh-camshot { object-fit: cover; background: var(--b-ink); }
+.b-sh-link:disabled { cursor: default; opacity: .55; }
+
+/* The Home widgets this screen feeds (Lamp, Bulb, Floor lamp, Front door),
+   from the lamp widget in Atlas Dashboard Beta.dc.html. Imported by
+   src/components/atlas/home/widgets.tsx; every class is bw-sh-*. */
+.bw-sh-lamp { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+.bw-sh-lamp-glow { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); width: 110px; height: 110px; border-radius: 50%; filter: blur(8px); pointer-events: none; transition: opacity .45s; }
+.bw-sh-lamp-btn { position: relative; padding: 2px; border: none; background: none; cursor: pointer; transition: transform .2s; }
+.bw-sh-lamp-btn:active { transform: scale(.9); }
+.bw-sh-lamp-btn:disabled { cursor: default; }
+.bw-sh-lamp-btn svg { display: block; }
+.bw-sh-lamp-btn svg * { transition: fill .4s, opacity .4s; }
+.bw-sh-lamp-status { flex-shrink: 0; font-size: 12px; color: var(--b-ink2); text-align: center; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bw-sh-swatches { flex-shrink: 0; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 2px; }
+.bw-sh-swatches button { width: 22px; height: 22px; padding: 0; border: none; border-radius: 50%; cursor: pointer; transition: transform .2s; }
+.bw-sh-swatches button:hover { transform: scale(1.12); }
+.bw-sh-swatches button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--b-card), 0 0 0 4px var(--b-ink); }
+.bw-sh-swatches button:disabled { cursor: default; opacity: .55; }
+.bw--s .bw-sh-swatches { display: none; }
+.bw-sh-cam { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .55; }
+.bw-sh-cam-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.bw-sh-cam-err { font-size: 12px; color: var(--b-on-ink-small); }
+@media (prefers-reduced-motion: reduce) {
+  .bw-sh-lamp-glow, .bw-sh-lamp-btn, .bw-sh-lamp-btn svg *, .bw-sh-swatches button { transition: none; }
+}
+
 /* Widths: two columns under 1280, one under 900 with the rooms as a row. */
 @media (max-width: 1279px) {
   .b-sh-grid { grid-template-columns: 200px minmax(0, 1fr); }
@@ -183,6 +266,8 @@
 @media (max-width: 640px) {
   .b-sh { padding-left: 16px; padding-right: 16px; }
   .b-sh-head { gap: 10px 16px; }
+  .b-sh-mode { height: 38px; padding: 0 14px; }
+  .b-sh-select { max-width: 180px; }
   .b-sh-stage { height: clamp(380px, 70vh, 560px); border-radius: var(--b-r-band); }
   .b-sh-stage-head { left: 18px; right: 18px; top: 18px; }
   .b-sh-controls { left: 10px; right: 10px; bottom: 10px; padding: 10px; }
@@ -200,5 +285,6 @@
 @media (prefers-reduced-motion: reduce) {
   .b-sh-head { animation: none; }
   .b-sh-live i[data-on="true"] { animation: none; }
-  .b-sh-scene, .b-sh-room, .b-sh-tile, .b-sh-pow, .b-sh-swatch, .b-sh-stage-status i, .b-sh-dot, .b-sh-back, .b-sh-lock, .b-sh-link { transition: none; }
+  .b-sh-scene, .b-sh-room, .b-sh-tile, .b-sh-pow, .b-sh-swatch, .b-sh-stage-status i, .b-sh-dot, .b-sh-back, .b-sh-lock, .b-sh-link,
+  .b-sh-mode, .b-sh-switch { transition: none; }
 }

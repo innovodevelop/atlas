@@ -1467,3 +1467,107 @@ CREATE TABLE IF NOT EXISTS music_resume (
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 CREATE INDEX IF NOT EXISTS idx_music_resume_updated ON music_resume(updated_at);
+
+-- ###########################################################################
+-- # SMART HOME, THE BETA EXTRAS — begin                                      #
+-- #                                                                          #
+-- # What the Beta Smart Home reads beyond the mirror above: the attributes a #
+-- # device's one value cannot carry, Home Assistant's own machinery          #
+-- # (automations, scripts, people), the history Atlas keeps of what the      #
+-- # devices did, and the Home / Away / Night modes. New tables only, so no   #
+-- # migration: CREATE TABLE IF NOT EXISTS creates each one on first launch.  #
+-- # Everything is keyed to a bridge and cascades with it, so unlinking Home  #
+-- # Assistant takes its history with it — except the mode mapping, which    #
+-- # names routines by their Home Assistant id and survives a relink.         #
+-- # Written by src-tauri/src/home/history.rs.                                #
+-- ###########################################################################
+
+-- One row per mirrored device: what the bridge says beyond `value`.
+CREATE TABLE IF NOT EXISTS home_device_detail (
+  device_id     TEXT PRIMARY KEY REFERENCES home_devices(id) ON DELETE CASCADE,
+  user_id       TEXT NOT NULL,
+  -- The Home Assistant domain (`climate`, `water_heater`, `sensor`). It is
+  -- what keeps a water heater's 55° out of the inside temperature.
+  domain        TEXT NOT NULL,
+  device_class  TEXT,
+  unit          TEXT,
+  state_class   TEXT,
+  -- What a thermostat is SET to. NULL is "the bridge did not say" (a
+  -- thermostat that is off, a heat-cool range) — never 0.
+  target        REAL,
+  -- The climate entity's own word for what it is doing: heating, idle, off.
+  hvac_action   TEXT,
+  -- The Home Assistant device the entity belongs to: files a plug's power
+  -- sensor under the plug, a doorbell's motion sensor under the camera.
+  hub_device_id TEXT,
+  -- grid | solar | device, from Home Assistant's Energy dashboard.
+  energy_role   TEXT,
+  updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+-- Home Assistant's machinery: read, never drawn as a device.
+CREATE TABLE IF NOT EXISTS home_hub_entities (
+  id             TEXT PRIMARY KEY,
+  user_id        TEXT NOT NULL,
+  bridge_id      TEXT NOT NULL REFERENCES home_bridges(id) ON DELETE CASCADE,
+  external_id    TEXT NOT NULL,
+  domain         TEXT NOT NULL CHECK (domain IN ('automation','script','person','device_tracker')),
+  label          TEXT NOT NULL,
+  -- The raw state word: on/off, home/not_home or a zone's name.
+  state          TEXT,
+  available      INTEGER NOT NULL DEFAULT 1 CHECK (available IN (0,1)),
+  -- For a script: 0 only when Atlas read its config and found no lock in it.
+  -- DEFAULT 1 for the same reason as home_scenes.touches_locks.
+  touches_locks  INTEGER NOT NULL DEFAULT 1 CHECK (touches_locks IN (0,1)),
+  last_changed   TEXT,
+  last_triggered TEXT,
+  created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_home_hub_entities_bridge_ext ON home_hub_entities(bridge_id, external_id);
+CREATE INDEX IF NOT EXISTS idx_home_hub_entities_user ON home_hub_entities(user_id, domain, label);
+
+-- What the mirror saw the devices do, and what Atlas told them to do.
+-- Capped: rows older than 30 days are pruned, and each account keeps at most
+-- 20 000 (home/history.rs, `prune_events`). Measurements (sensor.*) are never
+-- recorded — the energy card reads Home Assistant's own statistics instead.
+CREATE TABLE IF NOT EXISTS home_events (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id      TEXT NOT NULL,
+  bridge_id    TEXT NOT NULL REFERENCES home_bridges(id) ON DELETE CASCADE,
+  -- The entity id. Not the local device id: the history outlives a device
+  -- being re-created by a sync, and a scene or automation has no device row.
+  external_id  TEXT NOT NULL,
+  -- `state`: the bridge reported a change. `command`: Atlas sent one.
+  kind         TEXT NOT NULL CHECK (kind IN ('state','command')),
+  value        REAL,
+  state        TEXT,
+  available    INTEGER CHECK (available IN (0,1)),
+  -- For a command, the verb ("lock", "turn_off", "set"); NULL for a state.
+  detail       TEXT,
+  at           TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_home_events_entity ON home_events(user_id, external_id, at);
+CREATE INDEX IF NOT EXISTS idx_home_events_at ON home_events(user_id, at);
+
+-- Home / Away / Night, each mapped by the user to a scene or a script.
+CREATE TABLE IF NOT EXISTS home_modes (
+  user_id              TEXT NOT NULL,
+  mode                 TEXT NOT NULL CHECK (mode IN ('home','away','night')),
+  routine_kind         TEXT CHECK (routine_kind IN ('scene','script')),
+  routine_external_id  TEXT,
+  routine_label        TEXT,
+  updated_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  PRIMARY KEY (user_id, mode)
+);
+
+-- The mode the house is in, as far as Atlas set it. One row per account.
+CREATE TABLE IF NOT EXISTS home_mode_state (
+  user_id    TEXT PRIMARY KEY,
+  mode       TEXT NOT NULL CHECK (mode IN ('home','away','night')),
+  since      TEXT NOT NULL
+);
+
+-- ###########################################################################
+-- # SMART HOME, THE BETA EXTRAS — end.                                       #
+-- ###########################################################################
