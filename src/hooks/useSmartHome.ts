@@ -71,6 +71,13 @@ export const HOME_COMMANDS = {
   setAutonomy: 'home_set_autonomy',
   liveStart: 'home_live_start',
   liveStop: 'home_live_stop',
+  // The Beta extras (src-tauri/src/home/beta.rs).
+  history: 'home_history',
+  energyToday: 'home_energy_today',
+  cameraStill: 'home_camera_still',
+  automationSet: 'home_automation_set',
+  modeMap: 'home_mode_map',
+  modeSet: 'home_mode_set',
 } as const;
 
 export type InvokeFn = <T = unknown>(cmd: string, args: Record<string, unknown>) => Promise<T>;
@@ -110,6 +117,71 @@ export interface LiveDevice extends SmartDevice {
   pending: OverlayPhase | null;
   /** Why the last actuation for this device did not happen, in Rust's words. */
   note: DeviceNote | null;
+  // ── The Beta extras (home_device_detail). Each is absent or null when the
+  // bridge did not say — a thermostat with no target is not set to 0°. ──
+  /** The Home Assistant domain: `climate`, `water_heater`, `binary_sensor`… */
+  domain?: string | null;
+  deviceClass?: string | null;
+  unit?: string | null;
+  /** What a thermostat or water heater is SET to. `value` stays the reading. */
+  target?: number | null;
+  /** `heating`, `cooling`, `idle`, `off` — the thermostat's own word. */
+  hvacAction?: string | null;
+  /** The Home Assistant device this entity belongs to. */
+  hubDeviceId?: string | null;
+  /** `grid` | `solar` | `device`, from Home Assistant's Energy dashboard. */
+  energyRole?: string | null;
+  /** The raw ISO of the last state change ("Locked at 08:31"). */
+  lastChangedAt?: string | null;
+}
+
+/** One Home Assistant automation, with the switch the Beta screen draws. */
+export interface LiveAutomation {
+  id: string;
+  externalId: string;
+  label: string;
+  on: boolean;
+  available: boolean;
+  lastTriggered: string | null;
+}
+
+/** One script, and whether Atlas may run it (it reaches no lock). */
+export interface LiveScript {
+  id: string;
+  externalId: string;
+  label: string;
+  runnable: boolean;
+  available: boolean;
+}
+
+/** A person (or a phone's GPS tracker) and where Home Assistant says they are. */
+export interface LivePerson {
+  id: string;
+  name: string;
+  kind: 'person' | 'device_tracker';
+  /** `home`, `not_home`, or a zone's name. */
+  state: string | null;
+  available: boolean;
+  lastChanged: string | null;
+}
+
+export type HomeMode = 'home' | 'away' | 'night';
+export const HOME_MODES: readonly HomeMode[] = ['home', 'away', 'night'];
+
+/** What one mode runs. `routineId` is null when the bridge no longer reports it. */
+export interface ModeRoutine {
+  mode: HomeMode;
+  kind: 'scene' | 'script' | null;
+  externalId: string | null;
+  label: string | null;
+  routineId: string | null;
+  runnable: boolean | null;
+}
+
+export interface LiveModes {
+  current: HomeMode | null;
+  since: string | null;
+  map: ModeRoutine[];
 }
 
 export interface LiveRoom extends SmartRoom {
@@ -141,6 +213,10 @@ export interface LiveSnapshot extends SmartHomeSnapshot {
   /** "40 minutes ago", or null if Atlas has never completed a sync. */
   lastReachedLabel: string | null;
   counts: { devices: number; rooms: number; scenes: number; unavailable: number };
+  automations: LiveAutomation[];
+  scripts: LiveScript[];
+  presence: LivePerson[];
+  modes: LiveModes;
 }
 
 /** `bad` — it did not happen. `warn` — it may have; nobody has confirmed. */
@@ -155,6 +231,8 @@ export interface DeviceOverlay {
   phase: OverlayPhase;
   value?: number;
   colour?: string;
+  /** A thermostat's requested target: the stepper moves this, not the reading. */
+  target?: number;
 }
 
 export interface UseSmartHome extends SmartHomeState {
@@ -168,6 +246,14 @@ export interface UseSmartHome extends SmartHomeState {
   warning: string | null;
   /** The last scene Atlas applied. No bridge reports which scene is "on". */
   lastSceneRun: { id: string; label: string; at: number } | null;
+  /** Automations whose switch is in flight: id → the state asked for. */
+  automationPending: Record<string, boolean>;
+  /** The mode being switched to while its scene or script runs. */
+  modePending: HomeMode | null;
+  setAutomation(id: string, on: boolean): void;
+  /** Map a mode to a scene or script (a local id), or clear it with null. */
+  mapMode(mode: HomeMode, routineId: string | null): Promise<void>;
+  setMode(mode: HomeMode): void;
   refresh(): Promise<void>;
   linkHomeAssistant(baseUrl: string, token: string): Promise<void>;
   unlink(kind: string): Promise<void>;

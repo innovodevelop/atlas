@@ -23,6 +23,7 @@ use std::collections::HashMap;
 
 use serde_json::{json, Value};
 
+use super::extras::{self, DeviceDetail, HubEntityPull, PullExtras, Registry};
 use super::{BridgeInfo, BridgeKind, BridgePull, DevicePull, HomeAdapter, HomeError, RoomPull, ScenePull};
 use crate::home::ws::WsClient;
 
@@ -30,7 +31,7 @@ use crate::home::ws::WsClient;
 /// `person`, `sun`, `zone`, `update`, `input_*` — is skipped rather than shown
 /// as a nameless "sensor": those are Home Assistant's own machinery, and a
 /// device list that contains them is a debugging view, not a house.
-const RENDERED_DOMAINS: &[&str] = &[
+pub(crate) const RENDERED_DOMAINS: &[&str] = &[
     "light",
     "switch",
     "lock",
@@ -177,16 +178,192 @@ impl HomeAssistant {
         ))
     }
 
-    /// Rooms, and which entity is in which — the half REST cannot serve.
-    fn registry(&self) -> Result<(Vec<RoomPull>, HashMap<String, String>), HomeError> {
+    /// Rooms, which entity is in which room and on which device, the Energy
+    /// dashboard's roles, and the scripts' configs — the half REST cannot
+    /// serve, in one WebSocket session.
+    ///
+    /// Only the area and entity lists are required; they are what the room
+    /// map has always needed. The device registry, the energy preferences and
+    /// each script's config are extras, and a bridge that refuses one (no
+    /// Energy dashboard set up, a script it will not describe) costs that
+    /// extra, not the sync. A script whose config did not arrive is judged as
+    /// one that might touch a lock — `extras::hub_entity_from_state`.
+    fn hub_registry(&self, scripts: &[String]) -> Result<Registry, HomeError> {
         let mut ws = self.ws_connect()?;
         let areas = self.ws_call(&mut ws, 1, json!({ "id": 1, "type": "config/area_registry/list" }))?;
         let entities =
             self.ws_call(&mut ws, 2, json!({ "id": 2, "type": "config/entity_registry/list" }))?;
+        let devices = self
+            .ws_call(&mut ws, 3, json!({ "id": 3, "type": "config/device_registry/list" }))
+            .unwrap_or(Value::Null);
+        let prefs = self
+            .ws_call(&mut ws, 4, json!({ "id": 4, "type": "energy/get_prefs" }))
+            .unwrap_or(Value::Null);
+        let mut script_configs = HashMap::new();
+        for (i, id) in scripts.iter().filter(|id| extras::is_entity_id(id)).enumerate() {
+            let call_id = 5 + i as u64;
+            match self.ws_call(&mut ws, call_id, json!({ "id": call_id, "type": "script/config", "entity_id": id })) {
+                Ok(v) => {
+                    if !v["config"].is_null() {
+                        script_configs.insert(id.clone(), v["config"].clone());
+                    }
+                }
+                // A broken socket fails every call after it; stop asking.
+                Err(HomeError::Unreachable(_)) => break,
+                Err(_) => {}
+            }
+        }
         ws.close();
-        Ok(parse_registry(&areas, &entities))
+        let (rooms, area_of, device_of) = extras::parse_registry_full(&areas, &entities, &devices);
+        Ok(Registry { rooms, area_of, device_of, energy_roles: extras::energy_roles(&prefs), script_configs })
+    }
+
+    /// Everything the bridge knows, plus the extras the Beta screen reads.
+    ///
+    /// The states come FIRST now (they used to follow the registry): the
+    /// registry pass asks for each script's config, and only the states say
+    /// which scripts exist. A WebSocket failure still degrades to "devices
+    /// with no room" rather than to no sync.
+    pub fn pull_full(&self) -> Result<(BridgePull, PullExtras), HomeError> {
+        let states = self.get("/api/states")?;
+        if !states.is_array() {
+            return Err(HomeError::Malformed(
+                "the bridge's state list was not a list.".into(),
+            ));
+        }
+        let reg = match self.hub_registry(&extras::script_ids(&states)) {
+            Ok(r) => r,
+            Err(e) => {
+                log::warn!("[home] room registry unavailable, syncing without rooms: {e}");
+                Registry::default()
+            }
+        };
+        let (devices, scenes) = parse_states(&states, &reg.area_of);
+        let more = extras::parse_extras(&states, &reg, RENDERED_DOMAINS);
+        Ok((BridgePull { rooms: reg.rooms, devices, scenes }, more))
+    }
+
+    /// One entity's current state, for refreshing a row after a command.
+    pub fn state_of(&self, entity_id: &str) -> Result<Value, HomeError> {
+        if !extras::is_entity_id(entity_id) {
+            return Err(HomeError::Refused(format!("'{entity_id}' is not an entity id")));
+        }
+        self.get(&format!("/api/states/{entity_id}"))
+    }
+
+    /// Switch one automation on or off. `automation.turn_off` stops it running
+    /// on its triggers; it does not stop an automation already mid-run.
+    pub fn set_automation(&self, entity_id: &str, on: bool) -> Result<(), HomeError> {
+        if domain_of(entity_id) != "automation" || !extras::is_entity_id(entity_id) {
+            return Err(HomeError::Refused(format!("{entity_id} is not an automation.")));
+        }
+        self.service("automation", if on { "turn_on" } else { "turn_off" }, json!({ "entity_id": entity_id }))
+    }
+
+    /// Start one script. The caller has already checked it is one Atlas may run.
+    pub fn run_script(&self, entity_id: &str) -> Result<(), HomeError> {
+        if domain_of(entity_id) != "script" || !extras::is_entity_id(entity_id) {
+            return Err(HomeError::Refused(format!("{entity_id} is not a script.")));
+        }
+        self.service("script", "turn_on", json!({ "entity_id": entity_id }))
+    }
+
+    /// One still frame from a camera, through Home Assistant's camera proxy.
+    ///
+    /// The token stays here: the webview gets the image bytes, never a URL it
+    /// could load with a credential in it. Capped, because a camera that
+    /// answers with a stream instead of a frame must not fill memory.
+    pub fn camera_still(&self, entity_id: &str) -> Result<(Vec<u8>, String), HomeError> {
+        use std::io::Read as _;
+        if domain_of(entity_id) != "camera" || !extras::is_entity_id(entity_id) {
+            return Err(HomeError::Refused(format!("{entity_id} is not a camera.")));
+        }
+        let resp = crate::http::agent()
+            .get(&format!("{}/api/camera_proxy/{entity_id}", self.base_url))
+            .set("Authorization", &format!("Bearer {}", self.token))
+            .call()
+            .map_err(http_err)?;
+        let kind = resp.content_type().to_string();
+        if !kind.starts_with("image/") {
+            return Err(HomeError::Malformed("the camera answered with something that is not an image.".into()));
+        }
+        let mut bytes = Vec::new();
+        resp.into_reader()
+            .take(CAMERA_STILL_MAX_BYTES as u64 + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|_| HomeError::Unreachable("the camera stopped sending halfway through the image.".into()))?;
+        if bytes.len() > CAMERA_STILL_MAX_BYTES {
+            return Err(HomeError::Malformed("the camera's image is larger than Atlas will hold.".into()));
+        }
+        Ok((bytes, kind))
+    }
+
+    /// Today's energy per sensor, from Home Assistant's own long-term
+    /// statistics — the numbers its Energy dashboard shows.
+    ///
+    /// Statistics rather than raw history, for two reasons: a sensor that
+    /// resets at midnight and one that counts up forever both come back as the
+    /// change over the day, and the answer is one number per sensor rather
+    /// than every reading since midnight. `units` asks for kWh whatever the
+    /// sensor counts in. Returns, per id: the day's change (`None` when the
+    /// recorder keeps no statistics for it) and the raw hourly rows.
+    pub fn energy_today(
+        &self,
+        ids: &[String],
+        midnight_iso: &str,
+    ) -> Result<Vec<(String, Option<f64>, Value)>, HomeError> {
+        let ids: Vec<&String> = ids.iter().filter(|i| extras::is_entity_id(i)).collect();
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut ws = self.ws_connect()?;
+        let hourly = self
+            .ws_call(
+                &mut ws,
+                1,
+                json!({
+                    "id": 1,
+                    "type": "recorder/statistics_during_period",
+                    "start_time": midnight_iso,
+                    "statistic_ids": ids,
+                    "period": "hour",
+                    "types": ["change"],
+                    "units": { "energy": "kWh" },
+                }),
+            )
+            .unwrap_or(Value::Null);
+        let mut out = Vec::new();
+        for (i, id) in ids.iter().enumerate() {
+            let call_id = 2 + i as u64;
+            let change = match self.ws_call(
+                &mut ws,
+                call_id,
+                json!({
+                    "id": call_id,
+                    "type": "recorder/statistic_during_period",
+                    "statistic_id": id,
+                    "calendar": { "period": "day" },
+                    "types": ["change"],
+                    "units": { "energy": "kWh" },
+                }),
+            ) {
+                Ok(v) => extras::stat_change(&v),
+                Err(HomeError::Unreachable(m)) => {
+                    ws.close();
+                    return Err(HomeError::Unreachable(m));
+                }
+                Err(_) => None,
+            };
+            out.push(((*id).clone(), change, hourly[id.as_str()].clone()));
+        }
+        ws.close();
+        Ok(out)
     }
 }
+
+/// The largest still Atlas will accept from a camera. A 4K JPEG is a few
+/// megabytes; anything past this is not a still.
+pub const CAMERA_STILL_MAX_BYTES: usize = 8 * 1024 * 1024;
 
 /// Split the two registry payloads into rooms and an entity→area index.
 pub fn parse_registry(areas: &Value, entities: &Value) -> (Vec<RoomPull>, HashMap<String, String>) {
@@ -609,24 +786,11 @@ impl HomeAdapter for HomeAssistant {
     }
 
     fn pull(&self) -> Result<BridgePull, HomeError> {
-        // Rooms first, and a failure here is survivable: `registry` needs the
-        // WebSocket, and a hub behind a proxy that only forwards HTTP still has
-        // devices worth showing. They land in "No room" and the sync succeeds.
-        let (rooms, areas) = match self.registry() {
-            Ok(pair) => pair,
-            Err(e) => {
-                log::warn!("[home] room registry unavailable, syncing without rooms: {e}");
-                (Vec::new(), HashMap::new())
-            }
-        };
-        let states = self.get("/api/states")?;
-        if !states.is_array() {
-            return Err(HomeError::Malformed(
-                "the bridge's state list was not a list.".into(),
-            ));
-        }
-        let (devices, scenes) = parse_states(&states, &areas);
-        Ok(BridgePull { rooms, devices, scenes })
+        // The registry pass is survivable: it needs the WebSocket, and a hub
+        // behind a proxy that only forwards HTTP still has devices worth
+        // showing. They land in "No room" and the sync succeeds. The extras
+        // ride along for `sync_bridge`, which calls `pull_full` directly.
+        self.pull_full().map(|(pull, _)| pull)
     }
 
     fn set_value(&self, external_id: &str, value: f64) -> Result<(), HomeError> {
@@ -704,6 +868,18 @@ pub struct PushedState {
     pub colour: Option<String>,
     pub available: bool,
     pub last_changed: Option<String>,
+    /// The attributes a push can change: a thermostat's target and action.
+    /// The registry facts in it (device, energy role) are empty on a push and
+    /// the store leaves the synced ones alone.
+    pub detail: DeviceDetail,
+}
+
+/// What the push channel hands its owner: a device's new state, or a hub
+/// entity's (an automation switched, a person came home).
+#[derive(Debug)]
+pub enum Push {
+    Device(PushedState),
+    Hub(HubEntityPull),
 }
 
 /// Reduce a `state_changed` event to a mirror update, or `None` when it is not
@@ -723,6 +899,7 @@ pub fn pushed_state(event: &Value) -> Option<PushedState> {
         colour: colour_of(attrs),
         available: is_available(state),
         last_changed: new_state["last_changed"].as_str().map(str::to_string),
+        detail: extras::detail_of(entity_id, attrs, &Registry::default()),
     })
 }
 
@@ -736,7 +913,7 @@ impl HomeAssistant {
     pub fn subscribe(
         &self,
         keep_going: &dyn Fn() -> bool,
-        on_state: &mut dyn FnMut(PushedState),
+        on_state: &mut dyn FnMut(Push),
     ) -> Result<(), HomeError> {
         let mut ws = self.ws_connect()?;
         ws.send_text(
@@ -759,7 +936,9 @@ impl HomeAssistant {
                         continue;
                     }
                     if let Some(update) = pushed_state(&msg) {
-                        on_state(update);
+                        on_state(Push::Device(update));
+                    } else if let Some(hub) = extras::pushed_hub_entity(&msg) {
+                        on_state(Push::Hub(hub));
                     }
                 }
                 // The read timeout is how this loop gets to re-check the stop

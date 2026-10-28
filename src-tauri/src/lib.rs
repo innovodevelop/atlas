@@ -593,6 +593,15 @@ pub fn run() {
       home::home_set_autonomy,
       home::home_live_start,
       home::home_live_stop,
+      // The Beta Smart Home's extras (home/beta.rs): history, today's energy,
+      // a camera still on request, automation switches, Home/Away/Night. None
+      // is on the control port — see the header of home/beta.rs.
+      home::beta::home_history,
+      home::beta::home_energy_today,
+      home::beta::home_camera_still,
+      home::beta::home_automation_set,
+      home::beta::home_mode_map,
+      home::beta::home_mode_set,
       // HomeKit over the LAN, Lighthouse only. WITHOUT THESE TWO LINES the
       // HomeKit Lab screen is dead in the one build that compiles the feature:
       // Tauri answers an unregistered command with "Command
